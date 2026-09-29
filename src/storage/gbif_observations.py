@@ -74,6 +74,11 @@ def _obs_to_row(obs: GBIFObservation) -> dict[str, Any]:
         "dataset_key": obs.dataset_key,
         "rights_holder": obs.rights_holder,
         "recorded_by": obs.recorded_by,
+        "sampling_protocol": obs.sampling_protocol,
+        "event_id": obs.event_id,
+        "sampling_effort": obs.sampling_effort,
+        "sample_size_value": obs.sample_size_value,
+        "sample_size_unit": obs.sample_size_unit,
     }
 
 

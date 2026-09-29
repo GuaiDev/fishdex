@@ -156,6 +156,25 @@ def normalise_licence(uri: str | None) -> str | None:
     return None
 
 
+def _first_str(value: object) -> str | None:
+    """GBIF returns samplingProtocol as a string on some records and a list on
+    others. Keep the first entry rather than stringifying a list into the DB."""
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return str(value[0]) if value else None
+    return str(value)
+
+
+def _as_float(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _parse_observation(result: dict) -> GBIFObservation:
     lat = result["decimalLatitude"]
     lng = result["decimalLongitude"]
@@ -179,6 +198,14 @@ def _parse_observation(result: dict) -> GBIFObservation:
         dataset_key=result.get("datasetKey"),
         rights_holder=result.get("rightsHolder"),
         recorded_by=result.get("recordedBy"),
+        # Survey provenance. GBIF returns these on gear-based records and they
+        # used to be dropped here, which made a boat-electrofishing survey
+        # record indistinguishable from a phone photo once stored.
+        sampling_protocol=_first_str(result.get("samplingProtocol")),
+        event_id=result.get("eventID"),
+        sampling_effort=result.get("samplingEffort"),
+        sample_size_value=_as_float(result.get("sampleSizeValue")),
+        sample_size_unit=result.get("sampleSizeUnit"),
     )
 
 

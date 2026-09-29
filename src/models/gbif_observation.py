@@ -37,3 +37,31 @@ class GBIFObservation(BaseModel):
 
     rights_holder: str | None = None
     recorded_by: str | None = None
+
+    # ── survey provenance ─────────────────────────────────────────────────────
+    # What separates a standardised survey from somebody's phone photo. GBIF
+    # returns these and they were previously dropped at parse, so a boat
+    # electrofishing record from a fisheries survey landed in the corpus
+    # indistinguishable from a casual iNaturalist upload. They are the fields
+    # that let a model weight effort-based records above opportunistic ones —
+    # and the only route to a real absence, which presence-only data cannot
+    # produce at all.
+    sampling_protocol: str | None = None
+    """Gear or method, verbatim from GBIF — e.g. "boat electrofisher", "seine",
+    "fyke net". A GBIF-indexed facet, so it is also queryable upstream.
+    None means the publisher did not state one, NOT that no gear was used."""
+
+    event_id: str | None = None
+    """Identifier of the sampling event this record belongs to. Records sharing
+    an event_id were collected together, which is what makes effort-corrected
+    absence inference possible."""
+
+    sampling_effort: str | None = None
+    """Free-text effort description as published — e.g. "20 minutes", "3 passes".
+    Unstructured by design upstream; kept verbatim rather than parsed into a
+    number we would be inventing."""
+
+    sample_size_value: float | None = None
+    sample_size_unit: str | None = None
+    """Structured effort where the publisher supplied it, e.g. 100.0 / "metre".
+    Kept as a value+unit pair because the unit is not assumable."""

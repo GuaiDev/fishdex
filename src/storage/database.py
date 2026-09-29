@@ -42,6 +42,7 @@ def _apply_migrations(db: Database) -> None:
     migrate_observations_source(db)
     migrate_observations_licensing(db)
     migrate_gbif_licensing(db)
+    migrate_gbif_survey_provenance(db)
     migrate_species_status_provenance(db)
     migrate_regulation_chunks_zone_name(db)
     migrate_segment_synthesis_jurisdiction(db)
@@ -1237,6 +1238,35 @@ def migrate_gbif_licensing(db: Database) -> None:
         ("dataset_key", "TEXT"),
         ("rights_holder", "TEXT"),
         ("recorded_by", "TEXT"),
+    ):
+        if name not in cols:
+            try:
+                db.execute(f"ALTER TABLE gbif_observations ADD COLUMN {name} {coltype}")
+            except Exception:
+                pass
+    db.conn.commit()
+
+
+def migrate_gbif_survey_provenance(db: Database) -> None:
+    """Add survey-provenance columns to gbif_observations. Idempotent.
+
+    These fields arrive from GBIF on gear-based records (electrofishing, seine,
+    fyke net) and were previously discarded at parse, so a standardised survey
+    record was stored indistinguishably from a casual photo. Left NULL for
+    existing rows: absent is not the same as "no gear was used", and inventing
+    a value here would be inventing the survey.
+
+    Re-ingesting backfills them for records the adapter sees again.
+    """
+    if "gbif_observations" not in db.table_names():
+        return
+    cols = {c.name for c in db["gbif_observations"].columns}
+    for name, coltype in (
+        ("sampling_protocol", "TEXT"),
+        ("event_id", "TEXT"),
+        ("sampling_effort", "TEXT"),
+        ("sample_size_value", "REAL"),
+        ("sample_size_unit", "TEXT"),
     ):
         if name not in cols:
             try:
