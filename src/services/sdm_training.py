@@ -9,6 +9,7 @@ Train-flow:
 
 import logging
 from pathlib import Path
+from typing import NamedTuple
 
 import joblib
 import numpy as np
@@ -288,7 +289,9 @@ def train_species_model(
     """Train a calibrated Random Forest SDM for one species.
 
     Returns a dict with:
-      species, n_presence, n_pseudo_absence, spatial_cv_auc,
+      species, n_presence, n_pseudo_absence, spatial_cv_auc (None if
+      unvalidated), spatial_cv_folds_used, spatial_cv_skipped,
+      spatial_cv_note,
       feature_importances, n_inat, n_gbif, model (CalibratedClassifierCV)
     """
     X_pres, y_pres = prepare_species_data(species_name, db, feature_matrix)
@@ -309,8 +312,9 @@ def train_species_model(
     X_all = pd.concat([X_pres, X_abs])
     y_all = pd.concat([y_pres, y_abs]).values
 
-    # Spatial block CV for AUC estimate
-    spatial_cv_auc = _spatial_block_cv(X_all, y_all, X_all.index.tolist(), feature_matrix)
+    # Spatial block CV for AUC estimate. None when no fold was usable — the
+    # caller must be able to tell "unvalidated" from "scored 0.5".
+    cv = _spatial_block_cv(X_all, y_all, X_all.index.tolist(), feature_matrix)
 
     # Final calibrated model on all data
     base = _build_base_pipeline()
@@ -329,7 +333,10 @@ def train_species_model(
         "species": species_name,
         "n_presence": n_presence,
         "n_pseudo_absence": len(absence_ogf_ids),
-        "spatial_cv_auc": float(spatial_cv_auc),
+        "spatial_cv_auc": None if cv.auc is None else float(cv.auc),
+        "spatial_cv_folds_used": cv.folds_used,
+        "spatial_cv_skipped": dict(cv.skipped),
+        "spatial_cv_note": cv.describe(),
         "feature_importances": _importances_from_pipeline(base_for_imp),
         "n_inat": n_inat,
         "n_gbif": n_gbif,
@@ -430,18 +437,55 @@ def _build_base_pipeline() -> Pipeline:
     )
 
 
+class SpatialCVResult(NamedTuple):
+    """Outcome of spatial block CV, with the reason when it could not be scored.
+
+    `auc` is None when no fold was usable. That is a different fact from a model
+    that scored 0.5, and it used to be reported identically: the old version
+    returned a bare `0.5` both for "genuinely no better than chance" and for
+    "nothing could be evaluated". A caller could not tell them apart, and a run
+    with every fold skipped read as a plausible-looking score.
+    """
+
+    auc: float | None
+    folds_used: int
+    skipped: dict[str, int]
+
+    @property
+    def evaluable(self) -> bool:
+        return self.auc is not None
+
+    def describe(self) -> str:
+        if self.evaluable:
+            return f"{self.auc:.4f} over {self.folds_used}/4 spatial folds"
+        parts = ", ".join(f"{k}={v}" for k, v in sorted(self.skipped.items()))
+        return f"not evaluable (0/4 folds usable: {parts or 'no folds attempted'})"
+
+
 def _spatial_block_cv(
     X: pd.DataFrame,
     y: np.ndarray,
     ogf_ids: list[int],
     feature_matrix: pd.DataFrame,
-) -> float:
-    """4-fold spatial block CV using NW/NE/SW/SE quadrants of the training bounding box."""
+) -> SpatialCVResult:
+    """4-fold spatial block CV using NW/NE/SW/SE quadrants of the training bounding box.
+
+    Every skip is counted and returned. A fold is unusable when either side of
+    the split is too small or single-class — including the TRAIN side, which the
+    first version did not check. Fitting on one class yields constant
+    predictions and an AUC of exactly 0.5, which is arithmetically real and
+    methodologically meaningless; it looked like a measurement.
+    """
+    skipped: dict[str, int] = {}
+
+    def skip(reason: str) -> None:
+        skipped[reason] = skipped.get(reason, 0) + 1
+
     fm_idx = feature_matrix.set_index("ogf_id")[["centroid_lat", "centroid_lng"]]
     try:
         coords = fm_idx.loc[ogf_ids]
     except KeyError:
-        return 0.5
+        return SpatialCVResult(None, 0, {"ogf_ids_not_in_feature_matrix": len(ogf_ids)})
 
     lats = coords["centroid_lat"].values
     lngs = coords["centroid_lng"].values
@@ -459,9 +503,25 @@ def _spatial_block_cv(
     for fold in range(4):
         test_mask = quadrants == fold
         train_mask = ~test_mask
-        if test_mask.sum() < 5 or train_mask.sum() < 10:
+        if test_mask.sum() < 5:
+            skip("test_fold_too_small")
             continue
-        if y[test_mask].sum() == 0 or (1.0 - y[test_mask]).sum() == 0:
+        if train_mask.sum() < 10:
+            skip("train_fold_too_small")
+            continue
+        if y[test_mask].sum() == 0:
+            skip("no_presences_in_test")
+            continue
+        if (1.0 - y[test_mask]).sum() == 0:
+            skip("no_absences_in_test")
+            continue
+        # Single-class TRAIN side: the fit degenerates to a constant prediction
+        # and roc_auc_score returns exactly 0.5. Previously unchecked.
+        if y[train_mask].sum() == 0:
+            skip("no_presences_in_train")
+            continue
+        if (1.0 - y[train_mask]).sum() == 0:
+            skip("no_absences_in_train")
             continue
         try:
             pipe = _build_base_pipeline()
@@ -469,9 +529,24 @@ def _spatial_block_cv(
             proba = pipe.predict_proba(X.iloc[test_mask])[:, 1]
             aucs.append(float(roc_auc_score(y[test_mask], proba)))
         except Exception as exc:
+            skip("fold_raised")
             logger.debug("Spatial CV fold %d failed: %s", fold, exc)
 
-    return float(np.mean(aucs)) if aucs else 0.5
+    if not aucs:
+        logger.warning(
+            "Spatial CV could not be evaluated: 0 of 4 folds usable (%s). "
+            "AUC is unavailable, not 0.5 — the model is unvalidated.",
+            ", ".join(f"{k}={v}" for k, v in sorted(skipped.items())) or "no folds attempted",
+        )
+        return SpatialCVResult(None, 0, skipped)
+
+    if skipped:
+        logger.warning(
+            "Spatial CV scored on %d of 4 folds (%s) — AUC rests on a partial split.",
+            len(aucs),
+            ", ".join(f"{k}={v}" for k, v in sorted(skipped.items())),
+        )
+    return SpatialCVResult(float(np.mean(aucs)), len(aucs), skipped)
 
 
 def _importances_from_pipeline(pipeline: Pipeline) -> dict[str, float]:

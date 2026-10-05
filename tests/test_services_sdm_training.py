@@ -27,8 +27,22 @@ _N = 80  # number of synthetic segments
 
 def _make_features(n: int = _N, seed: int = 0) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
-    lats = np.linspace(43.2, 44.8, n)
-    lngs = np.linspace(-80.5, -78.5, n)
+    # Segments are laid out on a snaking 2D grid, not a straight diagonal.
+    # A diagonal made both coordinates increase together, so quadrant-based
+    # spatial block CV only ever populated two of four quadrants and every
+    # fold was skipped — the smoke tests were passing on the old 0.5 sentinel
+    # rather than on a scored model. The snake keeps consecutive indices
+    # spatially adjacent, which the _coords_at-based tests rely on, while
+    # filling all four quadrants.
+    cols = int(np.ceil(np.sqrt(n)))
+    rows = int(np.ceil(n / cols))
+    idx = np.arange(n)
+    row_of = idx // cols
+    col_in_row = idx % cols
+    # reverse every other row so index n and n+1 stay neighbours
+    col_of = np.where(row_of % 2 == 0, col_in_row, cols - 1 - col_in_row)
+    lats = 43.2 + (row_of / max(rows - 1, 1)) * 1.6
+    lngs = -80.5 + (col_of / max(cols - 1, 1)) * 2.0
 
     summer_temp = np.full(n, np.nan)
     summer_temp[:10] = rng.uniform(10, 22, 10)
@@ -340,8 +354,13 @@ def test_train_species_model_smoke(tmp_path: Path):
     assert result["species"] == "Semotilus atromaculatus"
     assert result["n_presence"] >= 5
     assert result["n_pseudo_absence"] > 0
-    assert isinstance(result["spatial_cv_auc"], float)
-    assert 0.0 <= result["spatial_cv_auc"] <= 1.0
+    # None is a legitimate outcome (no usable spatial fold) and must not be
+    # confused with a score; whichever it is, the note has to agree.
+    auc = result["spatial_cv_auc"]
+    assert auc is None or isinstance(auc, float)
+    if auc is not None:
+        assert 0.0 <= auc <= 1.0
+    assert (auc is None) == ("not evaluable" in result["spatial_cv_note"])
     assert "model" in result
 
 
@@ -352,7 +371,9 @@ def test_train_species_model_auc_returned(tmp_path: Path):
     result = train_species_model("Perca flavescens", db, df)
 
     assert "spatial_cv_auc" in result
-    assert isinstance(result["spatial_cv_auc"], float)
+    auc = result["spatial_cv_auc"]
+    assert auc is None or isinstance(auc, float)
+    assert result["spatial_cv_folds_used"] >= 0
 
 
 def test_train_species_model_feature_importances_sum_to_one(tmp_path: Path):
@@ -479,3 +500,93 @@ def test_calibrated_probabilities_are_monotonic_in_the_raw_score(tmp_path: Path)
 
     rho, _ = spearmanr(raw, calibrated)
     assert rho > 0.0, f"Calibration inverted the ranking (Spearman {rho:.3f})"
+
+
+# ── spatial CV: unvalidated must not read as a score ──────────────────────────
+
+
+def test_spatial_cv_returns_none_not_half_when_no_fold_is_usable():
+    """The regression this guards.
+
+    _spatial_block_cv used to return a bare 0.5 both for "genuinely chance"
+    and for "nothing could be evaluated". A survey-absence experiment reported
+    0.5000 and was nearly written up as "true absences perform worse"; every
+    fold had in fact been skipped.
+    """
+    from src.services.sdm_training import _spatial_block_cv
+
+    df = _make_features(n=40)
+    # all one class -> every fold fails the presence/absence checks
+    from src.services.sdm_training import _extract_features
+
+    X = _extract_features(df)
+    y = np.ones(len(X))
+
+    res = _spatial_block_cv(X, y, X.index.tolist(), df)
+
+    assert res.auc is None, "unevaluable CV must not report a number"
+    assert res.evaluable is False
+    assert res.folds_used == 0
+    assert sum(res.skipped.values()) > 0, "skips must be counted, not swallowed"
+    assert "not evaluable" in res.describe()
+
+
+def test_spatial_cv_skips_single_class_training_fold():
+    """A fold whose TRAIN side is one class fits a constant and scores exactly
+    0.5. The first version checked only the test side, so this looked real."""
+    from src.services.sdm_training import _extract_features, _spatial_block_cv
+
+    df = _make_features(n=60)
+    X = _extract_features(df)
+    y = np.ones(len(X))
+
+    # Every absence in one quadrant, but leave some presences there too. The
+    # test side then holds both classes and passes its checks, while the train
+    # side (the other three quadrants) is all presence. That is the shape the
+    # survey-absence experiment hit: absences clustered in one region because
+    # only that region had been re-ingested.
+    lats, lngs = df["centroid_lat"].values, df["centroid_lng"].values
+    lat_mid = (lats.max() + lats.min()) / 2
+    lng_mid = (lngs.max() + lngs.min()) / 2
+    sw = np.flatnonzero((lats < lat_mid) & (lngs < lng_mid))
+    assert len(sw) >= 8, f"fixture must populate the SW quadrant, got {len(sw)}"
+    y[sw[: len(sw) - 3]] = 0.0  # keep 3 presences in SW so the test side is mixed
+
+    res = _spatial_block_cv(X, y, X.index.tolist(), df)
+
+    assert "no_absences_in_train" in res.skipped, (
+        f"single-class train fold not detected; skipped={res.skipped}"
+    )
+    assert res.auc is None, "a run with no usable fold must not report a score"
+
+
+def test_spatial_cv_reports_partial_evaluation():
+    """Scoring on some folds is fine, but the caller is told how many."""
+    from src.services.sdm_training import _extract_features, _spatial_block_cv
+
+    df = _make_features(n=80)
+    X = _extract_features(df)
+    rng = np.random.default_rng(3)
+    y = rng.integers(0, 2, len(X)).astype(float)
+
+    res = _spatial_block_cv(X, y, X.index.tolist(), df)
+
+    assert res.folds_used + sum(res.skipped.values()) <= 4
+    if res.evaluable:
+        assert 0.0 <= res.auc <= 1.0
+        assert f"{res.folds_used}/4" in res.describe()
+
+
+def test_train_species_model_carries_the_cv_reason(tmp_path: Path):
+    df = _make_features()
+    db = _setup_smoke_db(tmp_path, df, "Ambloplites rupestris")
+
+    result = train_species_model("Ambloplites rupestris", db, df)
+
+    assert "spatial_cv_folds_used" in result
+    assert "spatial_cv_skipped" in result
+    assert "spatial_cv_note" in result
+    auc = result["spatial_cv_auc"]
+    assert auc is None or isinstance(auc, float)
+    # the note and the value must agree about whether this was validated
+    assert (auc is None) == ("not evaluable" in result["spatial_cv_note"])

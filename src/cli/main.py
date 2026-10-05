@@ -595,7 +595,10 @@ def train_sdm() -> None:
             save_model(result)
 
             elapsed = time.time() - t0
-            auc_str = f"{result['spatial_cv_auc']:.3f}"
+            # None means spatial CV had no usable fold — the model is
+            # unvalidated, which must not render as a number.
+            _auc = result.get("spatial_cv_auc")
+            auc_str = f"{_auc:.3f}" if _auc is not None else "[yellow]unvalidated[/yellow]"
             results_table.add_row(
                 species,
                 str(result["n_presence"]),
