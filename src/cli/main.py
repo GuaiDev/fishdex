@@ -2,6 +2,7 @@
 
 from datetime import date as date_type
 
+import truststore
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -14,6 +15,18 @@ from src.models.trip import Trip
 from src.storage.database import get_db
 from src.storage.profile import load_profile, save_profile
 from src.storage.trips import insert_trip, recent_trips
+
+# Verify TLS against the OS trust store rather than certifi's bundle. A machine
+# running TLS-inspecting software — a corporate proxy, or consumer antivirus
+# such as Norton Web Shield — re-signs HTTPS with a private root that lives in
+# the OS store and is not, and should not be, in certifi. Without this every
+# network adapter fails with CERTIFICATE_VERIFY_FAILED while curl and git work
+# fine, which reads as a dead API rather than a local trust problem.
+#
+# Verification is preserved; only the set of trusted roots changes. It patches
+# SSLContext creation, so running it here — after the imports, before any
+# client is constructed — is early enough.
+truststore.inject_into_ssl()
 
 app = typer.Typer(name="fishbot", help="Personal fishing exploration bot.")
 console = Console()
@@ -1285,6 +1298,89 @@ def _print_profile(p: UserProfile) -> None:
     if p.budget is not None:
         body_lines.append(f"Annual budget: ${p.budget}")
     console.print(Panel("\n".join(body_lines), title="Profile", border_style="cyan"))
+
+
+@app.command(name="ingest-trca")
+def ingest_trca() -> None:
+    """Ingest TRCA fish community survey data (abundance + sampling events)."""
+    import importlib
+
+    from src.storage.fish_surveys import upsert_fish_surveys
+
+    trca = importlib.import_module("src.ingest.jurisdictions.ca_on.trca_surveys")
+    url = trca.resolve_csv_url()
+    if not url:
+        console.print("[red]Could not resolve the TRCA fish community CSV.[/red]")
+        console.print("[dim]Run with -v: discovery logs the available resource names.[/dim]")
+        raise typer.Exit(1)
+
+    path = trca.download_survey_csv(url)
+    if path is None:
+        console.print("[red]Download failed.[/red]")
+        raise typer.Exit(1)
+
+    records = trca.parse_survey_records(path, source_url=url)
+    db = get_db()
+    written = upsert_fish_surveys(db, records)
+
+    n_events = db.execute(
+        "SELECT COUNT(*) FROM (SELECT 1 FROM fish_surveys GROUP BY station_name, visit_date)"
+    ).fetchone()[0]
+
+    table = Table(title="TRCA fish community survey")
+    table.add_column("metric")
+    table.add_column("value", justify="right")
+    table.add_row("records parsed", str(len(records)))
+    table.add_row("new rows written", str(written))
+    table.add_row("rows in table", str(db["fish_surveys"].count))
+    table.add_row("sampling events", str(n_events))
+    console.print(table)
+
+
+@app.command(name="harvest-ca")
+def harvest_ca() -> None:
+    """Probe Conservation Authority portals for publishable fish data.
+
+    Discovery only -- writes no records. Free to run on a schedule: plain HTTP,
+    no model calls. The report names any authority publishing fish data that has
+    no adapter yet, which is the only part needing a human.
+    """
+    import importlib
+
+    h = importlib.import_module("src.ingest.jurisdictions.ca_on.ca_harvest")
+    results = h.harvest()
+    path = h.write_report(results)
+
+    counts: dict[str, int] = {}
+    for r in results:
+        counts[r.status] = counts.get(r.status, 0) + 1
+
+    meanings = {
+        "adapted": "adapter exists",
+        "catalogue_found": "catalogue responds, not yet adapted",
+        "no_catalogue": "site up, no machine-readable index",
+        "needs_url": "[yellow]unchecked[/yellow] - no website recorded",
+    }
+    table = Table(title="Conservation Authority portal harvest")
+    table.add_column("status")
+    table.add_column("count", justify="right")
+    table.add_column("meaning")
+    for status, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+        table.add_row(status, str(n), meanings.get(status, ""))
+    console.print(table)
+
+    actionable = [r for r in results if r.status == "catalogue_found" and r.fish_datasets]
+    if actionable:
+        console.print()
+        console.print("[green]Publishes fish data, no adapter yet:[/green]")
+        for r in actionable:
+            console.print(f"  {r.name}")
+            for d in r.fish_datasets[:5]:
+                console.print(f"    [dim]{d}[/dim]")
+    else:
+        console.print()
+        console.print("[dim]No newly adaptable sources found.[/dim]")
+    console.print(f"[dim]Report: {path}[/dim]")
 
 
 if __name__ == "__main__":

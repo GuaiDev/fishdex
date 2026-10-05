@@ -35,3 +35,8 @@ __pycache__/
 .claude/
 .github/hooks/
 .github/skills/
+
+# Generated discovery output. The registry it reads (data/registry/ca_portals.json)
+# IS committed — that is config. This is the report, which is a fact about one
+# moment and regenerated for free by `make harvest-ca`.
+data/processed/ca_harvest_report.json

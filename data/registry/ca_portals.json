@@ -1,0 +1,323 @@
+{
+  "schema_version": 1,
+  "purpose": "Where each Ontario Conservation Authority publishes data, if anywhere. Conservation Authorities run the fish community surveys (OSAP electrofishing) that are the only realistic source of systematic abundance and true-absence data, since MNRF's own records are locked in fishnetv3. This file is config, not code: adding a portal is a one-line edit, so expanding Ontario coverage does not require writing an adapter until a catalogue is actually found to hold fish data.",
+  "status_values": {
+    "adapted": "a catalogue was found, holds fish data, and an adapter exists",
+    "catalogue_found": "machine-readable catalogue responds; not yet adapted",
+    "needs_probe": "website known, catalogue not yet located — harvester will try",
+    "needs_url": "no website recorded; cannot be probed until one is added"
+  },
+  "authorities": [
+    {
+      "name": "Ausable Bayfield Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Cataraqui Region Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Catfish Creek Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Central Lake Ontario Conservation",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Conservation Halton",
+      "website": "https://conservationhalton.ca",
+      "portals": [],
+      "adapter": null,
+      "status": "needs_probe",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Conservation Sudbury",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Credit Valley Conservation",
+      "website": "https://cvc.ca",
+      "portals": [],
+      "adapter": null,
+      "status": "needs_probe",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Crowe Valley Conservation",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Essex Region Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Ganaraska Region Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Grand River Conservation Authority",
+      "website": "https://grandriver.ca",
+      "portals": [],
+      "adapter": null,
+      "status": "needs_probe",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Grey Sauble Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Hamilton Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Kawartha Conservation",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Kettle Creek Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Lake Simcoe Region Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Long Point Region Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Lower Thames Valley Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Lower Trent Conservation",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Maitland Valley Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Mattagami Region Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Mississippi Valley Conservation",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Niagara Peninsula Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "North Bay-Mattawa Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Nottawasaga Valley Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Otonabee Conservation",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Quinte Conservation",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Raisin Region Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Rideau Valley Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Saugeen Conservation",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "South Nation Conservation",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "St. Clair Region Conservation Authority",
+      "website": null,
+      "portals": [],
+      "adapter": null,
+      "status": "needs_url",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Toronto and Region Conservation Authority",
+      "website": "https://trca.ca",
+      "portals": [
+        {
+          "kind": "ckan",
+          "url": "https://data.trca.ca"
+        }
+      ],
+      "adapter": "src/ingest/jurisdictions/ca_on/trca_surveys.py",
+      "status": "adapted",
+      "last_checked": null,
+      "notes": null
+    },
+    {
+      "name": "Upper Thames River Conservation Authority",
+      "website": "https://thamesriver.on.ca",
+      "portals": [],
+      "adapter": null,
+      "status": "needs_probe",
+      "last_checked": null,
+      "notes": null
+    }
+  ]
+}
