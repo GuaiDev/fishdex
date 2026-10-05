@@ -5,6 +5,7 @@ No model accuracy assertions — outputs are data-dependent.
 """
 
 import json
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -590,3 +591,60 @@ def test_train_species_model_carries_the_cv_reason(tmp_path: Path):
     assert auc is None or isinstance(auc, float)
     # the note and the value must agree about whether this was validated
     assert (auc is None) == ("not evaluable" in result["spatial_cv_note"])
+
+
+# ── feature-set drift must not predict silently ───────────────────────────────
+
+
+def test_model_records_the_feature_set_it_was_trained_on(tmp_path: Path):
+    df = _make_features()
+    db = _setup_smoke_db(tmp_path, df, "Culaea inconstans")
+
+    result = train_species_model("Culaea inconstans", db, df)
+
+    assert result["features"] == list(_ALL_FEATURES)
+
+
+def test_predict_refuses_a_model_trained_on_other_features(tmp_path: Path):
+    """The regression this guards.
+
+    Nine models sat on disk trained with length_m in the feature set. Removing
+    it from _ALL_FEATURES would have fed them columns they were never fitted
+    on, and nothing recorded the feature list, so the mismatch was undetectable
+    -- an obscure sklearn error at best, a confident wrong float at worst.
+    """
+    from src.services.sdm_training import predict_all_segments
+
+    df = _make_features()
+    db = _setup_smoke_db(tmp_path, df, "Etheostoma caeruleum")
+    result = train_species_model("Etheostoma caeruleum", db, df)
+
+    # a model from before the change: trained with one extra feature
+    result["features"] = [*_ALL_FEATURES, "length_m"]
+
+    with pytest.raises(ValueError, match="trained on"):
+        predict_all_segments(result, df)
+
+
+def test_predict_warns_on_a_model_with_no_feature_record(tmp_path: Path, caplog):
+    """Models saved before feature tracking cannot be checked. That is a third
+    state -- not verified, not known-bad -- and it is said out loud."""
+    from src.services.sdm_training import predict_all_segments
+
+    df = _make_features()
+    db = _setup_smoke_db(tmp_path, df, "Perca flavescens")
+    result = train_species_model("Perca flavescens", db, df)
+    result.pop("features")
+
+    with caplog.at_level(logging.WARNING):
+        preds = predict_all_segments(result, df)
+
+    assert len(preds) == len(df)
+    assert "predates feature-set tracking" in caplog.text
+
+
+def test_length_m_is_not_a_model_input():
+    """Segment length is a mapping artifact, not habitat. Measured: removing it
+    took walleye from 0.6082 to 0.6489 spatial-CV AUC and left smallmouth
+    unchanged. It stays in the parquet; it is not a feature."""
+    assert "length_m" not in _ALL_FEATURES

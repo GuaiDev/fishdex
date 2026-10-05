@@ -59,7 +59,14 @@ _CATEGORICAL_FEATURES = ["substrate_category", "thermal_regime", "ept_quality"]
 _NUMERIC_FEATURES = [
     # Stream geometry
     "stream_order",
-    "length_m",
+    # length_m deliberately excluded. It is how OHN happened to cut the river
+    # into pieces -- a mapping artifact with no ecological meaning -- and it
+    # ranked SECOND of 16 features at ~0.20 importance, so a fifth of the
+    # model's attention went on bookkeeping. Measured with spatial block CV:
+    # walleye 0.6082 -> 0.6489 without it, smallmouth 0.5910 -> 0.5921.
+    # Better for one species, neutral for the other, and principled either way.
+    # The column remains in the feature-matrix parquet; it is simply not a
+    # model input.
     "flow_verified",
     # Thermal / water quality
     "summer_mean_temp_c",
@@ -333,6 +340,9 @@ def train_species_model(
         "species": species_name,
         "n_presence": n_presence,
         "n_pseudo_absence": len(absence_ogf_ids),
+        # The exact feature set this model was fitted on, so predict can refuse
+        # a stale model instead of scoring against the wrong columns.
+        "features": list(_ALL_FEATURES),
         "spatial_cv_auc": None if cv.auc is None else float(cv.auc),
         "spatial_cv_folds_used": cv.folds_used,
         "spatial_cv_skipped": dict(cv.skipped),
@@ -349,7 +359,35 @@ def predict_all_segments(
     model_result: dict,
     feature_matrix: pd.DataFrame,
 ) -> pd.Series:
-    """Run model on all segments. Returns Series[ogf_id → probability 0.0–1.0]."""
+    """Run model on all segments. Returns Series[ogf_id → probability 0.0–1.0].
+
+    Refuses to predict with a model trained on a different feature set. The
+    feature list used to live only in the module constant, so changing
+    _ALL_FEATURES silently invalidated every model already on disk: predict
+    would hand the pipeline columns it had never seen and either raise
+    something obscure from sklearn or, worse, score against the wrong columns.
+    A stale model is a wrong answer with a confident float attached, so it
+    fails loudly and names the remedy.
+    """
+    trained_on = model_result.get("features")
+    if trained_on is not None and list(trained_on) != list(_ALL_FEATURES):
+        missing = [f for f in trained_on if f not in _ALL_FEATURES]
+        added = [f for f in _ALL_FEATURES if f not in trained_on]
+        raise ValueError(
+            f"Model for {model_result.get('species', '?')} was trained on "
+            f"{len(trained_on)} features, the current set has {len(_ALL_FEATURES)}. "
+            f"No longer present: {missing or 'none'}. Newly added: {added or 'none'}. "
+            "Retrain with `fishbot train-sdm` — predicting across a feature change "
+            "would score against the wrong columns."
+        )
+    if trained_on is None:
+        logger.warning(
+            "Model for %s predates feature-set tracking, so it cannot be checked "
+            "against the current %d features. Retrain to remove the doubt.",
+            model_result.get("species", "?"),
+            len(_ALL_FEATURES),
+        )
+
     model = model_result["model"]
     X = feature_matrix.set_index("ogf_id")[_ALL_FEATURES].copy()
     _cast_bool_cols(X)
