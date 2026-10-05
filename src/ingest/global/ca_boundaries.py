@@ -10,6 +10,7 @@ REST service:
 
 import hashlib
 import json
+import logging
 import time
 from datetime import datetime
 from pathlib import Path
@@ -24,12 +25,26 @@ _CACHE_DIR = Path("data/cache/ca_boundaries")
 _CACHE_TTL_SECONDS = 2_592_000  # 30 days
 _USER_AGENT = "fishbot/1.0 (personal fishing exploration bot)"
 
+logger = logging.getLogger(__name__)
+
+_UNKNOWN_NAME = "Unknown CA"
+
+# The service publishes COMMON_NAME and LEGAL_NAME. Neither was in the original
+# candidate list, so every one of the 24 ingested rows silently became
+# "Unknown CA" — the brittle-label-matching failure class (see Known issues:
+# matching an exact published label rather than structure). COMMON_NAME first:
+# "Upper Thames River" is what a person calls it.
 _NAME_FIELD_CANDIDATES = [
+    "COMMON_NAME",
+    "LEGAL_NAME",
     "OFFICIAL_CONSERVATION_AUTHORITY_NAME",
     "CA_NAME",
     "AUTHORITY_NAME",
     "NAME",
 ]
+
+# Fields that contain "NAME" but are not the authority's name.
+_NAME_FIELD_EXCLUSIONS = ("FILE_NAME", "LAYER_NAME", "DATASET_NAME", "USER_NAME")
 
 
 def fetch_ca_boundaries_near(lat: float, lng: float, radius_km: float = 200.0) -> list[dict]:
@@ -56,10 +71,30 @@ def fetch_ca_boundaries_near(lat: float, lng: float, radius_km: float = 200.0) -
     features = _query_all_pages(xmin, ymin, xmax, ymax)
     now = datetime.now().isoformat()
     boundaries = []
+    n_unnamed = 0
     for feat in features:
         parsed = _parse_feature(feat, now)
+        if parsed is not None and parsed.get("name") == _UNKNOWN_NAME:
+            n_unnamed += 1
         if parsed is not None:
             boundaries.append(parsed)
+
+    # A placeholder name is indistinguishable from a real one once stored, and
+    # all 24 previously-ingested rows were "Unknown CA" with nothing saying so.
+    # A boundary whose authority cannot be named cannot route a point to the
+    # authority that surveys it, which is the only reason this layer exists.
+    if n_unnamed:
+        share = n_unnamed / len(boundaries) if boundaries else 1.0
+        emit = logger.warning if share >= 0.1 else logger.info
+        emit(
+            "CA boundaries: %d of %d polygons (%.0f%%) have no resolvable authority "
+            "name and were stored as %r. The service's name field has probably been "
+            "renamed — check the layer's field list against _NAME_FIELD_CANDIDATES.",
+            n_unnamed,
+            len(boundaries),
+            share * 100,
+            _UNKNOWN_NAME,
+        )
 
     cache_file.write_text(json.dumps(boundaries))
     return boundaries
@@ -123,7 +158,7 @@ def _parse_feature(feature: dict, fetched_at: str) -> dict | None:
     if not geom:
         return None
 
-    name = _resolve_field(props, _NAME_FIELD_CANDIDATES) or "Unknown CA"
+    name = _resolve_field(props, _NAME_FIELD_CANDIDATES) or _UNKNOWN_NAME
 
     ca_id = None
     for id_field in ("OBJECTID", "FID", "OBJECTID_1", "CA_ID"):
@@ -169,11 +204,30 @@ def _extract_rings(geom: dict) -> list[list[list[float]]] | None:
 
 
 def _resolve_field(props: dict, candidates: list[str]) -> str | None:
+    """Resolve a named field, by candidate list then by structure.
+
+    The structural pass exists because a published label can be renamed
+    upstream without notice, which is exactly how this adapter came to write
+    "Unknown CA" for every row. Any string field whose name contains NAME and
+    is not an obvious non-name field will do: a wrong-but-plausible name is
+    recoverable, a silent placeholder is not.
+    """
     props_upper = {k.upper(): v for k, v in props.items()}
     for candidate in candidates:
         val = props_upper.get(candidate.upper())
-        if val is not None:
-            return str(val)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+
+    for key, val in props_upper.items():
+        if "NAME" not in key or key in _NAME_FIELD_EXCLUSIONS:
+            continue
+        if isinstance(val, str) and val.strip():
+            logger.warning(
+                "CA boundaries: no candidate name field matched; fell back to "
+                "%r by structure. Add it to _NAME_FIELD_CANDIDATES.",
+                key,
+            )
+            return val.strip()
     return None
 
 

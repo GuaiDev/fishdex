@@ -80,6 +80,61 @@ Species requiring stocking exclusion (`STOCKING_CONFOUND_SPECIES` in `src/servic
 
 Non-salmonid species (Creek Chub, Yellow Perch, Rainbow Darter, etc.) are never stocked at scale in Ontario. Applying stocking exclusion to them incorrectly removes valid habitat observations at stocked sites (which are also real stream habitat). The `stocking_exclusion` parameter in `prepare_species_data()` is ignored for species outside this list.
 
+## The SDM is dormant, not a prediction layer (decided, do not relitigate)
+
+Measured 2026-10-05 with spatial block CV, after fixing that CV so an
+unevaluable run no longer reports 0.5 (see `SpatialCVResult`). Fourteen species,
+all near chance:
+
+| Narrow-niche specialists | pres | AUC | Generalists | pres | AUC |
+|---|---|---|---|---|---|
+| Iowa darter | 42 | 0.6018 | Creek chub | 459 | 0.6156 |
+| Least darter | 50 | 0.3361 | White sucker | 378 | 0.6157 |
+| Fantail darter | 128 | 0.3881 | Largemouth bass | 309 | 0.5667 |
+| Central mudminnow | 103 | 0.5591 | Rock bass | 312 | 0.5111 |
+| Stonecat | 129 | 0.4135 | | | |
+| **mean** | | **0.4597** | **mean** | | **0.5773** |
+
+The nine production species in `SPECIES_TO_TRAIN` span 0.41–0.62, mean ≈ 0.57.
+Best case anywhere is 0.62.
+
+**Why, and why more features will not fix it.** Presence is near-universal
+within the obvious habitat type — any Ontario creek probably holds creek chub,
+any lake holds some bass — so there is little for a habitat model to separate.
+The records are presence-only, so `generate_pseudo_absences` has to invent the
+negatives, and it draws them from the same observer-effort distribution as the
+presences. That is the presence-vs-pressure thesis applied to the model's own
+training data.
+
+**The niche hypothesis was tested and does not hold.** The intuition is that
+SDM should work for narrow-niche rarities (Iowa darter, least darter) even if
+it fails for generalists. Measured, specialists score *worse* — three of five
+below chance. Two mechanical reasons: rare species have few, spatially
+clustered records, so spatial blocking cannot form folds (least darter ran 2/4,
+stonecat and fantail 3/4); and the feature set is reach-scale (stream order,
+substrate category, mean temperature) while a darter's niche is vegetation and
+substrate at centimetre scale. The features cannot see the niche. This is "not
+with this data volume and this feature set", not a refutation of the ecology.
+
+**What this means for the product.** A model output will never be more credible
+than a record of someone catching a fish at that spot. The bot's job is
+retrieval and explanation, not prediction: say what is known, where it came
+from, and why the water looks the way it does. `Provenance` already ranks
+RECORD / WEB / INFERENCE; the survey fields on `gbif_observations`
+(`sampling_protocol`, `event_id`) extend that *inside* RECORD — a standardised
+electrofishing haul with known gear outranks a casual photo, and both outrank
+anything a model emits.
+
+**Status.** The pipeline stays — it is tested and the measurement is cheap to
+re-run. `sdm_predictions` stays empty and nothing in the context layer reads
+it. Re-open only if the inputs change in kind, not in volume: true absences
+from survey effort (see `event_id` grouping), or microhabitat-scale features.
+Do not re-open to add presence records or tune the feature list; that was tried.
+
+`length_m` was removed from `_NUMERIC_FEATURES` on principle (digitization
+artifact, was ranking 2nd at ~0.20 importance), **not** for accuracy: across
+nine species it is a wash, mean +0.0035, with two species meaningfully worse.
+
 ## Phase 2d: Untapped potential — access score coverage limitation
 
 Access scores (`src/services/accessibility.py`) are only meaningful within the OSM ingestion radius (~55km of home). The OHN stream network covers all of Ontario (309k segments), but access point data (roads, parking, buildings) is fetched for 25km around home. Segments outside this radius receive a neutral baseline score (~0.27 after normalization) and are not meaningfully differentiated by access.
