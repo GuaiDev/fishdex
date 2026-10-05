@@ -21,6 +21,49 @@ def get_db(path: Path | None = None) -> Database:
     return db
 
 
+
+def _ensure_fish_surveys(db: Database) -> None:
+    """Create the fish_surveys table. Idempotent.
+
+    (station_name, visit_date) is the sampling-event key and is indexed as
+    such: grouping by it is what turns a list of catches into an event with
+    known effort, from which an absence can be read.
+    """
+    if "fish_surveys" not in db.table_names():
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS fish_surveys (
+                record_id               TEXT PRIMARY KEY,
+                survey_program          TEXT NOT NULL,
+                station_name            TEXT NOT NULL,
+                visit_date              TEXT,
+                sample_year             INTEGER,
+                watershed               TEXT,
+                subwatershed            TEXT,
+                lat                     REAL,
+                lng                     REAL,
+                jurisdiction            TEXT NOT NULL,
+                species_common_name     TEXT NOT NULL,
+                species_scientific_name TEXT,
+                total_count             INTEGER,
+                total_weight_g          REAL,
+                sampling_protocol       TEXT,
+                source_url              TEXT,
+                ingested_at             TEXT
+            )
+        """)
+        db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_fish_surveys_event "
+            "ON fish_surveys(station_name, visit_date)"
+        )
+        db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_fish_surveys_coords ON fish_surveys(lat, lng)"
+        )
+        db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_fish_surveys_species "
+            "ON fish_surveys(species_common_name)"
+        )
+        db.conn.commit()
+
 def _apply_migrations(db: Database) -> None:
     """Bring an existing schema up to current. Every step is idempotent.
 
@@ -43,6 +86,7 @@ def _apply_migrations(db: Database) -> None:
     migrate_observations_licensing(db)
     migrate_gbif_licensing(db)
     migrate_gbif_survey_provenance(db)
+    _ensure_fish_surveys(db)
     migrate_species_status_provenance(db)
     migrate_regulation_chunks_zone_name(db)
     migrate_segment_synthesis_jurisdiction(db)
