@@ -25,8 +25,8 @@ HOW IT WORKS
      in EnMoDS.
   4. Keep fresh-water, normal (non-blank/replicate/spike), detected, numeric
      results for the five parameters the water slice uses, from ambient
-     surface-water location types only, and fold the rows of one visit into a
-     single WaterQualityReading.
+     surface-water location types only, and fold the rows of one location-day
+     into a single WaterQualityReading (see _fold).
 
 LOCATION TYPES
   Outfalls, ditches and culverts, seepage, landfills, in-plant and storage
@@ -190,7 +190,7 @@ def parse_results(
 ) -> tuple[list[WaterQualityReading], ParseStats]:
     """Stream a results file (.csv or .csv.gz) and return (readings, stats)."""
     stats = ParseStats()
-    visits: dict[tuple[str, str], dict] = {}
+    visits: dict[tuple[str, str], dict] = {}  # (Location_ID, sample date)
     deg_lat = radius_km / 111.0
     deg_lng = radius_km / (111.320 * math.cos(math.radians(lat)))
 
@@ -212,13 +212,13 @@ def parse_results(
 
     readings = [
         WaterQualityReading(
-            record_id=f"{_JURISDICTION}:{location_id}:{observed}",
+            record_id=f"{_JURISDICTION}:{location_id}:{day}",
             station_id=location_id,
             jurisdiction=_JURISDICTION,
             **visit["meta"],
-            **{name: value for name, (_, value) in visit["values"].items()},
+            **_fold(visit["samples"]),
         )
-        for (location_id, observed), visit in visits.items()
+        for (location_id, day), visit in visits.items()
     ]
     stats.readings = len(readings)
     return readings, stats
@@ -278,7 +278,7 @@ def _accumulate(
         return
 
     visit = visits.setdefault(
-        (location_id, observed),
+        (location_id, sampled_at.isoformat()),
         {
             "meta": {
                 "station_name": row.get("Location_Name") or None,
@@ -286,16 +286,35 @@ def _accumulate(
                 "lng": row_lng,
                 "sampled_at": sampled_at,
             },
-            "values": {},
+            "samples": [],
         },
     )
-    # One visit can hold a depth profile and both field and lab codes for one
-    # parameter. Keep the shallowest sample (missing depth = surface); at equal
-    # depth prefer the field measurement; on a full tie the first row wins.
-    rank = (depth, code not in _FIELD_CODES)
-    current = visit["values"].get(field_name)
-    if current is None or rank < current[0]:
-        visit["values"][field_name] = (rank, value)
+    visit["samples"].append((depth, observed, code not in _FIELD_CODES, field_name, value))
+
+
+def _fold(samples: list[tuple[float, str, bool, str, float]]) -> dict[str, float]:
+    """Collapse one location-day of samples to one value per parameter.
+
+    A visit can hold a depth profile and both field and lab codes for one
+    parameter. Keep the shallowest sample (missing depth = surface); at equal
+    depth prefer the field measurement.
+
+    Many lake profiles carry no depth at all: each step is a separate timestamp
+    with a blank Depth_Upper. Among the shallowest samples, the step with the
+    highest DO stands for the surface — the surface is the water in contact
+    with air, and near-anoxic bottom water must not reach the area's median.
+    Every parameter is then taken from that same step where it was measured.
+    Remaining ties go to the earliest timestamp, so file order never decides.
+    """
+    top = min(s[0] for s in samples)
+    surface_do = [s for s in samples if s[0] == top and s[3] == "do_mgl"]
+    step = min(surface_do, key=lambda s: (-s[4], s[2], s[1]))[1] if surface_do else None
+    best: dict[str, tuple] = {}
+    for depth, observed, is_lab, name, value in samples:
+        rank = (depth, observed != step, is_lab, observed, value)
+        if name not in best or rank < best[name]:
+            best[name] = rank
+    return {name: rank[-1] for name, rank in best.items()}
 
 
 def _open_text(path: Path):

@@ -82,7 +82,7 @@ def test_parameters_from_one_visit_fold_into_one_reading():
     assert visit[0].temp_c == 6.4
     assert visit[0].conductivity_us_cm == 90.3
     assert visit[0].jurisdiction == "CA-BC"
-    assert visit[0].record_id.startswith("CA-BC:E339144:2025-12-02T08:06")
+    assert visit[0].record_id == "CA-BC:E339144:2025-12-02"
 
 
 def test_conductivity_in_ms_per_cm_is_converted():
@@ -141,6 +141,42 @@ def test_visit_fold_keeps_shallowest_sample_and_prefers_field_ph(tmp_path):
         assert len(readings) == 1
         assert readings[0].do_mgl == 9.0
         assert readings[0].ph == 7.2
+
+
+def test_depthless_lake_profile_collapses_to_its_surface_step(tmp_path):
+    # Real shape (Bose Lake, 2025-06-16): no Depth_Upper, one timestamp per step,
+    # an early near-bottom grab, then a descent from ~10.5 mg/L to anoxia.
+    profile = [
+        ("10:02", "0.23", "4.1"),
+        ("12:45", "10.48", "18.9"),
+        ("12:53", "10.64", "18.2"),
+        ("12:57", "8.37", "12.0"),
+        ("13:00", "3.75", "8.5"),
+        ("13:05", "0.08", "5.2"),
+    ]
+    rows = []
+    for hhmm, do, temp in profile:
+        when = f"2025-06-16T{hhmm}-08:00"
+        rows.append(
+            _river_row(
+                Observed_Date_Time=when,
+                Observed_Property_Name="DO-F",
+                Result_Unit="mg/L",
+                Result_Value=do,
+            )
+        )
+        rows.append(
+            _river_row(
+                Observed_Date_Time=when,
+                Observed_Property_Name="TEMF",
+                Result_Unit="degC",
+                Result_Value=temp,
+            )
+        )
+    for ordering in (rows, rows[::-1]):
+        readings, _ = wq.parse_results(_write_rows(tmp_path / "f.csv", ordering), *FRASER, 100)
+        assert [(r.do_mgl, r.temp_c) for r in readings] == [(10.64, 18.2)]
+        assert readings[0].record_id == "CA-BC:E900001:2025-06-16"
 
 
 def test_field_do_is_read_and_preferred_over_lab_do(tmp_path):
