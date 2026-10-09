@@ -197,7 +197,7 @@ Maritime province stubs added in two sessions June 28 2026.
 - `src/ingest/jurisdictions/ca_bc/` — BC adapters:
   - `hydro_network.py` (FWA stream network via DataBC WFS) — ~1,400 segments per 10km radius
   - `fish_observations.py` (FISS fish observations via DataBC WFS) — ~4,200 obs per 10km radius
-  - `water_quality.py` (BC EMS stations) — stations discoverable; results stubbed (see below)
+  - `water_quality.py` (BC EnMoDS results) — current-tier file streamed and filtered by radius (see below)
 - `src/services/bc_ingest.py` — BC service layer
 - `/ingest/data-bc` endpoint — X-Api-Key protected, returns 202 (background task)
 - Model additions: `stream_order` + `segment_source` on StreamSegment; `source` on Observation
@@ -216,19 +216,39 @@ segments (both ON and BC) on every Ontario ingest. Fixed to scope by jurisdictio
   (GeoServer: "Cannot do natural order without a primary key").
 - `propertyName` with a non-existent field name returns HTTP 400, not 404.
 
-### BC EMS water quality results — stubbed 📋 (TODO corrected ✅ July 17 2026)
-Layer `EMS_MONITORING_LOCN_TYPES_SVW` is correct and still live (verified — a HEAD
-request 404s but GET works, same WFS quirk seen elsewhere in this repo).
-The old resource ID here (`76be8cdb-95b7-4a96-aae4-f3f59455fbcb`) had gone stale —
-investigated why: BC retired EMS in favour of EnMoDS (Environmental Monitoring Data
-System) on 2026-03-05; EMS stopped receiving new data on 2026-02-26. Current EnMoDS
-results are 4 time-tier CSVs served via the COMS object API (no auth needed for GET,
-HTTP Range supported), dataset slug "bc-environmental-monitoring-data-system-results".
-The "last 2 years" tier alone is confirmed 336,131,287 bytes (~320MB) via
-Content-Range. Plan unchanged in spirit: download the current-tier file (now monthly,
-not annually — EnMoDS updates more often than EMS did), filter to nearby
-MONITORING_LOCATION_IDs, index locally. Still not implemented — TODO only, per
-instruction not to build it out yet.
+### BC EnMoDS water quality results ✅ (built October 9 2026)
+BC retired EMS in favour of EnMoDS (Environmental Monitoring Data System) on
+2026-03-05; EMS stopped receiving data on 2026-02-26. `ca_bc/water_quality.py` now
+reads the EnMoDS "Current EnMoDS Results" tier (dataset slug
+"bc-environmental-monitoring-data-system-results", COMS object
+`84ed1220-bd51-40a8-9f29-d916144e2dfe`, no auth).
+
+- The object 302-redirects to a short-lived signed URL; the payload is a single
+  **gzip** stream of a CSV (413,529,081 bytes on 2026-10-09), not a zip as the old
+  note guessed. Downloaded once to `data/cache/bc_enmods/` (30-day TTL, written via
+  a `.part` file), then stream-decompressed row by row — never loaded whole.
+- Rows carry their own `Location_Latitude`/`Location_Longitude`, so the filter is by
+  distance from the query point and the old EMS station WFS is no longer called.
+  That also settles the open question about post-migration locations that exist
+  only in EnMoDS.
+- Kept: `Water - Fresh`, `QC_Type = NORMAL`, no `Detection_Condition`, numeric
+  results for DO / pH / temperature / conductivity / turbidity, matched by EMS
+  observed-property code (not the free-text label) and checked against unit.
+  Rows of one visit fold into one `water_quality_readings` row (`jurisdiction`
+  `CA-BC`, `record_id` = `CA-BC:<location>:<observed time>`), so re-ingest upserts.
+  mS/cm is converted to µS/cm; NTU is stored in the `turbidity_fnu` column.
+- Counts that separate "worked" from "silently dropped" (unusable rows, validator
+  rejections, unit surprises) come back in `ParseStats` and log at WARNING when
+  non-zero.
+- The existing water context slice reads the table by radius; its source label is
+  now taken from each reading's jurisdiction ("PWQMN", "BC EnMoDS") instead of
+  being hardcoded. No new agent tool.
+- Measured end to end, Fraser River near Surrey (49.15, -122.6, 25 km): 328 readings
+  at 39 locations, 2025-01-07 to 2026-09-11, in about 100 s including the download.
+  Dissolved oxygen is rare in this tier near there (0 readings), pH is common (316).
+
+Not done: the older time tiers (2-5, 5-10, 10+ years), and scheduling the ~400 MB
+download as a recurring ingest (hosting is being moved separately).
 
 ### Phase 2 — national + AB + QC + Maritimes expansion (June 28 2026)
 
@@ -378,7 +398,7 @@ them had ever actually run against real data before.
   verification is pending the API key (see Pending above).
 - **Admin dashboard**: new `GET /admin/dashboard` — see Admin dashboard section below.
 - **Synthesis cache jurisdiction isolation**: see Synthesis cache section above.
-- **BC EMS TODO**: corrected with real current resource info — see BC EMS section above.
+- **BC EMS TODO**: corrected with real current resource info, then built — see BC EnMoDS section above.
 
 ## Coaching improvements 📋
 Wait for data accumulation (need 10+ stops with time_of_day).
@@ -435,8 +455,8 @@ Full adapter coverage: OHN, PWQMN, MNRF stocking, MNRF regs, CABIN, GBIF, iNat, 
 FWA hydro + FISS observations + FISS stocking + BC regs PDF + NuSEDS salmon escapement
 live and verified end-to-end (both regs and NuSEDS had gone stale/broken — see Bug
 fixes — session 6).
-EMS water quality: stations indexed, results stubbed (TODO corrected July 17 2026,
-see EMS note above).
+EnMoDS water quality (replaces EMS): current-tier results ingested and filtered by
+radius (October 9 2026, see EnMoDS note above).
 
 ### Alberta 🔨 (June 28 2026; regulations completed + stocking fixed July 17 2026)
 3 cron areas (Bow/Calgary, North Saskatchewan/Edmonton, Oldman/Lethbridge).

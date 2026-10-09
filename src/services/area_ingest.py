@@ -114,7 +114,7 @@ def _check_sdm_retrain(db, label: str) -> None:
 
 
 def run_bc_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
-    """Run FWA, FISS, and BC EMS ingest for a BC location."""
+    """Run FWA, FISS, and BC EnMoDS ingest for a BC location."""
     from src.services.bc_ingest import (
         ingest_bc_hydro_network,
         ingest_bc_water_quality,
@@ -138,7 +138,7 @@ def run_bc_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaI
     )
     _attempt(
         result,
-        "BC EMS water quality",
+        "BC EnMoDS water quality",
         lambda: ingest_bc_water_quality(lat, lng, radius_km=radius_km),
     )
     _log.info("[%s] BC ingest complete", label)

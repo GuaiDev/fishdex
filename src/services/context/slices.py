@@ -376,6 +376,19 @@ def _fill_substrate(db: Database, place: Place, out: WaterSlice) -> None:
     )
 
 
+_CHEMISTRY_SOURCES = {
+    "CA-ON": "PWQMN",
+    "CA-BC": "BC EnMoDS",
+}
+
+
+def _chemistry_source(rows: list) -> str:
+    """Name the network(s) the readings came from, by their jurisdiction code."""
+    codes = sorted({getattr(r, "jurisdiction", None) or "CA-ON" for r in rows})
+    names = [_CHEMISTRY_SOURCES.get(c, f"water quality ({c})") for c in codes]
+    return " + ".join(names) if names else "water quality"
+
+
 def _fill_chemistry(db: Database, place: Place, out: WaterSlice) -> None:
     if "water_quality_readings" not in db.table_names():
         out.dissolved_oxygen = ContextField.empty(EmptyReason.SOURCE_DOES_NOT_COVER_AREA)
@@ -393,12 +406,16 @@ def _fill_chemistry(db: Database, place: Place, out: WaterSlice) -> None:
 
     do_vals = [r.do_mgl for r in rows if getattr(r, "do_mgl", None) is not None]
     ph_vals = [r.ph for r in rows if getattr(r, "ph", None) is not None]
+    do_source = _chemistry_source(
+        [r for r in rows if getattr(r, "do_mgl", None) is not None]
+    )
+    ph_source = _chemistry_source([r for r in rows if getattr(r, "ph", None) is not None])
 
     if do_vals:
         median = sorted(do_vals)[len(do_vals) // 2]
         out.dissolved_oxygen = ContextField.recorded(
             round(float(median), 1),
-            source=f"PWQMN ({len(do_vals)} readings)",
+            source=f"{do_source} ({len(do_vals)} readings)",
             meaning=translate.dissolved_oxygen(float(median)),
         )
     else:
@@ -411,7 +428,7 @@ def _fill_chemistry(db: Database, place: Place, out: WaterSlice) -> None:
         # "nothing recorded" would be false — the reading exists.
         out.ph = (
             ContextField.recorded(
-                round(float(median), 1), source="PWQMN", meaning=meaning
+                round(float(median), 1), source=ph_source, meaning=meaning
             )
             if meaning
             else ContextField.empty(EmptyReason.RECORDED_BUT_NOT_DECISION_RELEVANT)

@@ -6,7 +6,7 @@ Orchestrates the CA-BC adapters:
   - FISS stocking extraction (ca_bc/fish_observations.py)
   - NuSEDS salmon escapement (ca_bc/nuseds.py — province-wide, not bbox)
   - BC fishing regulations (ca_bc/regulations.py — province-wide, not bbox)
-  - BC EMS water quality (ca_bc/water_quality.py — stations only; results stubbed)
+  - BC EnMoDS water quality (ca_bc/water_quality.py — current-tier results file)
 
 Called from the CLI `ingest-bc` command or the /ingest/data-bc API endpoint.
 Global sources (iNat, GBIF, WSC, OSM, eBird) are handled by the standard
@@ -100,17 +100,23 @@ def ingest_bc_water_quality(
     lng: float,
     radius_km: float = 50.0,
 ) -> int:
-    """Fetch BC EMS water quality readings for a BC location. Returns count stored.
+    """Fetch BC EnMoDS water quality readings near a location. Returns count stored.
 
-    Currently returns 0 — results fetch is not yet implemented; see
-    src/ingest/jurisdictions/ca_bc/water_quality.py for the TODO.
+    Downloads the current-tier results file once (cached 30 days), filters it to
+    radius_km around the point and upserts into water_quality_readings, which the
+    water slice of the context layer already reads.
     """
-    logger.info(
-        "BC EMS: fetching water quality — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km
-    )
+    from src.storage.water_quality import upsert_water_quality_readings
+
     _wq = importlib.import_module("src.ingest.jurisdictions.ca_bc.water_quality")
+    db = get_db()
+    logger.info(
+        "BC EnMoDS: fetching water quality — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km
+    )
     readings = _wq.fetch_water_quality_readings(lat, lng, radius_km)
-    logger.info("BC EMS: %d readings stored", len(readings))
+    if readings:
+        upsert_water_quality_readings(db, readings)
+    logger.info("BC EnMoDS: %d readings stored", len(readings))
     return len(readings)
 
 
