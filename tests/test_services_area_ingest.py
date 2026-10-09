@@ -15,7 +15,7 @@ def test_committed_area_list_loads_and_matches_the_old_workflow():
     """The 33 curl steps of the retired GitHub Action became 25 areas."""
     areas = load_areas(DEFAULT_AREAS_PATH)
     assert len(areas) == 25
-    assert sum(len(a.sources) for a in areas) == 33
+    assert sum(len(a.sources) for a in areas) == 35
     assert len({a.label for a in areas}) == 25
     by_label = {a.label: a for a in areas}
     bronte = by_label["Bronte Creek Oakville"]
@@ -27,6 +27,10 @@ def test_committed_area_list_loads_and_matches_the_old_workflow():
     )
     assert by_label["Miramichi River NB"].radius_for(IngestSource.TIDAL) == 100
     assert IngestSource.BC in by_label["Skeena River Terrace"].sources
+    # All three configured AB areas run the AB bundle (FWMIS hydro since 2026-10-09)
+    assert IngestSource.AB in by_label["Bow River Calgary"].sources
+    assert IngestSource.AB in by_label["North Saskatchewan River Edmonton"].sources
+    assert IngestSource.AB in by_label["Oldman River Lethbridge"].sources
 
 
 def test_load_areas_rejects_a_malformed_area(tmp_path):

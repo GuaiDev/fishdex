@@ -165,7 +165,7 @@ register(JurisdictionConfig(
         CronArea("Oldman River Lethbridge",             49.70,  -112.84, 40),
     ],
     data_sources={
-        "hydro_network":     False,  # NHN stub — OSM covers this adequately
+        "hydro_network":     True,   # FWMIS Simplified Hydro Arcs (Geospatial Alberta)
         "fish_observations": False,  # AB FWMIS not publicly accessible
         "water_quality":     False,  # stub — no public API
         "stocking":          True,   # planned stocking XLSX from Open Alberta (openpyxl required)
@@ -175,6 +175,10 @@ register(JurisdictionConfig(
         "geology":           False,  # not yet built
     },
     api_endpoints={
+        "hydro_network": (
+            "https://geospatial.alberta.ca/titan/rest/services/"
+            "fisheries/fwmis_hydrography/FeatureServer/0"
+        ),
         "stocking": (
             "https://open.alberta.ca/dataset/ae7521d6-7629-4b69-ac45-857fc798c10c"
         ),
@@ -184,8 +188,12 @@ register(JurisdictionConfig(
     },
     notes=(
         "Global sources (iNat, GBIF, WSC, OSM, eBird) work automatically for any AB lat/lng. "
-        "HYDRO: NHN GeoPackage tiles are available via FTP but no WFS exists; "
-        "OSM covers AB streams adequately at order 3+. "
+        "HYDRO: FWMIS Simplified Hydro Arcs FeatureServer (fwmis_hydrography layer 0) — "
+        "stream arcs with Strahler stream order, water-body id/name and length_m in metres; "
+        "WGS84 in/out (inSR=outSR=4326, no reprojection needed); maxRecordCount 2000, "
+        "paginated via resultOffset and the exceededTransferLimit flag; first ~7k segments "
+        "verified live across the Bow/Elbow area 2026-10-09. No barrier layer — "
+        "barrier_count is always 0 for CA-AB. ",
         "REGULATIONS: only 3 Fish Management Zones split into 10 Watershed Units "
         "(ES1-4/PP1-2/NB1-4) — verified all 10 extract correctly against the 2026 edition "
         "(7.5k-31k chars each); URL resolved dynamically via CKAN package_show (picks the "
