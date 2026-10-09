@@ -13,6 +13,7 @@ data/raw/
 data/models/
 data/processed/map_index.html
 data/photos/
+data/weekly_ingest.log
 
 # Node
 web/node_modules/

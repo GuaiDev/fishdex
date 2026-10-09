@@ -112,8 +112,14 @@ uv sync
 # Start the chat bot
 make run
 
-# Run all ingestion adapters
+# Serve the web app + API locally — open http://localhost:8000/app
+make serve
+
+# Run all ingestion adapters around home
 make ingest
+
+# Refresh every area in data/ingest_areas.json (the weekly ingest)
+make weekly-ingest
 
 # Run tests
 make test
@@ -141,7 +147,23 @@ Optional keys unlock individual adapters and features:
 
 Note that `.env.example` currently documents only `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`, `LOG_LEVEL` and `DATASTREAM_API_KEY` — the rest are read by code but undocumented there.
 
-When deploying, set `DATA_DIR` to a persistent volume, or ingested data is lost on redeploy.
+### Everything runs locally
+
+There is no hosted deployment. `make serve` runs the FastAPI backend (which also serves the built web app at `/app`) on `127.0.0.1:8000` against the local database at `data/fishing.db`; set `DATA_DIR` to keep the database and catch photos somewhere else. `SERVE_HOST=0.0.0.0 make serve` makes it reachable from a phone on the same network.
+
+The weekly data refresh is `make weekly-ingest`. It reads the list of areas (label, jurisdiction, lat, lng, radius and which source bundles to run) from `data/ingest_areas.json` and runs each one through the same service code as the `/ingest/data*` endpoints, one after another, then prints what each dataset stored and what failed. Edit that file to add or drop an area. To preview without fetching anything:
+
+```bash
+uv run python -m src.cli.main weekly-ingest --dry-run
+```
+
+To run it every week, add a line to your crontab (`crontab -e`), adjusting the path:
+
+```
+0 2 * * 0  cd /path/to/fishbot && PATH=$HOME/.local/bin:$PATH make weekly-ingest >> data/weekly_ingest.log 2>&1
+```
+
+The command exits non-zero when any dataset failed, so the log shows the run that needs attention.
 
 ## Project scope
 

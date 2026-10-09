@@ -1,0 +1,30 @@
+{
+  "_comment": "Areas covered by `make weekly-ingest`. Each source runs the matching ingest bundle (global = iNaturalist/GBIF/WSC/OSM; bc/ab/qc = jurisdiction adapters; tidal = CHS tide predictions). source_radius_km overrides radius_km for one source.",
+  "areas": [
+    {"label": "Grand River Dunnville", "jurisdiction": "CA-ON", "lat": 42.917, "lng": -79.774, "radius_km": 50, "sources": ["global"]},
+    {"label": "Credit River Mississauga", "jurisdiction": "CA-ON", "lat": 43.55, "lng": -79.65, "radius_km": 30, "sources": ["global"]},
+    {"label": "Bronte Creek Oakville", "jurisdiction": "CA-ON", "lat": 43.45, "lng": -79.72, "radius_km": 25, "sources": ["global"]},
+    {"label": "Thames River London", "jurisdiction": "CA-ON", "lat": 42.984, "lng": -81.244, "radius_km": 30, "sources": ["global"]},
+    {"label": "Fraser River Lower Mainland", "jurisdiction": "CA-BC", "lat": 49.12, "lng": -122.05, "radius_km": 60, "sources": ["global", "bc"]},
+    {"label": "Thompson River Kamloops", "jurisdiction": "CA-BC", "lat": 50.67, "lng": -120.33, "radius_km": 50, "sources": ["global", "bc"]},
+    {"label": "Okanagan Vernon", "jurisdiction": "CA-BC", "lat": 50.27, "lng": -119.27, "radius_km": 40, "sources": ["global", "bc"]},
+    {"label": "Skeena River Terrace", "jurisdiction": "CA-BC", "lat": 54.51, "lng": -128.6, "radius_km": 50, "sources": ["global", "bc"]},
+    {"label": "Bow River Calgary", "jurisdiction": "CA-AB", "lat": 51.05, "lng": -114.07, "radius_km": 50, "sources": ["global", "ab"]},
+    {"label": "North Saskatchewan River Edmonton", "jurisdiction": "CA-AB", "lat": 53.53, "lng": -113.49, "radius_km": 50, "sources": ["global"]},
+    {"label": "Oldman River Lethbridge", "jurisdiction": "CA-AB", "lat": 49.7, "lng": -112.84, "radius_km": 40, "sources": ["global"]},
+    {"label": "St Lawrence River Montreal", "jurisdiction": "CA-QC", "lat": 45.5, "lng": -73.56, "radius_km": 60, "sources": ["global", "qc"]},
+    {"label": "Riviere Saint-Maurice", "jurisdiction": "CA-QC", "lat": 46.35, "lng": -72.55, "radius_km": 40, "sources": ["global"]},
+    {"label": "Saguenay River", "jurisdiction": "CA-QC", "lat": 48.42, "lng": -71.07, "radius_km": 40, "sources": ["global"]},
+    {"label": "Riviere Gatineau", "jurisdiction": "CA-QC", "lat": 45.48, "lng": -75.7, "radius_km": 40, "sources": ["global"]},
+    {"label": "Red River Winnipeg", "jurisdiction": "CA-MB", "lat": 49.9, "lng": -97.14, "radius_km": 50, "sources": ["global"]},
+    {"label": "Lake Winnipeg South", "jurisdiction": "CA-MB", "lat": 50.7, "lng": -96.9, "radius_km": 60, "sources": ["global"]},
+    {"label": "Assiniboine River", "jurisdiction": "CA-MB", "lat": 50.07, "lng": -99.95, "radius_km": 40, "sources": ["global"]},
+    {"label": "South Saskatchewan River Saskatoon", "jurisdiction": "CA-SK", "lat": 52.13, "lng": -106.67, "radius_km": 50, "sources": ["global"]},
+    {"label": "Qu Appelle River", "jurisdiction": "CA-SK", "lat": 50.44, "lng": -103.82, "radius_km": 40, "sources": ["global"]},
+    {"label": "Churchill River", "jurisdiction": "CA-SK", "lat": 55.75, "lng": -108.45, "radius_km": 50, "sources": ["global"]},
+    {"label": "Miramichi River NB", "jurisdiction": "CA-NB", "lat": 46.97, "lng": -65.54, "radius_km": 50, "sources": ["global", "tidal"], "source_radius_km": {"tidal": 100}},
+    {"label": "Saint John River NB", "jurisdiction": "CA-NB", "lat": 45.97, "lng": -66.64, "radius_km": 50, "sources": ["global"]},
+    {"label": "Annapolis River NS", "jurisdiction": "CA-NS", "lat": 44.98, "lng": -65.5, "radius_km": 40, "sources": ["global", "tidal"], "source_radius_km": {"tidal": 100}},
+    {"label": "Margaree River NS", "jurisdiction": "CA-NS", "lat": 46.17, "lng": -61.07, "radius_km": 30, "sources": ["global"]}
+  ]
+}
