@@ -143,6 +143,25 @@ def test_visit_fold_keeps_shallowest_sample_and_prefers_field_ph(tmp_path):
         assert readings[0].ph == 7.2
 
 
+def test_field_do_is_read_and_preferred_over_lab_do(tmp_path):
+    # DO-F carries most ambient BC dissolved oxygen; its % saturation rows are a known skip.
+    field_only = [
+        _river_row(Observed_Property_Name="DO-F", Result_Unit="mg/L", Result_Value="10.4"),
+        _river_row(Observed_Property_Name="DO-F", Result_Unit="%", Result_Value="96"),
+    ]
+    readings, stats = wq.parse_results(_write_rows(tmp_path / "f.csv", field_only), *FRASER, 100)
+    assert [r.do_mgl for r in readings] == [10.4]
+    assert stats.unit_counts == {}
+
+    both = [
+        _river_row(Observed_Property_Name="0014", Result_Unit="mg/L", Result_Value="8.0"),
+        _river_row(Observed_Property_Name="DO-F", Result_Unit="mg/L", Result_Value="10.4"),
+    ]
+    for ordering in (both, both[::-1]):
+        readings, _ = wq.parse_results(_write_rows(tmp_path / "f.csv", ordering), *FRASER, 100)
+        assert [r.do_mgl for r in readings] == [10.4]
+
+
 def test_rejected_parameter_keeps_the_rest_of_its_visit(tmp_path):
     rows = [
         _river_row(Observed_Property_Name="TEMF", Result_Unit="degC", Result_Value="45"),

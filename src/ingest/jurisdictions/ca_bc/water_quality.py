@@ -37,8 +37,9 @@ LOCATION TYPES
 PARAMETER MATCHING
   By EMS observed-property code (the Observed_Property_Name column), not by the
   long label in Observed_Property_ID, which is free text. Codes and units were
-  checked against the real file: DO 0014 (mg/L only — the % saturation rows
-  share the code and are skipped on unit), pH 0004/PH-F, temperature 0013/TEMF,
+  checked against the real file: DO DO-F/0014 (mg/L only — the % saturation
+  rows share the codes and are skipped on unit; DO-F carries ~92% of ambient
+  fresh-water DO), pH 0004/PH-F, temperature 0013/TEMF,
   conductivity 0011/SC-F (µS/cm; mS/cm is converted), turbidity 0015/TURF (NTU,
   stored in the turbidity_fnu column — the two units agree for routine use).
 
@@ -75,6 +76,7 @@ _AMBIENT_LOCATION_TYPES = frozenset({"River, Stream, or Creek", "Lake or Pond", 
 # EMS observed-property code -> (reading field, accepted units -> multiplier).
 _PARAMETERS: dict[str, tuple[str, dict[str, float]]] = {
     "0014": ("do_mgl", {"mg/L": 1.0}),
+    "DO-F": ("do_mgl", {"mg/L": 1.0}),
     "0004": ("ph", {"pH units": 1.0}),
     "PH-F": ("ph", {"pH units": 1.0}),
     "0013": ("temp_c", {"degC": 1.0}),
@@ -84,9 +86,9 @@ _PARAMETERS: dict[str, tuple[str, dict[str, float]]] = {
     "0015": ("turbidity_fnu", {"NTU": 1.0}),
     "TURF": ("turbidity_fnu", {"NTU": 1.0}),
 }
-_FIELD_CODES = frozenset({"PH-F", "TEMF", "SC-F", "TURF"})
+_FIELD_CODES = frozenset({"DO-F", "PH-F", "TEMF", "SC-F", "TURF"})
 # Known units the adapter deliberately does not use; any other unit is a surprise.
-_SKIPPED_UNITS = frozenset({("0014", "%")})
+_SKIPPED_UNITS = frozenset({("0014", "%"), ("DO-F", "%")})
 
 logger = logging.getLogger(__name__)
 
