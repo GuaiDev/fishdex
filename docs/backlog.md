@@ -539,6 +539,9 @@ Design pending:
 ## Infrastructure
 
 ### Railway deployment 🔨
+> Superseded 2026-10-09: Railway was dropped. The app is served with `make serve`
+> and the weekly ingest runs locally with `make weekly-ingest` — see README.
+
 URL: https://web-production-e2094.up.railway.app
 Volume vol_wc8gnr3fyrcdcydx is attached but DATA_DIR env var is NOT set in
 Railway dashboard. Database is writing to the container's ephemeral filesystem

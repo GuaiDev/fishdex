@@ -170,7 +170,9 @@ _static_dir = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(_static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
-# Catch photos, saved to the Railway persistent volume by src/services/photo_storage.py
+from src.services import area_ingest  # noqa: E402
+
+# Catch photos, saved under DATA_DIR/photos by src/services/photo_storage.py
 from src.services.photo_storage import PHOTOS_DIR  # noqa: E402
 
 PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1051,93 +1053,6 @@ def ingest(body: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _run_global_ingest(
-    lat: float, lng: float, radius_km: float, label: str, days_back: int | None = 90
-) -> None:
-    """Background task: run iNat, GBIF, WSC, OSM, and SDM check for a location."""
-    import json as _json
-    import os as _os
-
-    _log.info(
-        "[%s] Global ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-
-    from src.services.gbif import fetch_and_store as gbif_fetch
-    from src.services.observations import fetch_and_store as inat_fetch
-    from src.services.osm import fetch_and_store as osm_fetch
-    from src.services.stream_gauge import fetch_and_store as wsc_fetch
-    from src.storage.database import ensure_schema, get_db
-
-    db = get_db()
-    ensure_schema(db)
-
-    inat_label = f"last {days_back} days" if days_back else "all history"
-    _log.info("[%s] iNat: fetching observations (%s)", label, inat_label)
-    try:
-        n = inat_fetch(lat, lng, radius_km=radius_km, days_back=days_back)
-        _log.info("[%s] iNat: %d observations stored", label, n)
-    except Exception:
-        _log.exception("[%s] iNat fetch failed", label)
-
-    _log.info("[%s] GBIF: fetching occurrences", label)
-    try:
-        n = gbif_fetch(lat, lng, radius_km=radius_km)
-        _log.info("[%s] GBIF: %d records stored", label, n)
-    except Exception:
-        _log.exception("[%s] GBIF fetch failed", label)
-
-    _log.info("[%s] WSC: fetching stream gauge readings", label)
-    try:
-        n = wsc_fetch(lat, lng, radius_km=radius_km)
-        _log.info("[%s] WSC: %d station readings stored", label, n)
-    except Exception:
-        _log.exception("[%s] WSC fetch failed", label)
-
-    _log.info("[%s] OSM: fetching water features and access points", label)
-    try:
-        osm_water, osm_access = osm_fetch(lat, lng)
-        _log.info(
-            "[%s] OSM: %d water features, %d access points stored", label, osm_water, osm_access
-        )
-    except Exception:
-        _log.exception("[%s] OSM fetch failed", label)
-
-    # SDM retrain check — non-fatal if it errors
-    try:
-        import joblib as _joblib
-
-        from src.services.species_mapping import COMMON_TO_SCIENTIFIC as _c2s
-
-        model_dir = "data/processed/sdm_models"
-        if _os.path.exists(model_dir):
-            trip_counts: dict = {}
-            for (sc_json,) in db.execute(
-                "SELECT species_caught FROM stops WHERE was_productive = 1"
-            ).fetchall():
-                for common in _json.loads(sc_json or "[]"):
-                    clean = common.lower().replace("(uncertain)", "").strip()
-                    sci = _c2s.get(clean)
-                    if sci:
-                        trip_counts[sci] = trip_counts.get(sci, 0) + 1
-            retrain_candidates = []
-            for f in _os.listdir(model_dir):
-                if not f.endswith(".joblib"):
-                    continue
-                b = _joblib.load(_os.path.join(model_dir, f))
-                species = b.get("species")
-                baseline = (b.get("n_inat", 0) or 0) + (b.get("n_gbif", 0) or 0)
-                n_trip = b.get("n_trip_log", 0) or 0
-                current = trip_counts.get(species, 0)
-                if baseline > 0 and (current - n_trip) >= baseline * 0.20:
-                    retrain_candidates.append(species)
-            if retrain_candidates:
-                _log.info("[%s] SDM retrain recommended for: %s", label, retrain_candidates)
-    except Exception:
-        _log.exception("[%s] SDM retrain check failed", label)
-
-    _log.info("[%s] Global ingest complete", label)
-
-
 @app.post("/ingest/data")
 def ingest_data(
     body: dict,
@@ -1166,7 +1081,7 @@ def ingest_data(
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
 
-    background_tasks.add_task(_run_global_ingest, lat, lng, radius_km, label, days_back)
+    background_tasks.add_task(area_ingest.run_global_ingest, lat, lng, radius_km, label, days_back)
 
     return JSONResponse(
         status_code=202,
@@ -1176,46 +1091,6 @@ def ingest_data(
             "message": "ingest started in background",
         },
     )
-
-
-def _run_bc_ingest(lat: float, lng: float, radius_km: float, label: str) -> None:
-    """Background task: run FWA, FISS, and BC EMS ingest for a BC location."""
-    _log.info(
-        "[%s] BC ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-
-    from src.services.bc_ingest import (
-        ingest_bc_hydro_network,
-        ingest_bc_water_quality,
-        ingest_fiss_observations,
-    )
-    from src.storage.database import ensure_schema, get_db
-
-    db = get_db()
-    ensure_schema(db)
-
-    _log.info("[%s] FWA: fetching stream segments", label)
-    try:
-        segs, _ = ingest_bc_hydro_network(lat, lng, radius_km=radius_km)
-        _log.info("[%s] FWA: %d stream segments stored", label, segs)
-    except Exception:
-        _log.exception("[%s] FWA fetch failed", label)
-
-    _log.info("[%s] FISS: fetching fish observations", label)
-    try:
-        n = ingest_fiss_observations(lat, lng, radius_km=radius_km)
-        _log.info("[%s] FISS: %d observations stored", label, n)
-    except Exception:
-        _log.exception("[%s] FISS fetch failed", label)
-
-    _log.info("[%s] BC EMS: fetching water quality", label)
-    try:
-        n = ingest_bc_water_quality(lat, lng, radius_km=radius_km)
-        _log.info("[%s] BC EMS: %d readings stored", label, n)
-    except Exception:
-        _log.exception("[%s] BC EMS fetch failed", label)
-
-    _log.info("[%s] BC ingest complete", label)
 
 
 @app.post("/ingest/data-bc")
@@ -1245,7 +1120,7 @@ def ingest_data_bc(
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
 
-    background_tasks.add_task(_run_bc_ingest, lat, lng, radius_km, label)
+    background_tasks.add_task(area_ingest.run_bc_ingest, lat, lng, radius_km, label)
 
     return JSONResponse(
         status_code=202,
@@ -1255,23 +1130,6 @@ def ingest_data_bc(
             "message": "ingest started in background",
         },
     )
-
-
-def _run_ab_ingest(lat: float, lng: float, radius_km: float, label: str) -> None:
-    """Background task: run Alberta-specific ingest adapters."""
-    _log.info(
-        "[%s] AB ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-    from src.services.ab_ingest import ingest_ab_data
-    from src.storage.database import ensure_schema, get_db
-
-    db = get_db()
-    ensure_schema(db)
-    try:
-        counts = ingest_ab_data(lat, lng, radius_km)
-        _log.info("[%s] AB ingest complete: %s", label, counts)
-    except Exception:
-        _log.exception("[%s] AB ingest failed", label)
 
 
 @app.post("/ingest/data-ab")
@@ -1292,7 +1150,7 @@ def ingest_data_ab(
     label = body.get("label", f"{lat},{lng}")
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
-    background_tasks.add_task(_run_ab_ingest, lat, lng, radius_km, label)
+    background_tasks.add_task(area_ingest.run_ab_ingest, lat, lng, radius_km, label)
     return JSONResponse(
         status_code=202,
         content={
@@ -1301,23 +1159,6 @@ def ingest_data_ab(
             "message": "AB ingest started in background",
         },
     )
-
-
-def _run_qc_ingest(lat: float, lng: float, radius_km: float, label: str) -> None:
-    """Background task: run Quebec-specific ingest adapters."""
-    _log.info(
-        "[%s] QC ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-    from src.services.qc_ingest import ingest_qc_data
-    from src.storage.database import ensure_schema, get_db
-
-    db = get_db()
-    ensure_schema(db)
-    try:
-        counts = ingest_qc_data(lat, lng, radius_km)
-        _log.info("[%s] QC ingest complete: %s", label, counts)
-    except Exception:
-        _log.exception("[%s] QC ingest failed", label)
 
 
 @app.post("/ingest/data-qc")
@@ -1338,7 +1179,7 @@ def ingest_data_qc(
     label = body.get("label", f"{lat},{lng}")
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
-    background_tasks.add_task(_run_qc_ingest, lat, lng, radius_km, label)
+    background_tasks.add_task(area_ingest.run_qc_ingest, lat, lng, radius_km, label)
     return JSONResponse(
         status_code=202,
         content={
@@ -1437,26 +1278,6 @@ def ingest_data_national(
     )
 
 
-def _run_tidal_ingest(lat: float, lng: float, radius_km: float, label: str) -> None:
-    """Background task: run CHS tidal predictions ingest."""
-    _log.info(
-        "[%s] Tidal ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-    from src.storage.database import ensure_schema, get_db
-
-    db = get_db()
-    ensure_schema(db)
-    try:
-        from src.ingest.jurisdictions.ca_national.tidal import fetch_tidal_readings
-
-        rows = fetch_tidal_readings(lat, lng, radius_km)
-        if rows:
-            db["tidal_readings"].upsert_all(rows, pk="record_id")
-        _log.info("[%s] Tidal ingest: %d records stored", label, len(rows))
-    except Exception:
-        _log.exception("[%s] Tidal ingest failed", label)
-
-
 @app.post("/ingest/data-tidal")
 def ingest_data_tidal(
     body: dict,
@@ -1477,7 +1298,7 @@ def ingest_data_tidal(
     label = body.get("label", f"{lat},{lng}")
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
-    background_tasks.add_task(_run_tidal_ingest, lat, lng, radius_km, label)
+    background_tasks.add_task(area_ingest.run_tidal_ingest, lat, lng, radius_km, label)
     return JSONResponse(
         status_code=202,
         content={

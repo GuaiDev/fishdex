@@ -518,6 +518,77 @@ def ingest(
     _check_sdm_retrain_needed(get_db())
 
 
+@app.command(name="weekly-ingest")
+def weekly_ingest(
+    areas_file: str = typer.Option(
+        "data/ingest_areas.json", "--areas", help="JSON file listing the areas to ingest"
+    ),
+    only: str = typer.Option(
+        None, "--only", help="Run only areas whose label contains this text (case-insensitive)"
+    ),
+    days_back: int = typer.Option(
+        90, "--days", help="iNaturalist history to pull per area (0 = all history)"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="List what would run, fetch nothing"),
+) -> None:
+    """Ingest every area in data/ingest_areas.json, one after another.
+
+    Replaces the old weekly GitHub Action that POSTed each area to a hosted
+    server. Runs the same service code as the /ingest/data* endpoints, against
+    the local database. Exits non-zero if any dataset failed, so a cron job's
+    mail or log shows it.
+    """
+    from pathlib import Path
+
+    from src.services.area_ingest import load_areas, run_area
+
+    areas = load_areas(Path(areas_file))
+    if only:
+        areas = [a for a in areas if only.lower() in a.label.lower()]
+        if not areas:
+            console.print(f"[red]No area label contains {only!r}.[/red]")
+            raise typer.Exit(1)
+
+    jobs = [(a, s) for a in areas for s in a.sources]
+    if dry_run:
+        table = Table(title=f"weekly-ingest plan ({len(jobs)} runs)")
+        for col in ("Area", "Jurisdiction", "Source", "lat", "lng", "radius km"):
+            table.add_column(col)
+        for a, s in jobs:
+            table.add_row(
+                a.label, a.jurisdiction, s.value, str(a.lat), str(a.lng), str(a.radius_for(s))
+            )
+        console.print(table)
+        return
+
+    results = []
+    for i, (a, s) in enumerate(jobs, 1):
+        console.print(f"[dim]({i}/{len(jobs)}) {a.label} — {s.value}…[/dim]")
+        results.append(run_area(a, s, days_back=days_back or None))
+
+    table = Table(title="Weekly ingest summary")
+    table.add_column("Area", overflow="fold")
+    table.add_column("Source")
+    table.add_column("Result")
+    table.add_column("Detail", overflow="fold")
+    for r in results:
+        stored = ", ".join(f"{k}: {v}" for k, v in r.stored.items())
+        failed = ", ".join(f"{k}: {v}" for k, v in r.failed.items())
+        table.add_row(
+            r.label,
+            r.source.value,
+            "[green]ok[/green]" if r.ok else "[red]FAILED[/red]",
+            "; ".join(x for x in (stored, failed) if x),
+        )
+    console.print(table)
+
+    failed_runs = [r for r in results if not r.ok]
+    if failed_runs:
+        console.print(f"[red]{len(failed_runs)} of {len(results)} runs had a failed dataset.[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]All {len(results)} runs succeeded.[/green]")
+
+
 @app.command(name="ingest-hydat")
 def ingest_hydat() -> None:
     """Derive stream thermal regime from PWQMN water quality readings in the database.
@@ -1119,7 +1190,7 @@ def invite(note: str = typer.Option("", "--note", "-n", help="Note for this invi
     db = get_db()
     code = generate_invite_code(db, created_by=1, note=note)
     console.print(f"\n[green]Invite code: [bold]{code}[/bold][/green]")
-    console.print("Share this URL: https://web-production-e2094.up.railway.app/app")
+    console.print("Share this URL: http://localhost:8000/app (wherever `make serve` runs)")
     console.print(f"They enter: [bold]{code}[/bold] + choose a username")
     if note:
         console.print(f"Note: {note}")
@@ -1167,7 +1238,7 @@ def users() -> None:
 
 @app.command()
 def token() -> None:
-    """Get or refresh the admin Bearer token for Railway API access."""
+    """Get or refresh the admin Bearer token for the web API."""
     import secrets
     import sys
     from datetime import datetime, timedelta
@@ -1200,7 +1271,7 @@ def token() -> None:
         console.print("\n[green]Admin token (valid 90 days):[/green]")
         console.print(f"Bearer {new_token}")
         console.print("\n[dim]Save this. Use it to generate invite codes:[/dim]")
-        console.print("curl -X POST https://web-production-e2094.up.railway.app/admin/invite \\")
+        console.print("curl -X POST http://localhost:8000/admin/invite \\")
         console.print(f'  -H "Authorization: Bearer {new_token}" \\')
         console.print('  -d \'{"note": "friendsname"}\'')
     except Exception as e:
