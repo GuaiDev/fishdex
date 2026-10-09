@@ -331,6 +331,35 @@ def test_empty_bbox_skips_the_feature_query(cache_dir):
     assert mock_get.call_count == 1
 
 
+def test_count_error_fails_loudly_and_is_not_cached(cache_dir):
+    from src.ingest.jurisdictions.ca_on.hydro_network import _fetch_tile
+
+    fixture = _load_fixture("ohn_watercourse_response.json")
+    error = _mock_response({"error": {"code": 504, "message": "Gateway Timeout"}})
+    with (
+        patch(_HYDRO_HTTPX, return_value=error),
+        patch(_HYDRO_CACHE, cache_dir),
+        pytest.raises(RuntimeError, match=r"0\.00000,0\.00000,1\.00000,1\.00000"),
+    ):
+        _fetch_tile("http://lio.test/query", {}, 0.0, 0.0, 1.0, 1.0)
+
+    assert list(cache_dir.iterdir()) == []
+    with patch(_HYDRO_HTTPX, side_effect=_server(fixture)), patch(_HYDRO_CACHE, cache_dir):
+        feats = _fetch_tile("http://lio.test/query", {}, 0.0, 0.0, 1.0, 1.0)
+    assert len(feats) == len(fixture["features"])
+
+
+def test_count_response_without_a_count_fails_loudly(cache_dir):
+    from src.ingest.jurisdictions.ca_on.hydro_network import _fetch_tile
+
+    with (
+        patch(_HYDRO_HTTPX, return_value=_mock_response({})),
+        patch(_HYDRO_CACHE, cache_dir),
+        pytest.raises(RuntimeError, match="no feature count"),
+    ):
+        _fetch_tile("http://lio.test/query", {}, 0.0, 0.0, 1.0, 1.0)
+
+
 def _relabel(feat: dict, ogf_id: int) -> dict:
     return {**feat, "attributes": {**feat["attributes"], "OGF_ID": ogf_id}}
 

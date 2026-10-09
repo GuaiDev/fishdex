@@ -334,7 +334,10 @@ def _count_in_bbox(url: str, base_params: dict, bbox_str: str) -> int:
         "returnCountOnly": "true",
         "f": "json",
     }
-    return int(_cached_get(url, params).get("count", 0))
+    count = _cached_get(url, params).get("count")
+    if not isinstance(count, int):
+        raise RuntimeError(f"OHN: no feature count for tile {bbox_str} (got {count!r})")
+    return count
 
 
 # ── internal parsers ──────────────────────────────────────────────────────────
@@ -531,6 +534,8 @@ def _cached_get(url: str, params: dict) -> dict:
     )
     response.raise_for_status()
     data = response.json()
+    if "error" in data:
+        raise RuntimeError(f"OHN query failed for tile {params.get('geometry')}: {data['error']}")
     cache_file.write_text(json.dumps(data))
     return data
 

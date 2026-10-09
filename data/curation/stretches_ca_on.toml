@@ -29,9 +29,10 @@
 # First Nations territory: no boundary layer exists in this repository, so it
 # is handled here, by leaving those waters out. The Grand between Brantford and
 # Caledonia (Six Nations of the Grand River, Mississaugas of the Credit), the
-# Thames below Delaware (Chippewas of the Thames, Munsee-Delaware, Oneida Nation
-# of the Thames, Delaware Nation at Moraviantown) and the St. Clair delta
-# (Walpole Island First Nation) have no stretch on purpose.
+# Thames between Delaware and Thamesville (Chippewas of the Thames,
+# Munsee-Delaware, Oneida Nation of the Thames, Delaware Nation at
+# Moraviantown) and the St. Clair delta (Walpole Island First Nation) have no
+# stretch on purpose.
 
 version = 1
 jurisdiction = "CA-ON"
