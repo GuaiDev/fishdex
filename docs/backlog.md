@@ -234,11 +234,16 @@ reads the EnMoDS "Current EnMoDS Results" tier (dataset slug
 - Kept: `Water - Fresh`, `QC_Type = NORMAL`, no `Detection_Condition`, numeric
   results for DO / pH / temperature / conductivity / turbidity, matched by EMS
   observed-property code (not the free-text label) and checked against unit.
+  Only ambient location types (`River, Stream, or Creek`, `Lake or Pond`,
+  `Estuary`) are kept; outfalls, ditches/culverts, seepage, landfills and other
+  permittee compliance points are counted and excluded.
   Rows of one visit fold into one `water_quality_readings` row (`jurisdiction`
   `CA-BC`, `record_id` = `CA-BC:<location>:<observed time>`), so re-ingest upserts.
+  Within a visit each parameter keeps the shallowest sample (missing depth =
+  surface), and the field code beats the lab code at equal depth.
   mS/cm is converted to µS/cm; NTU is stored in the `turbidity_fnu` column.
-- Counts that separate "worked" from "silently dropped" (unusable rows, validator
-  rejections, unit surprises) come back in `ParseStats` and log at WARNING when
+- Counts that separate "worked" from "silently dropped" (unusable rows, per-row
+  validator rejections, unit surprises) come back in `ParseStats` and log at WARNING when
   non-zero.
 - The existing water context slice reads the table by radius; its source label is
   now taken from each reading's jurisdiction ("PWQMN", "BC EnMoDS") instead of

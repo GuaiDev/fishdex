@@ -24,8 +24,15 @@ HOW IT WORKS
      station WFS is not needed — and it cannot miss locations that only exist
      in EnMoDS.
   4. Keep fresh-water, normal (non-blank/replicate/spike), detected, numeric
-     results for the five parameters the water slice uses, and fold the rows
-     of one visit into a single WaterQualityReading.
+     results for the five parameters the water slice uses, from ambient
+     surface-water location types only, and fold the rows of one visit into a
+     single WaterQualityReading.
+
+LOCATION TYPES
+  Outfalls, ditches and culverts, seepage, landfills, in-plant and storage
+  points are permittee compliance sampling, not the water a fish lives in — a
+  ditch reading of DO 1 mg/L would otherwise drag the area's median toward
+  "too low for fish". Only _AMBIENT_LOCATION_TYPES is kept.
 
 PARAMETER MATCHING
   By EMS observed-property code (the Observed_Property_Name column), not by the
@@ -60,6 +67,11 @@ _USER_AGENT = "fishbot/1.0 (personal fishing exploration bot)"
 _CHUNK_BYTES = 1 << 20
 _JURISDICTION = "CA-BC"
 
+# Every Location_Type in the file (checked 2026-10-09) that is ambient surface
+# water. Everything else — Outfall, Ditch or Culvert, Seepage, Landfill, Well,
+# In-Plant, Storage, sewers, ponds built for treatment — is excluded.
+_AMBIENT_LOCATION_TYPES = frozenset({"River, Stream, or Creek", "Lake or Pond", "Estuary"})
+
 # EMS observed-property code -> (reading field, accepted units -> multiplier).
 _PARAMETERS: dict[str, tuple[str, dict[str, float]]] = {
     "0014": ("do_mgl", {"mg/L": 1.0}),
@@ -72,6 +84,9 @@ _PARAMETERS: dict[str, tuple[str, dict[str, float]]] = {
     "0015": ("turbidity_fnu", {"NTU": 1.0}),
     "TURF": ("turbidity_fnu", {"NTU": 1.0}),
 }
+_FIELD_CODES = frozenset({"PH-F", "TEMF", "SC-F", "TURF"})
+# Known units the adapter deliberately does not use; any other unit is a surprise.
+_SKIPPED_UNITS = frozenset({("0014", "%")})
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +96,14 @@ class ParseStats:
     """What the pass over the file kept and what it threw away, and why."""
 
     rows_scanned: int = 0
+    rows_no_coords: int = 0  # anywhere in the province, before the radius test
     rows_in_radius: int = 0
     rows_not_wanted: int = 0  # wrong medium, QC type, non-detect, other parameter
-    rows_unusable: int = 0  # wanted, but value/unit/date/coordinate would not parse
+    rows_not_ambient: int = 0  # wanted, but from a compliance/discharge location type
+    rows_unusable: int = 0  # wanted, but value/date/depth would not parse
     rows_rejected: int = 0  # parsed, but a reading validator refused the value
     readings: int = 0
-    unit_counts: dict[str, int] = field(default_factory=dict)
+    unit_counts: dict[str, int] = field(default_factory=dict)  # unexpected units only
 
 
 def fetch_water_quality_readings(
@@ -101,15 +118,25 @@ def fetch_water_quality_readings(
     """
     path = download_results()
     readings, stats = parse_results(path, lat, lng, radius_km)
-    log = logger.warning if stats.rows_unusable + stats.rows_rejected else logger.info
+    unexpected_units = sum(stats.unit_counts.values())
+    log = (
+        logger.warning
+        if stats.rows_unusable + stats.rows_rejected + unexpected_units
+        else logger.info
+    )
     log(
-        "BC EnMoDS: scanned %d rows, %d within %.0fkm, %d unusable, %d rejected by "
-        "validators, %d not wanted -> %d readings",
+        "BC EnMoDS: scanned %d rows (%d without coordinates), %d within %.0fkm, "
+        "%d unusable, %d rejected by validators, %d with unexpected units %s, "
+        "%d from non-ambient location types, %d not wanted -> %d readings",
         stats.rows_scanned,
+        stats.rows_no_coords,
         stats.rows_in_radius,
         radius_km,
         stats.rows_unusable,
         stats.rows_rejected,
+        unexpected_units,
+        stats.unit_counts,
+        stats.rows_not_ambient,
         stats.rows_not_wanted,
         stats.readings,
     )
@@ -170,7 +197,7 @@ def parse_results(
             stats.rows_scanned += 1
             coords = _coords(row)
             if coords is None:
-                stats.rows_unusable += 1
+                stats.rows_no_coords += 1
                 continue
             row_lat, row_lng = coords
             # Cheap box test first: this runs over millions of rows.
@@ -181,19 +208,16 @@ def parse_results(
             stats.rows_in_radius += 1
             _accumulate(row, row_lat, row_lng, visits, stats)
 
-    readings: list[WaterQualityReading] = []
-    for (location_id, observed), data in visits.items():
-        try:
-            readings.append(
-                WaterQualityReading(
-                    record_id=f"{_JURISDICTION}:{location_id}:{observed}",
-                    station_id=location_id,
-                    jurisdiction=_JURISDICTION,
-                    **data,
-                )
-            )
-        except ValidationError:
-            stats.rows_rejected += 1
+    readings = [
+        WaterQualityReading(
+            record_id=f"{_JURISDICTION}:{location_id}:{observed}",
+            station_id=location_id,
+            jurisdiction=_JURISDICTION,
+            **visit["meta"],
+            **{name: value for name, (_, value) in visit["values"].items()},
+        )
+        for (location_id, observed), visit in visits.items()
+    ]
     stats.readings = len(readings)
     return readings, stats
 
@@ -215,37 +239,61 @@ def _accumulate(
         stats.rows_not_wanted += 1
         return
 
+    if row.get("Location_Type") not in _AMBIENT_LOCATION_TYPES:
+        stats.rows_not_ambient += 1
+        return
+
+    code = row["Observed_Property_Name"].strip()
     field_name, units = spec
     unit = row.get("Result_Unit", "")
     multiplier = units.get(unit)
     if multiplier is None:
-        # DO as % saturation shares the DO code; anything else is unexpected.
-        stats.rows_not_wanted += 1
-        stats.unit_counts[unit] = stats.unit_counts.get(unit, 0) + 1
+        if (code, unit) in _SKIPPED_UNITS:
+            stats.rows_not_wanted += 1
+        else:
+            stats.unit_counts[unit] = stats.unit_counts.get(unit, 0) + 1
         return
 
     observed = row.get("Observed_Date_Time", "").strip()
     location_id = row.get("Location_ID", "").strip()
+    depth_text = (row.get("Depth_Upper") or "").strip()
     try:
         value = float(row["Result_Value"]) * multiplier
         sampled_at = date.fromisoformat(observed[:10])
+        depth = float(depth_text) if depth_text else 0.0
     except (KeyError, ValueError):
         stats.rows_unusable += 1
         return
     if not location_id or not math.isfinite(value):
         stats.rows_unusable += 1
         return
+    try:
+        WaterQualityReading(
+            record_id="", station_id="", sampled_at=sampled_at, **{field_name: value}
+        )
+    except ValidationError:
+        stats.rows_rejected += 1
+        return
 
     visit = visits.setdefault(
         (location_id, observed),
         {
-            "station_name": row.get("Location_Name") or None,
-            "lat": row_lat,
-            "lng": row_lng,
-            "sampled_at": sampled_at,
+            "meta": {
+                "station_name": row.get("Location_Name") or None,
+                "lat": row_lat,
+                "lng": row_lng,
+                "sampled_at": sampled_at,
+            },
+            "values": {},
         },
     )
-    visit[field_name] = value
+    # One visit can hold a depth profile and both field and lab codes for one
+    # parameter. Keep the shallowest sample (missing depth = surface); at equal
+    # depth prefer the field measurement; on a full tie the first row wins.
+    rank = (depth, code not in _FIELD_CODES)
+    current = visit["values"].get(field_name)
+    if current is None or rank < current[0]:
+        visit["values"][field_name] = (rank, value)
 
 
 def _open_text(path: Path):

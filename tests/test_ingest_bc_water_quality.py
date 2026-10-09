@@ -6,7 +6,9 @@ water, replicate QC, a non-detect, pH 99, DO as % saturation, an empty value, a
 mS/cm conductivity, and a location in Ontario.
 """
 
+import csv
 import gzip
+import logging
 import shutil
 from pathlib import Path
 
@@ -28,6 +30,31 @@ def gz_fixture(tmp_path):
     with FIXTURE.open("rb") as src, gzip.open(out, "wb") as dst:
         shutil.copyfileobj(src, dst)
     return out
+
+
+def _fixture_rows():
+    with FIXTURE.open(encoding="utf-8-sig", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def _write_rows(path, rows):
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _river_row(**overrides):
+    template = next(r for r in _fixture_rows() if r["Location_ID"] == "E339144")
+    row = {
+        **template,
+        "Location_ID": "E900001",
+        "Observed_Date_Time": "2025-10-01T09:00-08:00",
+        "Depth_Upper": "",
+    }
+    row.update(overrides)
+    return row
 
 
 def _by_station(readings):
@@ -70,7 +97,7 @@ def test_unwanted_rows_are_dropped_and_counted():
     # waste water (11-02), replicate (11-03), non-detect (11-04), % saturation (11-06)
     assert not dates & {"2025-11-02", "2025-11-03", "2025-11-04", "2025-11-06"}
     assert stats.rows_not_wanted >= 4
-    assert stats.unit_counts.get("%") == 1
+    assert stats.unit_counts == {}  # % saturation is a known skip, not a surprise
     # empty Result_Value (11-07) cannot be parsed
     assert stats.rows_unusable == 1
 
@@ -79,6 +106,82 @@ def test_validator_rejection_is_counted_not_silent():
     readings, stats = wq.parse_results(FIXTURE, *FRASER, radius_km=100)
     assert stats.rows_rejected == 1  # pH 99 on 2025-11-05
     assert "2025-11-05" not in {r.sampled_at.isoformat() for r in readings}
+
+
+def test_compliance_location_types_never_reach_stored_readings(tmp_path, monkeypatch, gz_fixture):
+    _, stats = wq.parse_results(FIXTURE, *FRASER, radius_km=100)
+    assert stats.rows_not_ambient == 4
+
+    db_path = tmp_path / "t.db"
+    monkeypatch.setattr(wq, "download_results", lambda: gz_fixture)
+    monkeypatch.setattr("src.services.bc_ingest.get_db", lambda: get_db(db_path))
+    ingest_bc_water_quality(49.10, -123.02, radius_km=30)
+    stored = query_water_quality(get_db(db_path), lat=49.10, lng=-123.02, radius_km=30)
+    # 0301336 is the 'Ditch or Culvert' station with DO 1.08 mg/L and pH 3.98.
+    assert stored
+    assert "0301336" not in {r.station_id for r in stored}
+    assert 1.08 not in {r.do_mgl for r in stored}
+
+
+def test_visit_fold_keeps_shallowest_sample_and_prefers_field_ph(tmp_path):
+    rows = [
+        _river_row(
+            Observed_Property_Name="0014", Result_Unit="mg/L", Result_Value="2.0", Depth_Upper="12"
+        ),
+        _river_row(Observed_Property_Name="0014", Result_Unit="mg/L", Result_Value="9.0"),
+        _river_row(
+            Observed_Property_Name="0014", Result_Unit="mg/L", Result_Value="7.0", Depth_Upper="5"
+        ),
+        _river_row(Observed_Property_Name="0004", Result_Unit="pH units", Result_Value="6.5"),
+        _river_row(Observed_Property_Name="PH-F", Result_Unit="pH units", Result_Value="7.2"),
+        _river_row(Observed_Property_Name="0004", Result_Unit="pH units", Result_Value="6.0"),
+    ]
+    for ordering in (rows, rows[::-1]):
+        readings, _ = wq.parse_results(_write_rows(tmp_path / "f.csv", ordering), *FRASER, 100)
+        assert len(readings) == 1
+        assert readings[0].do_mgl == 9.0
+        assert readings[0].ph == 7.2
+
+
+def test_rejected_parameter_keeps_the_rest_of_its_visit(tmp_path):
+    rows = [
+        _river_row(Observed_Property_Name="TEMF", Result_Unit="degC", Result_Value="45"),
+        _river_row(Observed_Property_Name="PH-F", Result_Unit="pH units", Result_Value="7.4"),
+    ]
+    readings, stats = wq.parse_results(_write_rows(tmp_path / "f.csv", rows), *FRASER, 100)
+    assert stats.rows_rejected == 1
+    assert [(r.ph, r.temp_c) for r in readings] == [(7.4, None)]
+
+
+def test_unexpected_unit_is_counted_and_logged_at_warning(tmp_path, monkeypatch, caplog):
+    rows = [
+        _river_row(Observed_Property_Name="SC-F", Result_Unit="uS/cm", Result_Value="90"),
+        _river_row(Observed_Property_Name="PH-F", Result_Unit="pH units", Result_Value="7.4"),
+    ]
+    path = _write_rows(tmp_path / "f.csv", rows)
+    monkeypatch.setattr(wq, "download_results", lambda: path)
+    with caplog.at_level(logging.INFO, logger=wq.__name__):
+        readings = wq.fetch_water_quality_readings(*FRASER, radius_km=100)
+    assert [r.conductivity_us_cm for r in readings] == [None]
+    [record] = [r for r in caplog.records if "BC EnMoDS: scanned" in r.getMessage()]
+    assert record.levelno == logging.WARNING
+    assert "uS/cm" in record.getMessage()
+
+
+def test_rows_without_coordinates_are_counted_apart_and_do_not_warn(tmp_path, monkeypatch, caplog):
+    rows = [
+        _river_row(Location_Latitude="", Location_Longitude=""),
+        _river_row(Observed_Property_Name="PH-F", Result_Unit="pH units", Result_Value="7.4"),
+    ]
+    path = _write_rows(tmp_path / "f.csv", rows)
+    _, stats = wq.parse_results(path, *FRASER, 100)
+    assert (stats.rows_no_coords, stats.rows_unusable) == (1, 0)
+
+    monkeypatch.setattr(wq, "download_results", lambda: path)
+    with caplog.at_level(logging.INFO, logger=wq.__name__):
+        wq.fetch_water_quality_readings(*FRASER, radius_km=100)
+    [record] = [r for r in caplog.records if "BC EnMoDS: scanned" in r.getMessage()]
+    assert record.levelno == logging.INFO
 
 
 def test_radius_excludes_distant_locations():
