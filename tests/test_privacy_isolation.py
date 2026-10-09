@@ -1,0 +1,168 @@
+"""One user's spots must never reach another user.
+
+Covers the synthesis cache (a cached reply is built from the asker's own
+catches and visits) and dismissed_segments (a blank stop hides water from
+Explore). No model calls; all databases are temporary.
+"""
+
+import json
+
+import pytest
+
+from src.agent.tools import execute_tool
+from src.services.context import _seen_segment_ids
+from src.services.synthesis_cache import get_cached_synthesis, store_synthesis
+from src.services.trip_logger import _penalise_segment
+from src.storage.database import (
+    get_db,
+    migrate_dismissed_segments_user,
+    migrate_segment_synthesis_user,
+)
+
+LAT, LNG = 43.5, -79.7
+
+
+@pytest.fixture()
+def db(tmp_path):
+    return get_db(tmp_path / "test.db")
+
+
+# ── synthesis cache ──────────────────────────────────────────────────────────
+
+
+def test_cached_reply_is_not_served_to_another_user_by_coordinates(db):
+    store_synthesis(db, "A caught 3 bass here", user_id=1, lat=LAT, lng=LNG)
+    assert get_cached_synthesis(db, user_id=2, lat=LAT, lng=LNG) is None
+    # Nearby point (proximity path) too
+    assert get_cached_synthesis(db, user_id=2, lat=LAT + 0.0005, lng=LNG) is None
+
+
+def test_cached_reply_is_not_served_to_another_user_by_name(db):
+    store_synthesis(db, "A's secret spot", user_id=1, location_name="Hidden Creek")
+    assert get_cached_synthesis(db, user_id=2, location_name="Hidden Creek") is None
+    # Fuzzy name path
+    assert get_cached_synthesis(db, user_id=2, location_name="Hidden Creek Pond") is None
+
+
+def test_owner_still_hits_own_cache(db):
+    store_synthesis(db, "mine", user_id=1, lat=LAT, lng=LNG, location_name="Hidden Creek")
+    assert get_cached_synthesis(db, user_id=1, lat=LAT, lng=LNG)["synthesis"] == "mine"
+    assert get_cached_synthesis(db, user_id=1, location_name="Hidden Creek")["synthesis"] == "mine"
+
+
+def test_two_users_keep_separate_rows_for_the_same_place(db):
+    store_synthesis(db, "reply for A", user_id=1, lat=LAT, lng=LNG)
+    store_synthesis(db, "reply for B", user_id=2, lat=LAT, lng=LNG)
+    assert get_cached_synthesis(db, user_id=1, lat=LAT, lng=LNG)["synthesis"] == "reply for A"
+    assert get_cached_synthesis(db, user_id=2, lat=LAT, lng=LNG)["synthesis"] == "reply for B"
+
+
+def test_legacy_rows_without_a_user_are_never_served(db):
+    # A row as written before the user_id column existed.
+    db.execute(
+        "INSERT INTO segment_synthesis (cache_key, lat, lng, location_name, synthesis)"
+        " VALUES (?, ?, ?, ?, ?)",
+        [f"geo:{LAT},{LNG}", LAT, LNG, "Old Creek", "old shared reply"],
+    )
+    db.conn.commit()
+    for uid in (1, 2):
+        assert get_cached_synthesis(db, user_id=uid, lat=LAT, lng=LNG) is None
+        assert get_cached_synthesis(db, user_id=uid, location_name="Old Creek") is None
+
+
+def test_synthesis_migration_adds_user_id_to_old_table(tmp_path):
+    db = get_db(tmp_path / "old.db")
+    db.execute("DROP TABLE segment_synthesis")
+    db.execute(
+        "CREATE TABLE segment_synthesis (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " cache_key TEXT UNIQUE NOT NULL, lat REAL, lng REAL, location_name TEXT,"
+        " jurisdiction TEXT, synthesis TEXT NOT NULL, data_sources TEXT,"
+        " computed_at TEXT, hit_count INTEGER DEFAULT 0)"
+    )
+    db.execute(
+        "INSERT INTO segment_synthesis (cache_key, lat, lng, synthesis)"
+        " VALUES ('geo:1,1', 1, 1, 'x')"
+    )
+    migrate_segment_synthesis_user(db)
+    migrate_segment_synthesis_user(db)  # idempotent
+    assert "user_id" in {c.name for c in db["segment_synthesis"].columns}
+    assert get_cached_synthesis(db, user_id=1, lat=1, lng=1) is None
+
+
+def test_chat_web_path_never_serves_another_users_cache(tmp_path, monkeypatch):
+    """Through run_chat_api: user 2 asking about user 1's cached place gets a fresh answer."""
+    import src.agent.chat as chat
+    import src.agent.router as router
+    import src.storage.database as db_mod
+
+    monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
+    db = get_db(tmp_path / "test.db")
+    store_synthesis(db, "A's catches", user_id=1, lat=LAT, lng=LNG)
+
+    pipeline_users = []
+
+    def fake_pipeline(messages, session_id, mode="synthesis", user_id=1):
+        pipeline_users.append(user_id)
+        return {"reply": f"fresh answer for user {user_id}", "tool_calls": []}
+
+    monkeypatch.setattr(chat, "_run_full_pipeline", fake_pipeline)
+    monkeypatch.setattr(chat, "_log_routing", lambda *a, **k: None)
+    monkeypatch.setattr(router, "classify_message", lambda *a, **k: {"mode": "synthesis"})
+    monkeypatch.setattr(
+        router,
+        "extract_location_from_message",
+        lambda m: {"lat": LAT, "lng": LNG, "location_name": None},
+    )
+
+    msgs = [{"role": "user", "content": "tell me about this spot"}]
+    result = chat.run_chat_api(list(msgs), session_id="s", user_id=2)
+    assert result["reply"] == "fresh answer for user 2"
+    assert "A's catches" not in json.dumps(result)
+    assert pipeline_users == [2]
+    # ...and B's fresh reply is now cached for B only.
+    assert get_cached_synthesis(db, user_id=2, lat=LAT, lng=LNG)["synthesis"] == (
+        "fresh answer for user 2"
+    )
+    assert get_cached_synthesis(db, user_id=1, lat=LAT, lng=LNG)["synthesis"] == "A's catches"
+
+
+# ── dismissed_segments ───────────────────────────────────────────────────────
+
+
+def test_blank_stop_by_one_user_does_not_hide_water_from_another(db):
+    _penalise_segment(db, 101, user_id=1)
+    assert 101 in _seen_segment_ids(db, user_id=1)
+    assert 101 not in _seen_segment_ids(db, user_id=2)
+
+
+def test_dismiss_tool_is_per_user(tmp_path, monkeypatch):
+    import src.storage.database as db_mod
+
+    monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
+    db = get_db(tmp_path / "test.db")
+    out = json.loads(execute_tool("dismiss_segment", {"ogf_id": 42}, user_id=1))
+    assert out["success"] is True
+    assert 42 in _seen_segment_ids(db, user_id=1)
+    assert 42 not in _seen_segment_ids(db, user_id=2)
+
+
+def test_both_users_can_dismiss_the_same_segment(db):
+    _penalise_segment(db, 7, user_id=1)
+    _penalise_segment(db, 7, user_id=2)
+    assert 7 in _seen_segment_ids(db, user_id=1)
+    assert 7 in _seen_segment_ids(db, user_id=2)
+
+
+def test_dismissed_segments_migration_assigns_old_rows_to_user_1(tmp_path):
+    db = get_db(tmp_path / "old.db")
+    db.execute("DROP TABLE dismissed_segments")
+    db.execute(
+        "CREATE TABLE dismissed_segments"
+        " (ogf_id INTEGER PRIMARY KEY, dismissed_at TEXT, reason TEXT)"
+    )
+    db.execute("INSERT INTO dismissed_segments VALUES (55, '2026-01-01', 'blank')")
+    db.conn.commit()
+    migrate_dismissed_segments_user(db)
+    migrate_dismissed_segments_user(db)  # idempotent
+    assert 55 in _seen_segment_ids(db, user_id=1)
+    assert 55 not in _seen_segment_ids(db, user_id=2)

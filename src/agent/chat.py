@@ -263,7 +263,9 @@ def run_chat_api(
         _is_time_forward = any(p in latest_user.lower() for p in _cache_bypass_patterns)
 
         if not _is_time_forward and (lat is not None or location_name is not None):
-            cached = get_cached_synthesis(db, lat=lat, lng=lng, location_name=location_name)
+            cached = get_cached_synthesis(
+                db, user_id=user_id, lat=lat, lng=lng, location_name=location_name
+            )
             if cached:
                 cache_prompt = (
                     f"The user asked: {latest_user}\n\n"
@@ -305,6 +307,7 @@ def run_chat_api(
             try:
                 store_synthesis(
                     db,
+                    user_id=user_id,
                     synthesis=result["reply"],
                     lat=lat,
                     lng=lng,
@@ -367,6 +370,8 @@ def run_chat() -> None:
 
     profile = load_profile()
     db = get_db()
+    # The CLI is single-user: everything it reads and writes belongs to user 1.
+    cli_user_id = 1
     session_id = datetime.now().isoformat()
     start_session(db, session_id)
 
@@ -443,7 +448,9 @@ def run_chat() -> None:
             c_name = cache_loc.get("location_name")
 
             if c_lat is not None or c_name is not None:
-                cached = get_cached_synthesis(db, lat=c_lat, lng=c_lng, location_name=c_name)
+                cached = get_cached_synthesis(
+                    db, user_id=cli_user_id, lat=c_lat, lng=c_lng, location_name=c_name
+                )
                 if cached:
                     cache_prompt = (
                         f"The user asked: {user_input}\n\n"
@@ -503,7 +510,12 @@ def run_chat() -> None:
                         from src.services.synthesis_cache import store_synthesis
 
                         store_synthesis(
-                            db, synthesis=reply, lat=c_lat, lng=c_lng, location_name=c_name
+                            db,
+                            user_id=cli_user_id,
+                            synthesis=reply,
+                            lat=c_lat,
+                            lng=c_lng,
+                            location_name=c_name,
                         )
                     except Exception:
                         pass  # Non-fatal

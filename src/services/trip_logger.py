@@ -474,7 +474,7 @@ def log_session(
 
         if not stop.get("was_productive") and stop.get("ohn_segment_id"):
             try:
-                _penalise_segment(db_conn, int(stop["ohn_segment_id"]))
+                _penalise_segment(db_conn, int(stop["ohn_segment_id"]), user_id)
             except (ValueError, TypeError):
                 pass
 
@@ -581,6 +581,7 @@ def log_trip(  # DEPRECATED — use log_session / parse_session_from_text instea
     text: str,
     user_lat: float | None = None,
     user_lng: float | None = None,
+    user_id: int = 1,
 ) -> dict:
     """Parse a natural-language trip description and persist it.
 
@@ -613,7 +614,7 @@ def log_trip(  # DEPRECATED — use log_session / parse_session_from_text instea
 
     # Mark unproductive segments as seen-before (0.3× exploration penalty)
     if parsed.get("was_productive") is False and ogf_id:
-        _penalise_segment(db, ogf_id)
+        _penalise_segment(db, ogf_id, user_id)
 
     confirmation = _build_confirmation(parsed, trip_id, snapped, seg_name)
 
@@ -850,16 +851,17 @@ def _maybe_insert_species_insights(
     return inserted
 
 
-def _penalise_segment(db: Database, ogf_id: int) -> None:
-    """Add an unproductive segment to dismissed_segments for 0.3× exploration penalty."""
+def _penalise_segment(db: Database, ogf_id: int, user_id: int) -> None:
+    """Add an unproductive segment to this user's dismissed_segments (0.3× exploration penalty)."""
     try:
         db["dismissed_segments"].upsert(
             {
+                "user_id": user_id,
                 "ogf_id": ogf_id,
                 "dismissed_at": datetime.now().isoformat(),
                 "reason": "unproductive_trip_log",
             },
-            pk="ogf_id",
+            pk=("user_id", "ogf_id"),
         )
     except Exception as e:
         logger.warning("Failed to penalise segment %s: %s", ogf_id, e)

@@ -272,7 +272,9 @@ def _seen_segment_ids(db: Database, user_id: int) -> set[int]:
         ).fetchall()
         seen.update(int(r[0]) for r in rows if r[0] is not None)
     if "dismissed_segments" in db.table_names():
-        rows = db.execute("SELECT ogf_id FROM dismissed_segments").fetchall()
+        rows = db.execute(
+            "SELECT ogf_id FROM dismissed_segments WHERE user_id = ?", [user_id]
+        ).fetchall()
         seen.update(int(r[0]) for r in rows if r[0] is not None)
     return seen
 

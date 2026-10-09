@@ -548,14 +548,19 @@ def _find_tributaries(inputs: dict, _user_id: int) -> str:
     )
 
 
-def _dismiss_segment(inputs: dict, _user_id: int) -> str:
+def _dismiss_segment(inputs: dict, user_id: int) -> str:
     from datetime import datetime
 
     ogf_id = int(inputs["ogf_id"])
     reason = inputs.get("reason") or ""
     get_db()["dismissed_segments"].upsert(
-        {"ogf_id": ogf_id, "dismissed_at": datetime.now().isoformat(), "reason": reason},
-        pk="ogf_id",
+        {
+            "user_id": user_id,
+            "ogf_id": ogf_id,
+            "dismissed_at": datetime.now().isoformat(),
+            "reason": reason,
+        },
+        pk=("user_id", "ogf_id"),
     )
     return json.dumps(
         {

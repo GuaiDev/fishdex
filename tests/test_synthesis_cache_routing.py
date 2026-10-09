@@ -59,18 +59,21 @@ def test_store_and_retrieve_synthesis(db_conn):
     store_synthesis(
         db_conn,
         synthesis="Willoway Park has marshy OHN tributaries that concentrate catfish.",
+        user_id=1,
         lat=42.917,
         lng=-79.774,
         location_name="Willoway Park",
     )
-    result = get_cached_synthesis(db_conn, lat=42.917, lng=-79.774)
+    result = get_cached_synthesis(db_conn, user_id=1, lat=42.917, lng=-79.774)
     assert result is not None
     assert result["cache_hit"] is True
     assert "catfish" in result["synthesis"]
 
 
 def test_cache_miss_returns_none(db_conn):
-    result = get_cached_synthesis(db_conn, lat=43.5, lng=-80.5, location_name="Nowhere Creek")
+    result = get_cached_synthesis(
+        db_conn, user_id=1, lat=43.5, lng=-80.5, location_name="Nowhere Creek"
+    )
     assert result is None
 
 
@@ -78,10 +81,11 @@ def test_cache_hit_increments_count(db_conn):
     store_synthesis(
         db_conn,
         synthesis="Test synthesis content.",
+        user_id=1,
         location_name="Test Location",
     )
     # First hit
-    get_cached_synthesis(db_conn, location_name="Test Location")
+    get_cached_synthesis(db_conn, user_id=1, location_name="Test Location")
     row = db_conn.execute(
         "SELECT hit_count FROM segment_synthesis WHERE location_name = ?",
         ["Test Location"],
@@ -89,7 +93,7 @@ def test_cache_hit_increments_count(db_conn):
     assert row[0] == 1
 
     # Second hit
-    get_cached_synthesis(db_conn, location_name="Test Location")
+    get_cached_synthesis(db_conn, user_id=1, location_name="Test Location")
     row = db_conn.execute(
         "SELECT hit_count FROM segment_synthesis WHERE location_name = ?",
         ["Test Location"],
@@ -102,11 +106,12 @@ def test_nearby_coord_hits_cache(db_conn):
     store_synthesis(
         db_conn,
         synthesis="Spotted close to Byng Island.",
+        user_id=1,
         lat=43.000,
         lng=-80.000,
     )
     # 0.001 degree ≈ 100m — within default 150m radius
-    result = get_cached_synthesis(db_conn, lat=43.001, lng=-80.001)
+    result = get_cached_synthesis(db_conn, user_id=1, lat=43.001, lng=-80.001)
     assert result is not None
     assert result["cache_hit"] is True
 
@@ -124,6 +129,7 @@ def test_name_only_entries_auto_tagged_with_jurisdiction_from_coords(db_conn):
     store_synthesis(
         db_conn,
         synthesis="Ontario Mill Creek: warm, silty, chub and creek chub water.",
+        user_id=1,
         lat=43.20,
         lng=-79.90,  # CA-ON
         location_name="Mill Creek",
@@ -142,10 +148,13 @@ def test_exact_name_key_does_not_cross_jurisdictions_when_both_known(db_conn):
     store_synthesis(
         db_conn,
         synthesis="Ontario Mill Creek synthesis.",
+        user_id=1,
         location_name="Mill Creek",
         jurisdiction="CA-ON",
     )
-    result = get_cached_synthesis(db_conn, location_name="Mill Creek", jurisdiction="CA-BC")
+    result = get_cached_synthesis(
+        db_conn, user_id=1, location_name="Mill Creek", jurisdiction="CA-BC"
+    )
     assert result is None
 
 
@@ -153,10 +162,13 @@ def test_exact_name_key_still_hits_when_jurisdiction_matches(db_conn):
     store_synthesis(
         db_conn,
         synthesis="BC Mill Creek synthesis.",
+        user_id=1,
         location_name="Mill Creek",
         jurisdiction="CA-BC",
     )
-    result = get_cached_synthesis(db_conn, location_name="Mill Creek", jurisdiction="CA-BC")
+    result = get_cached_synthesis(
+        db_conn, user_id=1, location_name="Mill Creek", jurisdiction="CA-BC"
+    )
     assert result is not None
     assert "BC Mill Creek" in result["synthesis"]
 
@@ -167,9 +179,10 @@ def test_exact_name_key_still_hits_when_neither_side_has_jurisdiction(db_conn):
     store_synthesis(
         db_conn,
         synthesis="Some creek synthesis, no coordinates ever resolved.",
+        user_id=1,
         location_name="Beaver Creek",
     )
-    result = get_cached_synthesis(db_conn, location_name="Beaver Creek")
+    result = get_cached_synthesis(db_conn, user_id=1, location_name="Beaver Creek")
     assert result is not None
 
 
@@ -179,11 +192,14 @@ def test_fuzzy_name_match_blocked_across_known_jurisdictions(db_conn):
     store_synthesis(
         db_conn,
         synthesis="Alberta Bow River Calgary: trout, catch and release.",
+        user_id=1,
         lat=51.05,
         lng=-114.07,  # CA-AB
         location_name="Bow River Calgary",
     )
-    result = get_cached_synthesis(db_conn, location_name="Bow River", jurisdiction="CA-BC")
+    result = get_cached_synthesis(
+        db_conn, user_id=1, location_name="Bow River", jurisdiction="CA-BC"
+    )
     assert result is None
 
 
@@ -191,11 +207,14 @@ def test_fuzzy_name_match_still_works_within_same_jurisdiction(db_conn):
     store_synthesis(
         db_conn,
         synthesis="Alberta Bow River Calgary: trout, catch and release.",
+        user_id=1,
         lat=51.05,
         lng=-114.07,  # CA-AB
         location_name="Bow River Calgary",
     )
-    result = get_cached_synthesis(db_conn, location_name="Bow River", jurisdiction="CA-AB")
+    result = get_cached_synthesis(
+        db_conn, user_id=1, location_name="Bow River", jurisdiction="CA-AB"
+    )
     assert result is not None
 
 
@@ -205,8 +224,9 @@ def test_coordinate_proximity_match_blocked_across_known_jurisdictions(db_conn):
     store_synthesis(
         db_conn,
         synthesis="Some synthesis.",
+        user_id=1,
         lat=43.000,
         lng=-80.000,  # CA-ON
     )
-    result = get_cached_synthesis(db_conn, lat=43.001, lng=-80.001, jurisdiction="CA-BC")
+    result = get_cached_synthesis(db_conn, user_id=1, lat=43.001, lng=-80.001, jurisdiction="CA-BC")
     assert result is None
