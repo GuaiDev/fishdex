@@ -60,9 +60,15 @@ def ingest_ab_hydro_network(
 
     now = datetime.utcnow().isoformat()
 
+<<<<<<< HEAD
     seg_rows = [
         {
             "ogf_id": AB_SEGMENT_ID_OFFSET + s.ogf_id,
+=======
+    seg_rows = [
+        {
+            "ogf_id": AB_SEGMENT_ID_OFFSET + s.ogf_id,
+>>>>>>> 7e699b7 (feat(ab): implement FWMIS hydro network adapter and wire into weekly ingest)
             "watercourse_type": s.watercourse_type,
             "name": s.name,
             "flow_verified": int(s.flow_verified),
