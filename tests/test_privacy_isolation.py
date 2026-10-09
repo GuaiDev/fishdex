@@ -153,16 +153,77 @@ def test_both_users_can_dismiss_the_same_segment(db):
     assert 7 in _seen_segment_ids(db, user_id=2)
 
 
-def test_dismissed_segments_migration_assigns_old_rows_to_user_1(tmp_path):
-    db = get_db(tmp_path / "old.db")
+def _legacy_dismissed(db, rows):
     db.execute("DROP TABLE dismissed_segments")
     db.execute(
         "CREATE TABLE dismissed_segments"
         " (ogf_id INTEGER PRIMARY KEY, dismissed_at TEXT, reason TEXT)"
     )
-    db.execute("INSERT INTO dismissed_segments VALUES (55, '2026-01-01', 'blank')")
+    for ogf_id, reason in rows:
+        db.execute("INSERT INTO dismissed_segments VALUES (?, '2026-01-01', ?)", [ogf_id, reason])
     db.conn.commit()
-    migrate_dismissed_segments_user(db)
-    migrate_dismissed_segments_user(db)  # idempotent
+
+
+def _add_user(db, user_id):
+    db.execute(
+        "INSERT INTO users (id, username, display_name, role) VALUES (?, ?, ?, 'user')",
+        [user_id, f"u{user_id}", f"U{user_id}"],
+    )
+    db.conn.commit()
+
+
+def _blank_stop(db, user_id, ogf_id, was_productive=0):
+    session_id = db.execute(
+        "INSERT INTO sessions (date, user_id) VALUES ('2026-01-01', ?)", [user_id]
+    ).lastrowid
+    db.execute(
+        "INSERT INTO stops (session_id, location_text, ohn_segment_id, was_productive, user_id)"
+        " VALUES (?, 'creek', ?, ?, ?)",
+        [session_id, str(ogf_id), was_productive, user_id],
+    )
+    db.conn.commit()
+
+
+def _dismissed(db):
+    return set(db.execute("SELECT user_id, ogf_id FROM dismissed_segments").fetchall())
+
+
+def test_dismissed_segments_migration_traces_log_rows_to_every_blank_owner(db):
+    _add_user(db, 2)
+    _add_user(db, 3)
+    _blank_stop(db, 2, 55)
+    _blank_stop(db, 3, 55)
+    _blank_stop(db, 1, 55, was_productive=1)
+    _legacy_dismissed(db, [(55, "unproductive_trip_log")])
+
+    counts = migrate_dismissed_segments_user(db)
+
+    assert counts == {"traced": 2, "assigned": 0, "dropped": 0}
+    assert _dismissed(db) == {(2, 55), (3, 55)}
+    assert migrate_dismissed_segments_user(db) is None  # idempotent
+    assert _dismissed(db) == {(2, 55), (3, 55)}
+
+
+def test_dismissed_segments_migration_gives_untraced_rows_to_the_only_user(db):
+    _legacy_dismissed(db, [(55, "blank"), (66, "unproductive_trip_log")])
+
+    counts = migrate_dismissed_segments_user(db)
+
+    assert counts == {"traced": 0, "assigned": 2, "dropped": 0}
+    assert _dismissed(db) == {(1, 55), (1, 66)}
     assert 55 in _seen_segment_ids(db, user_id=1)
     assert 55 not in _seen_segment_ids(db, user_id=2)
+
+
+def test_dismissed_segments_migration_drops_untraced_rows_with_several_users(db):
+    _add_user(db, 2)
+    _blank_stop(db, 2, 77)
+    _legacy_dismissed(
+        db, [(55, "blank"), (66, "unproductive_trip_log"), (77, "unproductive_trip_log")]
+    )
+
+    counts = migrate_dismissed_segments_user(db)
+
+    assert counts == {"traced": 1, "assigned": 0, "dropped": 2}
+    assert _dismissed(db) == {(2, 77)}
+    assert "dismissed_segments_old" not in db.table_names()
