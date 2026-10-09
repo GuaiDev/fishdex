@@ -292,8 +292,14 @@ download as a recurring ingest (hosting is being moved separately).
 - `species_ranges.py` ✅ tested live July 17 2026, 118 species — see Bug fixes —
   session 6. NOTE: an earlier version of this note claimed COSEWIC status was
   included — it isn't; no conservation-status field exists in the real file.
-- `regulations.py` — stub
-- `water_quality.py` — stub (MELCCFP RSQER is PDF-only; DataStream covers some QC watersheds)
+- `regulations.py` — stub. Checked: quebec.ca printable-versions page (PDFs and zone-map PDFs
+  only), Données Québec searches (pêche, zone de pêche, règlement, pêche sportive — no
+  regulation dataset), geo.environnement.gouv.qc.ca REST (no fishing-zone layer). No
+  machine-readable source exists.
+- `water_quality.py` ✅ MELCCFP Réseau-rivières via Données Québec
+  (`suivi-physicochimique-des-rivieres-et-du-fleuve`): station CSV + per-watershed XLSX
+  chiffriers; pH, temperature, conductivity (no DO, no turbidity). Latest 3-year chiffrier per
+  station. The earlier "PDF-only" note was wrong. Wired for all four QC areas.
 
 **Province stubs** (MB, SK, NS, NB, PE `__init__.py`):
 - Documents which federal/global sources cover each province
