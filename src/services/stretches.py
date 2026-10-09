@@ -95,7 +95,6 @@ def build_stretches(
         ids = _trace_stretch(network, curation, stretch, claimed, report)
         if ids is None:
             continue
-        jurisdiction = curation.jurisdiction_of(stretch)
         shape = stretch_shape(network, ids)
         published.append(
             FishingStretch(
@@ -103,7 +102,7 @@ def build_stretches(
                 name=stretch.name,
                 river=stretch.river,
                 region=stretch.region,
-                jurisdiction=jurisdiction,
+                jurisdiction=curation.jurisdiction,
                 length_km=round(network.length_m(ids) / 1000, 2),
                 segment_count=len(ids),
                 geometry=shape.geometry,
@@ -119,7 +118,10 @@ def build_stretches(
             claimed[ogf_id] = stretch.id
             memberships.append(
                 StretchSegment(
-                    ogf_id=ogf_id, stretch_id=stretch.id, jurisdiction=jurisdiction, seq=seq
+                    ogf_id=ogf_id,
+                    stretch_id=stretch.id,
+                    jurisdiction=curation.jurisdiction,
+                    seq=seq,
                 )
             )
         report.built.append(stretch.id)

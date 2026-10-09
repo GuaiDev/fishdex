@@ -281,6 +281,9 @@ def test_curation_rejects_bad_ids_bbox_and_unknown_keys():
     typo = {**bad, "id": "ok", "nmae": "typo"}
     with pytest.raises(ValueError):
         StretchCuration.model_validate(_curation_dict(stretch=[typo]))
+    elsewhere = {**bad, "id": "ok", "jurisdiction": "US-MI"}
+    with pytest.raises(ValueError):
+        StretchCuration.model_validate(_curation_dict(stretch=[elsewhere]))
 
 
 def test_curation_requires_at_least_one_reach():
@@ -327,7 +330,7 @@ def test_shipped_curation_file_is_valid_and_covers_the_named_rivers():
         assert r in rivers
     assert "grand-dunnville-port-maitland" in {s.id for s in cur.stretches}
     assert {s.region for s in cur.stretches} >= {"Lake Erie"}
-    assert all(cur.jurisdiction_of(s) == "CA-ON" for s in cur.stretches)
+    assert cur.jurisdiction == "CA-ON"
 
 
 # ── build: curation overrides end to end ──────────────────────────────────────
@@ -491,7 +494,9 @@ def test_rebuild_drops_a_stretch_removed_from_the_file(db, tmp_path):
         "test-lower", "Lower", *LOWER
     )
     _build(db, tmp_path, body)
+    _build(db, tmp_path, body)
     assert count_stretches(db, "CA-ON") == 2
+    assert count_stretches(db) == 2
     _build(db, tmp_path, _stretch_toml("test-upper", "Upper", *UPPER))
     assert count_stretches(db, "CA-ON") == 1
     assert _members(db, "test-lower") == []

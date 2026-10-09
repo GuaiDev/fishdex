@@ -72,7 +72,6 @@ class CuratedStretch(BaseModel):
     name: str = Field(min_length=1)
     river: str = Field(min_length=1)
     region: str | None = None
-    jurisdiction: JurisdictionCode | None = None  # falls back to the file's
     reaches: list[CuratedReach] = Field(alias="reach", min_length=1)
     include_ogf_ids: list[int] = Field(default_factory=list)
     exclude_ogf_ids: list[int] = Field(default_factory=list)
@@ -108,9 +107,6 @@ class StretchCuration(BaseModel):
         if dupes:
             raise ValueError(f"duplicate stretch ids: {', '.join(dupes)}")
         return self
-
-    def jurisdiction_of(self, stretch: CuratedStretch) -> str:
-        return stretch.jurisdiction or self.jurisdiction
 
 
 # ── published records ─────────────────────────────────────────────────────────
