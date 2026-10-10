@@ -679,11 +679,3 @@ Hypothesis: conditions-driven. Need retroactive enrichment of prior session.
 ### Kool-aid vs natural cutbait
 Controlled comparison planned: same location, same rig, one rod each.
 Run at Byng or Willoway next session.
-
----
-
-## Key credentials (save these)
-- Railway API key: fdf0f9f1381176065637fe72a69cd651bb6ac117cbcabcf60d26988127a574a9
-- Railway URL: https://web-production-e2094.up.railway.app
-- Admin token endpoint: POST /admin/token with X-Api-Key header
-- GitHub repo: GuaiDev/fishbot (rename to fishdex when ready)
