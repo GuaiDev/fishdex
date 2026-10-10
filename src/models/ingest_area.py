@@ -23,6 +23,8 @@ class IngestSource(StrEnum):
     BC = "bc"  # FWA stream network, FISS observations, BC EMS water quality
     AB = "ab"  # AB stocking, regulations, water quality
     QC = "qc"  # QC species ranges, regulations, water quality
+    MB = "mb"  # MB stocking, WaLLAS stream network
+    SK = "sk"  # SK stream network, fish observations, stocking, water quality
     TIDAL = "tidal"  # CHS tide predictions — coastal areas only
 
 

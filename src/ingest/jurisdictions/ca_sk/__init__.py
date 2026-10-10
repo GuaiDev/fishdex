@@ -1,6 +1,16 @@
 # Saskatchewan (CA-SK)
 #
-# Covered by federal/global sources — no province-specific adapters required:
+# Province-specific adapters:
+#   Hydro        → ca_sk/hydro_network.py
+#       SaskGIS Hydrography watercourse layer (ArcGIS MapServer 121)
+#   Fish obs     → ca_sk/fish_observations.py
+#       SK Fish Atlas (FishAtlasHabiSask) joined to Species Info points
+#   Stocking     → ca_sk/stocking.py
+#       SK Fish Stocking History joined to Species Info points
+#   Water quality → ca_sk/water_quality.py
+#       Long Term Water Chemistry (historical, WSA)
+#
+# Covered by federal/global sources:
 #   iNaturalist, GBIF, WSC gauges, OSM, eBird    → src/ingest/global/
 #   CABIN benthic (all provinces)                 → src/ingest/jurisdictions/ca_on/benthic.py
 #   DataStream water quality
@@ -8,9 +18,7 @@
 #   DFO SAR critical habitat
 #       → src/ingest/jurisdictions/ca_national/dfo_critical_habitat.py
 #
-# Build province-specific adapters when these become available:
-#   Stream network: SaskWater hydrology (not publicly queryable as of 2026)
-#   Fish observations: SK Fish and Wildlife (internal, no public API)
-#   Stocking: SK Fisheries Branch — no bulk public data found
-#   Regulations:
-#       https://www.saskatchewan.ca/residents/environment-public-health-and-safety/fish-and-wildlife/fish/fishing-regulations (PDF)  # noqa: E501
+# Not yet built (as of 2026):
+#   Regulations — published as a PDF guide only:
+#       https://www.saskatchewan.ca/residents/environment-public-health-and-safety/
+#       fish-and-wildlife/fish/fishing-regulations

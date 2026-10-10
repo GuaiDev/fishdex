@@ -1,0 +1,56 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "WATERBODY_ID": "W1",
+        "WATERBODY_NAME": "Kingfisher Lake",
+        "FISHING_DIVISION": "Division 1",
+        "YEAR": 2023,
+        "DATE": 1672531200000,
+        "SPECIES": "Rainbow Trout",
+        "SIZE": "Fingerling",
+        "QUANTITY": 5000,
+        "LAT_DD": 49.9,
+        "LONG_DD": -97.14,
+        "WATERBODY_LAT": 49.9,
+        "WATERBODY_LONG": -97.14
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "WATERBODY_ID": "W2",
+        "WATERBODY_NAME": "No Coord Lake",
+        "FISHING_DIVISION": "Division 2",
+        "YEAR": 2022,
+        "DATE": 1640995200000,
+        "SPECIES": "Walleye",
+        "SIZE": "Fry",
+        "QUANTITY": 10000,
+        "LAT_DD": 0,
+        "LONG_DD": 0,
+        "WATERBODY_LAT": 0,
+        "WATERBODY_LONG": 0
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 3,
+        "WATERBODY_ID": "W3",
+        "WATERBODY_NAME": "Rainbow Lake",
+        "FISHING_DIVISION": "Division 1",
+        "YEAR": 2021,
+        "DATE": 1609459200000,
+        "SPECIES": "",
+        "SIZE": "Adult",
+        "QUANTITY": 100,
+        "LAT_DD": 50.07,
+        "LONG_DD": -99.95,
+        "WATERBODY_LAT": 50.07,
+        "WATERBODY_LONG": -99.95
+      }
+    }
+  ],
+  "exceededTransferLimit": false
+}

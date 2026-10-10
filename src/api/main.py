@@ -1190,6 +1190,64 @@ def ingest_data_qc(
     )
 
 
+@app.post("/ingest/data-mb")
+def ingest_data_mb(
+    body: dict,
+    background_tasks: BackgroundTasks,
+    _: None = Depends(verify_api_key),
+):
+    """Trigger Manitoba-specific data ingest for a location (runs in background).
+
+    Body: {"lat": float, "lng": float, "radius_km": float (optional), "label": str (optional)}
+    Runs MB stocking and the WaLLAS stream network.
+    Returns 202 immediately. Protected by X-Api-Key.
+    """
+    lat = body.get("lat")
+    lng = body.get("lng")
+    radius_km = body.get("radius_km", 50.0)
+    label = body.get("label", f"{lat},{lng}")
+    if lat is None or lng is None:
+        raise HTTPException(status_code=400, detail="lat and lng are required")
+    background_tasks.add_task(area_ingest.run_mb_ingest, lat, lng, radius_km, label)
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "accepted",
+            "label": label,
+            "message": "MB ingest started in background",
+        },
+    )
+
+
+@app.post("/ingest/data-sk")
+def ingest_data_sk(
+    body: dict,
+    background_tasks: BackgroundTasks,
+    _: None = Depends(verify_api_key),
+):
+    """Trigger Saskatchewan-specific data ingest for a location (runs in background).
+
+    Body: {"lat": float, "lng": float, "radius_km": float (optional), "label": str (optional)}
+    Runs SK stream network, fish observations, stocking, and water quality.
+    Returns 202 immediately. Protected by X-Api-Key.
+    """
+    lat = body.get("lat")
+    lng = body.get("lng")
+    radius_km = body.get("radius_km", 50.0)
+    label = body.get("label", f"{lat},{lng}")
+    if lat is None or lng is None:
+        raise HTTPException(status_code=400, detail="lat and lng are required")
+    background_tasks.add_task(area_ingest.run_sk_ingest, lat, lng, radius_km, label)
+    return JSONResponse(
+        status_code=202,
+        content={
+            "status": "accepted",
+            "label": label,
+            "message": "SK ingest started in background",
+        },
+    )
+
+
 def _run_national_ingest(
     lat: float | None, lng: float | None, radius_km: float, label: str
 ) -> None:
