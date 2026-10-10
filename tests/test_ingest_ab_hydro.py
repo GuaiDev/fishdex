@@ -267,6 +267,9 @@ def test_cache_miss_writes_file(cache_dir):
 
     cache_files = list(cache_dir.glob("*.json"))
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a9f9731 (fix(ab): keep earlier AB areas, namespace AB ids, keep capped tiles)
     assert len(cache_files) == 1
 
 def test_max_depth_tile_keeps_its_features(cache_dir):
@@ -284,6 +287,9 @@ def test_max_depth_tile_keeps_its_features(cache_dir):
         )
 
     assert len(feats) == 4
+<<<<<<< HEAD
 =======
     assert len(cache_files) == 1
 >>>>>>> 7e699b7 (feat(ab): implement FWMIS hydro network adapter and wire into weekly ingest)
+=======
+>>>>>>> a9f9731 (fix(ab): keep earlier AB areas, namespace AB ids, keep capped tiles)

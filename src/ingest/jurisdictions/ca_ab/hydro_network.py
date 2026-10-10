@@ -152,7 +152,10 @@ def _fetch_tile(
     """Paginate one bbox tile with resultOffset; recurse into quadrants when a
     tile returns an exact multiple of _PAGE_SIZE (server record cap suspected).
     """
+<<<<<<< HEAD
 
+=======
+>>>>>>> a9f9731 (fix(ab): keep earlier AB areas, namespace AB ids, keep capped tiles)
     bbox_str = f"{min_lon:.5f},{min_lat:.5f},{max_lon:.5f},{max_lat:.5f}"
     features: list[dict] = []
     offset = 0
