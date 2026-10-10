@@ -322,8 +322,7 @@ def tool_schemas(profile: Any) -> list[dict]:
                     "species": {
                         "type": "string",
                         "description": (
-                            "Optional: also return this angler's record "
-                            "with one species."
+                            "Optional: also return this angler's record with one species."
                         ),
                     }
                 },
@@ -658,8 +657,7 @@ def _log_trip(inputs: dict, user_id: int) -> str:
                     for s in parsed.get("stops", [])
                 ],
                 "confirmation": (
-                    f"Session #{result['session_id']} logged with "
-                    f"{result['stops_logged']} stop(s)."
+                    f"Session #{result['session_id']} logged with {result['stops_logged']} stop(s)."
                 ),
             }
         )
@@ -667,8 +665,7 @@ def _log_trip(inputs: dict, user_id: int) -> str:
     questions = result.get("followup_questions", [])
     if questions:
         parts.append(
-            "\n\nOne quick question to improve future recommendations: "
-            + questions[0]["question"]
+            "\n\nOne quick question to improve future recommendations: " + questions[0]["question"]
         )
     proactive = result.get("proactive_coaching")
     if proactive:
@@ -736,9 +733,7 @@ def _search_community(inputs: dict, _user_id: int) -> str:
         )
     from src.services.knowledge import search_knowledge_base_for_agent
 
-    return search_knowledge_base_for_agent(
-        query=inputs["query"], top_k=inputs.get("limit", 5)
-    )
+    return search_knowledge_base_for_agent(query=inputs["query"], top_k=inputs.get("limit", 5))
 
 
 _HANDLERS = {

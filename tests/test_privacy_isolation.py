@@ -126,6 +126,58 @@ def test_chat_web_path_never_serves_another_users_cache(tmp_path, monkeypatch):
     assert get_cached_synthesis(db, user_id=1, lat=LAT, lng=LNG)["synthesis"] == "A's catches"
 
 
+def test_chat_web_path_cache_hit_serves_only_the_askers_own_reply(tmp_path, monkeypatch):
+    """A repeat question by user 2 is a cache hit on user 2's reply; user 1's row is untouched."""
+    import types
+
+    import src.agent.chat as chat
+    import src.agent.router as router
+    import src.storage.database as db_mod
+
+    monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
+    db = get_db(tmp_path / "test.db")
+    store_synthesis(db, "A's catches", user_id=1, lat=LAT, lng=LNG)
+
+    pipeline_users = []
+
+    def fake_pipeline(messages, session_id, mode="synthesis", user_id=1):
+        pipeline_users.append(user_id)
+        return {"reply": f"fresh answer for user {user_id}", "tool_calls": []}
+
+    seen_prompts = []
+
+    class FakeClient:
+        class messages:
+            @staticmethod
+            def create(model, max_tokens, messages):
+                seen_prompts.append(messages[0]["content"])
+                block = types.SimpleNamespace(type="text", text="rewritten from cache")
+                usage = types.SimpleNamespace(input_tokens=1, output_tokens=1)
+                return types.SimpleNamespace(content=[block], usage=usage)
+
+    monkeypatch.setattr(chat, "_run_full_pipeline", fake_pipeline)
+    monkeypatch.setattr(chat, "_log_routing", lambda *a, **k: None)
+    monkeypatch.setattr(chat, "get_client", lambda: FakeClient)
+    monkeypatch.setattr(router, "classify_message", lambda *a, **k: {"mode": "synthesis"})
+    monkeypatch.setattr(
+        router,
+        "extract_location_from_message",
+        lambda m: {"lat": LAT, "lng": LNG, "location_name": None},
+    )
+
+    msgs = [{"role": "user", "content": "tell me about this spot"}]
+    first = chat.run_chat_api(list(msgs), session_id="s", user_id=2)
+    assert first["reply"] == "fresh answer for user 2"
+
+    second = chat.run_chat_api(list(msgs), session_id="s", user_id=2)
+    assert second["mode"] == "synthesis_cache_hit"
+    assert pipeline_users == [2]  # the repeat did not run the pipeline again
+    assert len(seen_prompts) == 1
+    assert "fresh answer for user 2" in seen_prompts[0]
+    assert "A's catches" not in seen_prompts[0]
+    assert get_cached_synthesis(db, user_id=1, lat=LAT, lng=LNG)["synthesis"] == "A's catches"
+
+
 # ── dismissed_segments ───────────────────────────────────────────────────────
 
 
@@ -227,3 +279,31 @@ def test_dismissed_segments_migration_drops_untraced_rows_with_several_users(db)
     assert counts == {"traced": 1, "assigned": 0, "dropped": 2}
     assert _dismissed(db) == {(2, 77)}
     assert "dismissed_segments_old" not in db.table_names()
+
+
+def test_blank_stop_logged_through_log_session_hides_water_only_from_its_owner(db, monkeypatch):
+    import src.services.trip_enrichment as enrichment
+    import src.services.trip_enrichment_conditions as conditions
+    from src.services.trip_logger import log_session
+
+    _add_user(db, 2)
+    # Keep the test offline: no model call, no weather fetch.
+    monkeypatch.setattr(enrichment, "enrich_session", lambda *a, **k: {"followup_questions": []})
+    monkeypatch.setattr(conditions, "enrich_session_conditions", lambda *a, **k: None)
+    monkeypatch.setattr("src.agent.client.get_client", lambda: object())
+
+    parsed = {
+        "date": "2026-06-01",
+        "stops": [
+            {
+                "location_text": "Bronte Creek",
+                "ohn_segment_id": 4242,
+                "species_caught": [],
+                "was_productive": False,
+            }
+        ],
+    }
+    log_session(parsed, db, user_id=1)
+
+    assert 4242 in _seen_segment_ids(db, user_id=1)
+    assert 4242 not in _seen_segment_ids(db, user_id=2)
