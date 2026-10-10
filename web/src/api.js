@@ -155,3 +155,29 @@ export async function getMyStops() {
   if (!res.ok) throw new Error('Failed to fetch stops');
   return res.json();
 }
+
+// Level 1 of the Explore map: every published fishing stretch as a GeoJSON
+// FeatureCollection (GET /map/stretches). An empty `features` list means the
+// stretches have not been built against this database.
+export async function getMapStretches() {
+  const res = await fetch(`${BASE_URL}/map/stretches`, { headers: authHeaders() });
+  if (res.status === 401) throw Object.assign(new Error('Not authenticated'), { status: 401 });
+  if (!res.ok) throw new Error(`Stretches fetch failed: ${res.status}`);
+  return res.json();
+}
+
+// Level 2: one stretch's anchors (Point features) and segment lines
+// (LineString features) as GeoJSON, plus a `stretch` member to frame the view.
+// The route comes from the anchors work (GET /map/stretches/{id}/anchors); a
+// backend without it, or a stretch that was never built, answers 404 — the
+// caller treats that as "no detail yet" and keeps the Level 1 line, so the
+// error carries `status` for it to tell the cases apart.
+export async function getStretchAnchors(stretchId) {
+  const res = await fetch(
+    `${BASE_URL}/map/stretches/${encodeURIComponent(stretchId)}/anchors`,
+    { headers: authHeaders() },
+  );
+  if (res.status === 401) throw Object.assign(new Error('Not authenticated'), { status: 401 });
+  if (!res.ok) throw Object.assign(new Error(`Anchors fetch failed: ${res.status}`), { status: res.status });
+  return res.json();
+}

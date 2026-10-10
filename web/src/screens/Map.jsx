@@ -1,71 +1,14 @@
 import 'leaflet/dist/leaflet.css';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { MapContainer, TileLayer, CircleMarker, useMapEvents } from 'react-leaflet';
-import { getMapSegments, getMyStops } from '../api';
-import { colorHeatHigh, colorHeatMed, colorHeatMid, colorHeatLow, colorHeatMin, colorMoss, colorTextAsh } from '../tokens';
+import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, CircleMarker } from 'react-leaflet';
+import { getMyStops } from '../api';
+import { colorMoss, colorTextAsh } from '../tokens';
 import InstrumentDial from '../components/InstrumentDial';
+import ExploreMode from '../components/ExploreMode';
 import '../fishdex-tokens.css';
-
-function scoreColor(score) {
-  if (score >= 0.7) return colorHeatHigh;
-  if (score >= 0.5) return colorHeatMed;
-  if (score >= 0.3) return colorHeatMid;
-  if (score >= 0.1) return colorHeatLow;
-  return colorHeatMin;
-}
 
 function stopColor(productive) {
   return productive ? colorMoss : colorTextAsh;
-}
-
-function ExploreLayer({ mode, onSegmentClick }) {
-  const [segments, setSegments] = useState([]);
-  const fetchTimeout = useRef(null);
-
-  const fetchSegments = useCallback((map) => {
-    const zoom = map.getZoom();
-    if (zoom < 11) { setSegments([]); return; }
-
-    clearTimeout(fetchTimeout.current);
-    const bounds = map.getBounds();
-    fetchTimeout.current = setTimeout(async () => {
-      try {
-        const data = await getMapSegments({
-          north: bounds.getNorth(),
-          south: bounds.getSouth(),
-          east: bounds.getEast(),
-          west: bounds.getWest(),
-        }, mode);
-        setSegments(data.segments || []);
-      } catch (e) {
-        console.error('Failed to fetch segments:', e);
-      }
-    }, 300);
-  }, [mode]);
-
-  const map = useMapEvents({
-    moveend: () => fetchSegments(map),
-    zoomend: () => fetchSegments(map),
-  });
-
-  useEffect(() => {
-    fetchSegments(map);
-  }, [map, fetchSegments]);
-
-  return segments.map(seg => (
-    <CircleMarker
-      key={seg.ogf_id}
-      center={[seg.lat, seg.lng]}
-      radius={6}
-      pathOptions={{
-        color: scoreColor(seg.score),
-        fillColor: scoreColor(seg.score),
-        fillOpacity: 0.8,
-        weight: 1,
-      }}
-      eventHandlers={{ click: () => onSegmentClick(seg) }}
-    />
-  ));
 }
 
 function PersonalLayer({ stops, onStopClick }) {
@@ -86,8 +29,7 @@ function PersonalLayer({ stops, onStopClick }) {
 }
 
 export default function Map() {
-  const [mapMode, setMapMode] = useState('personal');
-  const [exploreMode, setExploreMode] = useState('balanced');
+  const [mapMode, setMapMode] = useState('explore');
   const [myStops, setMyStops] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loadingStops, setLoadingStops] = useState(true);
@@ -131,10 +73,10 @@ export default function Map() {
           padding: 2,
           gap: 2,
         }}>
-          {['personal', 'explore'].map(m => (
+          {['explore', 'personal'].map(m => (
             <button
               key={m}
-              onClick={() => setMapMode(m)}
+              onClick={() => { setMapMode(m); setSelected(null); }}
               style={{
                 padding: '5px 12px',
                 borderRadius: 6,
@@ -154,29 +96,12 @@ export default function Map() {
           ))}
         </div>
 
-        {mapMode === 'explore' && (
-          <select
-            value={exploreMode}
-            onChange={e => setExploreMode(e.target.value)}
-            style={{
-              background: 'var(--fx-card-fill)',
-              border: '1px solid var(--fx-hairline)',
-              borderRadius: 6,
-              color: 'var(--fx-text-primary)',
-              fontFamily: 'var(--fx-font-ui)',
-              fontSize: 11,
-              padding: '4px 8px',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="balanced">Balanced</option>
-            <option value="easy">Easy access</option>
-            <option value="adventure">Adventure</option>
-          </select>
-        )}
       </div>
 
       {/* Map */}
+      {mapMode === 'explore' && <ExploreMode />}
+
+      {mapMode === 'personal' && (
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         <MapContainer
           center={defaultCenter}
@@ -188,17 +113,10 @@ export default function Map() {
             attribution='&copy; OpenStreetMap &copy; CARTO'
             maxZoom={19}
           />
-
-          {mapMode === 'personal' && (
-            <PersonalLayer stops={myStops} onStopClick={setSelected} />
-          )}
-
-          {mapMode === 'explore' && (
-            <ExploreLayer mode={exploreMode} onSegmentClick={setSelected} />
-          )}
+          <PersonalLayer stops={myStops} onStopClick={setSelected} />
         </MapContainer>
 
-        {mapMode === 'personal' && !loadingStops && myStops.length === 0 && (
+        {!loadingStops && myStops.length === 0 && (
           <div style={{
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%, -50%)',
@@ -221,26 +139,8 @@ export default function Map() {
           </div>
         )}
 
-        {mapMode === 'explore' && (
-          <div style={{
-            position: 'absolute',
-            bottom: 80, left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'color-mix(in srgb, var(--fx-card-fill) 90%, transparent)',
-            border: '1px solid var(--fx-hairline)',
-            borderRadius: 20,
-            padding: '6px 14px',
-            fontFamily: 'var(--fx-font-ui)',
-            fontSize: 11,
-            color: 'var(--fx-text-muted)',
-            zIndex: 1000,
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-          }}>
-            Zoom in to see spots
-          </div>
-        )}
       </div>
+      )}
 
       {/* Bottom sheet. Intentionally a lightweight detail panel, not a true
           modal: no focus trap, no Escape-to-close, background map stays
@@ -307,77 +207,6 @@ export default function Map() {
                   {selected.gear ? ` · ${selected.gear}` : ''}
                 </div>
               )}
-            </>
-          )}
-
-          {/* Explore segment detail */}
-          {selected.ogf_id && (
-            <>
-              <div style={{ fontFamily: 'var(--fx-font-serif)', fontSize: 16, fontWeight: 600, color: 'var(--fx-text-primary-2)', marginBottom: 4 }}>
-                {selected.watercourse_name || selected.nearest_named_stream || 'Unnamed stream'}
-              </div>
-              <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 12, color: 'var(--fx-text-muted)', marginBottom: 10 }}>
-                Stream order {selected.stream_order}
-                {selected.is_confluence ? ' · Confluence' : ''}
-                {selected.connected_to_waterbody ? ' · Connected to lake/river' : ''}
-              </div>
-
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 11, color: 'var(--fx-text-muted)', marginBottom: 4 }}>
-                  Exploration score
-                </div>
-                <div style={{
-                  height: 6, background: 'var(--fx-hairline)', borderRadius: 3, overflow: 'hidden',
-                }}>
-                  <div style={{
-                    height: '100%',
-                    width: '100%',
-                    transform: `scaleX(${selected.score || 0})`,
-                    transformOrigin: 'left',
-                    background: scoreColor(selected.score),
-                    borderRadius: 3,
-                    transition: 'transform 0.3s',
-                  }} />
-                </div>
-                <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 10, color: 'var(--fx-text-muted)', marginTop: 2 }}>
-                  {((selected.score || 0) * 100).toFixed(0)}/100
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                {selected.google_maps_url && (
-                  <a
-                    href={selected.google_maps_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      flex: 1, padding: '8px',
-                      background: 'var(--fx-hairline)', color: 'var(--fx-text-primary)',
-                      fontFamily: 'var(--fx-font-ui)',
-                      borderRadius: 8, fontSize: 12, fontWeight: 500,
-                      textAlign: 'center', textDecoration: 'none',
-                    }}
-                  >
-                    Open in Maps
-                  </a>
-                )}
-                {selected.swoop_url && (
-                  <a
-                    href={selected.swoop_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      flex: 1, padding: '8px',
-                      background: 'var(--fx-hairline)', color: 'var(--fx-text-primary)',
-                      fontFamily: 'var(--fx-font-ui)',
-                      borderRadius: 8, fontSize: 12, fontWeight: 500,
-                      textAlign: 'center', textDecoration: 'none',
-                    }}
-                  >
-                    Satellite view
-                  </a>
-                )}
-              </div>
             </>
           )}
         </div>

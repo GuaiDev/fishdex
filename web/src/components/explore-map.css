@@ -1,0 +1,49 @@
+/* Explore map: stretch labels and anchor markers. Leaflet renders divIcons
+   outside React's style props, so these live in a stylesheet. Colors come from
+   the fishdex tokens. */
+
+.fx-stretch-label { background: none; border: none; }
+.fx-stretch-label span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(8px, -50%);
+  white-space: nowrap;
+  font-family: var(--fx-font-serif);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fx-text-primary-2);
+  text-shadow: 0 0 3px var(--fx-canvas), 0 0 3px var(--fx-canvas), 0 0 6px var(--fx-canvas);
+  cursor: pointer;
+  /* Tap target taller than the glyphs. */
+  padding: 8px 4px;
+}
+.fx-stretch-label.is-dim span { opacity: 0.45; }
+
+.fx-anchor { background: none; border: none; }
+.fx-anchor .fx-anchor-hit {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.fx-anchor.is-selected .fx-anchor-hit {
+  background: color-mix(in srgb, var(--fx-brass-light) 28%, transparent);
+  box-shadow: 0 0 0 2px var(--fx-brass-light);
+}
+.fx-anchor svg { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
+
+.fx-map-card {
+  background: color-mix(in srgb, var(--fx-card-fill) 94%, transparent);
+  border: 1px solid var(--fx-hairline);
+  border-radius: 14px;
+  font-family: var(--fx-font-ui);
+  color: var(--fx-text-muted);
+}
+
+/* The tab bar is fixed over the bottom of the screen; keep the zoom buttons
+   clear of it. */
+.fx-explore-map .leaflet-bottom.leaflet-right { margin-bottom: 88px; }

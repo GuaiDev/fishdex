@@ -11,3 +11,10 @@ export const colorHeatMed = '#e67e22';
 export const colorHeatMid = '#f1c40f';
 export const colorHeatLow = '#2ecc71';
 export const colorHeatMin = '#3498db';
+
+// Explore map: stretch lines and anchor markers (see components/anchors.js).
+export const colorBrass = '#c2a06a';
+export const colorMossLight = '#9fae7a';
+export const colorRust = '#C1673D';
+export const colorBone = '#EAE3D3';
+export const colorWetStone = '#6B7268';
