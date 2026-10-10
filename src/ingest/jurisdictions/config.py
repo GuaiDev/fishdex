@@ -166,7 +166,7 @@ register(JurisdictionConfig(
     ],
     data_sources={
         "hydro_network":     True,   # FWMIS Simplified Hydro Arcs (Geospatial Alberta)
-        "fish_observations": False,  # AB FWMIS not publicly accessible
+        "fish_observations": True,   # FWMIS hydro polygons SPECIES_PRES (layer 1)
         "water_quality":     False,  # stub — no public API
         "stocking":          True,   # planned stocking XLSX from Open Alberta (openpyxl required)
         "regulations":       True,   # Watershed Unit PDF, tested against 2026 edition
@@ -178,6 +178,10 @@ register(JurisdictionConfig(
         "hydro_network": (
             "https://geospatial.alberta.ca/titan/rest/services/"
             "fisheries/fwmis_hydrography/FeatureServer/0"
+        ),
+        "fish_observations": (
+            "https://geospatial.alberta.ca/titan/rest/services/"
+            "fisheries/fwmis_hydrography/FeatureServer/1"
         ),
         "stocking": (
             "https://open.alberta.ca/dataset/ae7521d6-7629-4b69-ac45-857fc798c10c"
@@ -194,6 +198,14 @@ register(JurisdictionConfig(
         "paginated via resultOffset and the exceededTransferLimit flag; first ~7k segments "
         "verified live across the Bow/Elbow area 2026-10-09. No barrier layer — "
         "barrier_count is always 0 for CA-AB. ",
+        "FISH OBSERVATIONS: fwmis_hydro_polygons layer 1 — every surveyed waterbody carries a ",
+        "SPECIES_PRES field (comma-separated FWMIS species codes, quarterly updated); ",
+        "'NO FISH SAMPLED TO DATE' means unsampled, never absence. Authoritative presence, ",
+        "stored as observations (source='FWMIS'); centroid via returnCentroid+outSR=4326 ",
+        "(WGS84, verified). Codes decoded via the official FWMIS fisheries loadform list ",
+        "(OGL-Alberta); unknown codes kept verbatim. Source-of-truth caveat: presence ",
+        "per waterbody, not per point — a species listed for a big lake is 'somewhere in ",
+        "this waterbody', so large-lake centroids should be read as whole-waterbody signal.",
         "REGULATIONS: only 3 Fish Management Zones split into 10 Watershed Units "
         "(ES1-4/PP1-2/NB1-4) — verified all 10 extract correctly against the 2026 edition "
         "(7.5k-31k chars each); URL resolved dynamically via CKAN package_show (picks the "

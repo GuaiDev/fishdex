@@ -260,6 +260,12 @@ instruction not to build it out yet.
   radius; stream orders 0–9 populated; no barrier layer (barrier_count=0 for CA-AB).
   Bow + NS Edmonton + Oldman areas wired into weekly ingest.
 - `regulations.py` ✅ implemented July 17 2026, 10 chunks — see Bug fixes — session 6
+- `fish_observations.py` ✅ implemented 2026-10-10 — FWMIS hydro polygons layer 1
+  `SPECIES_PRES` (authoritative waterbody species presence, quarterly refreshed),
+  stored in the shared `observations` table (source='FWMIS'); codes decoded via the
+  official FWMIS loadform list (85 codes, OGL-Alberta), unknown codes kept verbatim;
+  'NO FISH SAMPLED TO DATE' means unsampled, never absence. Caveat: presence is per
+  waterbody, not per point — a big-lake centroid is whole-waterbody signal.
 - `water_quality.py` — stub (AEMERA portal is map-only; open.alberta.ca has no
   surface-water chemistry; federal national dataset has only 13 AB sites, none near
   the AB areas — re-checked 2026-10-09)
@@ -286,7 +292,7 @@ Test suite updated to match new signatures (35 tests pass).
 **New migration**: `regulation_chunks.zone_name TEXT` added via idempotent `ALTER TABLE`
 
 **New service entry points**:
-- `src/services/ab_ingest.py` — AB stocking, regulations, water quality
+- `src/services/ab_ingest.py` — AB hydro network, fish observations, stocking, regulations, water quality
 - `src/services/qc_ingest.py` — QC species ranges, regulations, water quality
 - `src/services/national_ingest.py` — DFO critical habitat, DataStream water quality
 - `src/services/tidal.py` — agent tool: `get_tidal_conditions_for_agent(lat, lng)`
@@ -451,7 +457,9 @@ does have coordinates (an earlier version of this note was wrong about that).
 Regulations now implemented (10 watershed-unit chunks, not the ~100-WMU scheme
 originally assumed).
 Hydro network: FWMIS Simplified Hydro Arcs live 2026-10-09 (full implementation,
-see Phase 2 — AB above). Water quality still stubbed (no machine-readable source).
+see Phase 2 — AB above). Fish observations: FWMIS SPECIES_PRES waterbody presence
+live 2026-10-10 (authoritative survey presence, shared `observations` table).
+Water quality still stubbed (no machine-readable source).
 DataStream covers some AB watersheds via /ingest/data-national.
 
 ### Quebec 🔨 (June 28 2026; species_ranges fixed July 17 2026)

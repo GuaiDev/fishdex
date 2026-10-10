@@ -5,6 +5,7 @@ Orchestrates CA-AB adapters:
   - AB regulations (stub — see ca_ab/regulations.py)
   - AB water quality (stub — no public API as of 2026)
   - AB hydro network (FWMIS Simplified Hydro Arcs via Geospatial Alberta)
+  - AB fish observations (FWMIS waterbody species presence SPECIES_PRES)
 
 Global sources (iNat, GBIF, WSC, OSM) are handled by the standard pipeline.
 NuSEDS salmon escapement is BC-only (not applicable to AB).
@@ -86,6 +87,34 @@ def ingest_ab_hydro_network(
     return len(segments), 0
 
 
+def ingest_ab_fish_observations(
+    lat: float,
+    lng: float,
+    radius_km: float = 50.0,
+) -> int:
+    """Fetch and store FWMIS waterbody species presence for an AB location.
+
+    Species come from SPECIES_PRES on fwmis_hydro_polygons (layer 1) — authoritative
+    survey presence per waterbody, stored as observations (source='FWMIS'). A
+    'NO FISH SAMPLED TO DATE' value is treated as unsampled, not absence.
+    Returns count stored.
+    """
+    from src.storage.observations import upsert_observations
+
+    _mod = importlib.import_module("src.ingest.jurisdictions.ca_ab.fish_observations")
+    db = get_db()
+
+    logger.info(
+        "FWMIS: fetching fish presence — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km
+    )
+    observations = _mod.fetch_waterbody_presence(lat, lng, radius_km)
+    logger.info("FWMIS: %d observations fetched from FeatureServer", len(observations))
+    if observations:
+        upsert_observations(db, observations)
+    logger.info("FWMIS: %d observations stored to DB", len(observations))
+    return len(observations)
+
+
 def ingest_ab_regulations() -> int:
     """Fetch Alberta fishing regulations. Returns chunk count (currently 0 — stub)."""
     _mod = importlib.import_module("src.ingest.jurisdictions.ca_ab.regulations")
@@ -124,12 +153,14 @@ def ingest_ab_data(
 ) -> dict[str, int]:
     """Run all Alberta-specific ingest adapters. Returns counts per source."""
     hydro_segs, hydro_barriers = ingest_ab_hydro_network(lat, lng, radius_km)
+    fish_obs = ingest_ab_fish_observations(lat, lng, radius_km)
     stocking = ingest_ab_stocking()
     regulations = ingest_ab_regulations()
     wq = ingest_ab_water_quality(lat, lng, radius_km)
     return {
         "ab_hydro_segments": hydro_segs,
         "ab_hydro_barriers": hydro_barriers,
+        "ab_fish_observations": fish_obs,
         "ab_stocking": stocking,
         "ab_regulations": regulations,
         "ab_water_quality": wq,
