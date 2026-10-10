@@ -1,4 +1,4 @@
-.PHONY: run serve test lint format ingest weekly-ingest ingest-hydat ingest-trca harvest-ca recent build-features train-sdm compute-access compute-untapped export-map
+.PHONY: run serve test lint format ingest weekly-ingest ingest-hydat ingest-trca harvest-ca recent build-features train-sdm compute-access compute-untapped build-stretches export-map
 
 run:
 	uv run python -m src.cli.main run
@@ -60,6 +60,12 @@ compute-access:
 
 compute-untapped:
 	uv run python -m src.cli.main compute-untapped
+
+# Explore map, Level 1: named fishing stretches from data/curation/. Fetches the
+# OHN network for the curation file's build area (cached 30 days), so the first
+# run needs the network; later runs are offline until the cache expires.
+build-stretches:
+	uv run python -m src.cli.main build-stretches
 
 export-map:
 	uv run python -m src.cli.export_map

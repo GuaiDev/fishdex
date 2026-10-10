@@ -1454,5 +1454,60 @@ def harvest_ca() -> None:
     console.print(f"[dim]Report: {path}[/dim]")
 
 
+@app.command(name="build-stretches")
+def build_stretches_cmd(
+    curation: str = typer.Option(
+        "data/curation/stretches_ca_on.toml", "--curation", help="Curation file to build from."
+    ),
+    show_candidates: int = typer.Option(
+        10, "--candidates", help="How many uncovered candidates to print as curation entries."
+    ),
+) -> None:
+    """Rebuild the explore map's named fishing stretches from the curation file.
+
+    Fetches the OHN network for the file's build area (cached 30 days), traces
+    every curated stretch through it, and replaces the stored set. Exits 1 if
+    any curated stretch failed to build.
+    """
+    from pathlib import Path
+
+    from src.services.stretches import build_stretches, candidate_toml
+
+    report = build_stretches(get_db(), Path(curation))
+
+    table = Table(title=f"Fishing stretches — {report.jurisdiction}")
+    table.add_column("metric")
+    table.add_column("value", justify="right")
+    table.add_row("network segments", f"{report.network_segments:,}")
+    table.add_row("curated stretches", str(report.curated_total))
+    table.add_row("built", str(len(report.built)))
+    table.add_row("disabled", str(len(report.disabled)))
+    table.add_row("failed", str(len(report.failed)))
+    table.add_row("segments assigned", f"{report.segments_assigned:,}")
+    table.add_row("candidates clustered", str(report.candidates_total))
+    table.add_row("candidates not covered", str(len(report.uncovered_candidates)))
+    console.print(table)
+
+    for issue in report.issues:
+        colour = "red" if issue.blocking else "yellow"
+        console.print(f"[{colour}]{issue.stretch_id}: {issue.kind}[/{colour}] {issue.detail}")
+
+    if report.uncovered_candidates and show_candidates > 0:
+        console.print()
+        console.print(
+            "[dim]Largest clustered candidates with no curated stretch "
+            "(paste into the curation file to add one):[/dim]"
+        )
+        for cand in report.uncovered_candidates[:show_candidates]:
+            console.print(
+                f"[dim]# {cand.length_km:.1f} km, {cand.upstream_km:,.0f} km of channel "
+                f"upstream[/dim]"
+            )
+            console.print(candidate_toml(cand), markup=False, highlight=False)
+
+    if report.failed:
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

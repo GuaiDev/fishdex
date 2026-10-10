@@ -55,6 +55,10 @@ _MAX_TILE_DEPTH = 5
 # Pre-tile the outer bbox into sub-tiles of this degree width/height.
 # ~0.5° ≈ 55km lat × 40km lon at 43°N — safely below the ArcGIS scale-sampling threshold.
 _TILE_DEG = 0.5
+# Server-side generalisation for map-scale fetches (~30m). Douglas-Peucker keeps
+# each line's first and last vertex, so start_node / end_node — the topology —
+# survive; only the interior vertices thin out. Cuts a 0.5° tile from ~12MB to ~1.4MB.
+_MAP_SCALE_OFFSET_DEG = 0.0003
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +104,62 @@ def fetch_watercourses(lat: float, lon: float, radius_km: float = 300.0) -> list
             segments.append(seg)
 
     logger.info("OHN watercourse fetch complete: %d segments", len(segments))
+    return segments
+
+
+def fetch_watercourses_bbox(
+    min_lon: float,
+    min_lat: float,
+    max_lon: float,
+    max_lat: float,
+) -> list[StreamSegment]:
+    """Fetch every OHN watercourse touching a bbox, with map-scale line geometry.
+
+    Unlike fetch_watercourses, nothing is collapsed to a centroid POINT: every
+    segment keeps a (generalised) LINESTRING, because the caller draws it.
+    Tiles snap to a global _TILE_DEG grid rather than to the bbox corner, so
+    overlapping requests reuse the same cache entries. Cached 30 days.
+    """
+    base_params = {
+        "geometryType": "esriGeometryEnvelope",
+        "spatialRel": "esriSpatialRelIntersects",
+        "outFields": (
+            "OGF_ID,WATERCOURSE_TYPE,OFFICIAL_NAME_LABEL,"
+            "FLOW_DIRECTION_VERIFIED_IND,PERMANENCY,"
+            "FLOW_CLASSIFICATION,SYSTEM_CALCULATED_LENGTH"
+        ),
+        "returnGeometry": "true",
+        "outSR": "4326",
+        "maxAllowableOffset": _MAP_SCALE_OFFSET_DEG,
+        "geometryPrecision": 5,
+        "resultRecordCount": _PAGE_SIZE,
+        "f": "json",
+    }
+    url = f"{_SERVICE_BASE}/{_WATERCOURSE_LAYER}/query"
+
+    tiles = _aligned_tiles(min_lon, min_lat, max_lon, max_lat)
+    logger.info("OHN watercourse (map scale): fetching %d grid tiles", len(tiles))
+    seen: dict[int, dict] = {}
+    for i, tile in enumerate(tiles, 1):
+        for feat in _fetch_tile(url, base_params, *tile):
+            ogf_id = feat.get("attributes", {}).get("OGF_ID")
+            if ogf_id is not None and ogf_id not in seen:
+                seen[ogf_id] = feat
+        if i % 25 == 0:
+            logger.info("OHN watercourse (map scale): %d/%d tiles", i, len(tiles))
+
+    segments: list[StreamSegment] = []
+    for feat in seen.values():
+        seg = _parse_segment(feat)
+        if seg is not None:
+            segments.append(seg)
+
+    dropped = len(seen) - len(segments)
+    if dropped:
+        share = dropped / len(seen)
+        log = logger.warning if share >= 0.01 else logger.info
+        log("OHN watercourse (map scale): %d of %d features unparseable", dropped, len(seen))
+    logger.info("OHN watercourse (map scale) fetch complete: %d segments", len(segments))
     return segments
 
 
@@ -173,6 +233,20 @@ def _grid_tiles(
     return tiles
 
 
+def _aligned_tiles(
+    min_lon: float,
+    min_lat: float,
+    max_lon: float,
+    max_lat: float,
+) -> list[tuple[float, float, float, float]]:
+    """Global-grid _TILE_DEG tiles covering a bbox (cache-friendly: shared edges)."""
+    lon0 = math.floor(min_lon / _TILE_DEG) * _TILE_DEG
+    lat0 = math.floor(min_lat / _TILE_DEG) * _TILE_DEG
+    lon1 = math.ceil(max_lon / _TILE_DEG) * _TILE_DEG
+    lat1 = math.ceil(max_lat / _TILE_DEG) * _TILE_DEG
+    return _grid_tiles(lon0, lat0, max(lon1, lon0 + _TILE_DEG), max(lat1, lat0 + _TILE_DEG))
+
+
 # ── tiled pagination ──────────────────────────────────────────────────────────
 
 
@@ -185,61 +259,85 @@ def _fetch_tile(
     max_lat: float,
     depth: int = 0,
 ) -> list[dict]:
-    """Paginate a single bbox tile, recursively splitting into quadrants if a
-    server record cap is suspected (total results = exact multiple of _PAGE_SIZE).
+    """Fetch every feature in one bbox tile, splitting into quadrants until complete.
+
+    Completeness is judged against the server's own count for the bbox, not
+    against page length. The LIO service silently returns a thinned subset for
+    dense tiles — 4,381 of 8,344 features for one 0.5° tile near Brantford, with
+    no exceededTransferLimit flag and a page well under _PAGE_SIZE — so "a short
+    page means the last page" read a half-empty network as complete.
     """
-    if depth > _MAX_TILE_DEPTH:
-        logger.warning(
-            "OHN: max tiling depth %d reached for bbox %.3f,%.3f,%.3f,%.3f — may be incomplete",
-            _MAX_TILE_DEPTH,
-            min_lon,
-            min_lat,
-            max_lon,
-            max_lat,
-        )
+    bbox_str = f"{min_lon:.5f},{min_lat:.5f},{max_lon:.5f},{max_lat:.5f}"
+    expected = _count_in_bbox(url, base_params, bbox_str)
+    if expected == 0:
         return []
 
-    bbox_str = f"{min_lon:.5f},{min_lat:.5f},{max_lon:.5f},{max_lat:.5f}"
     features: list[dict] = []
     offset = 0
-
-    while True:
+    while len(features) < expected:
         params = {**base_params, "geometry": bbox_str, "resultOffset": offset}
-        data = _cached_get(url, params)
-        page = data.get("features", [])
-        features.extend(page)
+        page = _cached_get(url, params).get("features", [])
         logger.debug("OHN tile depth=%d offset=%d: %d features", depth, offset, len(page))
-
-        if not page or len(page) < _PAGE_SIZE:
+        if not page:
+            break
+        features.extend(page)
+        if len(page) < _PAGE_SIZE:
             break
         offset += _PAGE_SIZE
 
-    # Exact multiple of _PAGE_SIZE → server may have capped results; tile to confirm
-    if features and len(features) % _PAGE_SIZE == 0:
-        logger.info(
-            "OHN: possible record cap at %d features (depth=%d) — splitting into quadrants",
-            len(features),
-            depth,
-        )
-        mid_lon = (min_lon + max_lon) / 2
-        mid_lat = (min_lat + max_lat) / 2
-        quadrants = [
-            (min_lon, min_lat, mid_lon, mid_lat),
-            (mid_lon, min_lat, max_lon, mid_lat),
-            (min_lon, mid_lat, mid_lon, max_lat),
-            (mid_lon, mid_lat, max_lon, max_lat),
-        ]
-        seen: set = set()
-        tiled: list[dict] = []
-        for q in quadrants:
-            for feat in _fetch_tile(url, base_params, *q, depth=depth + 1):
-                ogf_id = feat.get("attributes", {}).get("OGF_ID")
-                if ogf_id not in seen:
-                    seen.add(ogf_id)
-                    tiled.append(feat)
-        return tiled
+    if len(features) >= expected:
+        return features
 
-    return features
+    if depth >= _MAX_TILE_DEPTH:
+        logger.warning(
+            "OHN: tile %s still short at max depth %d — got %d of %d features; "
+            "the network here is incomplete",
+            bbox_str,
+            depth,
+            len(features),
+            expected,
+        )
+        return features
+
+    logger.info(
+        "OHN: tile %s returned %d of %d features (depth=%d) — splitting into quadrants",
+        bbox_str,
+        len(features),
+        expected,
+        depth,
+    )
+    mid_lon = (min_lon + max_lon) / 2
+    mid_lat = (min_lat + max_lat) / 2
+    quadrants = [
+        (min_lon, min_lat, mid_lon, mid_lat),
+        (mid_lon, min_lat, max_lon, mid_lat),
+        (min_lon, mid_lat, mid_lon, max_lat),
+        (mid_lon, mid_lat, max_lon, max_lat),
+    ]
+    seen: set = set()
+    tiled: list[dict] = []
+    for q in quadrants:
+        for feat in _fetch_tile(url, base_params, *q, depth=depth + 1):
+            ogf_id = feat.get("attributes", {}).get("OGF_ID")
+            if ogf_id not in seen:
+                seen.add(ogf_id)
+                tiled.append(feat)
+    return tiled
+
+
+def _count_in_bbox(url: str, base_params: dict, bbox_str: str) -> int:
+    """The server's feature count for a bbox — the yardstick for completeness."""
+    params = {
+        "geometry": bbox_str,
+        "geometryType": base_params.get("geometryType", "esriGeometryEnvelope"),
+        "spatialRel": base_params.get("spatialRel", "esriSpatialRelIntersects"),
+        "returnCountOnly": "true",
+        "f": "json",
+    }
+    count = _cached_get(url, params).get("count")
+    if not isinstance(count, int):
+        raise RuntimeError(f"OHN: no feature count for tile {bbox_str} (got {count!r})")
+    return count
 
 
 # ── internal parsers ──────────────────────────────────────────────────────────
@@ -436,6 +534,8 @@ def _cached_get(url: str, params: dict) -> dict:
     )
     response.raise_for_status()
     data = response.json()
+    if "error" in data:
+        raise RuntimeError(f"OHN query failed for tile {params.get('geometry')}: {data['error']}")
     cache_file.write_text(json.dumps(data))
     return data
 

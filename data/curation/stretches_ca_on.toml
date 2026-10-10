@@ -1,0 +1,657 @@
+# Fishing stretches — Ontario. Level 1 of the explore map.
+#
+# This file is the authority on which stretches the map shows. `make
+# build-stretches` reads it, traces every [[stretch]] through the Ontario Hydro
+# Network, and replaces the stored set. No code change is needed for any edit:
+#
+#   rename  change `name` (keep `id` — it is the stable key the map and later
+#           anchors/pins refer to; change it only if the stretch is new water).
+#   add     append a [[stretch]]. The build prints the largest clustered
+#           candidates that no stretch covers, already in this format.
+#   drop    delete the entry, or set `enabled = false` to keep it on file.
+#   merge   give one stretch several [[stretch.reach]] tables.
+#   split   two entries whose reaches share a boundary point.
+#
+# Each reach runs `from` one point `to` another, optionally through `via`
+# points that pin the route where channels connect more than one way. A point
+# snaps to the largest channel within 150 m of the nearest one (and never more
+# than `max_snap_m`, default 400 m, away). Where that picks the wrong channel,
+# add `ogf_id = <OHN segment id>` to the point to pin it.
+#
+# Overrides per stretch: `include_ogf_ids` / `exclude_ogf_ids` add or remove
+# individual OHN segments after tracing. A segment belongs to at most one
+# stretch; if two claim it, the earlier entry in this file keeps it and the
+# build reports the conflict.
+#
+# `notes` records where the clustering or snapping needed a human — read it
+# before moving a point.
+#
+# First Nations territory: no boundary layer exists in this repository, so it
+# is handled here, by leaving those waters out. The Grand between Brantford and
+# Caledonia (Six Nations of the Grand River, Mississaugas of the Credit), the
+# Thames between Delaware and Thamesville (Chippewas of the Thames,
+# Munsee-Delaware, Oneida Nation of the Thames, Delaware Nation at
+# Moraviantown) and the St. Clair delta (Walpole Island First Nation) have no
+# stretch on purpose.
+
+version = 1
+jurisdiction = "CA-ON"
+# (min_lon, min_lat, max_lon, max_lat) — the network fetched for the build:
+# southern Ontario to the French River latitude, Windsor to Ottawa.
+build_bbox = [-83.5, 41.5, -75.5, 45.5]
+
+[[stretch]]
+id = "grand-shand-dam-west-montrose"
+name = "Upper Grand — Shand Dam to West Montrose"
+river = "Grand River"
+region = "Grand River"
+[[stretch.reach]]
+from = { lat = 43.71634, lon = -80.34993, label = "Shand Dam (Belwood Lake)" }
+via = [
+  { lat = 43.69452, lon = -80.38176, label = "Fergus" },
+  { lat = 43.67715, lon = -80.44479, label = "Elora" },
+]
+to = { lat = 43.5724, lon = -80.48496, label = "West Montrose covered bridge" }
+
+[[stretch]]
+id = "grand-conestogo-cambridge"
+name = "Middle Grand — Conestogo to Cambridge"
+river = "Grand River"
+region = "Grand River"
+[[stretch.reach]]
+from = { lat = 43.53056, lon = -80.48065, label = "Conestogo River confluence" }
+via = [
+  { lat = 43.47229, lon = -80.4701, label = "Bridgeport" },
+  { lat = 43.3865, lon = -80.37722, label = "Blair" },
+]
+to = { lat = 43.35431, lon = -80.31638, label = "Cambridge (Galt)" }
+
+[[stretch]]
+id = "grand-cambridge-paris"
+name = "Cambridge to Paris"
+river = "Grand River"
+region = "Grand River"
+[[stretch.reach]]
+from = { lat = 43.35431, lon = -80.31638, label = "Cambridge (Galt)" }
+via = [
+  { lat = 43.2727, lon = -80.35711, label = "Glen Morris" },
+]
+to = { lat = 43.19085, lon = -80.37615, label = "Paris" }
+
+[[stretch]]
+id = "grand-paris-brantford"
+name = "Paris to Brantford"
+river = "Grand River"
+region = "Grand River"
+[[stretch.reach]]
+from = { lat = 43.19085, lon = -80.37615, label = "Paris" }
+to = { lat = 43.12834, lon = -80.2644, label = "Brantford (Lorne Bridge)" }
+
+[[stretch]]
+id = "grand-caledonia-cayuga"
+name = "Caledonia to Cayuga"
+river = "Grand River"
+region = "Grand River"
+notes = "Starts at Caledonia: the Grand between Brantford and Caledonia runs along Six Nations of the Grand River and Mississaugas of the Credit territory and is deliberately left out."
+[[stretch.reach]]
+from = { lat = 43.06597, lon = -79.938, label = "Caledonia dam" }
+to = { lat = 42.94034, lon = -79.85744, label = "Cayuga" }
+
+[[stretch]]
+id = "grand-cayuga-dunnville"
+name = "Cayuga to Dunnville"
+river = "Grand River"
+region = "Grand River"
+[[stretch.reach]]
+from = { lat = 42.94034, lon = -79.85744, label = "Cayuga" }
+to = { lat = 42.89649, lon = -79.60883, label = "Dunnville dam" }
+
+[[stretch]]
+id = "grand-dunnville-port-maitland"
+name = "Dunnville to Port Maitland"
+river = "Grand River"
+region = "Grand River"
+[[stretch.reach]]
+from = { lat = 42.89649, lon = -79.60883, label = "Dunnville dam" }
+to = { lat = 42.85417, lon = -79.57836, label = "Port Maitland (lake mouth)" }
+
+[[stretch]]
+id = "conestogo-dam-grand"
+name = "Conestogo River — Conestogo Dam to the Grand"
+river = "Conestogo River"
+region = "Grand River"
+notes = "Grand River confluence: placed on the tributary just above the confluence, not on the river it joins."
+[[stretch.reach]]
+from = { lat = 43.66817, lon = -80.71255, label = "Conestogo Dam" }
+to = { lat = 43.53751, lon = -80.4914, label = "Grand River confluence" }
+
+[[stretch]]
+id = "speed-guelph-cambridge"
+name = "Speed River — Guelph to Cambridge"
+river = "Speed River"
+region = "Grand River"
+notes = "Grand River confluence (Preston): placed on the tributary just above the confluence, not on the river it joins."
+[[stretch.reach]]
+from = { lat = 43.53472, lon = -80.25084, label = "Guelph" }
+to = { lat = 43.40451, lon = -80.35831, label = "Grand River confluence (Preston)" }
+
+[[stretch]]
+id = "nith-new-hamburg-ayr"
+name = "Nith River — New Hamburg to Ayr"
+river = "Nith River"
+region = "Grand River"
+[[stretch.reach]]
+from = { lat = 43.36982, lon = -80.6958, label = "New Hamburg" }
+to = { lat = 43.28114, lon = -80.46807, label = "Ayr" }
+
+[[stretch]]
+id = "nith-ayr-paris"
+name = "Nith River — Ayr to Paris"
+river = "Nith River"
+region = "Grand River"
+notes = "Split: the Nith from New Hamburg to Paris traces 100 km through its meanders, so it is two stretches sharing Ayr as a boundary. Grand River confluence (Paris): placed on the tributary just above the confluence, not on the river it joins."
+[[stretch.reach]]
+from = { lat = 43.28114, lon = -80.46807, label = "Ayr" }
+to = { lat = 43.1922, lon = -80.38758, label = "Grand River confluence (Paris)" }
+
+[[stretch]]
+id = "big-creek-delhi-long-point-bay"
+name = "Big Creek — Delhi to Long Point Bay"
+river = "Big Creek"
+region = "Lake Erie"
+[[stretch.reach]]
+from = { lat = 42.84177, lon = -80.50729, label = "Delhi" }
+via = [
+  { lat = 42.67109, lon = -80.53062, label = "Walsingham" },
+]
+to = { lat = 42.60255, lon = -80.44586, label = "Big Creek marsh mouth" }
+
+[[stretch]]
+id = "big-otter-tillsonburg-port-burwell"
+name = "Big Otter Creek — Tillsonburg to Port Burwell"
+river = "Big Otter Creek"
+region = "Lake Erie"
+notes = "Port Burwell: point placed on the river channel, not the lake flow line a few hundred metres offshore."
+[[stretch.reach]]
+from = { lat = 42.8493, lon = -80.73424, label = "Tillsonburg" }
+via = [
+  { lat = 42.66993, lon = -80.80446, label = "Vienna" },
+]
+to = { lat = 42.6383, lon = -80.80661, label = "Port Burwell" }
+
+[[stretch]]
+id = "catfish-aylmer-port-bruce"
+name = "Catfish Creek — Aylmer to Port Bruce"
+river = "Catfish Creek"
+region = "Lake Erie"
+[[stretch.reach]]
+from = { lat = 42.77566, lon = -80.9983, label = "Aylmer" }
+to = { lat = 42.6532, lon = -81.00748, label = "Port Bruce" }
+
+[[stretch]]
+id = "kettle-st-thomas-port-stanley"
+name = "Kettle Creek — St. Thomas to Port Stanley"
+river = "Kettle Creek"
+region = "Lake Erie"
+[[stretch.reach]]
+from = { lat = 42.76715, lon = -81.20371, label = "St. Thomas" }
+to = { lat = 42.65768, lon = -81.21266, label = "Port Stanley" }
+
+[[stretch]]
+id = "lynn-simcoe-port-dover"
+name = "Lynn River — Simcoe to Port Dover"
+river = "Lynn River"
+region = "Lake Erie"
+notes = "Port Dover: point placed on the river channel, not the lake flow line a few hundred metres offshore."
+[[stretch.reach]]
+from = { lat = 42.83653, lon = -80.30005, label = "Simcoe" }
+to = { lat = 42.78233, lon = -80.20059, label = "Port Dover" }
+
+[[stretch]]
+id = "niagara-upper-fort-erie-chippawa"
+name = "Upper Niagara — Fort Erie to Chippawa"
+river = "Niagara River"
+region = "Niagara"
+[[stretch.reach]]
+from = { lat = 42.91966, lon = -78.90765, label = "Fort Erie (Peace Bridge)" }
+to = { lat = 43.05915, lon = -79.05272, label = "Chippawa" }
+
+[[stretch]]
+id = "niagara-lower-queenston-notl"
+name = "Lower Niagara — Queenston to Niagara-on-the-Lake"
+river = "Niagara River"
+region = "Niagara"
+[[stretch.reach]]
+from = { lat = 43.17512, lon = -79.05304, label = "Queenston" }
+to = { lat = 43.25985, lon = -79.06666, label = "Niagara-on-the-Lake (lake mouth)" }
+
+[[stretch]]
+id = "welland-river-wellandport-chippawa"
+name = "Welland River — Wellandport to Chippawa"
+river = "Welland River"
+region = "Niagara"
+notes = "Chippawa: placed on the tributary just above the confluence, not on the river it joins. Chippawa: pinned to OHN segment 127941196; the snap picks a neighbour."
+[[stretch.reach]]
+from = { lat = 43.01973, lon = -79.60888, label = "Wellandport" }
+to = { lat = 43.04994, lon = -79.06622, label = "Chippawa", ogf_id = 127941196 }
+
+[[stretch]]
+id = "twenty-mile-balls-falls-jordan"
+name = "Twenty Mile Creek — Ball's Falls to Jordan Harbour"
+river = "Twenty Mile Creek"
+region = "Niagara"
+notes = "Jordan Harbour: point placed on the river channel, not the lake flow line a few hundred metres offshore."
+[[stretch.reach]]
+from = { lat = 43.13705, lon = -79.37661, label = "Ball's Falls" }
+to = { lat = 43.17918, lon = -79.37414, label = "Jordan Harbour" }
+
+[[stretch]]
+id = "credit-forks-glen-williams"
+name = "Upper Credit — Forks of the Credit to Glen Williams"
+river = "Credit River"
+region = "Lake Ontario"
+[[stretch.reach]]
+from = { lat = 43.80937, lon = -79.98758, label = "Forks of the Credit" }
+to = { lat = 43.67453, lon = -79.92755, label = "Glen Williams" }
+
+[[stretch]]
+id = "credit-glen-williams-streetsville"
+name = "Middle Credit — Glen Williams to Streetsville"
+river = "Credit River"
+region = "Lake Ontario"
+[[stretch.reach]]
+from = { lat = 43.67453, lon = -79.92755, label = "Glen Williams" }
+via = [
+  { lat = 43.64852, lon = -79.84121, label = "Norval" },
+]
+to = { lat = 43.57789, lon = -79.70129, label = "Streetsville" }
+
+[[stretch]]
+id = "credit-streetsville-port-credit"
+name = "Lower Credit — Streetsville to Port Credit"
+river = "Credit River"
+region = "Lake Ontario"
+notes = "Port Credit (lake mouth): point placed on the river channel, not the lake flow line a few hundred metres offshore."
+[[stretch.reach]]
+from = { lat = 43.57789, lon = -79.70129, label = "Streetsville" }
+to = { lat = 43.54736, lon = -79.58028, label = "Port Credit (lake mouth)" }
+
+[[stretch]]
+id = "sixteen-mile-milton-oakville"
+name = "Sixteen Mile Creek — Milton to Oakville Harbour"
+river = "Sixteen Mile Creek"
+region = "Lake Ontario"
+[[stretch.reach]]
+from = { lat = 43.50906, lon = -79.86922, label = "Milton" }
+via = [
+  { lat = 43.45369, lon = -79.71654, label = "Lions Valley" },
+]
+to = { lat = 43.43775, lon = -79.66367, label = "Oakville Harbour" }
+
+[[stretch]]
+id = "bronte-lowville-bronte"
+name = "Bronte Creek — Lowville to Bronte Harbour"
+river = "Bronte Creek"
+region = "Lake Ontario"
+notes = "Bronte Creek near Lowville: upstream end placed by following the mainstem 20 km up from the downstream end."
+[[stretch.reach]]
+from = { lat = 43.42759, lon = -79.84726, label = "Bronte Creek near Lowville" }
+via = [
+  { lat = 43.41274, lon = -79.74732, label = "Bronte Creek Provincial Park" },
+]
+to = { lat = 43.38219, lon = -79.69862, label = "Bronte Harbour" }
+
+[[stretch]]
+id = "humber-woodbridge-humber-bay"
+name = "Lower Humber — Woodbridge to Humber Bay"
+river = "Humber River"
+region = "Lake Ontario"
+[[stretch.reach]]
+from = { lat = 43.78404, lon = -79.5911, label = "Woodbridge" }
+via = [
+  { lat = 43.63804, lon = -79.4832, label = "Old Mill" },
+]
+to = { lat = 43.63037, lon = -79.4675, label = "Humber Bay (lake mouth)" }
+
+[[stretch]]
+id = "rouge-lower"
+name = "Rouge River — Little Rouge to Lake Ontario"
+river = "Rouge River"
+region = "Lake Ontario"
+notes = "Merge: Little Rouge Creek and the lower Rouge mainstem as one stretch."
+[[stretch.reach]]
+from = { lat = 43.80446, lon = -79.14915, label = "Little Rouge confluence" }
+to = { lat = 43.79191, lon = -79.11321, label = "Rouge Beach (lake mouth)" }
+[[stretch.reach]]
+from = { lat = 43.87344, lon = -79.19525, label = "Little Rouge Creek, Steeles Ave" }
+to = { lat = 43.80446, lon = -79.14915, label = "Rouge River confluence" }
+
+[[stretch]]
+id = "duffins-pickering-ajax"
+name = "Duffins Creek — Greenwood to Ajax"
+river = "Duffins Creek"
+region = "Lake Ontario"
+[[stretch.reach]]
+from = { lat = 43.87997, lon = -79.05821, label = "Greenwood" }
+to = { lat = 43.81408, lon = -79.03376, label = "Ajax (lake mouth)" }
+
+[[stretch]]
+id = "bowmanville-soper"
+name = "Bowmanville & Soper Creeks"
+river = "Bowmanville Creek"
+region = "Lake Ontario"
+notes = "Merge: Soper Creek joins Bowmanville Creek just above the mouth; anglers treat them as one run."
+[[stretch.reach]]
+from = { lat = 43.90668, lon = -78.6883, label = "Bowmanville" }
+to = { lat = 43.89065, lon = -78.6659, label = "Port Darlington (lake mouth)" }
+[[stretch.reach]]
+from = { lat = 43.92373, lon = -78.66806, label = "Soper Creek, Hwy 2" }
+to = { lat = 43.89065, lon = -78.6659, label = "Bowmanville Creek confluence" }
+
+[[stretch]]
+id = "wilmot-newcastle"
+name = "Wilmot Creek — Orono to Newcastle"
+river = "Wilmot Creek"
+region = "Lake Ontario"
+notes = "Newcastle (lake mouth): point placed on the river channel, not the lake flow line a few hundred metres offshore. Wilmot Creek near Orono: upstream end placed by following the mainstem 12 km up from the downstream end. Newcastle (lake mouth): pinned to OHN segment 203844980; the snap picks a neighbour."
+[[stretch.reach]]
+from = { lat = 43.96794, lon = -78.62867, label = "Wilmot Creek near Orono" }
+to = { lat = 43.89245, lon = -78.59554, label = "Newcastle (lake mouth)", ogf_id = 203844980 }
+
+[[stretch]]
+id = "ganaraska-garden-hill-port-hope"
+name = "Ganaraska River — Garden Hill to Port Hope"
+river = "Ganaraska River"
+region = "Lake Ontario"
+notes = "Port Hope (lake mouth): point placed on the river channel, not the lake flow line a few hundred metres offshore. Ganaraska River above Canton: upstream end placed by following the mainstem 20 km up from the downstream end."
+[[stretch.reach]]
+from = { lat = 44.01311, lon = -78.41433, label = "Ganaraska River above Canton" }
+via = [
+  { lat = 43.95422, lon = -78.29509, label = "Corbett's Dam" },
+]
+to = { lat = 43.94084, lon = -78.29078, label = "Port Hope (lake mouth)" }
+
+[[stretch]]
+id = "trent-lower-frankford-trenton"
+name = "Lower Trent — Frankford to Trenton"
+river = "Trent River"
+region = "Bay of Quinte"
+[[stretch.reach]]
+from = { lat = 44.19255, lon = -77.59166, label = "Frankford" }
+to = { lat = 44.1037, lon = -77.57587, label = "Trenton" }
+
+[[stretch]]
+id = "moira-foxboro-belleville"
+name = "Moira River — Foxboro to Belleville"
+river = "Moira River"
+region = "Bay of Quinte"
+notes = "Belleville: point placed on the river channel, not the lake flow line a few hundred metres offshore."
+[[stretch.reach]]
+from = { lat = 44.24161, lon = -77.42701, label = "Foxboro" }
+to = { lat = 44.15565, lon = -77.38308, label = "Belleville" }
+
+[[stretch]]
+id = "saugeen-hanover-walkerton"
+name = "Saugeen — Hanover to Walkerton"
+river = "Saugeen River"
+region = "Lake Huron"
+[[stretch.reach]]
+from = { lat = 44.14576, lon = -81.04792, label = "Hanover" }
+to = { lat = 44.14041, lon = -81.16236, label = "Walkerton" }
+
+[[stretch]]
+id = "saugeen-walkerton-paisley"
+name = "Saugeen — Walkerton to Paisley"
+river = "Saugeen River"
+region = "Lake Huron"
+[[stretch.reach]]
+from = { lat = 44.14041, lon = -81.16236, label = "Walkerton" }
+to = { lat = 44.31777, lon = -81.27307, label = "Paisley" }
+
+[[stretch]]
+id = "saugeen-paisley-dennys-dam"
+name = "Saugeen — Paisley to Denny's Dam"
+river = "Saugeen River"
+region = "Lake Huron"
+[[stretch.reach]]
+from = { lat = 44.31777, lon = -81.27307, label = "Paisley" }
+to = { lat = 44.50467, lon = -81.33607, label = "Denny's Dam" }
+
+[[stretch]]
+id = "saugeen-dennys-dam-southampton"
+name = "Lower Saugeen — Denny's Dam to Southampton"
+river = "Saugeen River"
+region = "Lake Huron"
+notes = "Southampton (lake mouth): point placed on the river channel, not the lake flow line a few hundred metres offshore. Southampton (lake mouth): pinned to OHN segment 214619737; the snap picks a neighbour."
+[[stretch.reach]]
+from = { lat = 44.50467, lon = -81.33607, label = "Denny's Dam" }
+to = { lat = 44.501, lon = -81.37417, label = "Southampton (lake mouth)", ogf_id = 214619737 }
+
+[[stretch]]
+id = "maitland-wingham-auburn"
+name = "Maitland — Wingham to Auburn"
+river = "Maitland River"
+region = "Lake Huron"
+[[stretch.reach]]
+from = { lat = 43.88631, lon = -81.32516, label = "Wingham" }
+to = { lat = 43.72561, lon = -81.55764, label = "Auburn" }
+
+[[stretch]]
+id = "maitland-auburn-benmiller"
+name = "Maitland — Auburn to Benmiller"
+river = "Maitland River"
+region = "Lake Huron"
+[[stretch.reach]]
+from = { lat = 43.72561, lon = -81.55764, label = "Auburn" }
+to = { lat = 43.71705, lon = -81.65652, label = "Benmiller" }
+
+[[stretch]]
+id = "maitland-benmiller-goderich"
+name = "Lower Maitland — Benmiller to Goderich"
+river = "Maitland River"
+region = "Lake Huron"
+notes = "Goderich (lake mouth): point placed on the river channel, not the lake flow line a few hundred metres offshore. Goderich (lake mouth): pinned to OHN segment 214013937; the snap picks a neighbour."
+[[stretch.reach]]
+from = { lat = 43.71705, lon = -81.65652, label = "Benmiller" }
+to = { lat = 43.74894, lon = -81.72755, label = "Goderich (lake mouth)", ogf_id = 214013937 }
+
+[[stretch]]
+id = "bayfield-varna-bayfield"
+name = "Bayfield River — Varna to Bayfield"
+river = "Bayfield River"
+region = "Lake Huron"
+[[stretch.reach]]
+from = { lat = 43.5433, lon = -81.5749, label = "Varna" }
+to = { lat = 43.56951, lon = -81.71316, label = "Bayfield (lake mouth)" }
+
+[[stretch]]
+id = "ausable-arkona-port-franks"
+name = "Ausable River — Arkona to Port Franks"
+river = "Ausable River"
+region = "Lake Huron"
+[[stretch.reach]]
+from = { lat = 43.08976, lon = -81.81471, label = "Arkona (Rock Glen)" }
+to = { lat = 43.23639, lon = -81.90656, label = "Port Franks" }
+
+[[stretch]]
+id = "nottawasaga-nicolston-angus"
+name = "Nottawasaga — Nicolston Dam to Angus"
+river = "Nottawasaga River"
+region = "Georgian Bay"
+[[stretch.reach]]
+from = { lat = 44.17213, lon = -79.8149, label = "Nicolston Dam" }
+to = { lat = 44.33206, lon = -79.8742, label = "Angus" }
+
+[[stretch]]
+id = "nottawasaga-angus-edenvale"
+name = "Nottawasaga — Angus to Edenvale"
+river = "Nottawasaga River"
+region = "Georgian Bay"
+[[stretch.reach]]
+from = { lat = 44.33206, lon = -79.8742, label = "Angus" }
+to = { lat = 44.48515, lon = -79.97602, label = "Edenvale" }
+
+[[stretch]]
+id = "nottawasaga-edenvale-wasaga"
+name = "Lower Nottawasaga — Edenvale to Wasaga Beach"
+river = "Nottawasaga River"
+region = "Georgian Bay"
+notes = "Wasaga Beach (river mouth): point placed on the river channel, not the lake flow line a few hundred metres offshore."
+[[stretch.reach]]
+from = { lat = 44.48515, lon = -79.97602, label = "Edenvale" }
+to = { lat = 44.5399, lon = -80.00964, label = "Wasaga Beach (river mouth)" }
+
+[[stretch]]
+id = "beaver-kimberley-thornbury"
+name = "Beaver River — Kimberley to Thornbury"
+river = "Beaver River"
+region = "Georgian Bay"
+notes = "Thornbury: point placed on the river channel, not the lake flow line a few hundred metres offshore."
+[[stretch.reach]]
+from = { lat = 44.40121, lon = -80.53416, label = "Kimberley" }
+to = { lat = 44.56555, lon = -80.44585, label = "Thornbury" }
+
+[[stretch]]
+id = "bighead-bognor-meaford"
+name = "Bighead River — Bognor to Meaford"
+river = "Bighead River"
+region = "Georgian Bay"
+notes = "Bighead River near Bognor: upstream end placed by following the mainstem 25 km up from the downstream end."
+[[stretch.reach]]
+from = { lat = 44.53868, lon = -80.70581, label = "Bighead River near Bognor" }
+to = { lat = 44.61083, lon = -80.58823, label = "Meaford" }
+
+[[stretch]]
+id = "sydenham-owen-sound"
+name = "Sydenham River — Inglis Falls to Owen Sound"
+river = "Sydenham River (Owen Sound)"
+region = "Georgian Bay"
+[[stretch.reach]]
+from = { lat = 44.53838, lon = -80.93275, label = "Inglis Falls" }
+to = { lat = 44.58183, lon = -80.93917, label = "Owen Sound harbour" }
+
+[[stretch]]
+id = "sauble-allenford-sauble-falls"
+name = "Sauble River — Allenford to Sauble Falls"
+river = "Sauble River"
+region = "Lake Huron"
+[[stretch.reach]]
+from = { lat = 44.53684, lon = -81.19353, label = "Allenford" }
+to = { lat = 44.67493, lon = -81.25942, label = "Sauble Falls" }
+
+[[stretch]]
+id = "severn-washago-port-severn"
+name = "Severn River — Washago to Port Severn"
+river = "Severn River"
+region = "Georgian Bay"
+notes = "Washago: pinned to OHN segment 214600526; the snap picks a neighbour."
+[[stretch.reach]]
+from = { lat = 44.75241, lon = -79.31138, label = "Washago", ogf_id = 214600526 }
+to = { lat = 44.79575, lon = -79.72501, label = "Port Severn" }
+
+[[stretch]]
+id = "thames-north-st-marys-fanshawe"
+name = "North Thames — St. Marys to Fanshawe"
+river = "North Thames River"
+region = "Thames River"
+[[stretch.reach]]
+from = { lat = 43.24942, lon = -81.15107, label = "St. Marys" }
+to = { lat = 43.04159, lon = -81.19916, label = "Fanshawe Dam" }
+
+[[stretch]]
+id = "thames-north-fanshawe-forks"
+name = "North Thames — Fanshawe Dam to the Forks"
+river = "North Thames River"
+region = "Thames River"
+notes = "The Forks (London): placed on the tributary just above the confluence, not on the river it joins."
+[[stretch.reach]]
+from = { lat = 43.04159, lon = -81.19916, label = "Fanshawe Dam" }
+to = { lat = 42.98368, lon = -81.25715, label = "The Forks (London)" }
+
+[[stretch]]
+id = "thames-south-ingersoll-london"
+name = "South Thames — Ingersoll to London"
+river = "South Thames River"
+region = "Thames River"
+notes = "The Forks (London): placed on the tributary just above the confluence, not on the river it joins. The Forks (London): pinned to OHN segment 319678016; the snap picks a neighbour."
+[[stretch.reach]]
+from = { lat = 43.03612, lon = -80.8913, label = "Ingersoll" }
+to = { lat = 42.98059, lon = -81.25692, label = "The Forks (London)", ogf_id = 319678016 }
+
+[[stretch]]
+id = "thames-london-delaware"
+name = "Thames — London to Delaware"
+river = "Thames River"
+region = "Thames River"
+notes = "Ends at Delaware: below it the Thames runs through Chippewas of the Thames, Munsee-Delaware and Oneida Nation of the Thames territory, and past Delaware Nation at Moraviantown — left out deliberately."
+[[stretch.reach]]
+from = { lat = 42.97817, lon = -81.27128, label = "The Forks (London)" }
+to = { lat = 42.89881, lon = -81.42067, label = "Delaware" }
+
+[[stretch]]
+id = "thames-thamesville-chatham"
+name = "Thames — Thamesville to Chatham"
+river = "Thames River"
+region = "Thames River"
+[[stretch.reach]]
+from = { lat = 42.54517, lon = -81.98671, label = "Thamesville" }
+to = { lat = 42.40606, lon = -82.1886, label = "Chatham" }
+
+[[stretch]]
+id = "thames-chatham-lake-st-clair"
+name = "Lower Thames — Chatham to Lake St. Clair"
+river = "Thames River"
+region = "Lake St. Clair"
+[[stretch.reach]]
+from = { lat = 42.40606, lon = -82.1886, label = "Chatham" }
+to = { lat = 42.3262, lon = -82.46268, label = "Lighthouse Cove (lake mouth)" }
+
+[[stretch]]
+id = "sydenham-dresden-wallaceburg"
+name = "Sydenham River — Dresden to Wallaceburg"
+river = "Sydenham River"
+region = "Lake St. Clair"
+notes = "Wallaceburg: placed on the tributary just above the confluence, not on the river it joins."
+[[stretch.reach]]
+from = { lat = 42.58591, lon = -82.19216, label = "Dresden" }
+to = { lat = 42.59444, lon = -82.37436, label = "Wallaceburg" }
+
+[[stretch]]
+id = "st-clair-sarnia-port-lambton"
+name = "St. Clair River — Sarnia to Port Lambton"
+river = "St. Clair River"
+region = "Lake St. Clair"
+notes = "Ends at Port Lambton, above the delta: Walpole Island First Nation (Bkejwanong) territory is left out deliberately."
+[[stretch.reach]]
+from = { lat = 42.98839, lon = -82.42279, label = "Sarnia (Bluewater Bridge)" }
+to = { lat = 42.64898, lon = -82.50885, label = "Port Lambton" }
+
+[[stretch]]
+id = "detroit-windsor-amherstburg"
+name = "Detroit River — Windsor to Amherstburg"
+river = "Detroit River"
+region = "Lake Erie"
+[[stretch.reach]]
+from = { lat = 42.32371, lon = -83.04102, label = "Windsor (Ambassador Bridge)" }
+to = { lat = 42.09986, lon = -83.11473, label = "Amherstburg" }
+
+[[stretch]]
+id = "otonabee-lakefield-rice-lake"
+name = "Otonabee River — Lakefield to Rice Lake"
+river = "Otonabee River"
+region = "Kawarthas"
+[[stretch.reach]]
+from = { lat = 44.40735, lon = -78.26255, label = "Lakefield" }
+via = [
+  { lat = 44.28761, lon = -78.30886, label = "Peterborough" },
+]
+to = { lat = 44.19156, lon = -78.24095, label = "Rice Lake" }
+
+[[stretch]]
+id = "rideau-manotick-ottawa"
+name = "Rideau River — Manotick to Rideau Falls"
+river = "Rideau River"
+region = "Eastern Ontario"
+[[stretch.reach]]
+from = { lat = 45.22048, lon = -75.66842, label = "Manotick" }
+to = { lat = 45.44591, lon = -75.69608, label = "Rideau Falls" }

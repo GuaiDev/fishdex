@@ -1371,6 +1371,22 @@ def get_map_segments(
     }
 
 
+@app.get("/map/stretches")
+def get_map_stretches(
+    jurisdiction: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Named fishing stretches for the explore map's low-zoom level, as GeoJSON.
+
+    Built by `make build-stretches` from data/curation/; an empty collection
+    means the build has not been run against this database.
+    """
+    from src.services.stretches import stretches_geojson
+    from src.storage.database import get_db
+
+    return stretches_geojson(get_db(), jurisdiction)
+
+
 @app.get("/map/my-stops")
 def get_my_stops(user: dict = Depends(get_current_user)):
     """Return all of the user's logged stops with coordinates for personal map mode."""

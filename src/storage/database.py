@@ -21,7 +21,6 @@ def get_db(path: Path | None = None) -> Database:
     return db
 
 
-
 def _ensure_fish_surveys(db: Database) -> None:
     """Create the fish_surveys table. Idempotent.
 
@@ -55,14 +54,61 @@ def _ensure_fish_surveys(db: Database) -> None:
             "CREATE INDEX IF NOT EXISTS idx_fish_surveys_event "
             "ON fish_surveys(station_name, visit_date)"
         )
-        db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_fish_surveys_coords ON fish_surveys(lat, lng)"
-        )
+        db.execute("CREATE INDEX IF NOT EXISTS idx_fish_surveys_coords ON fish_surveys(lat, lng)")
         db.execute(
             "CREATE INDEX IF NOT EXISTS idx_fish_surveys_species "
             "ON fish_surveys(species_common_name)"
         )
         db.conn.commit()
+
+
+def _ensure_fishing_stretches(db: Database) -> None:
+    """Create the explore map's Level 1 tables. Idempotent.
+
+    stretch_segments is keyed on ogf_id alone: an OHN segment belongs to at
+    most one stretch. Two stretches drawn over the same water would show the
+    map two overlapping lines and leave a later step not knowing which
+    stretch a confluence on that water belongs to.
+    """
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS fishing_stretches (
+            stretch_id          TEXT PRIMARY KEY,
+            name                TEXT NOT NULL,
+            river               TEXT NOT NULL,
+            region              TEXT,
+            jurisdiction        TEXT NOT NULL,
+            length_km           REAL NOT NULL,
+            segment_count       INTEGER NOT NULL,
+            geometry_geojson    TEXT NOT NULL,
+            bbox_min_lng        REAL NOT NULL,
+            bbox_min_lat        REAL NOT NULL,
+            bbox_max_lng        REAL NOT NULL,
+            bbox_max_lat        REAL NOT NULL,
+            centroid_lat        REAL NOT NULL,
+            centroid_lng        REAL NOT NULL,
+            sort_order          INTEGER NOT NULL DEFAULT 0,
+            notes               TEXT,
+            source              TEXT NOT NULL,
+            built_at            TEXT NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS stretch_segments (
+            ogf_id              INTEGER PRIMARY KEY,
+            stretch_id          TEXT NOT NULL REFERENCES fishing_stretches(stretch_id),
+            jurisdiction        TEXT NOT NULL,
+            seq                 INTEGER NOT NULL
+        )
+    """)
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_fishing_stretches_jurisdiction "
+        "ON fishing_stretches(jurisdiction)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stretch_segments_stretch ON stretch_segments(stretch_id)"
+    )
+    db.conn.commit()
+
 
 def _apply_migrations(db: Database) -> None:
     """Bring an existing schema up to current. Every step is idempotent.
@@ -87,6 +133,7 @@ def _apply_migrations(db: Database) -> None:
     migrate_gbif_licensing(db)
     migrate_gbif_survey_provenance(db)
     _ensure_fish_surveys(db)
+    _ensure_fishing_stretches(db)
     migrate_species_status_provenance(db)
     migrate_regulation_chunks_zone_name(db)
     migrate_segment_synthesis_jurisdiction(db)
