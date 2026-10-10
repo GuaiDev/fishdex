@@ -23,6 +23,9 @@ MAX_TURNS_BEFORE_SUMMARY = 10
 
 HAIKU = "claude-haiku-4-5-20251001"
 
+# Jurisdiction for users who have no profile of their own (see _prompt_inputs).
+_DEFAULT_JURISDICTION = "CA-ON"
+
 logger = logging.getLogger(__name__)
 
 
@@ -68,6 +71,21 @@ def _summarize_history(messages: list[dict], client) -> list[dict]:
     ] + to_keep
 
 
+def _prompt_inputs(db: Any, user_id: int) -> tuple[Any, list, Any]:
+    """The profile, recent trips and jurisdiction a user's system prompt is built from.
+
+    The profile file (data/user_profile.json) and the legacy `trips` table have
+    no user_id: they are user 1's. Any other user gets neither, and the
+    jurisdiction falls back to the app default rather than user 1's home, so
+    nothing in their prompt (or in the tool descriptions built from the profile)
+    is derived from someone else's data.
+    """
+    if user_id == 1:
+        profile = load_profile()
+        return profile, recent_trips(db, limit=5), get_jurisdiction(profile.home_jurisdiction)
+    return None, [], get_jurisdiction(_DEFAULT_JURISDICTION)
+
+
 def _run_full_pipeline(
     messages: list[dict], session_id: str, mode: str = "synthesis", user_id: int = 1
 ) -> dict:
@@ -77,10 +95,8 @@ def _run_full_pipeline(
     except RuntimeError as e:
         return {"reply": str(e), "tool_calls": [], "messages": messages}
 
-    profile = load_profile()
     db = get_db()
-    trips = recent_trips(db, limit=5)
-    home = get_jurisdiction(profile.home_jurisdiction)
+    profile, trips, home = _prompt_inputs(db, user_id)
     system_prompt = assemble(load_template(), profile, trips, home)
     start_session(db, session_id)
     angler_context = load_context(db, user_id=user_id)
@@ -368,15 +384,13 @@ def run_chat() -> None:
         console.print(f"[red]{e}[/red]")
         return
 
-    profile = load_profile()
     db = get_db()
     # The CLI is single-user: everything it reads and writes belongs to user 1.
     cli_user_id = 1
     session_id = datetime.now().isoformat()
     start_session(db, session_id)
 
-    trips = recent_trips(db, limit=5)
-    home = get_jurisdiction(profile.home_jurisdiction)
+    profile, trips, home = _prompt_inputs(db, cli_user_id)
     system_prompt = assemble(load_template(), profile, trips, home)
     angler_context = load_context(db)
     if angler_context:

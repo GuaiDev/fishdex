@@ -16,9 +16,20 @@ def insert_insight(db: Database, insight: BehavioralInsight) -> int:
 
 
 def refine_insight(db: Database, prior_id: int, new_insight: BehavioralInsight) -> int:
+    """Version out `prior_id` and store `new_insight` as its successor.
+
+    An insight can only be refined by its own owner: the successor must carry
+    the same user_id as the row it replaces, or one angler's write would
+    retire another's conclusions.
+    """
     prior = get_insight(db, prior_id)
     if prior is None:
         raise ValueError(f"No insight with id={prior_id}")
+    if new_insight.user_id != prior.user_id:
+        raise ValueError(
+            f"Insight {prior_id} belongs to user {prior.user_id}; "
+            f"user {new_insight.user_id} cannot refine it"
+        )
     db["behavioral_insights"].update(prior_id, {"is_current": 0})
     new_insight.version = prior.version + 1
     new_insight.is_current = True
@@ -69,6 +80,7 @@ def contradict_insight(db: Database, old_id: int, new_id: int) -> None:
 def _to_row(insight: BehavioralInsight) -> dict[str, Any]:
     return {
         "id": insight.id,
+        "user_id": insight.user_id,
         "species": insight.species,
         "condition_type": insight.condition_type,
         "condition_context": insight.condition_context,

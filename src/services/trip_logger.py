@@ -610,7 +610,9 @@ def log_trip(  # DEPRECATED — use log_session / parse_session_from_text instea
 
     # Insert habitat/presence insights for caught species at a known segment
     if snapped and parsed.get("species_caught"):
-        insights_generated = _maybe_insert_species_insights(db, parsed, ogf_id, seg_name)
+        insights_generated = _maybe_insert_species_insights(
+            db, parsed, ogf_id, seg_name, user_id=user_id
+        )
 
     # Mark unproductive segments as seen-before (0.3× exploration penalty)
     if parsed.get("was_productive") is False and ogf_id:
@@ -803,6 +805,7 @@ def _maybe_insert_species_insights(
     parsed: dict,
     ogf_id: int,
     seg_name: str | None,
+    user_id: int = 1,
 ) -> int:
     """Generate one presence insight per caught species at the snapped segment."""
     from src.models.behavioral_insight import BehavioralInsight
@@ -841,6 +844,7 @@ def _maybe_insert_species_insights(
             source_detail=f"personal trip log: {loc}, {trip_date}",
             evidence_count=1,
             jurisdiction="CA-ON",
+            user_id=user_id,
         )
         try:
             insert_insight(db, insight)

@@ -73,6 +73,7 @@ def match_insights_to_stop(db: Database, stop: dict, user_id: int = 1) -> list:
                 lat=lat, lng=lng,
                 condition_season=season,
                 radius_km=1.0,
+                user_id=user_id,
             )
             for insight in conflicts:
                 matched.append({
@@ -185,8 +186,18 @@ def update_insight_confidence(
     was_productive: bool,
     stop: dict,
     client,
+    user_id: int = 1,
 ) -> BehavioralInsight:
-    """Update insight confidence based on whether the trip confirmed or contradicted it."""
+    """Update insight confidence based on whether the trip confirmed or contradicted it.
+
+    A trip can only touch its own angler's insights; anything else is refused
+    rather than silently updated.
+    """
+    if insight.user_id != user_id:
+        raise ValueError(
+            f"Insight {insight.id} belongs to user {insight.user_id}; "
+            f"a trip by user {user_id} cannot update it"
+        )
     current_confidence = insight.confidence
     evidence_count = insight.evidence_count or 0
 
@@ -231,6 +242,7 @@ def update_insight_confidence(
                 location_name=insight.location_name,
                 condition_season=insight.condition_season,
                 jurisdiction=insight.jurisdiction,
+                user_id=insight.user_id,
             )
             new_id = refine_insight(db, insight.id, new_insight)
             return get_insight(db, new_id)
@@ -308,7 +320,7 @@ def enrich_session(
 
         for match in matched:
             insight = match["insight"]
-            update_insight_confidence(db, insight, was_productive, stop, client)
+            update_insight_confidence(db, insight, was_productive, stop, client, user_id=user_id)
 
             gaps = identify_condition_gaps(stop, insight)
             question = build_followup_question(stop, insight, gaps, was_productive)
