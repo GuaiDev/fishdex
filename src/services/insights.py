@@ -65,7 +65,7 @@ def seed_dispersal_insights() -> int:
     for entry in raw:
         existing = list(
             db["behavioral_insights"].rows_where(
-                "LOWER(species) = ? AND condition_context = ? AND is_current = 1",
+                "user_id = 1 AND LOWER(species) = ? AND condition_context = ? AND is_current = 1",
                 [entry["species"].lower(), entry["condition_context"]],
             )
         )
@@ -118,6 +118,7 @@ def record_behavioral_insight_for_agent(
         recommendation=recommendation,
         condition_season=condition_season,
         location_name=location_name,
+        user_id=user_id,
     )
 
     db = get_db()
@@ -153,12 +154,10 @@ def record_behavioral_insight_for_agent(
         confidence_ok = new_rank >= CONFIDENCE_RANK.get(conflict.confidence, 0)
 
         if is_contradiction and same_type and confidence_ok:
-            refine_insight(db, conflict.id, insight)
+            # refine_insight inserts the new row and returns its id; a global
+            # MAX(id) here would pick up another user's insert made in between.
+            insight_id = refine_insight(db, conflict.id, insight)
             refined_ids.append(conflict.id)
-            # insight already inserted by refine_insight, get its id
-            insight_id = db.execute(
-                "SELECT MAX(id) FROM behavioral_insights"
-            ).fetchone()[0]
             if lat is not None or location_name is not None:
                 try:
                     from src.services.synthesis_cache import invalidate_cache

@@ -21,23 +21,21 @@ def load_template(path: Path | None = None) -> str:
 
 def assemble(
     template: str,
-    profile: UserProfile,
+    profile: UserProfile | None,
     recent_trips: list[Trip],
     active_jurisdiction: Jurisdiction,
 ) -> str:
-    return "\n".join(
-        [
-            template.rstrip(),
-            "",
-            "---",
-            "",
-            _format_profile(profile),
-            "",
-            _format_recent_trips(recent_trips),
-            "",
-            _format_jurisdiction(active_jurisdiction),
-        ]
-    )
+    """Build the system prompt.
+
+    `profile=None` omits the profile and recent-trips sections entirely. The
+    profile file and the legacy trips table belong to one angler; a prompt for
+    anyone else must not carry them, not even as an empty "No trips logged yet".
+    """
+    parts = [template.rstrip(), "", "---", ""]
+    if profile is not None:
+        parts += [_format_profile(profile), "", _format_recent_trips(recent_trips), ""]
+    parts.append(_format_jurisdiction(active_jurisdiction))
+    return "\n".join(parts)
 
 
 def _format_profile(profile: UserProfile) -> str:
