@@ -32,9 +32,7 @@ from src.services.context import slices, translate
 
 logger = logging.getLogger(__name__)
 
-CallerType = Literal[
-    "map_tap", "chat_place", "post_log", "coach", "trip_parse", "full"
-]
+CallerType = Literal["map_tap", "chat_place", "post_log", "coach", "trip_parse", "full"]
 
 # Which slices each caller gets. A map tap does not need live conditions —
 # that saves both tokens and a live API call, and a tap should feel free.
@@ -176,9 +174,7 @@ def explore(
     results = [
         ExploreResult(
             ogf_id=int(row["ogf_id"]),
-            name=(str(row["watercourse_name"]) or None)
-            if row.get("watercourse_name")
-            else None,
+            name=(str(row["watercourse_name"]) or None) if row.get("watercourse_name") else None,
             lat=float(row["centroid_lat"]),
             lng=float(row["centroid_lng"]),
             stream_order=int(row["stream_order"])
@@ -205,9 +201,7 @@ def explore(
         excluded_count=int(len(excluded)),
         excluded_examples=_gate_examples(excluded),
         tied_at_top=tied,
-        results_on_placeholder_access=sum(
-            1 for r in results if r.access_is_measured is False
-        ),
+        results_on_placeholder_access=sum(1 for r in results if r.access_is_measured is False),
         results_with_unknown_access_coverage=sum(
             1 for r in results if r.access_is_measured is None
         ),
@@ -272,7 +266,9 @@ def _seen_segment_ids(db: Database, user_id: int) -> set[int]:
         ).fetchall()
         seen.update(int(r[0]) for r in rows if r[0] is not None)
     if "dismissed_segments" in db.table_names():
-        rows = db.execute("SELECT ogf_id FROM dismissed_segments").fetchall()
+        rows = db.execute(
+            "SELECT ogf_id FROM dismissed_segments WHERE user_id = ?", [user_id]
+        ).fetchall()
         seen.update(int(r[0]) for r in rows if r[0] is not None)
     return seen
 

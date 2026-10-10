@@ -137,6 +137,8 @@ def _apply_migrations(db: Database) -> None:
     migrate_species_status_provenance(db)
     migrate_regulation_chunks_zone_name(db)
     migrate_segment_synthesis_jurisdiction(db)
+    migrate_segment_synthesis_user(db)
+    migrate_dismissed_segments_user(db)
     migrate_user_patterns(db)
 
 
@@ -654,11 +656,12 @@ def ensure_schema(db: Database) -> None:
     if "dismissed_segments" not in db.table_names():
         db["dismissed_segments"].create(
             {
+                "user_id": int,
                 "ogf_id": int,
                 "dismissed_at": str,
                 "reason": str,
             },
-            pk="ogf_id",
+            pk=("user_id", "ogf_id"),
         )
 
     if "critical_habitat" not in db.table_names():
@@ -950,6 +953,7 @@ def ensure_schema(db: Database) -> None:
         CREATE TABLE IF NOT EXISTS segment_synthesis (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             cache_key       TEXT UNIQUE NOT NULL,
+            user_id         INTEGER,
             lat             REAL,
             lng             REAL,
             location_name   TEXT,
@@ -1397,6 +1401,105 @@ def migrate_segment_synthesis_jurisdiction(db: Database) -> None:
             db.conn.commit()
         except Exception:
             pass
+
+
+def migrate_segment_synthesis_user(db: Database) -> None:
+    """Add user_id to segment_synthesis so one angler's reply is never served
+    to another — see src/services/synthesis_cache.py. Idempotent.
+
+    Rows written before this column existed have user_id NULL. Lookups filter
+    on `user_id = ?`, so a NULL row matches nobody: we cannot tell whose
+    catches and visits it was built from, so it is never served. It is inert
+    and gets replaced as each user asks again.
+    """
+    if "segment_synthesis" not in db.table_names():
+        return
+    cols = {c.name for c in db["segment_synthesis"].columns}
+    if "user_id" not in cols:
+        try:
+            db.execute("ALTER TABLE segment_synthesis ADD COLUMN user_id INTEGER")
+            db.conn.commit()
+        except Exception:
+            pass
+
+
+def migrate_dismissed_segments_user(db: Database) -> dict[str, int] | None:
+    """Make dismissed_segments per-user (primary key becomes user_id + ogf_id). Idempotent.
+
+    The old table had `ogf_id` as its only key, so one angler's blank stop hid
+    that water from everyone's Explore. SQLite cannot change a primary key in
+    place, so the table is rebuilt, in one transaction so an interruption
+    cannot leave the old rows orphaned.
+
+    Existing rows have no recorded owner. A dismissal is a soft ranking
+    signal, and keeping it under the wrong owner is the leak being fixed, so:
+
+    - `unproductive_trip_log` rows are traced to every user with a blank stop
+      on that segment, one row per such user.
+    - Anything untraced (dismiss-tool rows, log rows with no matching stop)
+      goes to the only user when there is exactly one, and is dropped otherwise.
+
+    Returns the traced/assigned/dropped counts, or None if nothing was migrated.
+    """
+    if "dismissed_segments" not in db.table_names():
+        return None
+    cols = {c.name for c in db["dismissed_segments"].columns}
+    if "user_id" in cols:
+        return None
+
+    tables = set(db.table_names())
+    users = (
+        [r[0] for r in db.execute("SELECT id FROM users LIMIT 2").fetchall()]
+        if "users" in tables
+        else []
+    )
+    sole_user = users[0] if len(users) == 1 else None
+
+    with db.conn:
+        db.execute("BEGIN")
+        db.execute("ALTER TABLE dismissed_segments RENAME TO dismissed_segments_old")
+        db.execute(
+            "CREATE TABLE dismissed_segments ("
+            "user_id INTEGER, ogf_id INTEGER, dismissed_at TEXT, reason TEXT, "
+            "PRIMARY KEY (user_id, ogf_id))"
+        )
+        traced = 0
+        if "stops" in tables:
+            traced = db.execute(
+                "INSERT OR IGNORE INTO dismissed_segments "
+                "(user_id, ogf_id, dismissed_at, reason) "
+                "SELECT DISTINCT st.user_id, o.ogf_id, o.dismissed_at, o.reason "
+                "FROM dismissed_segments_old o "
+                "JOIN stops st ON CAST(st.ohn_segment_id AS INTEGER) = o.ogf_id "
+                "WHERE o.reason = 'unproductive_trip_log' "
+                "AND COALESCE(st.was_productive, 0) = 0 "
+                "AND st.user_id IS NOT NULL"
+            ).rowcount
+        untraced = (
+            "FROM dismissed_segments_old "
+            "WHERE ogf_id NOT IN (SELECT ogf_id FROM dismissed_segments)"
+        )
+        assigned = dropped = 0
+        if sole_user is not None:
+            assigned = db.execute(
+                "INSERT INTO dismissed_segments (user_id, ogf_id, dismissed_at, reason) "
+                f"SELECT ?, ogf_id, dismissed_at, reason {untraced}",
+                [sole_user],
+            ).rowcount
+        else:
+            dropped = db.execute(f"SELECT COUNT(*) {untraced}").fetchone()[0]
+        db.execute("DROP TABLE dismissed_segments_old")
+
+    counts = {"traced": traced, "assigned": assigned, "dropped": dropped}
+    log = logger.warning if dropped else logger.info
+    log(
+        "dismissed_segments made per-user: %d traced to their owner, "
+        "%d assigned to the only user, %d dropped (owner unknown)",
+        traced,
+        assigned,
+        dropped,
+    )
+    return counts
 
 
 def cleanup_old_gauge_readings(db: Database, days: int = 7) -> None:

@@ -29,6 +29,17 @@ coordinates ever resolved for either) with the same extracted name but in
 different provinces still collide, since neither has a derivable
 jurisdiction. Fixing that fully needs geocoding a bare place name before
 the cache is even consulted, which no code path in this project does today.
+
+Per-user isolation
+-------------------
+A cached reply is the agent's full answer, built from the asker's own
+catches and visits ("records" and "history" in the chat_place bundle). It is
+therefore personal, and is only ever served back to the user it was built for.
+Every entry carries `user_id`, the user is part of `cache_key`, and every
+lookup (exact, proximity and fuzzy name) filters on `user_id = ?`. Rows
+written before the column existed have user_id NULL, which matches no user,
+so they are never served. `user_id` is a required argument on purpose: a
+default would let a caller forget it and quietly share replies again.
 """
 
 import json
@@ -52,8 +63,8 @@ def _compatible(a: str | None, b: str | None) -> bool:
     return a is None or b is None or a == b
 
 
-def _cache_key(lat: float | None, lng: float | None, location_name: str | None) -> str:
-    """Build a stable cache key. Round coords to ~100m grid so nearby queries hit."""
+def _location_key(lat: float | None, lng: float | None, location_name: str | None) -> str:
+    """Location part of the key. Round coords to ~100m grid so nearby queries hit."""
     if lat is not None and lng is not None:
         return f"geo:{round(lat, 3)},{round(lng, 3)}"
     if location_name:
@@ -61,8 +72,17 @@ def _cache_key(lat: float | None, lng: float | None, location_name: str | None) 
     return "unknown"
 
 
+def _cache_key(
+    lat: float | None, lng: float | None, location_name: str | None, user_id: int
+) -> str:
+    """Per-user cache key: the user is part of the key, so two users never share a row."""
+    return f"u{user_id}:{_location_key(lat, lng, location_name)}"
+
+
 def get_cached_synthesis(
     db: Database,
+    *,
+    user_id: int,
     lat: float | None = None,
     lng: float | None = None,
     location_name: str | None = None,
@@ -73,12 +93,15 @@ def get_cached_synthesis(
     Check the cache for an existing synthesis near this location.
     Returns the cached synthesis dict, or None on miss.
     """
-    key = _cache_key(lat, lng, location_name)
+    key = _cache_key(lat, lng, location_name, user_id)
     jur = jurisdiction or _jurisdiction_for(lat, lng)
 
     # rows_where returns dicts automatically
     try:
-        row = next(db["segment_synthesis"].rows_where("cache_key = ?", [key]), None)
+        row = next(
+            db["segment_synthesis"].rows_where("cache_key = ? AND user_id = ?", [key, user_id]),
+            None,
+        )
     except Exception:
         row = None
 
@@ -98,7 +121,9 @@ def get_cached_synthesis(
     if lat is not None and lng is not None:
         try:
             candidates = list(
-                db["segment_synthesis"].rows_where("lat IS NOT NULL AND lng IS NOT NULL")
+                db["segment_synthesis"].rows_where(
+                    "lat IS NOT NULL AND lng IS NOT NULL AND user_id = ?", [user_id]
+                )
             )
         except Exception:
             candidates = []
@@ -124,7 +149,11 @@ def get_cached_synthesis(
     # compatibility is required, not just a nice-to-have here.
     if location_name:
         try:
-            all_entries = list(db["segment_synthesis"].rows_where("location_name IS NOT NULL"))
+            all_entries = list(
+                db["segment_synthesis"].rows_where(
+                    "location_name IS NOT NULL AND user_id = ?", [user_id]
+                )
+            )
         except Exception:
             all_entries = []
         query_words = set(location_name.strip().lower().split())
@@ -151,6 +180,8 @@ def get_cached_synthesis(
 def store_synthesis(
     db: Database,
     synthesis: str,
+    *,
+    user_id: int,
     lat: float | None = None,
     lng: float | None = None,
     location_name: str | None = None,
@@ -158,18 +189,19 @@ def store_synthesis(
     jurisdiction: str | None = None,
 ) -> None:
     """Store a freshly computed synthesis in the cache."""
-    key = _cache_key(lat, lng, location_name)
+    key = _cache_key(lat, lng, location_name, user_id)
     jur = jurisdiction or _jurisdiction_for(lat, lng)
     # Raw SQL avoids sqlite-utils upsert quirks with AUTOINCREMENT primary keys
     db.execute(
         """
         INSERT OR REPLACE INTO segment_synthesis
-            (cache_key, lat, lng, location_name, jurisdiction, synthesis,
+            (cache_key, user_id, lat, lng, location_name, jurisdiction, synthesis,
              data_sources, computed_at, hit_count)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         """,
         [
             key,
+            user_id,
             lat,
             lng,
             location_name,
@@ -191,11 +223,15 @@ def invalidate_cache(
 ) -> int:
     """Delete cache entries for a location when insights are updated. Returns number deleted."""
     deleted = 0
-    key = _cache_key(lat, lng, location_name)
+    key = _location_key(lat, lng, location_name)
 
-    # Exact key match
+    # Exact key match. Keys are "u<user>:<location key>"; new facts about a
+    # place make every user's cached reply for it stale, so this covers all users.
     try:
-        result = db.execute("DELETE FROM segment_synthesis WHERE cache_key = ?", [key])
+        result = db.execute(
+            "DELETE FROM segment_synthesis WHERE cache_key = ? OR cache_key LIKE ?",
+            [key, f"u%:{key}"],
+        )
         deleted += result.rowcount
     except Exception:
         pass

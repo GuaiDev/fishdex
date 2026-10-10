@@ -157,7 +157,7 @@ The dominant bug shape in this codebase is a function that computes the number d
 - **`ebird.py:134,139,146` and `geology.py:109` skip rows silently.** eBird drops observations on unparseable dates and IDs; the geology KML parser drops malformed coordinate pairs, so a polygon can quietly lose vertices and still parse. Neither counts what it dropped.
 - **`sdm_features.py::coverage_fraction` is printed by `build-features` and never stored.** Coverage degrading run-over-run is invisible because nothing compares against the last value.
 - **`ca_ab/stocking.py:192` and `ca_bc/nuseds.py:195` log `n_skipped` at INFO**, so it is invisible without `-v`. `ca_on/water_quality.py:362` logs the same class of count at WARNING and is the pattern to copy. Both INFO cases are in frozen jurisdictions.
-- **`synthesis_cache.py:200,213,227` swallow cache-write failures.** A permanently failing cache is indistinguishable from a cold one; the only symptom is the API bill.
+- **`synthesis_cache.py:236,249,263` swallow cache-write failures.** A permanently failing cache is indistinguishable from a cold one; the only symptom is the API bill.
 - **`chat.py:150,542` swallow `tool_usage` insert failures.** Telemetry only, but a broken table reads as an agent that never calls tools.
 
 The rule when touching any of these: a count that separates "worked" from "silently did nothing" belongs at WARNING when the share is material, and in the return value always.
