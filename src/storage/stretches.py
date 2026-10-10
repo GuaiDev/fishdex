@@ -2,7 +2,8 @@
 
 A build replaces a jurisdiction's stretches wholesale, in one transaction. A
 stretch removed from the curation file must disappear from the map, and a
-half-written rebuild must never be what the map reads.
+half-written rebuild must never be what the map reads. Anchors hang off stretches
+(storage/stretch_anchors.py): dropping a stretch drops its anchors too.
 """
 
 import json
@@ -43,6 +44,16 @@ def replace_stretches(
                 "VALUES (:ogf_id, :stretch_id, :jurisdiction, :seq)",
                 segment_rows,
             )
+        # Anchors and segment lines of a stretch that is no longer published
+        # must not outlive it. Those of a stretch that was only rebuilt stay
+        # until build_anchors replaces them, so an OpenStreetMap outage during
+        # that step still leaves the last good dams and access points.
+        for table in ("stretch_anchors", "stretch_segment_lines"):
+            conn.execute(
+                f"DELETE FROM {table} WHERE jurisdiction = ? "
+                "AND stretch_id NOT IN (SELECT stretch_id FROM fishing_stretches)",
+                [jurisdiction],
+            )
     return count_stretches(db, jurisdiction)
 
 
@@ -61,6 +72,13 @@ def list_stretches(db: Database, jurisdiction: str | None = None) -> list[Fishin
         params,
     )
     return [_row_to_stretch(r) for r in rows]
+
+
+def get_stretch(db: Database, stretch_id: str) -> FishingStretch | None:
+    rows = db.execute_returning_dicts(
+        "SELECT * FROM fishing_stretches WHERE stretch_id = ?", [stretch_id]
+    )
+    return _row_to_stretch(rows[0]) if rows else None
 
 
 def stretch_segment_ids(db: Database, stretch_id: str) -> list[int]:

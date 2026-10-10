@@ -95,8 +95,15 @@ Saved spots visible in explore with filter, not on personal map.
    `data/curation/stretches_ca_on.toml` is the source of truth; `make build-stretches`
    traces it through the OHN network into `fishing_stretches` + `stretch_segments`
    and prints uncovered clustered candidates to paste in. `GET /map/stretches`
-   serves GeoJSON. Ontario only. `stretch_anchors` and `personal_pins` are not built.
-2. Anchor extraction — confluences, dams, access points
+   serves GeoJSON. Ontario only. `personal_pins` is not built.
+2. Anchor extraction — confluences, dams, access points ✅ built.
+   `make build-stretches` now also rebuilds `stretch_anchors` (and the full-detail
+   `stretch_segment_lines`); `make build-anchors` redoes only that half. Confluences
+   and lake mouths are derived from OHN topology; dams/weirs/locks, parking, trailheads,
+   boat launches and road crossings come from OpenStreetMap via Overpass (cached);
+   tailwaters are the ~400 m of OHN channel below a dam. `GET
+   /map/stretches/{stretch_id}/anchors` serves one stretch as GeoJSON (anchor points +
+   segment lines). Coverage numbers and known thin spots: see the PR that built it.
 3. Personal pin system — schema + API + trip log integration
 4. React/Lovable UI — two-level map with pin states
 

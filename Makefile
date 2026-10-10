@@ -1,4 +1,4 @@
-.PHONY: run serve test lint format ingest weekly-ingest ingest-hydat ingest-trca harvest-ca recent build-features train-sdm compute-access compute-untapped build-stretches export-map
+.PHONY: run serve test lint format ingest weekly-ingest ingest-hydat ingest-trca harvest-ca recent build-features train-sdm compute-access compute-untapped build-stretches build-anchors export-map
 
 run:
 	uv run python -m src.cli.main run
@@ -64,8 +64,14 @@ compute-untapped:
 # Explore map, Level 1: named fishing stretches from data/curation/. Fetches the
 # OHN network for the curation file's build area (cached 30 days), so the first
 # run needs the network; later runs are offline until the cache expires.
+# Level 2 anchors (confluences, dams, lake mouths, access points) are rebuilt as
+# the second half of build-stretches, because rebuilding stretches clears them.
+# build-anchors redoes only that half, e.g. to refresh OpenStreetMap data.
 build-stretches:
 	uv run python -m src.cli.main build-stretches
+
+build-anchors:
+	uv run python -m src.cli.main build-anchors
 
 export-map:
 	uv run python -m src.cli.export_map

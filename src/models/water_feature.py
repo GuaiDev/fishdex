@@ -46,3 +46,25 @@ class AccessPoint(BaseModel):
     jurisdiction: str
     tags: dict
     fetched_at: datetime = Field(default_factory=datetime.now)
+
+
+class CorridorFeature(BaseModel):
+    """An OSM feature found beside a river: a dam, somewhere to park, a road over it.
+
+    Raw candidate for the explore map's stretch anchors. Whether it becomes an
+    anchor — close enough to the water, open to the public — is decided by
+    the caller, which knows where the water is.
+    """
+
+    osm_id: str
+    kind: Literal[
+        "dam", "weir", "lock", "parking", "trail_head", "boat_launch", "fishing_spot", "road"
+    ]
+    name: str | None
+    lat: float
+    lng: float
+    jurisdiction: str
+    tags: dict
+    # (lon, lat) vertices — set for roads only, which are lines the caller
+    # intersects with the river rather than points.
+    line: list[tuple[float, float]] | None = None

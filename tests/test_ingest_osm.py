@@ -312,3 +312,139 @@ def test_access_cache_hit_skips_http(tmp_path):
         osm.fetch_access_points(43.65, -79.38)
 
     assert mock_post.call_count == 1
+
+
+# ── stream corridor (stretch anchors) ─────────────────────────────────────────
+
+CORRIDOR_LINE = [(-79.6346, 42.9033), (-79.6104, 42.8968), (-79.5776, 42.8482)]
+
+
+def _corridor(osm, tmp_path, response):
+    with (
+        patch("httpx.post", return_value=_make_mock_response(response)) as post,
+        patch("time.sleep"),
+        patch.object(osm, "_CACHE_DIR", tmp_path),
+    ):
+        return osm.fetch_stream_corridor(CORRIDOR_LINE, "CA-ON"), post
+
+
+def test_corridor_parses_every_kind_from_a_recorded_response(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    features, _ = _corridor(osm, tmp_path, _load_fixture("osm_corridor_dunnville.json"))
+
+    kinds = {f.kind for f in features}
+    assert {"weir", "parking", "boat_launch", "road"} <= kinds
+    assert all(f.jurisdiction == "CA-ON" for f in features)
+    assert len({f.osm_id for f in features}) == len(features)
+    for f in features:
+        assert 42.8 < f.lat < 43.0 and -79.7 < f.lng < -79.5
+
+
+def test_corridor_roads_keep_their_line_and_points_do_not(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    features, _ = _corridor(osm, tmp_path, _load_fixture("osm_corridor_dunnville.json"))
+
+    roads = [f for f in features if f.kind == "road"]
+    assert roads and all(f.line and len(f.line) >= 2 for f in roads)
+    assert all(f.line is None for f in features if f.kind != "road")
+
+
+def test_corridor_element_kinds_from_tags():
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    kind = osm._corridor_kind
+    assert kind({"waterway": "dam"}) == "dam"
+    assert kind({"waterway": "weir"}) == "weir"
+    assert kind({"waterway": "lock_gate"}) == "lock"
+    assert kind({"amenity": "boat_ramp"}) == "boat_launch"
+    assert kind({"leisure": "slipway"}) == "boat_launch"
+    assert kind({"leisure": "fishing"}) == "fishing_spot"
+    assert kind({"highway": "trailhead"}) == "trail_head"
+    assert kind({"amenity": "parking"}) == "parking"
+    assert kind({"highway": "layby"}) == "parking"
+    assert kind({"highway": "secondary"}) == "road"
+    assert kind({"building": "yes"}) is None
+
+
+def test_corridor_way_uses_its_center_and_a_road_without_geometry_is_skipped():
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    lot = {
+        "type": "way",
+        "id": 7,
+        "center": {"lat": 42.9, "lon": -79.6},
+        "tags": {"amenity": "parking", "name": "Lot"},
+    }
+    parsed = osm._parse_corridor_element(lot, None)
+    assert (parsed.osm_id, parsed.name, parsed.lat, parsed.lng) == ("way/7", "Lot", 42.9, -79.6)
+    assert parsed.jurisdiction == "CA-ON"  # looked up from the coordinates
+
+    no_geometry = {"type": "way", "id": 8, "tags": {"highway": "secondary"}}
+    assert osm._parse_corridor_element(no_geometry, None) is None
+
+
+def test_corridor_query_follows_the_river_line(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    _, post = _corridor(osm, tmp_path, {"elements": []})
+
+    query = post.call_args.kwargs["data"]["data"]
+    assert "42.90330,-79.63460,42.89680,-79.61040,42.84820,-79.57760" in query
+    assert "around:100," in query and "around:300," in query and "around:60," in query
+
+
+def test_corridor_caches_and_an_empty_answer_is_not_an_error(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    first, post = _corridor(osm, tmp_path, {"elements": []})
+    assert first == [] and post.call_count == 1
+    again, post2 = _corridor(osm, tmp_path, {"elements": [{"surprise": True}]})
+    assert again == [] and post2.call_count == 0  # served from cache
+
+
+def test_corridor_with_no_line_makes_no_request(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    with patch("httpx.post") as post, patch.object(osm, "_CACHE_DIR", tmp_path):
+        assert osm.fetch_stream_corridor([(-79.6, 42.9)]) == []
+    post.assert_not_called()
+
+
+def test_overpass_runtime_error_is_retried_and_never_cached(tmp_path):
+    """Overpass reports a timed-out query as HTTP 200 with a remark, and an
+    overloaded server as an HTML page. Neither may sit in the cache for 30 days."""
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    bad = _make_mock_response({"elements": [], "remark": "runtime error: Query timed out"})
+    html = MagicMock()
+    html.raise_for_status.return_value = None
+    html.json.side_effect = ValueError("not json")
+    good = _make_mock_response({"elements": []})
+
+    with (
+        patch("httpx.post", side_effect=[bad, html, good]) as post,
+        patch("time.sleep"),
+        patch.object(osm, "_CACHE_DIR", tmp_path),
+    ):
+        assert osm.fetch_stream_corridor(CORRIDOR_LINE) == []
+    assert post.call_count == 3
+    assert len(list(tmp_path.glob("*.json"))) == 1  # only the good answer
+
+    with (
+        patch("httpx.post", return_value=bad),
+        patch("time.sleep"),
+        patch.object(osm, "_CACHE_DIR", tmp_path / "other"),
+        pytest.raises(RuntimeError),
+    ):
+        osm.fetch_stream_corridor(CORRIDOR_LINE)
+    assert not list((tmp_path / "other").glob("*.json"))

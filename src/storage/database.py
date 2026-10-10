@@ -107,7 +107,51 @@ def _ensure_fishing_stretches(db: Database) -> None:
     db.execute(
         "CREATE INDEX IF NOT EXISTS idx_stretch_segments_stretch ON stretch_segments(stretch_id)"
     )
+    _ensure_stretch_anchors(db)
     db.conn.commit()
+
+
+def _ensure_stretch_anchors(db: Database) -> None:
+    """Create the explore map's Level 2 tables. Idempotent.
+
+    An anchor belongs to one stretch. The same dam can sit at the end of one
+    stretch and the start of the next, so it is two rows with two ids; the
+    shared real-world identity is `source_ref`.
+    """
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS stretch_anchors (
+            anchor_id           TEXT PRIMARY KEY,
+            stretch_id          TEXT NOT NULL REFERENCES fishing_stretches(stretch_id),
+            jurisdiction        TEXT NOT NULL,
+            anchor_type         TEXT NOT NULL,
+            subtype             TEXT,
+            name                TEXT,
+            lat                 REAL NOT NULL,
+            lng                 REAL NOT NULL,
+            source              TEXT NOT NULL,
+            source_ref          TEXT NOT NULL,
+            ogf_id              INTEGER,
+            snap_distance_m     REAL,
+            attributes_json     TEXT NOT NULL DEFAULT '{}',
+            built_at            TEXT NOT NULL
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS stretch_segment_lines (
+            ogf_id              INTEGER PRIMARY KEY,
+            stretch_id          TEXT NOT NULL REFERENCES fishing_stretches(stretch_id),
+            jurisdiction        TEXT NOT NULL,
+            name                TEXT,
+            geometry_geojson    TEXT NOT NULL
+        )
+    """)
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stretch_anchors_stretch ON stretch_anchors(stretch_id)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stretch_segment_lines_stretch "
+        "ON stretch_segment_lines(stretch_id)"
+    )
 
 
 def _apply_migrations(db: Database) -> None:

@@ -102,9 +102,10 @@ id = "grand-cayuga-dunnville"
 name = "Cayuga to Dunnville"
 river = "Grand River"
 region = "Grand River"
+notes = "Dunnville dam (OSM: a CanVec weir at 42.9001, -79.6194, beside the Rainham Road bridge) sits on OHN segment 127448036. The boundary is pinned to the segment above it so the dam and the water below it fall in the next stretch; a point placed at the dam snaps onto 127448036 and leaves it here."
 [[stretch.reach]]
 from = { lat = 42.94034, lon = -79.85744, label = "Cayuga" }
-to = { lat = 42.89649, lon = -79.60883, label = "Dunnville dam" }
+to = { lat = 42.9033, lon = -79.6346, label = "Dunnville dam (just above it)", ogf_id = 127448041 }
 
 [[stretch]]
 id = "grand-dunnville-port-maitland"
@@ -112,7 +113,7 @@ name = "Dunnville to Port Maitland"
 river = "Grand River"
 region = "Grand River"
 [[stretch.reach]]
-from = { lat = 42.89649, lon = -79.60883, label = "Dunnville dam" }
+from = { lat = 42.9033, lon = -79.6346, label = "Dunnville dam (just above it)", ogf_id = 127448041 }
 to = { lat = 42.85417, lon = -79.57836, label = "Port Maitland (lake mouth)" }
 
 [[stretch]]
