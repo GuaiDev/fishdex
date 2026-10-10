@@ -105,7 +105,11 @@ Saved spots visible in explore with filter, not on personal map.
    /map/stretches/{stretch_id}/anchors` serves one stretch as GeoJSON (anchor points +
    segment lines). Coverage numbers and known thin spots: see the PR that built it.
 3. Personal pin system — schema + API + trip log integration
-4. React/Lovable UI — two-level map with pin states
+4. React/Lovable UI — two-level map with pin states. Explore mode ✅ built
+   (`web/src/components/ExploreMode.jsx`): stretches at low zoom, tap to zoom into
+   anchors, tap an anchor for the bot's synthesis. It replaces the old segment-score
+   explore view, so `GET /map/segments` is now unused by the UI (left in place).
+   Pin states and the "save to my map" action wait on step 3.
 
 ## Social layer (future, NOT on map) 💡
 Catches and PBs only, never spot locations.

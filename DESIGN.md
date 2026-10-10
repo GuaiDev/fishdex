@@ -225,8 +225,8 @@ Palette is unchanged from the prior revision — warm neutrals, a desaturated mo
 ### Semantic (single alarm)
 - **Rust** (`#C1673D` text / `#2A1810` background / `#4A2C1A` border): The one alarm color — errors, warnings, and poor-condition instrument readings alike.
 
-### Data (map exploration score — unchanged, flagged)
-- **Heat High → Heat Min**: The map's sequential score scale stays as-is (Section 5, Progress & Trail notes). Still the one saturated holdover; still not solved in this revision.
+### Data (heat scale — now unused by the map)
+- **Heat High → Heat Min**: The explore map no longer shows a segment score (it draws stretches and anchors in Brass/Moss/Rust/Bone from `tokens.js`), so nothing in `web/src` reads the heat scale; the `tokens.css` variables and frontmatter entries remain until removed deliberately.
 
 ### Named Rules
 **The Photograph IS the Interface Rule.** On any species, catch, or session screen, the photo is not an element on the page — it is the page. UI sits on top of it as a thin translucent layer (see The Overlay Chrome Rule), never as a frame around a smaller photo inside a card.
@@ -327,8 +327,8 @@ Modeled directly on a "walk complete" summary: a clear, earned end-of-session mo
 ### Message Bubbles
 - Bot: Loam background, 2px Moss left accent, asymmetric radius. User: Moss Fill background, Bone text, mirrored radius. Unchanged.
 
-### Exploration Score Bar (map only — unchanged, distinct from the Discovery Trail above)
-- 6px height, Twig track, fill uses the Heat data scale, 0.3s width transition. This is a continuous score meter for the map, not a collection-progress indicator — see Discovery Progress Trail for that use case.
+### Exploration Score Bar (no longer rendered — distinct from the Discovery Trail above)
+- 6px height, Twig track, fill uses the Heat data scale, 0.3s width transition. It was the old segment-score explore view's meter and has no current caller; the Discovery Progress Trail covers collection progress.
 
 ## 6. Do's and Don'ts
 
@@ -472,9 +472,8 @@ explore-mode dropdown, empty state, bottom sheet (stop/segment detail),
 species chips, and the "Open in Maps"/"Satellite view" links all moved to
 `--fx-*`. **Not touched, deliberately:** `MapContainer`/`TileLayer`/
 `CircleMarker` (react-leaflet, can't consume CSS custom properties anyway —
-see `tokens.js`), and `scoreColor`/`stopColor`'s heat-scale + Moss/Ash
-marker colors, which Section 2's "Data" note already flags as an
-unchanged, unsolved saturated holdover. `InstrumentDial.jsx` also moved to
+see `tokens.js`), and `stopColor`'s Moss/Ash marker colors. (The former `scoreColor`
+heat-scale was removed with the old explore view.) `InstrumentDial.jsx` also moved to
 `--fx-*` — it's shared with Trips.jsx, so Trips' instrument dial now
 inherits the new moss ring color too, as a side effect of the shared
 component; nothing else on Trips changed.
