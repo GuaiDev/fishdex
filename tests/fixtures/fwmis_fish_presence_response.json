@@ -1,0 +1,81 @@
+{
+ "kind": "fwmis_hydro_polygons_layer1",
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 79010,
+    "WB_ID": 2035,
+    "OFFICIAL_NM": "ELBOW RIVER",
+    "COMMON_NM": null,
+    "Feature_Type": "RIV-MAJ",
+    "SPECIES_PRES": "BKTR, BLBK, BLTR, BNTR, BRST, BURB, CTTR, FAMCATO, FTMN, LKCH, LNDC, LNSC, MNWH, NRPK, PRDC, RNTR, SPSC, TRPR, UNKN, WHSC, YLPR",
+    "Shape__Area": 5401515.99788826
+   },
+   "centroid": {
+    "x": -114.55969380737211,
+    "y": 50.914467059362195
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 79015,
+    "WB_ID": 20349,
+    "OFFICIAL_NM": "UNNAMED",
+    "COMMON_NM": "BOW-CHESTERMERE DIVERSION CANAL (WID)",
+    "Feature_Type": "CANAL-MAJ",
+    "SPECIES_PRES": "BNTR, BRST, BURB, FTMN, GOFS, LKCH, LKTR, LKWH, LNDC, LNSC, MNSC, MNWH, NRPK, PRCR, PRDC, RNTR, SPSC, SPSH, TRPR, WHSC, YLPR",
+    "Shape__Area": 576287.544575665
+   },
+   "centroid": {
+    "x": -113.94174570643916,
+    "y": 50.997263551793445
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 79056,
+    "WB_ID": 1988,
+    "OFFICIAL_NM": "BOW RIVER",
+    "COMMON_NM": null,
+    "Feature_Type": "RIV-MAJ",
+    "SPECIES_PRES": "BKTR, BLTR, BNTR, BRST, BURB, CRTR, CTTR, EMSH, FAMCATO, FAMCYPR, FLCH, FNDC, FTMN, GOLD, LKCH, LKST, LKTR, LKWH, LNDC, LNSC, MNSC, MNWH, MOON, NNST, NOCY, NRPK, PRCR, PRDC, QUIL, RNTR, RVSH, SAUG, SHRD, SLMN, SLRD, SPSC, SPSH, TRPR, UNKN, WALL, WHSC, WSCT, YLPR",
+    "Shape__Area": 69273003.30051008
+   },
+   "centroid": {
+    "x": -113.2565749069595,
+    "y": 50.71140874706951
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 98403,
+    "WB_ID": 26447,
+    "OFFICIAL_NM": "UNNAMED",
+    "COMMON_NM": "KIDS CAN CATCH POND",
+    "Feature_Type": "LAKE-PER",
+    "SPECIES_PRES": "RNTR",
+    "Shape__Area": 611.41966306
+   },
+   "centroid": {
+    "x": -114.01769289350678,
+    "y": 51.04141962089342
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 120756,
+    "WB_ID": 327034,
+    "OFFICIAL_NM": "UNNAMED",
+    "COMMON_NM": null,
+    "Feature_Type": "LAKE-PER",
+    "SPECIES_PRES": "NO FISH SAMPLED TO DATE",
+    "Shape__Area": 20257.276061645
+   },
+   "centroid": {
+    "x": -114.00810286489417,
+    "y": 51.02723665799555
+   }
+  }
+ ],
+ "exceededTransferLimit": false
+}

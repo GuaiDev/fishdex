@@ -6,6 +6,8 @@ sqlite3.OperationalError the moment this path was actually exercised (it
 never had been, until this adapter was tested live).
 """
 
+from datetime import date
+
 from sqlite_utils import Database
 
 from src.storage.database import ensure_schema
@@ -119,3 +121,38 @@ def test_ab_hydro_ingest_keeps_earlier_areas_and_empty_fetch_wipes_nothing(tmp_p
         ab_ingest.ingest_ab_hydro_network(51.05, -114.07)
 
     assert db["stream_segments"].count_where("jurisdiction = ?", ["CA-AB"]) == 2
+
+
+def test_ingest_ab_fish_observations_writes_to_observations(tmp_path, monkeypatch):
+    from src.models.observation import Observation
+    from src.services import ab_ingest
+
+    db = _make_db(tmp_path)
+    monkeypatch.setattr(ab_ingest, "get_db", lambda: db)
+
+    fake_obs = [
+        Observation(
+            observation_id=8_000_000_123,
+            species="Walleye",
+            lat=51.05,
+            lng=-114.07,
+            observed_on=date(1900, 1, 1),
+            quality_grade="survey_data",
+            place_guess="BOW RIVER",
+            jurisdiction="CA-AB",
+            source="FWMIS",
+        )
+    ]
+    monkeypatch.setattr(
+        "src.ingest.jurisdictions.ca_ab.fish_observations.fetch_waterbody_presence",
+        lambda lat, lng, radius_km=50.0: fake_obs,
+    )
+
+    n = ab_ingest.ingest_ab_fish_observations(51.05, -114.07, 10)
+
+    assert n == 1
+    stored = list(db["observations"].rows)
+    assert len(stored) == 1
+    assert stored[0]["source"] == "FWMIS"
+    assert stored[0]["jurisdiction"] == "CA-AB"
+    assert stored[0]["species"] == "Walleye"
