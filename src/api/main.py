@@ -1387,6 +1387,24 @@ def get_map_stretches(
     return stretches_geojson(get_db(), jurisdiction)
 
 
+@app.get("/map/stretches/{stretch_id}/anchors")
+def get_map_stretch_anchors(stretch_id: str, user: dict = Depends(get_current_user)):
+    """One stretch's anchors and segment lines for the explore map's zoomed level.
+
+    Point features are confluences, dams and their tailwaters, lake mouths and
+    access points; LineString features are the stretch's own segments. Built by
+    `make build-stretches` (or `make build-anchors`); 404 for a stretch that has
+    not been built, an empty `features` list for one built without anchors.
+    """
+    from src.services.stretch_anchors import stretch_anchors_geojson
+    from src.storage.database import get_db
+
+    collection = stretch_anchors_geojson(get_db(), stretch_id)
+    if collection is None:
+        raise HTTPException(status_code=404, detail=f"No stretch named {stretch_id!r}")
+    return collection
+
+
 @app.get("/map/my-stops")
 def get_my_stops(user: dict = Depends(get_current_user)):
     """Return all of the user's logged stops with coordinates for personal map mode."""

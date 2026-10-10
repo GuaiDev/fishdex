@@ -13,7 +13,7 @@ from pathlib import Path
 import httpx
 
 from src.jurisdictions.geo import jurisdiction_for_coords
-from src.models.water_feature import AccessPoint, WaterFeature
+from src.models.water_feature import AccessPoint, CorridorFeature, WaterFeature
 
 # Primary + community mirror — tried in order on each attempt
 _OVERPASS_URLS = [
@@ -89,6 +89,71 @@ def fetch_access_points(lat: float, lng: float, radius_km: float = 25) -> list[A
     return points
 
 
+# How far from the river line each kind of feature is searched for. Dams and
+# roads must be on the water; parking and trailheads only need to be a walk away.
+_CORRIDOR_STRUCTURE_M = 100
+_CORRIDOR_ACCESS_M = 300
+_CORRIDOR_ROAD_M = 60
+# Vertices per Overpass query when following a river (see fetch_stream_corridor).
+_CORRIDOR_CHUNK_VERTICES = 24
+_CROSSING_ROADS = "trunk|primary|secondary|tertiary|unclassified|residential"
+
+
+def fetch_stream_corridor(
+    line: list[tuple[float, float]], jurisdiction: str | None = None
+) -> list[CorridorFeature]:
+    """Dams, access spots and crossing roads beside a river line. Cached 30 days.
+
+    `line` is (lon, lat) vertices along the river, as for a stretch's
+    geometry. One query per river rather than a radius around a point: the
+    radius fetch above covers the home area only, and a stretch two hours
+    away has no rows in access_points to read. A long river is queried in
+    overlapping pieces, each cached on its own, so no single query is large
+    and an outage part-way through costs the pieces not yet fetched, not all
+    of them.
+
+    Raises on an Overpass outage, after the usual retries. An empty list
+    means Overpass answered and found nothing — the two are different facts.
+    """
+    if len(line) < 2:
+        return []
+    found: dict[str, CorridorFeature] = {}
+    step = _CORRIDOR_CHUNK_VERTICES - 1  # pieces share an end vertex: no gap between them
+    for start in range(0, len(line) - 1, step):
+        piece = line[start : start + _CORRIDOR_CHUNK_VERTICES]
+        data = _overpass_query(_corridor_query(piece))
+        for element in data.get("elements", []):
+            feature = _parse_corridor_element(element, jurisdiction)
+            if feature is not None:
+                found.setdefault(feature.osm_id, feature)
+    return list(found.values())
+
+
+def _corridor_query(line: list[tuple[float, float]]) -> str:
+    poly = ",".join(f"{lat:.5f},{lon:.5f}" for lon, lat in line)
+
+    def near(metres: int) -> str:
+        return f"(around:{metres},{poly})"
+
+    structure, access, road = (
+        near(_CORRIDOR_STRUCTURE_M),
+        near(_CORRIDOR_ACCESS_M),
+        near(_CORRIDOR_ROAD_M),
+    )
+    return (
+        "[out:json][timeout:60];\n"
+        "(\n"
+        f'  nwr["waterway"~"^(dam|weir|lock_gate)$"]{structure};\n'
+        f'  nwr["amenity"~"^(parking|boat_ramp)$"]{access};\n'
+        f'  nwr["leisure"~"^(slipway|fishing)$"]{access};\n'
+        f'  nwr["highway"~"^(trailhead|layby)$"]{access};\n'
+        ")->.points;\n"
+        f'way["highway"~"^({_CROSSING_ROADS})$"]{road}->.roads;\n'
+        ".points out center tags;\n"
+        ".roads out geom tags;"
+    )
+
+
 def _overpass_query(query_str: str) -> dict:
     """POST to Overpass API with 30-day file cache. Sleeps 0.5s before live requests."""
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -115,9 +180,20 @@ def _overpass_query(query_str: str) -> dict:
                 )
                 response.raise_for_status()
                 data = response.json()
+                # Overpass answers a failed or timed-out query with HTTP 200 and
+                # either an HTML error page or a partial result with a remark.
+                # Neither is data, and neither may be cached for 30 days.
+                if "runtime error" in str(data.get("remark", "")):
+                    raise RuntimeError(f"Overpass runtime error: {data['remark']}")
                 cache_file.write_text(json.dumps(data))
                 return data
-            except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError) as e:
+            except (
+                httpx.HTTPStatusError,
+                httpx.TimeoutException,
+                httpx.ConnectError,
+                ValueError,
+                RuntimeError,
+            ) as e:
                 last_exc = e
     raise last_exc
 
@@ -174,6 +250,59 @@ def _parse_access_point(element: dict) -> AccessPoint | None:
         jurisdiction=jurisdiction_for_coords(c_lat, c_lng),
         tags=tags,
     )
+
+
+def _parse_corridor_element(element: dict, jurisdiction: str | None) -> CorridorFeature | None:
+    tags = element.get("tags", {})
+    kind = _corridor_kind(tags)
+    if kind is None:
+        return None
+
+    line = None
+    if kind == "road":
+        geometry = element.get("geometry", [])
+        line = [(g["lon"], g["lat"]) for g in geometry if "lat" in g and "lon" in g]
+        if len(line) < 2:
+            return None
+        lat = sum(y for _, y in line) / len(line)
+        lng = sum(x for x, _ in line) / len(line)
+    else:
+        centre = element.get("center") or element
+        if "lat" not in centre or "lon" not in centre:
+            return None
+        lat, lng = float(centre["lat"]), float(centre["lon"])
+
+    return CorridorFeature(
+        osm_id=f"{element.get('type')}/{element.get('id')}",
+        kind=kind,
+        name=tags.get("name") or None,
+        lat=lat,
+        lng=lng,
+        jurisdiction=jurisdiction or jurisdiction_for_coords(lat, lng),
+        tags=tags,
+        line=line,
+    )
+
+
+def _corridor_kind(tags: dict) -> str | None:
+    waterway = tags.get("waterway")
+    if waterway == "dam":
+        return "dam"
+    if waterway == "weir":
+        return "weir"
+    if waterway == "lock_gate":
+        return "lock"
+    if tags.get("amenity") == "boat_ramp" or tags.get("leisure") == "slipway":
+        return "boat_launch"
+    if tags.get("leisure") == "fishing":
+        return "fishing_spot"
+    if tags.get("highway") == "trailhead":
+        return "trail_head"
+    if tags.get("amenity") == "parking" or tags.get("highway") == "layby":
+        return "parking"
+    if tags.get("highway"):
+        return "road"
+    return None
 
 
 def _water_feature_type(tags: dict) -> str | None:

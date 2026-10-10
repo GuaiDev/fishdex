@@ -1466,14 +1466,24 @@ def build_stretches_cmd(
     """Rebuild the explore map's named fishing stretches from the curation file.
 
     Fetches the OHN network for the file's build area (cached 30 days), traces
-    every curated stretch through it, and replaces the stored set. Exits 1 if
-    any curated stretch failed to build.
+    every curated stretch through it, and replaces the stored set. Then rebuilds
+    each stretch's anchors — confluences, dams, lake mouths, access points — from
+    the same network and OpenStreetMap (also cached). Exits 1 if any curated
+    stretch failed to build.
     """
     from pathlib import Path
 
-    from src.services.stretches import build_stretches, candidate_toml
+    from src.services.stretch_anchors import build_anchors
+    from src.services.stretches import (
+        build_stretches,
+        candidate_toml,
+        load_curation,
+        load_network,
+    )
 
-    report = build_stretches(get_db(), Path(curation))
+    db = get_db()
+    segments = load_network(load_curation(Path(curation)))
+    report = build_stretches(db, Path(curation), segments)
 
     table = Table(title=f"Fishing stretches — {report.jurisdiction}")
     table.add_column("metric")
@@ -1505,8 +1515,52 @@ def build_stretches_cmd(
             )
             console.print(candidate_toml(cand), markup=False, highlight=False)
 
+    # Replacing stretches cleared their anchors, so this is not optional.
+    _print_anchor_report(build_anchors(db, Path(curation), segments))
+
     if report.failed:
         raise typer.Exit(1)
+
+
+@app.command(name="build-anchors")
+def build_anchors_cmd(
+    curation: str = typer.Option(
+        "data/curation/stretches_ca_on.toml",
+        "--curation",
+        help="Curation file the stretches came from.",
+    ),
+) -> None:
+    """Rebuild the explore map's stretch anchors without rebuilding the stretches.
+
+    Reads the stretches already stored by `build-stretches`, so run that first.
+    Use this to pick up new OpenStreetMap data (the Overpass cache lasts 30 days)
+    or after changing how anchors are derived.
+    """
+    from pathlib import Path
+
+    from src.services.stretch_anchors import build_anchors
+
+    _print_anchor_report(build_anchors(get_db(), Path(curation)))
+
+
+def _print_anchor_report(report) -> None:
+    table = Table(title=f"Stretch anchors — {report.jurisdiction}")
+    table.add_column("metric")
+    table.add_column("value", justify="right")
+    table.add_row("stretches", str(report.stretches))
+    table.add_row("anchors", str(report.anchors_total))
+    for anchor_type, n in sorted(report.by_type.items()):
+        table.add_row(f"  {anchor_type}", str(n))
+    for reason, n in sorted(report.dropped.items()):
+        table.add_row(f"[dim]not kept: {reason}[/dim]", f"[dim]{n}[/dim]")
+    console.print(table)
+
+    for issue in report.issues:
+        console.print(f"[yellow]{issue.stretch_id}: {issue.kind}[/yellow] {issue.detail}")
+    if report.stretches == 0:
+        console.print(
+            "[yellow]No stretches are stored — run `make build-stretches` first.[/yellow]"
+        )
 
 
 if __name__ == "__main__":

@@ -121,8 +121,12 @@ make ingest
 # Refresh every area in data/ingest_areas.json (the weekly ingest)
 make weekly-ingest
 
-# Rebuild the explore map's named fishing stretches from data/curation/
+# Rebuild the explore map's named fishing stretches from data/curation/,
+# then each stretch's anchors (confluences, dams, lake mouths, access points)
 make build-stretches
+
+# Rebuild only the anchors, e.g. to pick up fresh OpenStreetMap data
+make build-anchors
 
 # Run tests
 make test
