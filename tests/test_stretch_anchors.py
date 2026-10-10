@@ -618,6 +618,32 @@ def test_tailwater_is_listed_with_the_stretch_whose_water_it_is_in(db, stretches
     assert tail.lat < 43.05  # below the seam, in the lower stretch's water
 
 
+def test_outage_for_the_dams_stretch_keeps_the_tailwater_owned_by_the_next_one(db, stretches):
+    """The dam's stretch can't be fetched but the stretch below it can: the tailwater
+    is that lower stretch's to store, yet only the dam's carry-over knows about it."""
+    from src.storage.stretches import list_stretches
+
+    def seam_dam(line, j):
+        return [feat("dam", 43.0508, metres_east(LON, 40), "way/9", name="Seam Dam")]
+
+    build(db, stretches, seam_dam)
+    (before,) = by(db, "test-lower", "tailwater")
+
+    order = [s.stretch_id for s in list_stretches(db, "CA-ON")]
+    calls = []
+
+    def upper_down(line, j):
+        calls.append(1)
+        if order[len(calls) - 1] == "test-upper":
+            raise ConnectionError("overpass is down")
+        return []
+
+    report = build(db, stretches, upper_down)
+    assert [a.anchor_id for a in by(db, "test-lower", "tailwater")] == [before.anchor_id]
+    assert by(db, "test-upper", "dam")
+    assert "test-upper" in report.carried_over_stretches
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 

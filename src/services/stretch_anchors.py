@@ -143,6 +143,10 @@ def build_anchors(
         for s in stretches
     }
 
+    previous_tailwaters = [
+        a for kept in previous_osm.values() for a in kept if a.anchor_type == "tailwater"
+    ]
+
     report = AnchorBuildReport(jurisdiction=jurisdiction, stretches=len(stretches))
     built_at = datetime.now(UTC).isoformat(timespec="seconds")
     ctx = _Topology(network)
@@ -177,7 +181,10 @@ def build_anchors(
             kept = previous_osm[stretch.stretch_id]
             if kept:
                 report.carried_over_stretches.append(stretch.stretch_id)
-            found += kept
+            kept_dams = {a.source_ref for a in kept if a.anchor_type == "dam"}
+            found += kept + [
+                a for a in previous_tailwaters if a.attributes.get("dam_source_ref") in kept_dams
+            ]
         else:
             consecutive_failures = 0
             found += _osm_anchors(ctx, stretch, ids, corridor, claimed, built_at, report)
