@@ -3,7 +3,7 @@
 Orchestrates CA-QC adapters:
   - QC species ranges (MELCCFP GeoJSON)
   - QC regulations (stub — see ca_qc/regulations.py)
-  - QC water quality (stub — no public API as of 2026)
+  - QC water quality (MELCCFP Réseau-rivières, via Données Québec)
 
 Global sources (iNat, GBIF, WSC, OSM) are handled by the standard pipeline.
 """
@@ -53,7 +53,7 @@ def ingest_qc_water_quality(
     lng: float,
     radius_km: float = 50.0,
 ) -> int:
-    """Fetch Quebec water quality readings. Returns count (currently 0 — stub)."""
+    """Fetch and store Quebec river water quality readings. Returns count."""
     _mod = importlib.import_module("src.ingest.jurisdictions.ca_qc.water_quality")
     logger.info(
         "QC water quality: fetching — lat=%.4f lng=%.4f radius=%.0fkm",
@@ -63,8 +63,9 @@ def ingest_qc_water_quality(
     )
     readings = _mod.fetch_water_quality_readings(lat, lng, radius_km)
     if readings:
-        db = get_db()
-        db["water_quality_readings"].upsert_all(readings, pk="record_id")
+        from src.storage.water_quality import upsert_water_quality_readings
+
+        upsert_water_quality_readings(get_db(), readings)
     logger.info("QC water quality: %d readings stored", len(readings))
     return len(readings)
 

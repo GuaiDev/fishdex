@@ -292,8 +292,11 @@ download as a recurring ingest (hosting is being moved separately).
 - `species_ranges.py` ✅ tested live July 17 2026, 118 species — see Bug fixes —
   session 6. NOTE: an earlier version of this note claimed COSEWIC status was
   included — it isn't; no conservation-status field exists in the real file.
-- `regulations.py` — stub
-- `water_quality.py` — stub (MELCCFP RSQER is PDF-only; DataStream covers some QC watersheds)
+- `water_quality.py` ✅ MELCCFP Réseau-rivières via Données Québec
+  (`suivi-physicochimique-des-rivieres-et-du-fleuve`): station CSV + per-watershed XLSX
+  chiffriers; pH, temperature, conductivity (no DO, no turbidity). Latest 3-year chiffrier per
+  station. The earlier "PDF-only" note was wrong. Wired for all four QC areas.
+- `regulations.py` — stub (deferred to separate Regpec work)
 
 **Province stubs** (MB, SK, NS, NB, PE `__init__.py`):
 - Documents which federal/global sources cover each province
@@ -482,7 +485,8 @@ DataStream covers some AB watersheds via /ingest/data-national.
 Species ranges (MELCCFP GeoJSON, 118 spp) live — was silently returning 0 records
 before July 17 2026 (see Bug fixes — session 6); no COSEWIC status field actually
 exists in the source, contrary to what this note used to say.
-Regulations, water quality: stubbed (DataStream covers some QC watersheds).
+Water quality: MELCCFP Réseau-rivières live (see Quebec adapters above).
+Regulations: still a stub, deferred to separate Regpec work.
 
 ### Manitoba + Saskatchewan 📋
 3 cron areas each. Global sources only (iNat, GBIF, WSC, OSM).

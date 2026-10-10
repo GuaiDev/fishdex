@@ -213,7 +213,7 @@ register(JurisdictionConfig(
     data_sources={
         "hydro_network":     False,  # RHN adapter not yet built
         "fish_observations": False,  # Faune Québec not publicly accessible
-        "water_quality":     False,  # stub — MELCCFP RSQER has no public API
+        "water_quality":     True,   # MELCCFP Réseau-rivières via Données Québec
         "stocking":          False,  # not publicly available
         "regulations":       False,  # stub — PDF adapter not yet implemented
         "species_ranges":    True,   # MELCCFP GeoJSON via données.gouv.qc.ca
@@ -233,7 +233,8 @@ register(JurisdictionConfig(
         "Global sources (iNat, GBIF, WSC, OSM, eBird) work automatically for any QC lat/lng. "
         "HYDRO: Réseau hydrographique du Québec (RHN) — no queryable WFS found as of 2026; "
         "OSM covers QC rivers adequately. "
-        "WATER QUALITY: MELCCFP RSQER is PDF-only; DataStream covers some QC watersheds. "
+        "WATER QUALITY: MELCCFP Réseau-rivières via Données Québec (pH, temperature, "
+        "conductivity; no DO or turbidity) — see ca_qc/water_quality.py. "
         "SPECIES_RANGES: MELCCFP GeoJSON — verified 118 freshwater fish species extract "
         "correctly (an earlier version returned 0 records — wrong property names). No "
         "COSEWIC/SARA status field exists in this file (contrary to an earlier note here); "
