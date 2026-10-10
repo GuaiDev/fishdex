@@ -215,7 +215,7 @@ register(JurisdictionConfig(
         "fish_observations": False,  # Faune Québec not publicly accessible
         "water_quality":     False,  # stub — MELCCFP RSQER has no public API
         "stocking":          False,  # not publicly available
-        "regulations":       False,  # stub — PDF adapter not yet implemented
+        "regulations":       True,   # per-zone Regpec PDFs via printable-versions page
         "species_ranges":    True,   # MELCCFP GeoJSON via données.gouv.qc.ca
         "benthic":           True,   # CABIN (federal; all provinces)
         "geology":           False,  # not yet built
@@ -234,6 +234,16 @@ register(JurisdictionConfig(
         "HYDRO: Réseau hydrographique du Québec (RHN) — no queryable WFS found as of 2026; "
         "OSM covers QC rivers adequately. "
         "WATER QUALITY: MELCCFP RSQER is PDF-only; DataStream covers some QC watersheds. "
+        "REGULATIONS: per-zone 'Fishing periods, limits and exceptions' PDFs from the "
+        "MELCCFP Regpec service, linked from the printable-versions page. The idZone "
+        "query param does NOT match the printed zone number (Zone 14→idZone 15, Zone 19 "
+        "north→idZone 3063, etc.), so the adapter re-derives every (idZone, label) pair "
+        "from the live page each run and logs loudly if the page layout changes — never "
+        "hardcoded. One chunk per zone (34 total as of the 2026-2027 season incl. split "
+        "sub-zones 13e/w, 19n/sA/sB, 22n/s, 23n/s) with sequential zone ids and the "
+        "published label in zone_name; regulation_year parsed from the PDF's own season "
+        "header so it auto-advances. Province-wide general rules stay on an HTML page "
+        "and are not ingested. "
         "SPECIES_RANGES: MELCCFP GeoJSON — verified 118 freshwater fish species extract "
         "correctly (an earlier version returned 0 records — wrong property names). No "
         "COSEWIC/SARA status field exists in this file (contrary to an earlier note here); "
@@ -243,6 +253,8 @@ register(JurisdictionConfig(
         "jurisdictions_present unioned rather than overwritten — see species_ranges.py."
     ),
 ))
+
+
 
 register(JurisdictionConfig(
     jurisdiction_code="CA-MB",
