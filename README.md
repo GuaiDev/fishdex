@@ -121,6 +121,9 @@ make ingest
 # Refresh every area in data/ingest_areas.json (the weekly ingest)
 make weekly-ingest
 
+# Rebuild the explore map's named fishing stretches from data/curation/
+make build-stretches
+
 # Run tests
 make test
 

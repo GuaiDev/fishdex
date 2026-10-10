@@ -21,7 +21,6 @@ def get_db(path: Path | None = None) -> Database:
     return db
 
 
-
 def _ensure_fish_surveys(db: Database) -> None:
     """Create the fish_surveys table. Idempotent.
 
@@ -55,14 +54,13 @@ def _ensure_fish_surveys(db: Database) -> None:
             "CREATE INDEX IF NOT EXISTS idx_fish_surveys_event "
             "ON fish_surveys(station_name, visit_date)"
         )
-        db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_fish_surveys_coords ON fish_surveys(lat, lng)"
-        )
+        db.execute("CREATE INDEX IF NOT EXISTS idx_fish_surveys_coords ON fish_surveys(lat, lng)")
         db.execute(
             "CREATE INDEX IF NOT EXISTS idx_fish_surveys_species "
             "ON fish_surveys(species_common_name)"
         )
         db.conn.commit()
+
 
 def _ensure_fishing_stretches(db: Database) -> None:
     """Create the explore map's Level 1 tables. Idempotent.

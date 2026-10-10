@@ -57,7 +57,8 @@ Screens: Login, Chat, Log Trip, Map, Trips (renamed "My FishDex")
 Key: react-leaflet@4.2.1, dark theme, collection mechanic feel.
 
 ## Map redesign — two-level architecture 📋
-Full design document at docs/map_redesign_design_doc.md.
+The design document this once cited (docs/map_redesign_design_doc.md) was never
+committed; this section is the only record.
 Summary:
 
 ### Level 1 — Stretches (low zoom)
@@ -90,7 +91,11 @@ Saved spots visible in explore with filter, not on personal map.
 - personal_pins table (user pins with state)
 
 ### Build plan (4 sessions)
-1. Stretch definition — algorithmic clustering + manual curation
+1. Stretch definition — algorithmic clustering + manual curation ✅ built.
+   `data/curation/stretches_ca_on.toml` is the source of truth; `make build-stretches`
+   traces it through the OHN network into `fishing_stretches` + `stretch_segments`
+   and prints uncovered clustered candidates to paste in. `GET /map/stretches`
+   serves GeoJSON. Ontario only. `stretch_anchors` and `personal_pins` are not built.
 2. Anchor extraction — confluences, dams, access points
 3. Personal pin system — schema + API + trip log integration
 4. React/Lovable UI — two-level map with pin states

@@ -283,9 +283,7 @@ def cluster_candidates(
     "missing rivers" were all Lake Ontario. Connecting channels worth fishing
     — the Niagara, the Detroit — are curated by hand.
     """
-    major = {
-        i for i, km in network.upstream_km.items() if min_upstream_km <= km <= max_upstream_km
-    }
+    major = {i for i, km in network.upstream_km.items() if min_upstream_km <= km <= max_upstream_km}
     # A simple graph whose edges carry every segment between two nodes: a
     # braid is two segments with the same ends, and as two edges it would give
     # both ends degree 3 and cut the river into candidates at every island.
