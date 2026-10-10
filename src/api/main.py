@@ -1107,7 +1107,7 @@ def ingest_data_bc(
         "radius_km": float (optional, default 50),
         "label": str (optional, human-readable name for logging)
     }
-    Runs FWA stream network, FISS fish observations, and BC EMS water quality.
+    Runs FWA stream network, FISS fish observations, and BC EnMoDS water quality.
     Returns 202 immediately; ingest runs after the response is sent.
     Global sources (iNat, GBIF, WSC, OSM) are handled by /ingest/data.
     Protected by X-Api-Key header.

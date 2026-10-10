@@ -1,226 +1,339 @@
-"""BC Environmental Monitoring System (EMS) water quality ingestion.
+"""BC EnMoDS water quality ingestion (CA-BC).
 
-Source: DataBC Open Data — WFS 2.0.0 (stations) + BC Data Catalogue object
-storage (results)
+Source: BC Environmental Monitoring Data System (EnMoDS), which replaced EMS on
+2026-03-05 (EMS stopped receiving data on 2026-02-26). Dataset slug
+"bc-environmental-monitoring-data-system-results" on the BC Data Catalogue.
 
-STATIONS
-  Layer: WHSE_ENVIRONMENTAL_MONITORING.EMS_MONITORING_LOCN_TYPES_SVW
-  Endpoint: https://openmaps.gov.bc.ca/geo/pub/
-            WHSE_ENVIRONMENTAL_MONITORING.EMS_MONITORING_LOCN_TYPES_SVW/ows
-  This WFS returns monitoring station metadata (MONITORING_LOCATION_ID, name, lat/lng)
-  within a bbox. The original layer name ENV_MONITORING_LOCATIONS_SVW returns 404 —
-  it does not exist in the DataBC WFS catalogue. EMS_MONITORING_LOCN_TYPES_SVW is the
-  closest available layer (43,626 stations province-wide, 295 near Fraser River).
-  Note: the LONGITUDE property is stored as a positive value in this layer; use
-  geometry coordinates instead.
-  Verified still live 2026-07 (a HEAD request 404s — this WFS doesn't support HEAD,
-  same as several other DataBC/gov.bc.ca WFS layers in this codebase; use GET).
+The results are four time-tier files served by the COMS object API (no auth for
+GET). This adapter reads only the current tier ("Current EnMoDS Results",
+roughly the last two years):
 
-RESULTS (water quality measurements)
-  IMPORTANT — source system migrated since this TODO was first written: EMS is
-  being replaced by EnMoDS (Environmental Monitoring Data System) as of
-  2026-03-05, and EMS results stopped receiving new data on 2026-02-26 (per
-  the dataset's own notice). The old resource ID this TODO used to cite
-  (76be8cdb-95b7-4a96-aae4-f3f59455fbcb, under the dataset slug
-  "bc-env-monitoring-system-ems-monitoring-results") no longer resolves —
-  both the ID and the slug were wrong/stale. Verified 2026-07 via the BC Data
-  Catalogue API (catalogue.data.gov.bc.ca/api/3/action/package_show):
+    https://coms.api.gov.bc.ca/api/v1/object/84ed1220-bd51-40a8-9f29-d916144e2dfe
 
-  Current (EnMoDS) results — dataset slug
-  "bc-environmental-monitoring-data-system-results", split into 4 time-tier
-  CSV files served from the COMS object API (no auth needed for GET, HTTP
-  Range supported):
-    - "Current EnMoDS Results" (last 2 years):
-      https://coms.api.gov.bc.ca/api/v1/object/84ed1220-bd51-40a8-9f29-d916144e2dfe
-      — confirmed via Content-Range header: 336,131,287 bytes (~320 MB),
-      appears to be a zip (filename inside the response looks like
-      "20250101_to_20260711.csv" — decompress before parsing as CSV).
-    - "previous 2-5 years": .../object/6edecb56-d06a-4b2e-9ab0-48584eba3df0
-    - "previous 5-10 years": .../object/55e77e5a-ea9d-41e3-ab98-473fafabb0d6
-    - "Historic (older than 10 years)": .../object/d88adc20-297e-4585-8de9-76a6342dd8e7
-  These 4 together are genuinely multi-GB; for a targeted (non-historical)
-  ingest the "last 2 years" file alone is enough for "is this water fishable
-  right now" purposes.
+Measured 2026-10-09: the object 302-redirects to a short-lived signed URL, and the
+payload is a single gzip stream of a CSV (413,529,081 bytes), not a zip. The
+older tiers are out of scope — "is this water habitable now" needs the current
+tier only.
 
-  Old (frozen, historical-only) EMS results — dataset slug
-  "bc-environmental-monitoring-system-results" — 4 similarly-tiered CSVs at
-  pub.data.gov.bc.ca, useful only for pre-2026 history, not current readings.
+HOW IT WORKS
+  1. Download the .csv.gz once into the cache directory, streamed to disk in
+     chunks, and reuse it for 30 days (the file is refreshed roughly monthly).
+  2. Stream-decompress it row by row, never holding the file in memory.
+  3. Keep rows whose Location_Latitude/Location_Longitude fall within radius_km
+     of the query point. The file carries its own coordinates, so the old EMS
+     station WFS is not needed — and it cannot miss locations that only exist
+     in EnMoDS.
+  4. Keep fresh-water, normal (non-blank/replicate/spike), detected, numeric
+     results for the five parameters the water slice uses, from ambient
+     surface-water location types only, and fold the rows of one location-day
+     into a single WaterQualityReading (see _fold).
 
-  EnMoDS also has its own spatial locations dataset (slug
-  "environmental-monitoring-data-system-enmods-spatial-sampling-locations",
-  CSV or GeoPackage via the same COMS object API) — worth checking whether
-  it's a superset of the EMS WFS stations layer above or whether new
-  (post-migration) monitoring only shows up there and not in EMS_MONITORING_
-  LOCN_TYPES_SVW; not verified either way.
+LOCATION TYPES
+  Outfalls, ditches and culverts, seepage, landfills, in-plant and storage
+  points are permittee compliance sampling, not the water a fish lives in — a
+  ditch reading of DO 1 mg/L would otherwise drag the area's median toward
+  "too low for fish". Only _AMBIENT_LOCATION_TYPES is kept.
 
-  Practical options, in order of preference:
-    1. Download the EnMoDS "last 2 years" zip once per month (results update
-       continuously, unlike EMS's frozen annual-ish cadence), decompress,
-       filter to nearby MONITORING_LOCATION_ID values, index locally.
-    2. DataBC ArcGIS FeatureServer — not available for EnMoDS/EMS results.
-    3. CKAN datastore_search — doesn't apply; these are file resources, not
-       registered datastore tables.
-  Recommended approach unchanged in spirit from the original TODO: download
-  once (now monthly, not annually, given EnMoDS's more frequent updates),
-  index by MONITORING_LOCATION_ID, join against stations found by this
-  adapter, filter to rows near the query point for a targeted ingest.
+PARAMETER MATCHING
+  By EMS observed-property code (the Observed_Property_Name column), not by the
+  long label in Observed_Property_ID, which is free text. Codes and units were
+  checked against the real file: DO DO-F/0014 (mg/L only — the % saturation
+  rows share the codes and are skipped on unit; DO-F carries ~92% of ambient
+  fresh-water DO), pH 0004/PH-F, temperature 0013/TEMF,
+  conductivity 0011/SC-F (µS/cm; mS/cm is converted), turbidity 0015/TURF (NTU,
+  stored in the turbidity_fnu column — the two units agree for routine use).
 
-Current behaviour: fetches stations within bbox (stores EMS_ID + lat/lng to log),
-returns 0 readings with a warning until the results fetch is implemented.
-
-Cache TTL: 30 days for stations.
+Cache TTL: 30 days for the downloaded file.
 """
 
-import hashlib
-import json
+import csv
+import gzip
 import logging
 import math
 import time
+from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 import httpx
+from pydantic import ValidationError
 
-_STATIONS_WFS_URL = (
-    "https://openmaps.gov.bc.ca/geo/pub/"
-    "WHSE_ENVIRONMENTAL_MONITORING.EMS_MONITORING_LOCN_TYPES_SVW/ows"
-)
-_STATIONS_TYPE_NAME = "pub:WHSE_ENVIRONMENTAL_MONITORING.EMS_MONITORING_LOCN_TYPES_SVW"
-_PAGE_SIZE = 500
-_CACHE_DIR = Path("data/cache/bc_ems")
+from src.models.water_quality_reading import WaterQualityReading
+
+_RESULTS_URL = "https://coms.api.gov.bc.ca/api/v1/object/84ed1220-bd51-40a8-9f29-d916144e2dfe"
+_CACHE_DIR = Path("data/cache/bc_enmods")
+_CACHE_FILE = "enmods_current.csv.gz"
 _CACHE_TTL_SECONDS = 30 * 86400
 _USER_AGENT = "fishbot/1.0 (personal fishing exploration bot)"
+_CHUNK_BYTES = 1 << 20
+_JURISDICTION = "CA-BC"
+
+# Every Location_Type in the file (checked 2026-10-09) that is ambient surface
+# water. Everything else — Outfall, Ditch or Culvert, Seepage, Landfill, Well,
+# In-Plant, Storage, sewers, ponds built for treatment — is excluded.
+_AMBIENT_LOCATION_TYPES = frozenset({"River, Stream, or Creek", "Lake or Pond", "Estuary"})
+
+# EMS observed-property code -> (reading field, accepted units -> multiplier).
+_PARAMETERS: dict[str, tuple[str, dict[str, float]]] = {
+    "0014": ("do_mgl", {"mg/L": 1.0}),
+    "DO-F": ("do_mgl", {"mg/L": 1.0}),
+    "0004": ("ph", {"pH units": 1.0}),
+    "PH-F": ("ph", {"pH units": 1.0}),
+    "0013": ("temp_c", {"degC": 1.0}),
+    "TEMF": ("temp_c", {"degC": 1.0}),
+    "0011": ("conductivity_us_cm", {"µS/cm": 1.0, "mS/cm": 1000.0}),
+    "SC-F": ("conductivity_us_cm", {"µS/cm": 1.0, "mS/cm": 1000.0}),
+    "0015": ("turbidity_fnu", {"NTU": 1.0}),
+    "TURF": ("turbidity_fnu", {"NTU": 1.0}),
+}
+_FIELD_CODES = frozenset({"DO-F", "PH-F", "TEMF", "SC-F", "TURF"})
+# Known units the adapter deliberately does not use; any other unit is a surprise.
+_SKIPPED_UNITS = frozenset({("0014", "%"), ("DO-F", "%")})
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ParseStats:
+    """What the pass over the file kept and what it threw away, and why."""
+
+    rows_scanned: int = 0
+    rows_no_coords: int = 0  # anywhere in the province, before the radius test
+    rows_in_radius: int = 0
+    rows_not_wanted: int = 0  # wrong medium, QC type, non-detect, other parameter
+    rows_not_ambient: int = 0  # wanted, but from a compliance/discharge location type
+    rows_unusable: int = 0  # wanted, but value/date/depth would not parse
+    rows_rejected: int = 0  # parsed, but a reading validator refused the value
+    readings: int = 0
+    unit_counts: dict[str, int] = field(default_factory=dict)  # unexpected units only
 
 
 def fetch_water_quality_readings(
     lat: float,
     lng: float,
     radius_km: float = 50.0,
-) -> list:
-    """Fetch BC EMS water quality readings within radius_km of lat/lng.
+) -> list[WaterQualityReading]:
+    """Return BC EnMoDS readings within radius_km of lat/lng, newest data included.
 
-    Currently returns an empty list — stations are discovered and logged
-    but result data fetching is not yet implemented (see module TODO above).
+    Downloads (or reuses) the current-tier file, then streams it. Raises on
+    download failure — an unreachable source must not look like "no stations".
     """
-    stations = _fetch_stations(lat, lng, radius_km)
-    if not stations:
-        logger.info("BC EMS: no monitoring stations found within %.0fkm", radius_km)
-        return []
-
-    station_ids = [s["ems_id"] for s in stations if s.get("ems_id")]
-    logger.warning(
-        "BC EMS: found %d stations near (%.4f, %.4f) — "
-        "MONITORING_LOCATION_IDs: %s … "
-        "water quality results fetch not yet implemented; returning 0 readings. "
-        "See water_quality.py TODO for how to implement result ingestion.",
-        len(stations),
-        lat,
-        lng,
-        ", ".join(str(s) for s in station_ids[:5]),
+    path = download_results()
+    readings, stats = parse_results(path, lat, lng, radius_km)
+    unexpected_units = sum(stats.unit_counts.values())
+    log = (
+        logger.warning
+        if stats.rows_unusable + stats.rows_rejected + unexpected_units
+        else logger.info
     )
-    # TODO: implement results fetch — see module docstring for approach
-    return []
+    log(
+        "BC EnMoDS: scanned %d rows (%d without coordinates), %d within %.0fkm, "
+        "%d unusable, %d rejected by validators, %d with unexpected units %s, "
+        "%d from non-ambient location types, %d not wanted -> %d readings",
+        stats.rows_scanned,
+        stats.rows_no_coords,
+        stats.rows_in_radius,
+        radius_km,
+        stats.rows_unusable,
+        stats.rows_rejected,
+        unexpected_units,
+        stats.unit_counts,
+        stats.rows_not_ambient,
+        stats.rows_not_wanted,
+        stats.readings,
+    )
+    return readings
 
 
-# ── stations fetch ─────────────────────────────────────────────────────────────
+# ── download ───────────────────────────────────────────────────────────────────
 
 
-def _fetch_stations(lat: float, lng: float, radius_km: float) -> list[dict]:
-    """Return list of {ems_id, name, lat, lng} for stations within bbox."""
-    min_lon, min_lat, max_lon, max_lat = _bbox(lat, lng, radius_km)
-    # ",CRS:84" tells the server to interpret bbox as lon/lat and reproject into
-    # the layer's native BC Albers CRS. Without it, 0 results are returned.
-    bbox_str = f"{min_lon:.5f},{min_lat:.5f},{max_lon:.5f},{max_lat:.5f},CRS:84"
-
-    base_params = {
-        "service": "WFS",
-        "version": "2.0.0",
-        "request": "GetFeature",
-        "typeName": _STATIONS_TYPE_NAME,
-        "outputFormat": "application/json",
-        "srsName": "EPSG:4326",
-        "bbox": bbox_str,
-        # sortBy=OBJECTID required for startIndex pagination on this layer —
-        # GeoServer rejects startIndex without a sort key when there's no PK.
-        "sortBy": "OBJECTID",
-        # propertyName omitted — MONITORING_LOCATION_ID replaces EMS_ID and
-        # the LONGITUDE property is stored as a positive value in this layer.
-        # Use geometry coordinates for reliable lon/lat.
-    }
-
-    features: list[dict] = []
-    start = 0
-    while True:
-        params = {**base_params, "startIndex": start, "count": _PAGE_SIZE}
-        try:
-            data = _cached_get(_STATIONS_WFS_URL, params)
-        except Exception as exc:
-            logger.error("BC EMS stations WFS failed at startIndex=%d: %s", start, exc)
-            break
-        page = data.get("features", [])
-        features.extend(page)
-        logger.info("BC EMS stations WFS startIndex=%d: %d on page", start, len(page))
-        if len(page) < _PAGE_SIZE:
-            break
-        start += _PAGE_SIZE
-
-    stations = []
-    for feat in features:
-        props = feat.get("properties") or {}
-        geom = feat.get("geometry") or {}
-        coords = geom.get("coordinates", [])
-        if len(coords) >= 2:
-            # Geometry coords are reliable; LONGITUDE property is stored unsigned.
-            feature_lon, feature_lat = coords[0], coords[1]
-        else:
-            continue
-        stations.append({
-            "ems_id": props.get("MONITORING_LOCATION_ID"),
-            "name": props.get("MONITORING_LOCATION_NAME"),
-            "lat": feature_lat,
-            "lng": feature_lon,
-        })
-
-    return stations
-
-
-# ── HTTP + file cache ──────────────────────────────────────────────────────────
-
-
-def _cached_get(url: str, params: dict) -> dict:
+def download_results() -> Path:
+    """Return the cached current-tier .csv.gz, downloading it if absent or stale."""
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    raw_key = url + str(sorted(params.items()))
-    key = hashlib.sha256(raw_key.encode()).hexdigest()[:16]
-    cache_file = _CACHE_DIR / f"{key}.json"
-
-    if cache_file.exists():
-        age = time.time() - cache_file.stat().st_mtime
+    target = _CACHE_DIR / _CACHE_FILE
+    if target.exists():
+        age = time.time() - target.stat().st_mtime
         if age < _CACHE_TTL_SECONDS:
-            return json.loads(cache_file.read_text())
+            logger.info("BC EnMoDS file is fresh (%.1f days old), skipping download", age / 86400)
+            return target
 
-    response = httpx.get(
-        url,
-        params=params,
+    part = target.with_suffix(".part")
+    logger.info("Downloading BC EnMoDS current results (~400 MB) …")
+    # The COMS object endpoint 302s to a short-lived signed URL, so redirects
+    # must be followed. Write to a .part file so an interrupted download never
+    # leaves a truncated file that looks fresh.
+    with httpx.stream(
+        "GET",
+        _RESULTS_URL,
+        follow_redirects=True,
         headers={"User-Agent": _USER_AGENT},
-        timeout=60,
-    )
-    if response.status_code >= 400:
-        logger.error(
-            "BC EMS WFS HTTP %d — response body: %s",
-            response.status_code,
-            response.text[:500],
+        timeout=httpx.Timeout(60.0, read=300.0),
+    ) as r:
+        r.raise_for_status()
+        with part.open("wb") as f:
+            for chunk in r.iter_bytes(chunk_size=_CHUNK_BYTES):
+                f.write(chunk)
+    part.replace(target)
+    logger.info("Downloaded BC EnMoDS results to %s (%d bytes)", target, target.stat().st_size)
+    return target
+
+
+# ── parse ──────────────────────────────────────────────────────────────────────
+
+
+def parse_results(
+    path: Path,
+    lat: float,
+    lng: float,
+    radius_km: float,
+) -> tuple[list[WaterQualityReading], ParseStats]:
+    """Stream a results file (.csv or .csv.gz) and return (readings, stats)."""
+    stats = ParseStats()
+    visits: dict[tuple[str, str], dict] = {}  # (Location_ID, sample date)
+    deg_lat = radius_km / 111.0
+    deg_lng = radius_km / (111.320 * math.cos(math.radians(lat)))
+
+    with _open_text(path) as f:
+        for row in csv.DictReader(f):
+            stats.rows_scanned += 1
+            coords = _coords(row)
+            if coords is None:
+                stats.rows_no_coords += 1
+                continue
+            row_lat, row_lng = coords
+            # Cheap box test first: this runs over millions of rows.
+            if abs(row_lat - lat) > deg_lat or abs(row_lng - lng) > deg_lng:
+                continue
+            if _haversine_km(lat, lng, row_lat, row_lng) > radius_km:
+                continue
+            stats.rows_in_radius += 1
+            _accumulate(row, row_lat, row_lng, visits, stats)
+
+    readings = [
+        WaterQualityReading(
+            record_id=f"{_JURISDICTION}:{location_id}:{day}",
+            station_id=location_id,
+            jurisdiction=_JURISDICTION,
+            **visit["meta"],
+            **_fold(visit["samples"]),
         )
-    response.raise_for_status()
-    data = response.json()
-    cache_file.write_text(json.dumps(data))
-    return data
+        for (location_id, day), visit in visits.items()
+    ]
+    stats.readings = len(readings)
+    return readings, stats
 
 
-# ── geometry helpers ───────────────────────────────────────────────────────────
+def _accumulate(
+    row: dict[str, str],
+    row_lat: float,
+    row_lng: float,
+    visits: dict[tuple[str, str], dict],
+    stats: ParseStats,
+) -> None:
+    spec = _PARAMETERS.get(row.get("Observed_Property_Name", "").strip())
+    if (
+        spec is None
+        or row.get("Medium") != "Water - Fresh"
+        or row.get("QC_Type") != "NORMAL"
+        or row.get("Detection_Condition")
+    ):
+        stats.rows_not_wanted += 1
+        return
+
+    if row.get("Location_Type") not in _AMBIENT_LOCATION_TYPES:
+        stats.rows_not_ambient += 1
+        return
+
+    code = row["Observed_Property_Name"].strip()
+    field_name, units = spec
+    unit = row.get("Result_Unit", "")
+    multiplier = units.get(unit)
+    if multiplier is None:
+        if (code, unit) in _SKIPPED_UNITS:
+            stats.rows_not_wanted += 1
+        else:
+            stats.unit_counts[unit] = stats.unit_counts.get(unit, 0) + 1
+        return
+
+    observed = row.get("Observed_Date_Time", "").strip()
+    location_id = row.get("Location_ID", "").strip()
+    depth_text = (row.get("Depth_Upper") or "").strip()
+    try:
+        value = float(row["Result_Value"]) * multiplier
+        sampled_at = date.fromisoformat(observed[:10])
+        depth = float(depth_text) if depth_text else 0.0
+    except (KeyError, ValueError):
+        stats.rows_unusable += 1
+        return
+    if not location_id or not math.isfinite(value):
+        stats.rows_unusable += 1
+        return
+    try:
+        WaterQualityReading(
+            record_id="", station_id="", sampled_at=sampled_at, **{field_name: value}
+        )
+    except ValidationError:
+        stats.rows_rejected += 1
+        return
+
+    visit = visits.setdefault(
+        (location_id, sampled_at.isoformat()),
+        {
+            "meta": {
+                "station_name": row.get("Location_Name") or None,
+                "lat": row_lat,
+                "lng": row_lng,
+                "sampled_at": sampled_at,
+            },
+            "samples": [],
+        },
+    )
+    visit["samples"].append((depth, observed, code not in _FIELD_CODES, field_name, value))
 
 
-def _bbox(lat: float, lon: float, radius_km: float) -> tuple[float, float, float, float]:
-    lat_deg = radius_km / 111.0
-    lon_deg = radius_km / (111.320 * math.cos(math.radians(lat)))
-    return (lon - lon_deg, lat - lat_deg, lon + lon_deg, lat + lat_deg)
+def _fold(samples: list[tuple[float, str, bool, str, float]]) -> dict[str, float]:
+    """Collapse one location-day of samples to one value per parameter.
+
+    A visit can hold a depth profile and both field and lab codes for one
+    parameter. Keep the shallowest sample (missing depth = surface); at equal
+    depth prefer the field measurement.
+
+    Many lake profiles carry no depth at all: each step is a separate timestamp
+    with a blank Depth_Upper. Among the shallowest samples, the step with the
+    highest DO stands for the surface — the surface is the water in contact
+    with air, and near-anoxic bottom water must not reach the area's median.
+    Every parameter is then taken from that same step where it was measured.
+    Remaining ties go to the earliest timestamp, so file order never decides.
+    """
+    top = min(s[0] for s in samples)
+    surface_do = [s for s in samples if s[0] == top and s[3] == "do_mgl"]
+    step = min(surface_do, key=lambda s: (-s[4], s[2], s[1]))[1] if surface_do else None
+    best: dict[str, tuple] = {}
+    for depth, observed, is_lab, name, value in samples:
+        rank = (depth, observed != step, is_lab, observed, value)
+        if name not in best or rank < best[name]:
+            best[name] = rank
+    return {name: rank[-1] for name, rank in best.items()}
+
+
+def _open_text(path: Path):
+    if path.suffix == ".gz":
+        return gzip.open(path, "rt", encoding="utf-8-sig", newline="")
+    return path.open(encoding="utf-8-sig", newline="")
+
+
+def _coords(row: dict[str, str]) -> tuple[float, float] | None:
+    try:
+        return float(row["Location_Latitude"]), float(row["Location_Longitude"])
+    except (KeyError, ValueError):
+        return None
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    a = (
+        math.sin((p2 - p1) / 2) ** 2
+        + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lon2 - lon1) / 2) ** 2
+    )
+    return 6371.0 * 2 * math.asin(math.sqrt(a))
