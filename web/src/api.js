@@ -138,16 +138,6 @@ export async function getConditions(lat, lng) {
   return res.json();
 }
 
-export async function getMapSegments(bounds, mode = 'balanced') {
-  const { north, south, east, west } = bounds;
-  const params = new URLSearchParams({ north, south, east, west, mode });
-  const res = await fetch(`${BASE_URL}/map/segments?${params}`, {
-    headers: authHeaders(),
-  });
-  if (!res.ok) throw new Error('Failed to fetch segments');
-  return res.json();
-}
-
 export async function getMyStops() {
   const res = await fetch(`${BASE_URL}/map/my-stops`, {
     headers: authHeaders(),

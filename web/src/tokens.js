@@ -6,12 +6,6 @@
 export const colorMoss = '#7C8F69';
 export const colorTextAsh = '#9A9280';
 
-export const colorHeatHigh = '#e74c3c';
-export const colorHeatMed = '#e67e22';
-export const colorHeatMid = '#f1c40f';
-export const colorHeatLow = '#2ecc71';
-export const colorHeatMin = '#3498db';
-
 // Explore map: stretch lines and anchor markers (see components/anchors.js).
 export const colorBrass = '#c2a06a';
 export const colorMossLight = '#9fae7a';
