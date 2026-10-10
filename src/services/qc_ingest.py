@@ -2,7 +2,7 @@
 
 Orchestrates CA-QC adapters:
   - QC species ranges (MELCCFP GeoJSON)
-  - QC regulations (stub — no machine-readable source, see ca_qc/regulations.py)
+  - QC regulations (stub — see ca_qc/regulations.py)
   - QC water quality (MELCCFP Réseau-rivières, via Données Québec)
 
 Global sources (iNat, GBIF, WSC, OSM) are handled by the standard pipeline.
