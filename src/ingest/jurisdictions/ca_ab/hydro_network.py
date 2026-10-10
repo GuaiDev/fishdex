@@ -152,17 +152,6 @@ def _fetch_tile(
     """Paginate one bbox tile with resultOffset; recurse into quadrants when a
     tile returns an exact multiple of _PAGE_SIZE (server record cap suspected).
     """
-    if depth > _MAX_TILE_DEPTH:
-        logger.warning(
-            "FWMIS: max tiling depth %d reached for bbox %.3f,%.3f,%.3f,%.3f — may be incomplete",
-            _MAX_TILE_DEPTH,
-            min_lon,
-            min_lat,
-            max_lon,
-            max_lat,
-        )
-        return []
-
     bbox_str = f"{min_lon:.5f},{min_lat:.5f},{max_lon:.5f},{max_lat:.5f}"
     features: list[dict] = []
     offset = 0
@@ -181,7 +170,18 @@ def _fetch_tile(
         offset += _PAGE_SIZE
 
     # Exact multiple of _PAGE_SIZE → server may have capped results; tile to confirm
-    if features and len(features) % _PAGE_SIZE == 0:
+    if features and len(features) % _PAGE_SIZE == 0 and depth >= _MAX_TILE_DEPTH:
+        logger.warning(
+            "FWMIS: max tiling depth %d reached for bbox %.3f,%.3f,%.3f,%.3f — keeping %d "
+            "features, tile may be incomplete",
+            _MAX_TILE_DEPTH,
+            min_lon,
+            min_lat,
+            max_lon,
+            max_lat,
+            len(features),
+        )
+    elif features and len(features) % _PAGE_SIZE == 0:
         logger.info(
             "FWMIS: possible record cap at %d features (depth=%d) — splitting into quadrants",
             len(features),
