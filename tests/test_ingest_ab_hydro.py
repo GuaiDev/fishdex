@@ -267,3 +267,19 @@ def test_cache_miss_writes_file(cache_dir):
 
     cache_files = list(cache_dir.glob("*.json"))
     assert len(cache_files) == 1
+
+def test_max_depth_tile_keeps_its_features(cache_dir):
+    from src.ingest.jurisdictions.ca_ab import hydro_network
+
+    fixture = _load_fixture("fwmis_watercourse_response.json")
+    with (
+        patch(_HYDRO_HTTPX, return_value=_mock_response(fixture)),
+        patch(_HYDRO_CACHE, cache_dir),
+        patch.object(hydro_network, "_PAGE_SIZE", 4),
+    ):
+        feats = hydro_network._fetch_tile(
+            hydro_network._SERVICE_BASE + "/query", {}, -114.1, 51.0, -114.0, 51.1,
+            depth=hydro_network._MAX_TILE_DEPTH,
+        )
+
+    assert len(feats) == 4

@@ -18,6 +18,12 @@ from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
 
+# stream_segments has one primary key (ogf_id) shared by every jurisdiction, and
+# FWMIS OBJECTIDs are small integers in the same range as OHN/BC ids. Offsetting
+# AB ids into a range no other source reaches guarantees replace=True can only
+# ever overwrite a previous AB row, with no change to shared schema or readers.
+AB_SEGMENT_ID_OFFSET = 10**12
+
 
 def ingest_ab_stocking() -> int:
     """Download and store Alberta planned stocking XLSX. Returns count."""
@@ -54,13 +60,9 @@ def ingest_ab_hydro_network(
 
     now = datetime.utcnow().isoformat()
 
-    # Delete only CA-AB rows from the previous ingest for this jurisdiction
-    if "stream_segments" in db.table_names():
-        db["stream_segments"].delete_where("jurisdiction = ?", ["CA-AB"])
-
     seg_rows = [
         {
-            "ogf_id": s.ogf_id,
+            "ogf_id": AB_SEGMENT_ID_OFFSET + s.ogf_id,
             "watercourse_type": s.watercourse_type,
             "name": s.name,
             "flow_verified": int(s.flow_verified),
