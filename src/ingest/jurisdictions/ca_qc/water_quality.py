@@ -135,9 +135,7 @@ def _load_stations() -> list[dict]:
         return []
     zip_bytes = _cached_download(csv_url, _CACHE_DIR / "iqbp_csv.zip", _STATIONS_TTL)
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        member = next(
-            (n for n in zf.namelist() if n.casefold().endswith(_STATIONS_MEMBER)), None
-        )
+        member = next((n for n in zf.namelist() if n.casefold().endswith(_STATIONS_MEMBER)), None)
         if member is None:
             logger.error(
                 "QC water quality: %s not in the CSV zip (members: %s) — the publisher "
