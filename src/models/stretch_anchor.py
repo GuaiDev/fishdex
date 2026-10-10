@@ -54,7 +54,11 @@ class StretchAnchor(BaseModel):
 
 
 class StretchSegmentLine(BaseModel):
-    """One OHN segment of a stretch, drawn at full detail for the zoomed view."""
+    """One OHN segment of a stretch, drawn at full detail for the zoomed view.
+
+    The stretch's own geometry is simplified for province zoom; these are what
+    the map draws once the stretch fills the screen.
+    """
 
     ogf_id: int
     stretch_id: StretchId
@@ -62,16 +66,12 @@ class StretchSegmentLine(BaseModel):
     name: str | None = None
     geometry: dict  # GeoJSON LineString
 
-    # The stretch's own geometry is simplified for province zoom; this is what
-    # the map draws once the stretch fills the screen.
-
 
 # ── build diagnostics ─────────────────────────────────────────────────────────
 
 AnchorIssueKind = Literal[
     "osm_unavailable",  # Overpass failed for a stretch; OSM anchors carried over or absent
     "tailwater_unverified",  # a dam sits on water whose flow direction OHN has not verified
-    "dam_off_channel",  # an OSM dam lies in the corridor but not on any stretch segment
 ]
 
 

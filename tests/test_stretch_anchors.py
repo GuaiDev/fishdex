@@ -683,3 +683,19 @@ def test_build_anchors_command_reports_what_it_did_not_keep(monkeypatch, tmp_pat
     result = CliRunner().invoke(cli.app, ["build-anchors"])
     assert result.exit_code == 0, result.output
     assert "access_not_public" in result.output and "osm_unavailable" in result.output
+
+
+def test_an_off_river_dam_does_not_swallow_a_weir_on_the_river(db, stretches):
+    def fetch(line, j):
+        return [
+            # 140 m off the river, so not on it; the weir is 120 m from this dam,
+            # inside the merge radius, and ranks below it.
+            feat("dam", 43.045, metres_east(LON, 140), "way/50", name="Pond Dam"),
+            feat("weir", 43.045, metres_east(LON, 20), "node/51"),
+        ]
+
+    report = build(db, stretches, fetch)
+    (dam,) = by(db, "test-lower", "dam")
+    assert dam.source_ref == "node/51" and dam.subtype == "weir"
+    assert dam.attributes.get("also_mapped_as") is None
+    assert report.dropped["dam_off_channel"] >= 1

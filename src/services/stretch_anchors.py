@@ -448,15 +448,21 @@ def _osm_anchors(
     geoms = {i: network.geoms[i] for i in ids}
     out: list[StretchAnchor] = []
 
-    dams = [f for f in corridor if f.kind in ("dam", "weir", "lock")]
-    kept_dams, merged = _merge_dams(dams)
-    report.drop("dam_duplicate_mapping", merged)
-    for dam, also_mapped in kept_dams:
-        hit = _nearest_member(geoms, dam.lat, dam.lng)
+    # Snap first, merge second: a dam on a pond beside the river must not absorb
+    # (and then take down with it) a weir that is on the river.
+    on_channel: dict[str, tuple[int, float]] = {}
+    for f in corridor:
+        if f.kind not in ("dam", "weir", "lock"):
+            continue
+        hit = _nearest_member(geoms, f.lat, f.lng)
         if hit is None or hit[1] > DAM_SNAP_M:
             report.drop("dam_off_channel")
-            continue
-        ogf_id, dist = hit
+        else:
+            on_channel[f.osm_id] = hit
+    kept_dams, merged = _merge_dams([f for f in corridor if f.osm_id in on_channel])
+    report.drop("dam_duplicate_mapping", merged)
+    for dam, also_mapped in kept_dams:
+        ogf_id, dist = on_channel[dam.osm_id]
         out.append(_dam_anchor(stretch, dam, also_mapped, ogf_id, dist, built_at))
         tail = _tailwater(ctx, dam, ogf_id, claimed, stretch, built_at, report)
         if tail is not None:
