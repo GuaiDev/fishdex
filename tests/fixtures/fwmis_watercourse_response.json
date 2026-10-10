@@ -1,0 +1,72 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "geometryType": "esriGeometryPolyline",
+  "spatialReference": {"wkid": 4326, "latestWkid": 4326},
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 10001,
+        "WB_ID": 24267,
+        "OFFICIAL_NM": "BOW RIVER",
+        "COMMON_NM": "Bow River",
+        "STR_ORDER": 2.0,
+        "HUC_8": "04021001",
+        "Shape__Length": 5000.0
+      },
+      "geometry": {
+        "paths": [
+          [[-114.20, 51.00], [-114.19, 51.01], [-114.18, 51.02]]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 10002,
+        "WB_ID": 26543,
+        "OFFICIAL_NM": "ELBOW RIVER",
+        "COMMON_NM": null,
+        "STR_ORDER": 3.0,
+        "HUC_8": "04021001",
+        "Shape__Length": 3000.0
+      },
+      "geometry": {
+        "paths": [
+          [[-114.10, 51.00], [-114.09, 51.01]]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 10003,
+        "WB_ID": 65668,
+        "OFFICIAL_NM": "UNNAMED",
+        "COMMON_NM": null,
+        "STR_ORDER": 1.0,
+        "HUC_8": "04021001",
+        "Shape__Length": 1000.0
+      },
+      "geometry": {
+        "paths": [
+          [[-114.00, 50.95], [-113.99, 50.96]]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 10004,
+        "WB_ID": 65680,
+        "OFFICIAL_NM": "UNNAMED",
+        "COMMON_NM": null,
+        "STR_ORDER": 1.0,
+        "HUC_8": "04021001",
+        "Shape__Length": 800.0
+      },
+      "geometry": {
+        "paths": [
+          [[-114.05, 50.90], [-114.04, 50.91]]
+        ]
+      }
+    }
+  ],
+  "exceededTransferLimit": false
+}

@@ -254,9 +254,15 @@ instruction not to build it out yet.
 - `stocking.py` ✅ tested live July 17 2026, 527 records — see Bug fixes — session 6.
   NOTE: an earlier version of this note said AB stocking has no coordinates — that
   was wrong; the real file does have lat/lng.
-- `hydro_network.py` — stub; NHN has no queryable WFS (FTP tiles only); OSM covers AB adequately
+- `hydro_network.py` ✅ implemented 2026-10-09 — FWMIS Simplified Hydro Arcs
+  FeatureServer (fwmis_hydrography layer 0), WGS84 in/out, paginated via
+  resultOffset / exceededTransferLimit; 5,013 segments for Bow River Calgary 50km
+  radius; stream orders 0–9 populated; no barrier layer (barrier_count=0 for CA-AB).
+  Bow + NS Edmonton + Oldman areas wired into weekly ingest.
 - `regulations.py` ✅ implemented July 17 2026, 10 chunks — see Bug fixes — session 6
-- `water_quality.py` — stub (AEMERA portal is map-only; DataStream covers some AB watersheds)
+- `water_quality.py` — stub (AEMERA portal is map-only; open.alberta.ca has no
+  surface-water chemistry; federal national dataset has only 13 AB sites, none near
+  the AB areas — re-checked 2026-10-09)
 
 **Quebec** (`src/ingest/jurisdictions/ca_qc/`):
 - `species_ranges.py` ✅ tested live July 17 2026, 118 species — see Bug fixes —
@@ -444,7 +450,8 @@ Stocking (planned dates XLSX) live — real file rebuilt to match actual structu
 does have coordinates (an earlier version of this note was wrong about that).
 Regulations now implemented (10 watershed-unit chunks, not the ~100-WMU scheme
 originally assumed).
-Hydro, water quality: still stubbed.
+Hydro network: FWMIS Simplified Hydro Arcs live 2026-10-09 (full implementation,
+see Phase 2 — AB above). Water quality still stubbed (no machine-readable source).
 DataStream covers some AB watersheds via /ingest/data-national.
 
 ### Quebec 🔨 (June 28 2026; species_ranges fixed July 17 2026)
