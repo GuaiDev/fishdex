@@ -174,6 +174,8 @@ def log_session(
     fallback_photo_taken_at: str | None = None,
     fallback_photo_url: str | None = None,
     fallback_photo_path: str | None = None,
+    started_at: str | None = None,
+    ended_at: str | None = None,
 ) -> dict:
     """Insert a parsed session and all its stops into the database.
 
@@ -206,6 +208,15 @@ def log_session(
     to hold them, synthesize one from whatever location data the client
     already captured. See test_fast_tally_session_with_no_notes_still_persists.
 
+    started_at/ended_at are the "Start fishing" timer's two ends (ISO 8601,
+    with a timezone), stored so fish per hour can be computed later. Both are
+    optional and editable afterwards.
+
+    After the stops are written, each one is linked to the user's pins where
+    exactly one pin is in range (see src/services/pins). pin_links in the
+    result says what was linked and what the user should be asked; it is None
+    if linking failed, which never fails the trip itself.
+
     Returns {"session_id": int, "stops_logged": int, ...}
     """
     if not parsed_session.get("stops") and structured_catches:
@@ -236,6 +247,8 @@ def log_session(
                 "date_approx": parsed_session.get("date_approx"),
                 "overall_notes": parsed_session.get("overall_notes"),
                 "user_id": user_id,
+                "started_at": started_at,
+                "ended_at": ended_at,
             }
         )
         .last_pk
@@ -478,6 +491,19 @@ def log_session(
             except (ValueError, TypeError):
                 pass
 
+    pin_links = None
+    try:
+        from src.services.pins import link_session_stops
+
+        pin_links = link_session_stops(db_conn, user_id, session_id)
+    except Exception:  # noqa: BLE001 - a logged trip must never fail over this
+        logger.warning(
+            "Could not link session %s to user %s's pins; the trip is saved unlinked",
+            session_id,
+            user_id,
+            exc_info=True,
+        )
+
     followup_questions = []
     proactive_coaching = None
     try:
@@ -570,6 +596,7 @@ def log_session(
         "followup_questions": followup_questions,
         "proactive_coaching": proactive_coaching,
         "patterns_recomputed": patterns_recomputed,
+        "pin_links": pin_links,
         "conditions_enriched": conditions_result is not None
         and not conditions_result.get("timeout"),
         "conditions": conditions_result,

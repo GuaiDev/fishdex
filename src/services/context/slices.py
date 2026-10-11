@@ -379,6 +379,7 @@ def _fill_substrate(db: Database, place: Place, out: WaterSlice) -> None:
 _CHEMISTRY_SOURCES = {
     "CA-ON": "PWQMN",
     "CA-BC": "BC EnMoDS",
+    "CA-QC": "MELCCFP Réseau-rivières",
 }
 
 

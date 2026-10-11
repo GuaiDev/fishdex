@@ -41,6 +41,16 @@ from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
+from src.models.pin import (  # noqa: E402
+    PinCreate,
+    PinLinkCreate,
+    PinMerge,
+    PinUpdate,
+    RecalledVisitCreate,
+    SessionUpdate,
+    TripPinRating,
+)
+
 
 def verify_api_key(x_api_key: str = Header(None)) -> None:
     """Verify admin API key for protected endpoints."""
@@ -344,10 +354,14 @@ def _normalize_structured_catches(
             continue
         species = entry.get("species")
         species = species.strip() if isinstance(species, str) and species.strip() else None
+        # A missing or unusable count is stored as NULL, not guessed: "count
+        # it as one fish" is a rule applied where fish are added up.
         try:
-            count = int(entry.get("count") or 1)
+            count = int(entry["count"]) if entry.get("count") is not None else None
         except (TypeError, ValueError):
-            count = 1
+            count = None
+        if count is not None and count < 1:
+            count = None
         bait = entry.get("bait")
         bait = bait.strip() if isinstance(bait, str) and bait.strip() else None
         size_raw = entry.get("biggest_size_cm")
@@ -377,6 +391,28 @@ def _normalize_structured_catches(
     return normalized
 
 
+def _trip_times(started_at: str | None, ended_at: str | None) -> tuple[str | None, str | None]:
+    """Validate the "Start fishing" timer's two ends. 400 rather than guess."""
+    from pydantic import ValidationError
+
+    from src.models.pin import SessionUpdate
+
+    if not started_at and not ended_at:
+        return None, None
+    try:
+        times = SessionUpdate(started_at=started_at or None, ended_at=ended_at or None)
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=400,
+            detail="started_at/ended_at must be ISO 8601 times with a timezone, "
+            f"ending after they start: {e.errors()[0]['msg']}",
+        ) from e
+    return (
+        times.started_at.isoformat() if times.started_at else None,
+        times.ended_at.isoformat() if times.ended_at else None,
+    )
+
+
 def _log_trip_core(
     text: str,
     user: dict,
@@ -387,6 +423,8 @@ def _log_trip_core(
     photo_path: str | None = None,
     catches_json: str | None = None,
     extra_photos: list[dict | None] | None = None,
+    started_at: str | None = None,
+    ended_at: str | None = None,
 ) -> dict:
     """Shared implementation behind /log-trip and /log-trip/photo.
 
@@ -408,6 +446,7 @@ def _log_trip_core(
     text = text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="'text' field is required")
+    started_at, ended_at = _trip_times(started_at, ended_at)
 
     db = get_db()
     ensure_schema(db)
@@ -461,6 +500,8 @@ def _log_trip_core(
         fallback_photo_taken_at=photo_taken_at,
         fallback_photo_url=photo_url,
         fallback_photo_path=photo_path,
+        started_at=started_at,
+        ended_at=ended_at,
     )
 
     # Re-query session_conditions rather than passing log_session's internal
@@ -505,6 +546,12 @@ def _log_trip_core(
         # from this, not just pending_catches (which excludes already-
         # confirmed rows like typed species or fast-tally taps).
         "catches": result.get("catches", []),
+        # Per stop: the pin it was linked to without asking (undoable), the
+        # pins to choose between when several are in range, or a prompt to
+        # pin a spot fished before. None when linking failed.
+        "pin_links": result.get("pin_links"),
+        "started_at": started_at,
+        "ended_at": ended_at,
     }
 
 
@@ -520,7 +567,9 @@ def log_trip(body: dict, user: dict = Depends(get_current_user_or_apikey)):
         "photo_url": "string" (optional),
         "catches_json": "string" (optional — JSON array of structured
             {species, count, biggest_size_cm|biggest_size, bait} from the
-            multi-catch logging UI; see _normalize_structured_catches)
+            multi-catch logging UI; see _normalize_structured_catches),
+        "started_at", "ended_at": ISO 8601 with timezone (optional — the
+            "Start fishing" timer's two ends)
     }
     JSON-only — does not accept an actual photo file. Kept for backward
     compatibility with callers (e.g. /log log.html) that only send EXIF-derived
@@ -535,6 +584,8 @@ def log_trip(body: dict, user: dict = Depends(get_current_user_or_apikey)):
             photo_taken_at=body.get("photo_taken_at"),
             photo_url=body.get("photo_url"),
             catches_json=body.get("catches_json"),
+            started_at=body.get("started_at"),
+            ended_at=body.get("ended_at"),
         )
     except HTTPException:
         raise
@@ -551,6 +602,8 @@ def log_trip_with_photo(
     photo_taken_at: str | None = Form(None),
     catches_json: str | None = Form(None),
     photos: list[UploadFile] | None = File(default=None),
+    started_at: str | None = Form(None),
+    ended_at: str | None = Form(None),
     user: dict = Depends(get_current_user_or_apikey),
 ):
     """Log a fishing trip with an actual photo file (multipart/form-data).
@@ -566,6 +619,8 @@ def log_trip_with_photo(
     """
     from src.services.photo_storage import save_photo
 
+    # Before any file is written, so a refused request leaves no orphan photo.
+    started_at, ended_at = _trip_times(started_at, ended_at)
     try:
         saved = save_photo(photo)
 
@@ -589,6 +644,8 @@ def log_trip_with_photo(
             photo_path=saved["path"],
             catches_json=catches_json,
             extra_photos=extra_photos,
+            started_at=started_at,
+            ended_at=ended_at,
         )
     except HTTPException:
         raise
@@ -601,6 +658,7 @@ def get_sessions(user: dict = Depends(get_current_user)):
     """Return logged sessions for the current user."""
     from src.storage.catches import get_catches_for_sessions
     from src.storage.database import get_db
+    from src.storage.pins import pins_for_sessions
 
     db = get_db()
     try:
@@ -611,7 +669,8 @@ def get_sessions(user: dict = Depends(get_current_user)):
                 s.id, s.date, s.date_approx, s.overall_notes,
                 st.location_name, st.location_text,
                 GROUP_CONCAT(DISTINCT je.value) as species_caught,
-                sc.air_temp_c, sc.pressure_hpa, sc.anomaly_flag
+                sc.air_temp_c, sc.pressure_hpa, sc.anomaly_flag,
+                s.rating, s.started_at, s.ended_at
             FROM sessions s
             LEFT JOIN stops st ON st.session_id = s.id
             LEFT JOIN json_each(st.species_caught) je ON 1=1
@@ -627,6 +686,7 @@ def get_sessions(user: dict = Depends(get_current_user)):
 
         session_ids = [r[0] for r in rows]
         catches_by_session = get_catches_for_sessions(db, session_ids)
+        pins_by_session = pins_for_sessions(db, user["id"], session_ids)
 
         sessions = []
         for r in rows:
@@ -645,6 +705,14 @@ def get_sessions(user: dict = Depends(get_current_user)):
                     }
                     if r[7]
                     else None,
+                    # NULL = not rated, never a low rating. Times are absent
+                    # for trips logged before the timer was saved.
+                    "rating": r[10],
+                    "started_at": r[11],
+                    "ended_at": r[12],
+                    # The pins this trip's stops link to, with the trip's
+                    # rating at each (per pin on a multi-pin trip).
+                    "pins": pins_by_session.get(r[0], []),
                     # Catches predating this feature have no photo — photo_url is
                     # simply None, callers must handle the no-photo case.
                     "catches": [
@@ -1520,6 +1588,193 @@ def get_my_stops(user: dict = Depends(get_current_user)):
         )
 
     return {"stops": stops, "count": len(stops)}
+
+
+# --- Personal-map pins ---
+#
+# Every route takes the user from the bearer token and nowhere else. Another
+# user's pin, stop or trip answers 404, exactly like one that does not exist,
+# so a guessed id says nothing about whether it is in use.
+
+
+def _pin_db():
+    from src.storage.database import get_db
+
+    return get_db()
+
+
+@app.get("/pins/labels")
+def get_pin_labels(user: dict = Depends(get_current_user)):
+    """Constants and wording for the pin UI, from src/services/pins/labels.py."""
+    from src.services.pins.labels import labels_payload
+
+    return labels_payload()
+
+
+@app.get("/pins")
+def get_pins(user: dict = Depends(get_current_user)):
+    """The Personal map: the user's pins, and their located stops not yet pinned."""
+    from src.services.pins import map_payload
+
+    return map_payload(_pin_db(), user["id"])
+
+
+@app.post("/pins", status_code=201)
+def post_pin(body: PinCreate, user: dict = Depends(get_current_user)):
+    """Create a pin. from_stop_id is "Pin this spot" and links that stop."""
+    from src.services.pins import create_pin, pin_detail
+
+    db = _pin_db()
+    created = create_pin(
+        db,
+        user["id"],
+        body.name,
+        body.lat,
+        body.lng,
+        notes=body.notes,
+        is_favourite=body.is_favourite,
+        from_stop_id=body.from_stop_id,
+    )
+    if created is None:
+        raise HTTPException(status_code=404, detail="No such stop")
+    return {
+        **pin_detail(db, user["id"], created["pin_id"]),
+        "inferred_stop_ids": created["inferred_stop_ids"],
+    }
+
+
+@app.get("/pins/{pin_id}")
+def get_pin_detail(pin_id: int, user: dict = Depends(get_current_user)):
+    """One pin: its facts, linked trips, and recalled records (marked recalled)."""
+    from src.services.pins import pin_detail
+
+    detail = pin_detail(_pin_db(), user["id"], pin_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="No such pin")
+    return detail
+
+
+@app.patch("/pins/{pin_id}")
+def patch_pin(pin_id: int, body: PinUpdate, user: dict = Depends(get_current_user)):
+    """Rename, edit notes, or set or clear the favourite flag."""
+    from src.services.pins import pin_detail
+    from src.storage.pins import update_pin
+
+    db = _pin_db()
+    if not update_pin(db, user["id"], pin_id, body.model_dump(exclude_unset=True)):
+        raise HTTPException(status_code=404, detail="No such pin")
+    return pin_detail(db, user["id"], pin_id)
+
+
+@app.delete("/pins/{pin_id}")
+def delete_pin_endpoint(pin_id: int, user: dict = Depends(get_current_user)):
+    """Delete a pin. Its trips are unlinked and kept; its recalled records go with it."""
+    from src.storage.pins import delete_pin
+
+    if not delete_pin(_pin_db(), user["id"], pin_id):
+        raise HTTPException(status_code=404, detail="No such pin")
+    return {"deleted": pin_id}
+
+
+@app.post("/pins/{pin_id}/merge")
+def merge_pin(pin_id: int, body: PinMerge, user: dict = Depends(get_current_user)):
+    """Merge this pin into into_pin_id: its trips and recalled records move there."""
+    from src.services.pins import pin_detail
+    from src.storage.pins import merge_pins
+
+    db = _pin_db()
+    if pin_id == body.into_pin_id:
+        raise HTTPException(status_code=400, detail="A pin cannot be merged into itself")
+    if not merge_pins(db, user["id"], pin_id, body.into_pin_id):
+        raise HTTPException(status_code=404, detail="No such pin")
+    return pin_detail(db, user["id"], body.into_pin_id)
+
+
+@app.post("/pins/{pin_id}/links")
+def link_stop_to_pin(pin_id: int, body: PinLinkCreate, user: dict = Depends(get_current_user)):
+    """Link one of the user's stops to this pin by hand (a confirmed link)."""
+    from src.storage.pins import link_stop
+
+    link = link_stop(_pin_db(), user["id"], pin_id, body.stop_id, "confirmed")
+    if link is None:
+        raise HTTPException(status_code=404, detail="No such pin or stop")
+    return link
+
+
+@app.delete("/pins/{pin_id}/links/{stop_id}")
+def unlink_stop_from_pin(pin_id: int, stop_id: int, user: dict = Depends(get_current_user)):
+    """Undo a link. The stop and its trip are kept."""
+    from src.storage.pins import unlink_stop
+
+    if not unlink_stop(_pin_db(), user["id"], pin_id, stop_id):
+        raise HTTPException(status_code=404, detail="No such link")
+    return {"unlinked": stop_id}
+
+
+@app.post("/pins/{pin_id}/recalled", status_code=201)
+def add_recalled(pin_id: int, body: RecalledVisitCreate, user: dict = Depends(get_current_user)):
+    """ "I've fished here before": recalled history, excluded from every statistic."""
+    from src.storage.pins import add_recalled_visit
+
+    recalled_id = add_recalled_visit(
+        _pin_db(), user["id"], pin_id, body.date_approx, body.species, body.rating
+    )
+    if recalled_id is None:
+        raise HTTPException(status_code=404, detail="No such pin")
+    return {"id": recalled_id, "pin_id": pin_id, "provenance": "recalled"}
+
+
+@app.delete("/pins/{pin_id}/recalled/{recalled_id}")
+def delete_recalled(pin_id: int, recalled_id: int, user: dict = Depends(get_current_user)):
+    from src.storage.pins import delete_recalled_visit
+
+    if not delete_recalled_visit(_pin_db(), user["id"], pin_id, recalled_id):
+        raise HTTPException(status_code=404, detail="No such recalled record")
+    return {"deleted": recalled_id}
+
+
+@app.patch("/sessions/{session_id}")
+def patch_session(session_id: int, body: SessionUpdate, user: dict = Depends(get_current_user)):
+    """Rate a trip, or set or correct its start and end times.
+
+    A field left out is unchanged; null clears it. A single-pin trip's rating
+    is also that pin's rating.
+    """
+    from datetime import datetime
+
+    from src.storage.pins import get_session, update_session
+
+    db = _pin_db()
+    current = get_session(db, user["id"], session_id)
+    if current is None:
+        raise HTTPException(status_code=404, detail="No such trip")
+    fields = body.model_dump(exclude_unset=True)
+    for key in ("started_at", "ended_at"):
+        if fields.get(key) is not None:
+            fields[key] = fields[key].isoformat()
+    start = fields.get("started_at", current["started_at"])
+    end = fields.get("ended_at", current["ended_at"])
+    if start and end:
+        try:
+            ends_first = datetime.fromisoformat(end) <= datetime.fromisoformat(start)
+        except (TypeError, ValueError):
+            ends_first = False  # a stored legacy value we cannot compare
+        if ends_first:
+            raise HTTPException(status_code=400, detail="ended_at must be after started_at")
+    update_session(db, user["id"], session_id, fields)
+    return get_session(db, user["id"], session_id)
+
+
+@app.put("/sessions/{session_id}/pins/{pin_id}/rating")
+def put_trip_pin_rating(
+    session_id: int, pin_id: int, body: TripPinRating, user: dict = Depends(get_current_user)
+):
+    """Rate one pin of a trip that covered several. null clears it."""
+    from src.storage.pins import set_trip_pin_rating
+
+    if not set_trip_pin_rating(_pin_db(), user["id"], session_id, pin_id, body.rating):
+        raise HTTPException(status_code=404, detail="That trip is not linked to that pin")
+    return {"session_id": session_id, "pin_id": pin_id, "rating": body.rating}
 
 
 # Serve React web app from /app — mount last so API routes take priority

@@ -12,13 +12,14 @@ from src.services.area_ingest import DEFAULT_AREAS_PATH, load_areas
 
 
 def test_committed_area_list_loads_and_matches_the_old_workflow():
-    """The 33 curl steps of the retired GitHub Action became 25 areas.
+"""The 33 curl steps of the retired GitHub Action became 25 areas.
 
-    MB and SK areas each gained one province adapter source (39 = 33 + 6).
+    MB and SK areas each gained one province adapter source and three QC areas
+    gained the qc adapter (42 = 33 + 6 + 3).
     """
     areas = load_areas(DEFAULT_AREAS_PATH)
     assert len(areas) == 25
-    assert sum(len(a.sources) for a in areas) == 39
+    assert sum(len(a.sources) for a in areas) == 42
     assert len({a.label for a in areas}) == 25
     by_label = {a.label: a for a in areas}
     bronte = by_label["Bronte Creek Oakville"]
