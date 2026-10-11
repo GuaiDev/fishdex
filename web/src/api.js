@@ -66,7 +66,9 @@ export async function sendMessage(message, conversationHistory = []) {
 // per-catch photo uploads here to close that gap; count/size/bait already
 // persist correctly via catches_json (see trip_logger.py's structured_catches
 // path).
-export async function logTrip(text, photoLat, photoLng, photoTakenAt, photoFile, catches) {
+// startedAt/endedAt: the "Start fishing" timer's two ends as ISO strings
+// (toISOString, so always with a timezone), or null for a plain log.
+export async function logTrip(text, photoLat, photoLng, photoTakenAt, photoFile, catches, startedAt = null, endedAt = null) {
   let res;
   if (photoFile) {
     const form = new FormData();
@@ -75,6 +77,8 @@ export async function logTrip(text, photoLat, photoLng, photoTakenAt, photoFile,
     if (photoLat) { form.append('photo_lat', photoLat); form.append('photo_lng', photoLng); }
     if (photoTakenAt) form.append('photo_taken_at', photoTakenAt);
     if (catches) form.append('catches_json', JSON.stringify(catches));
+    if (startedAt) form.append('started_at', startedAt);
+    if (endedAt) form.append('ended_at', endedAt);
 
     const token = getToken();
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
@@ -84,6 +88,8 @@ export async function logTrip(text, photoLat, photoLng, photoTakenAt, photoFile,
     if (photoLat) { body.photo_lat = photoLat; body.photo_lng = photoLng; }
     if (photoTakenAt) body.photo_taken_at = photoTakenAt;
     if (catches) body.catches_json = JSON.stringify(catches);
+    if (startedAt) body.started_at = startedAt;
+    if (endedAt) body.ended_at = endedAt;
 
     res = await fetch(`${BASE_URL}/log-trip`, {
       method: 'POST',
@@ -148,10 +154,40 @@ export async function getMapSegments(bounds, mode = 'balanced') {
   return res.json();
 }
 
-export async function getMyStops() {
-  const res = await fetch(`${BASE_URL}/map/my-stops`, {
+// ── Personal-map pins ──────────────────────────────────────────────────────
+// One JSON helper for every pin and trip-edit route. A 404 means "not yours
+// or not there" — the server never says which.
+async function pinRequest(method, path, body) {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
     headers: authHeaders(),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!res.ok) throw new Error('Failed to fetch stops');
-  return res.json();
+  if (res.status === 401) throw Object.assign(new Error('Not authenticated'), { status: 401 });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = typeof data.detail === 'string' ? data.detail : `Request failed: ${res.status}`;
+    throw Object.assign(new Error(detail), { status: res.status });
+  }
+  return data;
 }
+
+export const getPinLabels = () => pinRequest('GET', '/pins/labels');
+// { pins: [...], unpinned_stops: [...] } — the Personal map.
+export const getPins = () => pinRequest('GET', '/pins');
+export const getPin = id => pinRequest('GET', `/pins/${id}`);
+// fields: { name, lat, lng, notes?, is_favourite?, from_stop_id? }
+export const createPin = fields => pinRequest('POST', '/pins', fields);
+// fields: any of { name, notes, is_favourite }; notes: null clears them.
+export const updatePin = (id, fields) => pinRequest('PATCH', `/pins/${id}`, fields);
+export const deletePin = id => pinRequest('DELETE', `/pins/${id}`);
+export const mergePin = (id, intoPinId) => pinRequest('POST', `/pins/${id}/merge`, { into_pin_id: intoPinId });
+export const linkStopToPin = (pinId, stopId) => pinRequest('POST', `/pins/${pinId}/links`, { stop_id: stopId });
+export const unlinkStopFromPin = (pinId, stopId) => pinRequest('DELETE', `/pins/${pinId}/links/${stopId}`);
+// fields: { date_approx?, species: [], rating? }
+export const addRecalledVisit = (pinId, fields) => pinRequest('POST', `/pins/${pinId}/recalled`, fields);
+export const deleteRecalledVisit = (pinId, id) => pinRequest('DELETE', `/pins/${pinId}/recalled/${id}`);
+// fields: any of { rating, started_at, ended_at }; null clears.
+export const updateSession = (id, fields) => pinRequest('PATCH', `/sessions/${id}`, fields);
+export const setTripPinRating = (sessionId, pinId, rating) =>
+  pinRequest('PUT', `/sessions/${sessionId}/pins/${pinId}/rating`, { rating });

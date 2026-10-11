@@ -5,6 +5,8 @@
 
 export const colorMoss = '#7C8F69';
 export const colorTextAsh = '#9A9280';
+// fishdex-tokens.css --fx-brass: a favourite pin's outline on the map.
+export const colorBrass = '#c2a06a';
 
 export const colorHeatHigh = '#e74c3c';
 export const colorHeatMed = '#e67e22';
