@@ -113,31 +113,14 @@ class StretchHints:
 
 
 def load_stretch_hints(curation_path: Path = DEFAULT_CURATION_PATH) -> dict[str, StretchHints]:
-    """The optional `lake` and `mouth` keys of each curated stretch, by stretch id.
-
-    Read leniently: the keys are added to the curation file by a separate
-    change, so a file or schema without them yields no hints, not an error.
-    """
+    """The optional `lake` and `mouth` keys of each curated stretch, by stretch id."""
     hints: dict[str, StretchHints] = {}
     for cs in load_curation(curation_path).stretches:
-        lake, mouth = _opt(cs, "lake"), _opt(cs, "mouth")
-        point = None
-        if mouth is not None:
-            lat, lon = _opt(mouth, "lat"), _opt(mouth, "lon", "lng")
-            if lat is not None and lon is not None:
-                point = (float(lat), float(lon))
-            lake = lake or _opt(mouth, "lake")
+        lake = cs.lake or (cs.mouth.lake if cs.mouth else None)
+        point = (cs.mouth.lat, cs.mouth.lon) if cs.mouth else None
         if lake or point:
-            hints[cs.id] = StretchHints(lake=str(lake) if lake else None, mouth=point)
+            hints[cs.id] = StretchHints(lake=lake, mouth=point)
     return hints
-
-
-def _opt(obj, *keys):
-    for key in keys:
-        value = obj.get(key) if isinstance(obj, dict) else getattr(obj, key, None)
-        if value is not None:
-            return value
-    return None
 
 
 # ── classify ──────────────────────────────────────────────────────────────────

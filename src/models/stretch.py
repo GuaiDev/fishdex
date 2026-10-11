@@ -40,6 +40,16 @@ class BoundaryPoint(BaseModel):
     ogf_id: int | None = None
 
 
+class CuratedMouth(BaseModel):
+    """Where a stretch meets its lake, for a mouth the stream network does not show."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    lake: str | None = None
+
+
 class CuratedReach(BaseModel):
     """One continuous run of channel, from one boundary point to another.
 
@@ -72,6 +82,8 @@ class CuratedStretch(BaseModel):
     name: str = Field(min_length=1)
     river: str = Field(min_length=1)
     region: str | None = None
+    lake: str | None = None  # the water the river mouth opens onto
+    mouth: CuratedMouth | None = None
     reaches: list[CuratedReach] = Field(alias="reach", min_length=1)
     include_ogf_ids: list[int] = Field(default_factory=list)
     exclude_ogf_ids: list[int] = Field(default_factory=list)

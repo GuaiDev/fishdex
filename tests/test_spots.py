@@ -6,7 +6,6 @@ build and API tests use throwaway databases, never the real one.
 """
 
 import re
-from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -613,20 +612,62 @@ def test_bridges_are_off_by_default_and_getting_there_is_on():
 # ── curation hints ────────────────────────────────────────────────────────────
 
 
-def test_hints_are_read_from_optional_curation_keys(monkeypatch):
-    import src.services.spots as module
+_CURATION_TOML = """
+version = 1
+jurisdiction = "CA-ON"
+build_bbox = [-80.0, 43.0, -79.0, 44.0]
 
-    stretches = [
-        SimpleNamespace(id="a", lake="Lake Erie", mouth=SimpleNamespace(lat=42.6, lon=-80.8)),
-        SimpleNamespace(id="b", mouth={"lat": 43.0, "lon": -79.0, "lake": "Lake Ontario"}),
-        SimpleNamespace(id="c"),  # none of the keys: the file as it is today
-    ]
-    monkeypatch.setattr(module, "load_curation", lambda path: SimpleNamespace(stretches=stretches))
-    hints = load_stretch_hints()
+[[stretch]]
+id = "credit-lower"
+name = "Lower Credit"
+river = "Credit River"
+lake = "Lake Ontario"
+[stretch.mouth]
+lat = 43.55
+lon = -79.58
+[[stretch.reach]]
+from = { lat = 43.6, lon = -79.7 }
+to = { lat = 43.55, lon = -79.58 }
+
+[[stretch]]
+id = "etobicoke-lower"
+name = "Lower Etobicoke"
+river = "Etobicoke Creek"
+[stretch.mouth]
+lat = 43.59
+lon = -79.54
+lake = "Lake Ontario"
+[[stretch.reach]]
+from = { lat = 43.65, lon = -79.6 }
+to = { lat = 43.59, lon = -79.54 }
+
+[[stretch]]
+id = "plain"
+name = "Plain"
+river = "Plain Creek"
+[[stretch.reach]]
+from = { lat = 43.7, lon = -79.7 }
+to = { lat = 43.6, lon = -79.6 }
+"""
+
+
+def test_curated_lake_and_mouth_load_and_reach_the_classifier(tmp_path):
+    path = tmp_path / "curation.toml"
+    path.write_text(_CURATION_TOML)
+    hints = load_stretch_hints(path)
     assert hints == {
-        "a": StretchHints(lake="Lake Erie", mouth=(42.6, -80.8)),
-        "b": StretchHints(lake="Lake Ontario", mouth=(43.0, -79.0)),
+        "credit-lower": StretchHints(lake="Lake Ontario", mouth=(43.55, -79.58)),
+        "etobicoke-lower": StretchHints(lake="Lake Ontario", mouth=(43.59, -79.54)),
     }
+
+    (spot,) = run([], [stretch("credit-lower")], hints).spots
+    assert spot.kind == "river_mouth"
+    assert (spot.lat, spot.lng) == (43.55, -79.58)
+    assert spot.sources[0].kind == "curation"
+
+    # the curated lake names the water even when the topology found the mouth
+    (found,) = run([mouth()], [stretch("credit-lower")], hints).spots
+    assert "Lake Ontario" in found.title
 
 
 def test_the_real_curation_file_loads_without_hints_or_errors():
