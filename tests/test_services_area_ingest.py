@@ -12,7 +12,7 @@ from src.services.area_ingest import DEFAULT_AREAS_PATH, load_areas
 
 
 def test_committed_area_list_loads_and_matches_the_old_workflow():
-"""The 33 curl steps of the retired GitHub Action became 25 areas.
+    """The 33 curl steps of the retired GitHub Action became 25 areas.
 
     MB and SK areas each gained one province adapter source and three QC areas
     gained the qc adapter (42 = 33 + 6 + 3).
