@@ -1,0 +1,50 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 101,
+        "FEAT_NAME": "Red River",
+        "ORDER_NUM": 5,
+        "F_TYPE": "RIVER/STREAM, PEREN (TIME OF PHOTO)",
+        "LENGTH": 0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[-97.14, 49.9], [-97.13, 49.91]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 102,
+        "FEAT_NAME": "",
+        "ORDER_NUM": 0,
+        "F_TYPE": "RIVER/STREAM, INDEFINITE",
+        "LENGTH": 0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[-97.2, 49.8], [-97.21, 49.81]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 103,
+        "FEAT_NAME": "Assiniboine River",
+        "ORDER_NUM": 6,
+        "F_TYPE": "RIVER/STREAM, PEREN (TIME OF PHOTO)",
+        "LENGTH": 0
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [[-99.95, 50.07], [-99.94, 50.08]],
+          [[-99.94, 50.08], [-99.93, 50.09]]
+        ]
+      }
+    }
+  ]
+}

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { getSessions, resolvePhotoUrl } from '../api';
+import { getSessions, resolvePhotoUrl, setTripPinRating, updateSession } from '../api';
 import InstrumentDial from '../components/InstrumentDial';
 import GrainOverlay from '../components/GrainOverlay';
+import RatingSlider from '../components/RatingSlider';
+import { isoToLocalInput, localInputToIso, pinUi, usePinLabels } from '../pins';
 import '../fishdex-tokens.css';
 
 // Same fish glyph as FishDex's no-photo placeholder (FishDex.jsx doesn't
@@ -123,10 +125,89 @@ function TripPlate({ session }) {
   );
 }
 
+// Edit a logged trip: its optional rating (per pin when the trip covered
+// several pins) and its start and end times, which fish per hour needs.
+// Trips logged before the timer was saved show "—" until times are added.
+function TripEditor({ session, onSaved }) {
+  const labels = usePinLabels();
+  const [started, setStarted] = useState(isoToLocalInput(session.started_at));
+  const [ended, setEnded] = useState(isoToLocalInput(session.ended_at));
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
+  const pins = session.pins || [];
+
+  async function run(fn) {
+    setError('');
+    setSaved(false);
+    try {
+      onSaved(await fn());
+      setSaved(true);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  const saveTimes = () => run(async () => {
+    const fields = { started_at: localInputToIso(started), ended_at: localInputToIso(ended) };
+    const updated = await updateSession(session.id, fields);
+    return { started_at: updated.started_at, ended_at: updated.ended_at };
+  });
+
+  if (!labels) return null;
+  return (
+    <div style={{
+      margin: '-6px 0 13px', padding: '12px 14px', display: 'grid', gap: 12,
+      background: 'var(--fx-card-fill)', border: '1px solid var(--fx-hairline)', borderRadius: 14,
+    }}>
+      {pins.length <= 1 ? (
+        <RatingSlider
+          value={session.rating}
+          onChange={v => run(async () => {
+            await updateSession(session.id, { rating: v });
+            return { rating: v, pins: pins.map(p => ({ ...p, rating: v })) };
+          })}
+        />
+      ) : (
+        pins.map(p => (
+          <RatingSlider
+            key={p.pin_id}
+            label={`How was ${p.name}?`}
+            value={p.rating}
+            onChange={v => run(async () => {
+              await setTripPinRating(session.id, p.pin_id, v);
+              return { pins: pins.map(q => (q.pin_id === p.pin_id ? { ...q, rating: v } : q)) };
+            })}
+          />
+        ))
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <label style={pinUi.muted}>
+          Started
+          <input type="datetime-local" style={pinUi.input} value={started} onChange={e => setStarted(e.target.value)} />
+        </label>
+        <label style={pinUi.muted}>
+          Ended
+          <input type="datetime-local" style={pinUi.input} value={ended} onChange={e => setEnded(e.target.value)} />
+        </label>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <button type="button" style={pinUi.primary} onClick={saveTimes}>Save times</button>
+        {saved && <span style={pinUi.muted}>Saved</span>}
+      </div>
+      {error && <div style={pinUi.error}>{error}</div>}
+    </div>
+  );
+}
+
 export default function Trips() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [editing, setEditing] = useState(null);
+
+  function patchSession(id, patch) {
+    setSessions(prev => prev.map(x => (x.id === id ? { ...x, ...patch } : x)));
+  }
 
   useEffect(() => {
     getSessions()
@@ -179,7 +260,22 @@ export default function Trips() {
         </div>
       )}
 
-      {sessions.map((session, i) => <TripPlate key={i} session={session} />)}
+      {sessions.map((session, i) => (
+        <div key={session.id ?? i}>
+          <button
+            type="button"
+            onClick={() => setEditing(editing === session.id ? null : session.id)}
+            aria-expanded={editing === session.id}
+            aria-label={`Edit trip ${session.location || ''} ${session.date || ''}`}
+            style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}
+          >
+            <TripPlate session={session} />
+          </button>
+          {editing === session.id && (
+            <TripEditor session={session} onSaved={patch => patchSession(session.id, patch)} />
+          )}
+        </div>
+      ))}
     </div>
   );
 }

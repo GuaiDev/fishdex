@@ -1,0 +1,50 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 201,
+        "NAMEEN": "South Saskatchewan River",
+        "PERMANENCY": 1,
+        "DEFINITION": 6,
+        "THEME": "HD",
+        "NHNAREA": 0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[-106.67, 52.13], [-106.66, 52.14]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 202,
+        "NAMEEN": "",
+        "PERMANENCY": 2,
+        "DEFINITION": 3,
+        "THEME": "HD",
+        "NHNAREA": 0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[-106.7, 52.1], [-106.71, 52.11]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 203,
+        "NAMEEN": "Canal X",
+        "PERMANENCY": 1,
+        "DEFINITION": 1,
+        "THEME": "HD",
+        "NHNAREA": 0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[-106.5, 52.0], [-106.51, 52.01]]
+      }
+    }
+  ]
+}

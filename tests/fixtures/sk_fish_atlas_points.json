@@ -1,0 +1,15 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "LOCATIONID": "ABC01", "NAME": "Lake A" },
+      "geometry": { "type": "Point", "coordinates": [-106.67, 52.13] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "LOCATIONID": "ABC02", "NAME": "Lake B" },
+      "geometry": { "type": "Point", "coordinates": [-106.5, 52.0] }
+    }
+  ]
+}

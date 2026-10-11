@@ -1,0 +1,36 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 9001,
+        "S_PRIMARY_COMMON_NAME": "Northern Pike",
+        "WATERBODY": "Lake A",
+        "NRCANCODE": "ABC01"
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 9002,
+        "S_PRIMARY_COMMON_NAME": "Walleye",
+        "WATERBODY": "Lake A",
+        "NRCANCODE": "ABC01"
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 9003,
+        "S_PRIMARY_COMMON_NAME": "Lake Whitefish",
+        "WATERBODY": "Lake B",
+        "NRCANCODE": "ABC02"
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 9004,
+        "S_PRIMARY_COMMON_NAME": "",
+        "WATERBODY": "Lake A",
+        "NRCANCODE": "ABC01"
+      }
+    }
+  ]
+}

@@ -1,9 +1,11 @@
 import 'leaflet/dist/leaflet.css';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, CircleMarker, useMapEvents } from 'react-leaflet';
-import { getMapSegments, getMyStops } from '../api';
-import { colorHeatHigh, colorHeatMed, colorHeatMid, colorHeatLow, colorHeatMin, colorMoss, colorTextAsh } from '../tokens';
+import { addRecalledVisit, createPin, getMapSegments, getPins, linkStopToPin } from '../api';
+import { colorHeatHigh, colorHeatMed, colorHeatMid, colorHeatLow, colorHeatMin, colorMoss, colorTextAsh, colorBrass } from '../tokens';
 import InstrumentDial from '../components/InstrumentDial';
+import PinSheet, { RecalledForm } from '../components/PinSheet';
+import { formatDistance, pinUi, usePinLabels } from '../pins';
 import '../fishdex-tokens.css';
 
 function scoreColor(score) {
@@ -68,38 +70,181 @@ function ExploreLayer({ mode, onSegmentClick }) {
   ));
 }
 
-function PersonalLayer({ stops, onStopClick }) {
-  return stops.map(stop => (
-    <CircleMarker
-      key={stop.stop_id}
-      center={[stop.lat, stop.lng]}
-      radius={8}
-      pathOptions={{
-        color: stopColor(stop.productive),
-        fillColor: stopColor(stop.productive),
-        fillOpacity: 0.9,
-        weight: 2,
-      }}
-      eventHandlers={{ click: () => onStopClick(stop) }}
-    />
-  ));
+// Saved pins are hollow rings, Visited pins are filled; a favourite gets a
+// brass outline. Stops not linked to any pin stay as small dots so a logged
+// trip never disappears from the map just because it is unpinned.
+function PersonalLayer({ pins, stops, onPinClick, onStopClick }) {
+  return (
+    <>
+      {stops.map(stop => (
+        <CircleMarker
+          key={`stop-${stop.stop_id}`}
+          center={[stop.lat, stop.lng]}
+          radius={5}
+          pathOptions={{
+            color: stopColor(stop.productive),
+            fillColor: stopColor(stop.productive),
+            fillOpacity: 0.7,
+            weight: 1,
+          }}
+          eventHandlers={{ click: () => onStopClick(stop) }}
+        />
+      ))}
+      {pins.map(pin => (
+        <CircleMarker
+          key={`pin-${pin.id}`}
+          center={[pin.lat, pin.lng]}
+          radius={10}
+          pathOptions={{
+            color: pin.is_favourite ? colorBrass : colorMoss,
+            fillColor: colorMoss,
+            fillOpacity: pin.state === 'visited' ? 0.85 : 0.08,
+            weight: pin.is_favourite ? 4 : 2,
+            dashArray: pin.state === 'visited' && pin.has_recalled && pin.visits === 0 ? '3 3' : null,
+          }}
+          eventHandlers={{ click: () => onPinClick(pin) }}
+        />
+      ))}
+    </>
+  );
+}
+
+function PlacePinOnTap({ onPlace }) {
+  useMapEvents({ click: e => onPlace({ lat: e.latlng.lat, lng: e.latlng.lng }) });
+  return null;
+}
+
+// A new pin at a tapped point: a Saved pin, or, with "I've fished here
+// before", one carrying a recalled visit.
+function NewPinForm({ at, onDone }) {
+  const [name, setName] = useState('');
+  const [notes, setNotes] = useState('');
+  const [recalled, setRecalled] = useState(false);
+  const [error, setError] = useState('');
+
+  async function save(recalledFields) {
+    const created = await createPin({ name: name.trim(), lat: at.lat, lng: at.lng, notes: notes.trim() || null });
+    if (recalledFields) await addRecalledVisit(created.pin.id, recalledFields);
+    onDone(created.pin.id);
+  }
+
+  return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <div style={pinUi.heading}>New pin</div>
+      <input style={pinUi.input} placeholder="Name this spot" value={name} onChange={e => setName(e.target.value)} aria-label="Pin name" />
+      <textarea style={{ ...pinUi.input, minHeight: 54 }} placeholder="Notes (optional, private)" value={notes} onChange={e => setNotes(e.target.value)} aria-label="Pin notes" />
+      <label style={{ ...pinUi.muted, display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input type="checkbox" checked={recalled} onChange={e => setRecalled(e.target.checked)} />
+        I've fished here before
+      </label>
+      {recalled ? (
+        <RecalledForm
+          submitLabel="Save pin"
+          onSubmit={fields => {
+            if (!name.trim()) throw new Error('Name the spot first');
+            return save(fields);
+          }}
+        />
+      ) : (
+        <div>
+          <button
+            type="button"
+            style={pinUi.primary}
+            disabled={!name.trim()}
+            onClick={() => save(null).catch(err => setError(err.message))}
+          >
+            Save pin
+          </button>
+        </div>
+      )}
+      {error && <div style={pinUi.error}>{error}</div>}
+    </div>
+  );
+}
+
+// "Pin this spot" for a logged stop, plus a one-tap link to any pin already
+// within the link radius.
+function StopPinActions({ stop, onDone }) {
+  const labels = usePinLabels();
+  const [name, setName] = useState(stop.location && stop.location !== 'Unknown' ? stop.location : '');
+  const [naming, setNaming] = useState(false);
+  const [error, setError] = useState('');
+
+  const run = fn => fn().then(onDone).catch(err => setError(err.message));
+
+  return (
+    <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+      {stop.candidates.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {stop.candidates.map(c => (
+            <button key={c.pin_id} type="button" style={pinUi.button}
+              onClick={() => run(() => linkStopToPin(c.pin_id, stop.stop_id).then(() => c.pin_id))}>
+              Link to {c.name} · {formatDistance(c.distance_m)}
+            </button>
+          ))}
+        </div>
+      )}
+      {naming ? (
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input style={pinUi.input} value={name} onChange={e => setName(e.target.value)} placeholder="Name this spot" aria-label="Pin name" />
+          <button type="button" style={pinUi.primary} disabled={!name.trim()}
+            onClick={() => run(() => createPin({ name: name.trim(), lat: stop.lat, lng: stop.lng, from_stop_id: stop.stop_id }).then(r => r.pin.id))}>
+            Save
+          </button>
+        </div>
+      ) : (
+        <div>
+          <button type="button" style={pinUi.primary} onClick={() => setNaming(true)}>📍 Pin this spot</button>
+          {labels && (
+            <span style={{ ...pinUi.muted, marginLeft: 8 }}>
+              Trips within {labels.link_radius_m} m link to it.
+            </span>
+          )}
+        </div>
+      )}
+      {error && <div style={pinUi.error}>{error}</div>}
+    </div>
+  );
 }
 
 export default function Map() {
   const [mapMode, setMapMode] = useState('personal');
   const [exploreMode, setExploreMode] = useState('balanced');
+  const [pins, setPins] = useState([]);
   const [myStops, setMyStops] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [selectedPinId, setSelectedPinId] = useState(null);
+  const [placing, setPlacing] = useState(false);
+  const [newPinAt, setNewPinAt] = useState(null);
   const [loadingStops, setLoadingStops] = useState(true);
 
-  useEffect(() => {
-    getMyStops()
+  const reload = useCallback(() => {
+    return getPins()
       .then(data => {
-        setMyStops(data.stops || []);
+        setPins(data.pins || []);
+        setMyStops(data.unpinned_stops || []);
         setLoadingStops(false);
       })
       .catch(() => setLoadingStops(false));
   }, []);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  function closeSheet() {
+    setSelected(null);
+    setSelectedPinId(null);
+    setNewPinAt(null);
+  }
+
+  function openPin(pinId) {
+    closeSheet();
+    setSelectedPinId(pinId);
+  }
+
+  function openOther(item) {
+    closeSheet();
+    setSelected(item);
+  }
 
   const defaultCenter = [43.5, -79.8];
   const defaultZoom = 10;
@@ -154,6 +299,22 @@ export default function Map() {
           ))}
         </div>
 
+        {mapMode === 'personal' && (
+          <button
+            type="button"
+            onClick={() => { closeSheet(); setPlacing(p => !p); }}
+            aria-pressed={placing}
+            style={{
+              ...pinUi.button,
+              padding: '5px 10px',
+              borderColor: placing ? 'var(--fx-moss-light)' : 'var(--fx-hairline)',
+              color: placing ? 'var(--fx-moss-lightest)' : 'var(--fx-text-primary)',
+            }}
+          >
+            {placing ? 'Cancel' : '+ Pin'}
+          </button>
+        )}
+
         {mapMode === 'explore' && (
           <select
             value={exploreMode}
@@ -190,15 +351,34 @@ export default function Map() {
           />
 
           {mapMode === 'personal' && (
-            <PersonalLayer stops={myStops} onStopClick={setSelected} />
+            <PersonalLayer
+              pins={pins}
+              stops={myStops}
+              onPinClick={pin => openPin(pin.id)}
+              onStopClick={openOther}
+            />
+          )}
+
+          {mapMode === 'personal' && placing && (
+            <PlacePinOnTap onPlace={at => { setPlacing(false); closeSheet(); setNewPinAt(at); }} />
           )}
 
           {mapMode === 'explore' && (
-            <ExploreLayer mode={exploreMode} onSegmentClick={setSelected} />
+            <ExploreLayer mode={exploreMode} onSegmentClick={openOther} />
           )}
         </MapContainer>
 
-        {mapMode === 'personal' && !loadingStops && myStops.length === 0 && (
+        {mapMode === 'personal' && placing && (
+          <div style={{
+            position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+            background: 'var(--fx-card-fill)', border: '1px solid var(--fx-hairline)', borderRadius: 20,
+            padding: '6px 14px', zIndex: 1000, pointerEvents: 'none', ...pinUi.muted,
+          }}>
+            Tap the map where the pin goes
+          </div>
+        )}
+
+        {mapMode === 'personal' && !loadingStops && myStops.length === 0 && pins.length === 0 && !placing && (
           <div style={{
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%, -50%)',
@@ -215,7 +395,7 @@ export default function Map() {
               Your map is empty
             </div>
             <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 12, color: 'var(--fx-text-muted)', lineHeight: 1.5 }}>
-              Log trips with GPS to see your spots appear here.
+              Log trips with GPS, or tap + Pin to save a spot.
               Switch to Explore to find new water.
             </div>
           </div>
@@ -246,7 +426,7 @@ export default function Map() {
           modal: no focus trap, no Escape-to-close, background map stays
           interactive. role="dialog" + aria-label identify it as a distinct
           region for assistive tech without the false promise of aria-modal. */}
-      {selected && (
+      {(selected || selectedPinId || newPinAt) && (
         <div role="dialog" aria-label="Location details" style={{
           position: 'fixed',
           bottom: 64, left: 0, right: 0,
@@ -258,7 +438,7 @@ export default function Map() {
           zIndex: 2000,
         }}>
           <button
-            onClick={() => setSelected(null)}
+            onClick={closeSheet}
             aria-label="Close"
             style={{
               position: 'absolute', top: 4, right: 8,
@@ -269,8 +449,21 @@ export default function Map() {
             }}
           ><span aria-hidden="true">×</span></button>
 
-          {/* Personal stop detail */}
-          {selected.stop_id && (
+          {selectedPinId && (
+            <PinSheet
+              pinId={selectedPinId}
+              otherPins={pins}
+              onChanged={reload}
+              onClose={closeSheet}
+            />
+          )}
+
+          {newPinAt && (
+            <NewPinForm at={newPinAt} onDone={pinId => reload().then(() => openPin(pinId))} />
+          )}
+
+          {/* Personal stop detail — a logged stop not yet linked to a pin */}
+          {selected?.stop_id && (
             <>
               <div style={{ fontFamily: 'var(--fx-font-serif)', fontSize: 16, fontWeight: 600, color: 'var(--fx-text-primary-2)', marginBottom: 4 }}>
                 {selected.location}
@@ -307,11 +500,16 @@ export default function Map() {
                   {selected.gear ? ` · ${selected.gear}` : ''}
                 </div>
               )}
+              <StopPinActions
+                key={selected.stop_id}
+                stop={selected}
+                onDone={pinId => reload().then(() => openPin(pinId))}
+              />
             </>
           )}
 
           {/* Explore segment detail */}
-          {selected.ogf_id && (
+          {selected?.ogf_id && (
             <>
               <div style={{ fontFamily: 'var(--fx-font-serif)', fontSize: 16, fontWeight: 600, color: 'var(--fx-text-primary-2)', marginBottom: 4 }}>
                 {selected.watercourse_name || selected.nearest_named_stream || 'Unnamed stream'}

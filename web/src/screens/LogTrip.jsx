@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { confirmCatchSpecies, logTrip, resolvePhotoUrl } from '../api';
 import GrainOverlay from '../components/GrainOverlay';
+import TripPinsCard from '../components/TripPinsCard';
 import '../fishdex-tokens.css';
 
 // A logged catch's species is a suggestion — from the text parser, and from
@@ -789,10 +790,15 @@ export default function LogTrip({ onNavigate }) {
       // fishing" tap and this very moment, already live in this component;
       // no backend round-trip needed). null (old-style single-catch log
       // with no live session) means the summary card omits the stat.
-      const durationSeconds = sessionStartedAt ? (Date.now() - sessionStartedAt) / 1000 : null;
+      const endedAt = Date.now();
+      const durationSeconds = sessionStartedAt ? (endedAt - sessionStartedAt) / 1000 : null;
 
+      // The timer's two ends are saved with the trip (editable later from
+      // Trips) so fish per hour can be worked out for this trip.
       const result = await logTrip(
-        text, exifData?.lat, exifData?.lng, exifData?.takenAt, photoFile, catchesPayload
+        text, exifData?.lat, exifData?.lng, exifData?.takenAt, photoFile, catchesPayload,
+        sessionStartedAt ? new Date(sessionStartedAt).toISOString() : null,
+        sessionStartedAt ? new Date(endedAt).toISOString() : null,
       );
       setStatus('success');
       setPendingCatches(result.pending_catches || []);
@@ -800,11 +806,15 @@ export default function LogTrip({ onNavigate }) {
         // Server truth, not the client's own filtered catchesPayload — this
         // is what actually got persisted, so it can't drift from a branch
         // that silently drops an entry server-side.
-        totalFish: (result.catches || []).reduce((sum, c) => sum + (c.count || 0), 0),
+        // A catch with no count is stored as null and counted as one fish
+        // here, where fish are added up.
+        totalFish: (result.catches || []).reduce((sum, c) => sum + (c.count ?? 1), 0),
         durationSeconds,
         locationName: result.location_name || null,
         conditions: result.conditions || null,
         catches: result.catches || [],
+        sessionId: result.session_id,
+        pinLinks: result.pin_links || [],
       });
       setSessionNotes('');
       setExifData(null);
@@ -1038,6 +1048,13 @@ export default function LogTrip({ onNavigate }) {
       {status === 'success' && (
         <>
           {sessionSummary && <SessionSummaryCard summary={sessionSummary} />}
+          {sessionSummary && (
+            <TripPinsCard
+              key={sessionSummary.sessionId}
+              sessionId={sessionSummary.sessionId}
+              initialLinks={sessionSummary.pinLinks}
+            />
+          )}
           {pendingCatches.map(p => (
             <SpeciesConfirmCard key={p.catch_id} pending={p} onConfirmed={handleCatchConfirmed} />
           ))}
