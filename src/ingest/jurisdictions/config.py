@@ -193,7 +193,7 @@ register(JurisdictionConfig(
         "WGS84 in/out (inSR=outSR=4326, no reprojection needed); maxRecordCount 2000, "
         "paginated via resultOffset and the exceededTransferLimit flag; first ~7k segments "
         "verified live across the Bow/Elbow area 2026-10-09. No barrier layer — "
-        "barrier_count is always 0 for CA-AB. ",
+        "barrier_count is always 0 for CA-AB. "
         "REGULATIONS: only 3 Fish Management Zones split into 10 Watershed Units "
         "(ES1-4/PP1-2/NB1-4) — verified all 10 extract correctly against the 2026 edition "
         "(7.5k-31k chars each); URL resolved dynamically via CKAN package_show (picks the "
@@ -204,8 +204,7 @@ register(JurisdictionConfig(
         "codes (mapped to full names); no clean stocking date, only free-text schedule notes "
         "(preserved in stocking_purpose) — see stocking.py. "
         "WATER QUALITY: AEMERA portal is map-based with no public API; "
-        "DataStream (ca_national/) covers some AB watersheds. "
-        "STOCKING: coordinates not included in Alberta data — waterbody name only."
+        "DataStream (ca_national/) covers some AB watersheds."
     ),
 ))
 
