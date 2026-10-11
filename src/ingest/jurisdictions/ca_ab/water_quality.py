@@ -14,6 +14,11 @@ Alternative data sources for Alberta water quality:
   - DataStream (ca_national/datastream_water_quality.py) — covers some AB watersheds
   - CABIN benthic (expanded ca_on/benthic.py) — proxy for habitat quality
 
+State (re-checked 2026-10-09): AEMERA portal is map-only; open.alberta.ca has
+no surface-water chemistry dataset; the federal national surface-water quality
+dataset holds only 13 AB sites, none near the configured AB areas. Remaining a
+stub until a machine-readable provincial source appears.
+
 Table: water_quality_readings (shared schema)
 """
 
@@ -32,6 +37,8 @@ def fetch_water_quality_readings(
         "AB water_quality: no public API available as of 2026 — returning 0 readings. "
         "Portal (map-based, no public API): "
         "https://environment.extranet.gov.ab.ca/apps/WaterQuality/dataportal/ "
-        "Consider DataStream (ca_national/) for lake Winnipeg basin data."
+        "Re-checked 2026-10-09: open.alberta.ca has no surface-water chemistry; the "
+        "federal national dataset has only 13 AB sites, none near the AB areas. "
+        "Consider DataStream (ca_national/) for AB watershed coverage."
     )
     return []
