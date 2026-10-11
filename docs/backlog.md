@@ -74,28 +74,34 @@ Stream network visible as lines.
 Tap any feature → bot synthesis of why it's interesting.
 
 ### Personal map (Google Maps replacement for fishing)
-Pin states: Saved → Fished → Productive
-One tap to save from explore mode.
-Only transitions to Fished/Productive when trip is logged.
-NEVER shared with other users (gatekeep culture is non-negotiable).
+Every pin is the user's own and private by default. Saved pins (never fished)
+and Visited pins (at least one linked trip) both show on the Personal map,
+styled differently. Favourite is a separate flag, not a state. There is no
+Productive state: the pin shows facts (visits, fish logged, species, biggest
+fish, fish per hour, last visit) and never an averaged score.
+Logged stops are not auto-pinned; the app offers "Pin this spot".
+Trips link to a pin automatically only when exactly one pin is within the
+link radius (150 m); otherwise the user picks. Links are tagged confirmed,
+inferred or recalled. "I've fished here before" records are provenance=recalled
+and never count toward statistics or the conditions match.
 
 ### Explore map
 Discovers stretches, anatomy within them.
 Save action adds pin to personal collection.
-Saved spots visible in explore with filter, not on personal map.
+Saved spots appear on the Personal map and as a "Saved by me" badge/filter in Explore.
 
 ### Schema needed
 - fishing_stretches table
 - stretch_segments table (many-to-one OHN → stretch)
 - stretch_anchors table (confluences, dams, access points)
-- personal_pins table (user pins with state)
+- pins, pin_links, pin_recalled_visits, pin_shares tables (phases 1 and 4 of the pins plan)
 
 ### Build plan (4 sessions)
 1. Stretch definition — algorithmic clustering + manual curation ✅ built.
    `data/curation/stretches_ca_on.toml` is the source of truth; `make build-stretches`
    traces it through the OHN network into `fishing_stretches` + `stretch_segments`
    and prints uncovered clustered candidates to paste in. `GET /map/stretches`
-   serves GeoJSON. Ontario only. `personal_pins` is not built.
+   serves GeoJSON. Ontario only.
 2. Anchor extraction — confluences, dams, access points ✅ built.
    `make build-stretches` now also rebuilds `stretch_anchors` (and the full-detail
    `stretch_segment_lines`); `make build-anchors` redoes only that half. Confluences
@@ -104,7 +110,10 @@ Saved spots visible in explore with filter, not on personal map.
    tailwaters are the ~400 m of OHN channel below a dam. `GET
    /map/stretches/{stretch_id}/anchors` serves one stretch as GeoJSON (anchor points +
    segment lines). Coverage numbers and known thin spots: see the PR that built it.
-3. Personal pin system — schema + API + trip log integration
+3. Personal pin system — schema + API + trip log integration ✅ phase 1 built.
+   `pins`, `pin_links` (one row per linked stop, tagged confirmed/inferred, carrying
+   the trip's rating for that pin) and `pin_recalled_visits`; `sessions` gained
+   `rating`, `started_at`, `ended_at`. Constants and labels: `src/services/pins/labels.py`.
 4. React/Lovable UI — two-level map with pin states
 
 ## Social layer (future, NOT on map) 💡

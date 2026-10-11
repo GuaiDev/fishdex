@@ -184,6 +184,18 @@ def _apply_migrations(db: Database) -> None:
     migrate_segment_synthesis_user(db)
     migrate_dismissed_segments_user(db)
     migrate_user_patterns(db)
+    migrate_pins(db)
+
+
+def migrate_pins(db: Database) -> None:
+    """Create the Personal-map pin tables and the trip rating/time columns.
+
+    Idempotent. Nothing is backfilled: no stop is auto-pinned, and trips
+    logged before this have no rating and no start or end time.
+    """
+    from src.storage.pins import ensure_tables
+
+    ensure_tables(db)
 
 
 def migrate_user_patterns(db: Database) -> None:
