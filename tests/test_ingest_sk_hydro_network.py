@@ -87,3 +87,19 @@ def test_service_stores_segments(tmp_path, monkeypatch):
     rows = list(get_db(db_path)["stream_segments"].rows)
     assert {r["jurisdiction"] for r in rows} == {"CA-SK"}
     assert {r["segment_source"] for r in rows} == {"SKHydro"}
+
+
+def test_service_does_not_overwrite_other_province_with_same_raw_id(tmp_path, monkeypatch):
+    db_path = tmp_path / "t.db"
+    db = get_db(db_path)
+    db["stream_segments"].insert(
+        {"ogf_id": 201, "name": "MB creek", "jurisdiction": "CA-MB"}, pk="ogf_id"
+    )
+    with patch(_HTTPX, return_value=_mock_response(_load())), patch(_CACHE, tmp_path):
+        monkeypatch.setattr("src.services.sk_ingest.get_db", lambda: get_db(db_path))
+        ingest_sk_hydro_network(52.13, -106.67, radius_km=50)
+
+    rows = list(get_db(db_path)["stream_segments"].rows)
+    other = [r for r in rows if r["jurisdiction"] == "CA-MB"]
+    assert len(other) == 1 and other[0]["ogf_id"] == 201 and other[0]["name"] == "MB creek"
+    assert len([r for r in rows if r["jurisdiction"] == "CA-SK"]) == 3

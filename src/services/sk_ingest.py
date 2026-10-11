@@ -19,6 +19,8 @@ from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
 
+SK_OGF_ID_OFFSET = 30000000000
+
 
 def ingest_sk_hydro_network(
     lat: float,
@@ -44,7 +46,7 @@ def ingest_sk_hydro_network(
     now = datetime.utcnow().isoformat()
     seg_rows = [
         {
-            "ogf_id": s.ogf_id,
+            "ogf_id": SK_OGF_ID_OFFSET + s.ogf_id,
             "watercourse_type": s.watercourse_type,
             "name": s.name,
             "flow_verified": int(s.flow_verified),
