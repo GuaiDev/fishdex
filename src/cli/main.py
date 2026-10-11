@@ -1517,6 +1517,7 @@ def build_stretches_cmd(
 
     # Replacing stretches cleared their anchors, so this is not optional.
     _print_anchor_report(build_anchors(db, Path(curation), segments))
+    _print_spot_report(_build_spots(db, Path(curation)))
 
     if report.failed:
         raise typer.Exit(1)
@@ -1540,7 +1541,56 @@ def build_anchors_cmd(
 
     from src.services.stretch_anchors import build_anchors
 
-    _print_anchor_report(build_anchors(get_db(), Path(curation)))
+    db = get_db()
+    _print_anchor_report(build_anchors(db, Path(curation)))
+    # Spots are derived from the anchors just rebuilt.
+    _print_spot_report(_build_spots(db, Path(curation)))
+
+
+@app.command(name="build-spots")
+def build_spots_cmd(
+    curation: str = typer.Option(
+        "data/curation/stretches_ca_on.toml",
+        "--curation",
+        help="Curation file the stretches came from.",
+    ),
+) -> None:
+    """Rebuild the explore map's spots from the stored stretch anchors.
+
+    Spots are what the map shows: river mouths, where creeks join, below dams and
+    public fishing spots. No network: it reads the anchors `build-anchors` stored,
+    so run that first. `build-stretches` and `build-anchors` run this at the end.
+    """
+    from pathlib import Path
+
+    _print_spot_report(_build_spots(get_db(), Path(curation)))
+
+
+def _build_spots(db, curation_path):
+    from src.services.spots import build_spots
+
+    return build_spots(db, curation_path)
+
+
+def _print_spot_report(report) -> None:
+    table = Table(title=f"Map spots — {report.jurisdiction}")
+    table.add_column("metric")
+    table.add_column("value", justify="right")
+    table.add_row("anchors read", str(report.anchors_in))
+    table.add_row("spots", str(report.spots_total))
+    for kind, n in sorted(report.by_kind.items()):
+        table.add_row(f"  {kind}", str(n))
+    for tier, n in sorted(report.by_tier.items()):
+        table.add_row(f"  tier {tier}", str(n))
+    for reason, n in sorted(report.held_back.items()):
+        table.add_row(f"[dim]tier 3 (hidden by default): {reason}[/dim]", f"[dim]{n}[/dim]")
+    for reason, n in sorted(report.dropped.items()):
+        table.add_row(f"[dim]not kept: {reason}[/dim]", f"[dim]{n}[/dim]")
+    for reason, n in sorted(report.title_fallbacks.items()):
+        table.add_row(f"[yellow]generic title: {reason}[/yellow]", f"[yellow]{n}[/yellow]")
+    table.add_row("getting-there anchors", str(report.access_anchors))
+    table.add_row("spots with no access nearby", str(report.spots_without_access))
+    console.print(table)
 
 
 def _print_anchor_report(report) -> None:

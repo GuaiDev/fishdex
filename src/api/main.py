@@ -1473,6 +1473,81 @@ def get_map_stretch_anchors(stretch_id: str, user: dict = Depends(get_current_us
     return collection
 
 
+def _parse_spot_filters(
+    bbox: str | None, kind: str | None, tier: int
+) -> tuple[tuple[float, float, float, float] | None, list[str] | None]:
+    from src.models.spot import SpotKind
+
+    box = None
+    if bbox:
+        try:
+            parts = tuple(float(p) for p in bbox.split(","))
+        except ValueError:
+            parts = ()
+        if len(parts) != 4 or not (parts[0] < parts[2] and parts[1] < parts[3]):
+            raise HTTPException(
+                status_code=422, detail="bbox must be min_lon,min_lat,max_lon,max_lat"
+            )
+        box = parts
+    kinds = None
+    if kind:
+        kinds = [k.strip() for k in kind.split(",") if k.strip()]
+        valid = set(SpotKind.__args__)
+        bad = [k for k in kinds if k not in valid]
+        if bad:
+            raise HTTPException(
+                status_code=422, detail=f"unknown kind {bad[0]!r}; one of {sorted(valid)}"
+            )
+    if tier not in (1, 2, 3):
+        raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
+    return box, kinds
+
+
+@app.get("/map/spots/labels")
+def get_map_spot_labels(user: dict = Depends(get_current_user)):
+    """Every user-facing word the spots map shows: chips, one-liners, layer names, and the
+    labelled general-reasoning paragraph per kind. The web app reads this; it hardcodes none."""
+    from src.services.spot_labels import labels_payload
+
+    return labels_payload()
+
+
+@app.get("/map/spots")
+def get_map_spots(
+    bbox: str | None = None,
+    kind: str | None = None,
+    tier: int = 2,
+    jurisdiction: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Spots for the explore map, as GeoJSON points.
+
+    `bbox` is min_lon,min_lat,max_lon,max_lat. `kind` is one or more comma-separated
+    kinds (river_mouth, creek_junction, below_dam, public_fishing, quiet_water).
+    `tier` is the highest tier to include, cumulative: 1 headline spots only, 2 adds
+    the normal ones (default), 3 everything. Built by `make build-spots` (and at the
+    end of `make build-anchors`); an empty collection means it has not been run.
+    """
+    from src.services.spots import spots_geojson
+    from src.storage.database import get_db
+
+    box, kinds = _parse_spot_filters(bbox, kind, tier)
+    return spots_geojson(get_db(), box, kinds, tier, jurisdiction)
+
+
+@app.get("/map/spots/{spot_id}")
+def get_map_spot(spot_id: str, user: dict = Depends(get_current_user)):
+    """One spot in full: title, structure facts, separate signals, nearby parking and
+    bridges, sources, and the other spots on the same river. 404 for an unknown id."""
+    from src.services.spots import get_spot_detail
+    from src.storage.database import get_db
+
+    detail = get_spot_detail(get_db(), spot_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"No spot with id {spot_id!r}")
+    return detail
+
+
 @app.get("/map/my-stops")
 def get_my_stops(user: dict = Depends(get_current_user)):
     """Return all of the user's logged stops with coordinates for personal map mode."""

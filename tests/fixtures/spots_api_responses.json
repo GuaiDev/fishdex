@@ -1,0 +1,791 @@
+{
+  "requests": [
+    {
+      "request": "GET /map/spots/labels",
+      "note": "every user-facing string; the app hardcodes none",
+      "status": 200,
+      "response": {
+        "kinds": [
+          {
+            "kind": "river_mouth",
+            "chip": "River mouths",
+            "one_liner": "Where a river runs out into a lake.",
+            "distinct": false,
+            "why_fish_gather": {
+              "text": "Fish that live in the lake pass through here to feed or to run upstream. The river also carries food out into open water.",
+              "label": "General reasoning, not a record about this spot",
+              "provenance": "inference"
+            }
+          },
+          {
+            "kind": "creek_junction",
+            "chip": "Where creeks join",
+            "one_liner": "Two streams meeting. Different temperature, speed and food mix at the join.",
+            "distinct": false,
+            "why_fish_gather": {
+              "text": "Two flows mixing makes a seam between fast and slow water, which fish use for shelter with food drifting past. A creek that runs cooler than the river can also give fish a place to ease out of warm water.",
+              "label": "General reasoning, not a record about this spot",
+              "provenance": "inference"
+            }
+          },
+          {
+            "kind": "below_dam",
+            "chip": "Below dams",
+            "one_liner": "The water just downstream of a dam or weir.",
+            "distinct": false,
+            "why_fish_gather": {
+              "text": "A dam or weir blocks fish from moving further upstream, so they gather in the water just below it. That water is churned up and rich in oxygen.",
+              "label": "General reasoning, not a record about this spot",
+              "provenance": "inference"
+            }
+          },
+          {
+            "kind": "public_fishing",
+            "chip": "Public fishing spots",
+            "one_liner": "Places that volunteer mappers have marked as set aside for fishing.",
+            "distinct": false,
+            "why_fish_gather": {
+              "text": "Someone has mapped this as a place to fish, usually because the water is easy and allowed to reach. That is about access, so it says nothing by itself about what is swimming there.",
+              "label": "General reasoning, not a record about this spot",
+              "provenance": "inference"
+            }
+          },
+          {
+            "kind": "quiet_water",
+            "chip": "Quiet water",
+            "one_liner": "Reaches with few public observation records, which may mean few anglers or just few observers.",
+            "distinct": true,
+            "why_fish_gather": {
+              "text": "These reaches have few public observation records. That can mean fewer anglers, few observers or hard access, and it never tells you whether fish are there.",
+              "label": "General reasoning, not a record about this spot",
+              "provenance": "inference"
+            }
+          }
+        ],
+        "river_mouth_subline": "Where a river meets a lake",
+        "layers": {
+          "getting_there": {
+            "label": "Getting there",
+            "kinds": [
+              "parking",
+              "trail_head",
+              "boat_launch"
+            ],
+            "default_on": true,
+            "note": "Mapped by OpenStreetMap volunteers; not checked on the ground."
+          },
+          "bridges": {
+            "label": "Bridges",
+            "kinds": [
+              "road_crossing"
+            ],
+            "default_on": false,
+            "note": "Public road crossings. A way to reach small water, not a place to fish."
+          }
+        },
+        "access_labels": {
+          "parking": "Parking",
+          "trail_head": "Trailhead",
+          "boat_launch": "Boat launch",
+          "road_crossing": "Road crossing"
+        }
+      }
+    },
+    {
+      "request": "GET /map/spots?bbox=-80.40,43.17,-80.30,43.25",
+      "note": "default tier (headline + normal) in a box on the Grand near Paris",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "count": 2,
+          "kind_counts": {
+            "river_mouth": 0,
+            "creek_junction": 1,
+            "below_dam": 1,
+            "public_fishing": 0,
+            "quiet_water": 0
+          },
+          "max_tier": 2
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "creek_junction:n8038226_4319286",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.38226,
+                43.19286
+              ]
+            },
+            "properties": {
+              "spot_id": "creek_junction:n8038226_4319286",
+              "kind": "creek_junction",
+              "title": "Where the Nith River joins the Grand River",
+              "subtitle": "Grand River · Cambridge to Paris",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "grand-cambridge-paris",
+              "water_name": "Cambridge to Paris",
+              "signals": {
+                "named": true,
+                "nearest_bridge_m": 187,
+                "nearest_parking_m": 138,
+                "size_class": "large"
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "below_dam:n8038314_4319587",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.38314,
+                43.195868
+              ]
+            },
+            "properties": {
+              "spot_id": "below_dam:n8038314_4319587",
+              "kind": "below_dam",
+              "title": "Below the Paris Dam",
+              "subtitle": "Grand River · Cambridge to Paris",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "grand-cambridge-paris",
+              "water_name": "Cambridge to Paris",
+              "signals": {
+                "named": true,
+                "nearest_bridge_m": 171,
+                "nearest_parking_m": 150
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/spots?bbox=-79.75,43.45,-79.55,43.62&kind=river_mouth,creek_junction&tier=1",
+      "note": "kind and tier filters: headline mouths and junctions around Port Credit",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "count": 4,
+          "kind_counts": {
+            "river_mouth": 1,
+            "creek_junction": 3,
+            "below_dam": 0,
+            "public_fishing": 0,
+            "quiet_water": 0
+          },
+          "max_tier": 1
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "river_mouth:n7957731_4354567",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.57731,
+                43.54567
+              ]
+            },
+            "properties": {
+              "spot_id": "river_mouth:n7957731_4354567",
+              "kind": "river_mouth",
+              "title": "Where the Credit River meets Lake Ontario",
+              "subtitle": "Credit River · Lower Credit — Streetsville to Port Credit",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "credit-streetsville-port-credit",
+              "water_name": "Lower Credit — Streetsville to Port Credit",
+              "signals": {
+                "named": true
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "creek_junction:n7966741_4355566",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.66741,
+                43.55566
+              ]
+            },
+            "properties": {
+              "spot_id": "creek_junction:n7966741_4355566",
+              "kind": "creek_junction",
+              "title": "Where Mullet Creek joins the Credit River",
+              "subtitle": "Credit River · Lower Credit — Streetsville to Port Credit",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "credit-streetsville-port-credit",
+              "water_name": "Lower Credit — Streetsville to Port Credit",
+              "signals": {
+                "named": true,
+                "size_class": "medium"
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "creek_junction:n7969691_4345188",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.69691,
+                43.45188
+              ]
+            },
+            "properties": {
+              "spot_id": "creek_junction:n7969691_4345188",
+              "kind": "creek_junction",
+              "title": "Where Morrison Creek joins Sixteen Mile Creek",
+              "subtitle": "Sixteen Mile Creek — Milton to Oakville Harbour",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "sixteen-mile-milton-oakville",
+              "water_name": "Sixteen Mile Creek — Milton to Oakville Harbour",
+              "signals": {
+                "named": true,
+                "size_class": "medium"
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "creek_junction:n7971768_4360952",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.71768,
+                43.60952
+              ]
+            },
+            "properties": {
+              "spot_id": "creek_junction:n7971768_4360952",
+              "kind": "creek_junction",
+              "title": "Where Fletchers Creek joins the Credit River",
+              "subtitle": "Credit River · Middle Credit — Glen Williams to Streetsville",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "credit-glen-williams-streetsville",
+              "water_name": "Middle Credit — Glen Williams to Streetsville",
+              "signals": {
+                "named": true,
+                "size_class": "medium"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/spots?bbox=-79.85,42.80,-79.55,42.95&kind=below_dam,public_fishing&tier=3",
+      "note": "dams and OSM fishing spots near Dunnville, including unnamed ones",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "count": 2,
+          "kind_counts": {
+            "river_mouth": 1,
+            "creek_junction": 14,
+            "below_dam": 1,
+            "public_fishing": 1,
+            "quiet_water": 0
+          },
+          "max_tier": 3
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "public_fishing:n7957862_4285528",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.5786218,
+                42.8552838
+              ]
+            },
+            "properties": {
+              "spot_id": "public_fishing:n7957862_4285528",
+              "kind": "public_fishing",
+              "title": "Public fishing spot on the Grand River",
+              "subtitle": "Grand River · Dunnville to Port Maitland",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "grand-dunnville-port-maitland",
+              "water_name": "Dunnville to Port Maitland",
+              "signals": {
+                "named": false,
+                "nearest_launch_m": 210,
+                "nearest_parking_m": 194
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "below_dam:n7961843_4289936",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.618429,
+                42.899355
+              ]
+            },
+            "properties": {
+              "spot_id": "below_dam:n7961843_4289936",
+              "kind": "below_dam",
+              "title": "Below the weir on the Grand River",
+              "subtitle": "Grand River · Dunnville to Port Maitland",
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": "grand-dunnville-port-maitland",
+              "water_name": "Dunnville to Port Maitland",
+              "signals": {
+                "named": false,
+                "nearest_bridge_m": 153,
+                "nearest_launch_m": 174,
+                "nearest_parking_m": 191
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/spots/below_dam:n8038314_4319587",
+      "note": "one below_dam spot in full",
+      "status": 200,
+      "response": {
+        "spot_id": "below_dam:n8038314_4319587",
+        "kind": "below_dam",
+        "jurisdiction": "CA-ON",
+        "lat": 43.195868,
+        "lng": -80.38314,
+        "water_id": "grand-cambridge-paris",
+        "water_name": "Cambridge to Paris",
+        "title": "Below the Paris Dam",
+        "subtitle": "Grand River · Cambridge to Paris",
+        "tier": 1,
+        "structure_type": "dam",
+        "structure_attrs": {
+          "dam_kind": "dam",
+          "reach_m": 410,
+          "tailwater_verified": true
+        },
+        "signals": {
+          "named": true,
+          "nearest_bridge_m": 171,
+          "nearest_parking_m": 150
+        },
+        "getting_there": [
+          {
+            "kind": "parking",
+            "name": null,
+            "lat": 43.196501,
+            "lng": -80.3815019,
+            "distance_m": 150,
+            "source_ref": "way/533807418",
+            "attributes": {}
+          },
+          {
+            "kind": "parking",
+            "name": null,
+            "lat": 43.1936867,
+            "lng": -80.3843379,
+            "distance_m": 262,
+            "source_ref": "way/475398031",
+            "attributes": {
+              "access": "yes",
+              "fee": "no",
+              "surface": "asphalt"
+            }
+          }
+        ],
+        "bridges": [
+          {
+            "kind": "road_crossing",
+            "name": "William Street",
+            "lat": 43.194342,
+            "lng": -80.383334,
+            "distance_m": 171,
+            "source_ref": "way/40790441",
+            "attributes": {
+              "ref": "CR 50"
+            }
+          }
+        ],
+        "sources": [
+          {
+            "kind": "osm",
+            "ref": "way/248706708",
+            "anchor_ids": [
+              "grand-cambridge-paris:tailwater:osm-way-248706708"
+            ],
+            "built_at": "2026-10-11T17:21:53+00:00"
+          },
+          {
+            "kind": "osm",
+            "ref": "way/248706708",
+            "anchor_ids": [
+              "grand-cambridge-paris:dam:osm-way-248706708"
+            ],
+            "built_at": "2026-10-11T17:21:53+00:00"
+          }
+        ],
+        "built_at": "2026-10-11T17:21:53+00:00",
+        "more_on_this_water": [
+          {
+            "spot_id": "creek_junction:n8038226_4319286",
+            "kind": "creek_junction",
+            "title": "Where the Nith River joins the Grand River",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n8031055_4330884",
+            "kind": "creek_junction",
+            "title": "Where Alder Creek joins the Grand River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n8031731_4334263",
+            "kind": "creek_junction",
+            "title": "Where Moffatt's Creek joins the Grand River",
+            "tier": 2
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/spots/creek_junction:n8038226_4319286",
+      "note": "one creek_junction spot in full",
+      "status": 200,
+      "response": {
+        "spot_id": "creek_junction:n8038226_4319286",
+        "kind": "creek_junction",
+        "jurisdiction": "CA-ON",
+        "lat": 43.19286,
+        "lng": -80.38226,
+        "water_id": "grand-cambridge-paris",
+        "water_name": "Cambridge to Paris",
+        "title": "Where the Nith River joins the Grand River",
+        "subtitle": "Grand River · Cambridge to Paris",
+        "tier": 1,
+        "structure_type": "confluence",
+        "structure_attrs": {
+          "also_on_water_ids": [
+            "nith-ayr-paris"
+          ],
+          "joining_ogf_ids": [
+            127449221
+          ],
+          "joining_upstream_km": 1377.5,
+          "stretch_flows_on": true,
+          "stretch_upstream_km": 4298.4,
+          "tributary_name_from_water_id": "nith-ayr-paris"
+        },
+        "signals": {
+          "named": true,
+          "nearest_bridge_m": 187,
+          "nearest_parking_m": 138,
+          "size_class": "large"
+        },
+        "getting_there": [
+          {
+            "kind": "parking",
+            "name": null,
+            "lat": 43.1930835,
+            "lng": -80.3839275,
+            "distance_m": 138,
+            "source_ref": "way/475398032",
+            "attributes": {
+              "access": "yes",
+              "fee": "no",
+              "surface": "asphalt"
+            }
+          },
+          {
+            "kind": "parking",
+            "name": null,
+            "lat": 43.1921315,
+            "lng": -80.3837112,
+            "distance_m": 143,
+            "source_ref": "way/687309977",
+            "attributes": {}
+          }
+        ],
+        "bridges": [
+          {
+            "kind": "road_crossing",
+            "name": "William Street",
+            "lat": 43.194342,
+            "lng": -80.383334,
+            "distance_m": 187,
+            "source_ref": "way/40790441",
+            "attributes": {
+              "ref": "CR 50"
+            }
+          },
+          {
+            "kind": "road_crossing",
+            "name": "Dundas Street",
+            "lat": 43.189487,
+            "lng": -80.374248,
+            "distance_m": 751,
+            "source_ref": "way/25388237",
+            "attributes": {
+              "ref": "CH 2",
+              "surface": "asphalt"
+            }
+          }
+        ],
+        "sources": [
+          {
+            "kind": "ohn_topology",
+            "ref": "ogf:127449216,127449221,127449252",
+            "anchor_ids": [
+              "grand-cambridge-paris:confluence:n8038226_4319286"
+            ],
+            "built_at": "2026-10-11T17:21:53+00:00"
+          },
+          {
+            "kind": "ohn_topology",
+            "ref": "ogf:127449221,127449252",
+            "anchor_ids": [
+              "nith-ayr-paris:confluence:n8038226_4319286"
+            ],
+            "built_at": "2026-10-11T17:21:53+00:00"
+          }
+        ],
+        "built_at": "2026-10-11T17:21:53+00:00",
+        "more_on_this_water": [
+          {
+            "spot_id": "below_dam:n8038314_4319587",
+            "kind": "below_dam",
+            "title": "Below the Paris Dam",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n8031055_4330884",
+            "kind": "creek_junction",
+            "title": "Where Alder Creek joins the Grand River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n8031731_4334263",
+            "kind": "creek_junction",
+            "title": "Where Moffatt's Creek joins the Grand River",
+            "tier": 2
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/spots/river_mouth:n7957731_4354567",
+      "note": "one river_mouth spot in full",
+      "status": 200,
+      "response": {
+        "spot_id": "river_mouth:n7957731_4354567",
+        "kind": "river_mouth",
+        "jurisdiction": "CA-ON",
+        "lat": 43.54567,
+        "lng": -79.57731,
+        "water_id": "credit-streetsville-port-credit",
+        "water_name": "Lower Credit — Streetsville to Port Credit",
+        "title": "Where the Credit River meets Lake Ontario",
+        "subtitle": "Credit River · Lower Credit — Streetsville to Port Credit",
+        "tier": 1,
+        "structure_type": "lake_mouth",
+        "structure_attrs": {
+          "lake": "Lake Ontario",
+          "shore_ogf_ids": [
+            214624516,
+            214624565
+          ]
+        },
+        "signals": {
+          "named": true
+        },
+        "getting_there": [],
+        "bridges": [],
+        "sources": [
+          {
+            "kind": "ohn_topology",
+            "ref": "ogf:214624516,214624565,214624585",
+            "anchor_ids": [
+              "credit-streetsville-port-credit:lake_mouth:n7957731_4354567"
+            ],
+            "built_at": "2026-10-11T17:21:53+00:00"
+          }
+        ],
+        "built_at": "2026-10-11T17:21:53+00:00",
+        "more_on_this_water": [
+          {
+            "spot_id": "creek_junction:n7966741_4355566",
+            "kind": "creek_junction",
+            "title": "Where Mullet Creek joins the Credit River",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n7959213_4355165",
+            "kind": "creek_junction",
+            "title": "Where Mary Fix Creek joins the Credit River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n7965757_4354286",
+            "kind": "creek_junction",
+            "title": "Where Sawmill Creek joins the Credit River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n7969383_4357433",
+            "kind": "creek_junction",
+            "title": "Where Carolyn Creek joins the Credit River",
+            "tier": 2
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/spots/public_fishing:n7957862_4285528",
+      "note": "one public_fishing spot in full",
+      "status": 200,
+      "response": {
+        "spot_id": "public_fishing:n7957862_4285528",
+        "kind": "public_fishing",
+        "jurisdiction": "CA-ON",
+        "lat": 42.8552838,
+        "lng": -79.5786218,
+        "water_id": "grand-dunnville-port-maitland",
+        "water_name": "Dunnville to Port Maitland",
+        "title": "Public fishing spot on the Grand River",
+        "subtitle": "Grand River · Dunnville to Port Maitland",
+        "tier": 1,
+        "structure_type": "fishing_spot",
+        "structure_attrs": {
+          "access": "yes"
+        },
+        "signals": {
+          "named": false,
+          "nearest_launch_m": 210,
+          "nearest_parking_m": 194
+        },
+        "getting_there": [
+          {
+            "kind": "parking",
+            "name": null,
+            "lat": 42.8570258,
+            "lng": -79.5787149,
+            "distance_m": 194,
+            "source_ref": "way/724608018",
+            "attributes": {}
+          },
+          {
+            "kind": "boat_launch",
+            "name": null,
+            "lat": 42.8571517,
+            "lng": -79.5782571,
+            "distance_m": 210,
+            "source_ref": "node/6762811051",
+            "attributes": {
+              "fee": "no",
+              "surface": "concrete"
+            }
+          },
+          {
+            "kind": "parking",
+            "name": null,
+            "lat": 42.8605048,
+            "lng": -79.5740431,
+            "distance_m": 691,
+            "source_ref": "node/9937723821",
+            "attributes": {}
+          },
+          {
+            "kind": "boat_launch",
+            "name": null,
+            "lat": 42.8611873,
+            "lng": -79.5740959,
+            "distance_m": 754,
+            "source_ref": "node/9937723822",
+            "attributes": {}
+          }
+        ],
+        "bridges": [],
+        "sources": [
+          {
+            "kind": "osm",
+            "ref": "node/6762811052",
+            "anchor_ids": [
+              "grand-dunnville-port-maitland:fishing_spot:osm-node-6762811052"
+            ],
+            "built_at": "2026-10-11T17:21:53+00:00"
+          }
+        ],
+        "built_at": "2026-10-11T17:21:53+00:00",
+        "more_on_this_water": [
+          {
+            "spot_id": "river_mouth:n7957763_4284817",
+            "kind": "river_mouth",
+            "title": "Where the Grand River flows into the lake",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n7956672_4287762",
+            "kind": "creek_junction",
+            "title": "Where Broad Creek joins the Grand River",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n7957212_4288203",
+            "kind": "creek_junction",
+            "title": "Where Maple Creek joins the Grand River",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n7963464_4290332",
+            "kind": "creek_junction",
+            "title": "Where the Grand River joins the Grand River",
+            "tier": 2
+          },
+          {
+            "spot_id": "below_dam:n7961843_4289936",
+            "kind": "below_dam",
+            "title": "Below the weir on the Grand River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n7957508_4286137",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Grand River",
+            "tier": 3
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/spots?kind=lake",
+      "note": "an unknown kind is a 422",
+      "status": 422,
+      "response": {
+        "detail": "unknown kind 'lake'; one of ['below_dam', 'creek_junction', 'public_fishing', 'quiet_water', 'river_mouth']"
+      }
+    },
+    {
+      "request": "GET /map/spots/creek_junction:n0_0",
+      "note": "an unknown spot id is a 404",
+      "status": 404,
+      "response": {
+        "detail": "No spot with id 'creek_junction:n0_0'"
+      }
+    }
+  ]
+}

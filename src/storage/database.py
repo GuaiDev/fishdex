@@ -108,6 +108,7 @@ def _ensure_fishing_stretches(db: Database) -> None:
         "CREATE INDEX IF NOT EXISTS idx_stretch_segments_stretch ON stretch_segments(stretch_id)"
     )
     _ensure_stretch_anchors(db)
+    _ensure_spots(db)
     db.conn.commit()
 
 
@@ -152,6 +153,40 @@ def _ensure_stretch_anchors(db: Database) -> None:
         "CREATE INDEX IF NOT EXISTS idx_stretch_segment_lines_stretch "
         "ON stretch_segment_lines(stretch_id)"
     )
+
+
+def _ensure_spots(db: Database) -> None:
+    """Create the explore map's spots table. Idempotent.
+
+    Spots are derived from stretch_anchors and rebuilt wholesale, so there is no
+    foreign key: a spot's water_id is context, and its id is built from
+    coordinates so it survives a stretch being renamed or rebuilt. The anchors it
+    was merged from are named in sources_json.
+    """
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS spots (
+            spot_id              TEXT PRIMARY KEY,
+            kind                 TEXT NOT NULL,
+            jurisdiction         TEXT NOT NULL,
+            lat                  REAL NOT NULL,
+            lng                  REAL NOT NULL,
+            water_id             TEXT,
+            water_name           TEXT,
+            title                TEXT NOT NULL,
+            subtitle             TEXT,
+            tier                 INTEGER NOT NULL,
+            structure_type       TEXT NOT NULL,
+            structure_attrs_json TEXT NOT NULL DEFAULT '{}',
+            signals_json         TEXT NOT NULL DEFAULT '{}',
+            getting_there_json   TEXT NOT NULL DEFAULT '[]',
+            bridges_json         TEXT NOT NULL DEFAULT '[]',
+            sources_json         TEXT NOT NULL DEFAULT '[]',
+            built_at             TEXT NOT NULL
+        )
+    """)
+    db.execute("CREATE INDEX IF NOT EXISTS idx_spots_jurisdiction ON spots(jurisdiction, kind)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_spots_position ON spots(lat, lng)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_spots_water ON spots(water_id)")
 
 
 def _apply_migrations(db: Database) -> None:
