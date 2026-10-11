@@ -20,9 +20,7 @@ def test_committed_area_list_loads_and_matches_the_old_workflow():
     areas = load_areas(DEFAULT_AREAS_PATH)
     assert len(areas) == 25
     assert sum(len(a.sources) for a in areas) == 44
-=======
-    assert sum(len(a.sources) for a in areas) == 42
->>>>>>> origin/master
+
     assert len({a.label for a in areas}) == 25
     by_label = {a.label: a for a in areas}
     bronte = by_label["Bronte Creek Oakville"]
@@ -38,10 +36,9 @@ def test_committed_area_list_loads_and_matches_the_old_workflow():
     assert IngestSource.AB in by_label["Bow River Calgary"].sources
     assert IngestSource.AB in by_label["North Saskatchewan River Edmonton"].sources
     assert IngestSource.AB in by_label["Oldman River Lethbridge"].sources
-=======
     assert IngestSource.MB in by_label["Red River Winnipeg"].sources
     assert IngestSource.SK in by_label["South Saskatchewan River Saskatoon"].sources
->>>>>>> origin/master
+
 
 
 def test_load_areas_rejects_a_malformed_area(tmp_path):
