@@ -128,6 +128,9 @@ make build-stretches
 # Rebuild only the anchors, e.g. to pick up fresh OpenStreetMap data
 make build-anchors
 
+# Rebuild the plain-language spots from the stored anchors (no network; see docs/spots-api.md)
+make build-spots
+
 # Run tests
 make test
 
