@@ -256,6 +256,74 @@ def test_a_river_that_simply_continues_into_big_water_is_not_a_mouth(db, stretch
     assert not by(db, "test-lower", "lake_mouth")
 
 
+# ── curated lake mouths ───────────────────────────────────────────────────────
+
+
+def curated_toml(body):
+    """HEADER plus a full test-lower entry carrying the given lake/mouth lines."""
+    return (
+        HEADER
+        + f"""
+[[stretch]]
+id = "test-lower"
+name = "Lower"
+river = "Test River"
+{body}
+[[stretch.reach]]
+from = {{ lat = 43.045, lon = -80.0 }}
+to = {{ lat = 43.005, lon = -80.0 }}
+"""
+    )
+
+
+def test_a_curated_mouth_is_used_and_the_topology_duplicate_is_suppressed(db, stretches):
+    stretches.write_text(
+        curated_toml(
+            'lake = "Lake Ontario"\nmouth = { lat = 43.0, lon = -80.0, lake = "Lake Ontario" }'
+        )
+    )
+    report = build(db, stretches)
+    (m,) = by(db, "test-lower", "lake_mouth")
+    assert (m.lat, m.lon) == (43.0, LON)
+    assert m.name == "Lake Ontario"
+    assert m.source == "curated" and m.source_ref == "curation:test-lower"
+    assert m.snap_distance_m == pytest.approx(0, abs=10)
+    assert report.dropped["lake_mouth_suppressed_by_curated"] == 1
+    assert report.by_type["lake_mouth"] == 1  # the topology copy is not doubled
+
+
+def test_a_curated_mouth_covers_a_lake_the_topology_cannot_see(db, stretches):
+    """Inland lakes have no Great Lakes shore line; the curated point is the mouth."""
+    stretches.write_text(curated_toml('mouth = { lat = 43.0, lon = -80.0, lake = "Rice Lake" }'))
+    segs = [s for s in network() if s.ogf_id not in (990, 991)]
+    build(db, stretches, segments=segs)
+    (m,) = by(db, "test-lower", "lake_mouth")
+    assert m.source == "curated" and m.name == "Rice Lake"
+    assert m.ogf_id == 110  # r10 runs (LON, 43.01) -> (LON, 43.0)
+    assert m.snap_distance_m == pytest.approx(0, abs=10)
+
+
+def test_the_lake_key_names_an_auto_detected_mouth(db, stretches):
+    stretches.write_text(curated_toml('lake = "Lake Ontario"'))
+    build(db, stretches)
+    (m,) = by(db, "test-lower", "lake_mouth")
+    assert m.name == "Lake Ontario"
+    assert m.source == "ohn_topology" and m.source_ref.startswith("ogf:")
+
+
+def test_a_curated_mouth_only_a_few_hundred_metres_away_still_suppresses_the_auto_one(
+    db, stretches
+):
+    """The whole point of the file's mouth is to pin its position; the topology
+    mouth near it is the same mouth, and 300 m of tolerance absorbs the snap
+    difference between the trace's end and where the curator put the point."""
+    stretches.write_text(curated_toml('mouth = { lat = 43.0005, lon = -80.0, lake = "Rice Lake" }'))
+    report = build(db, stretches)
+    (m,) = by(db, "test-lower", "lake_mouth")
+    assert (m.lat, m.lon) == (43.0005, LON)
+    assert report.dropped["lake_mouth_suppressed_by_curated"] == 1
+
+
 # ── OSM anchors ───────────────────────────────────────────────────────────────
 
 
