@@ -183,8 +183,6 @@ def _paginate(url: str, base_params: dict) -> list[dict]:
     while True:
         params = {**base_params, "resultOffset": offset, "resultRecordCount": _PAGE_SIZE}
         data = _cached_get(url, params)
-        if "error" in data:
-            raise RuntimeError(f"SK stocking: ArcGIS error at offset={offset}: {data['error']}")
         page = data.get("features", [])
         features.extend(page)
         if len(page) < _PAGE_SIZE:
@@ -214,6 +212,8 @@ def _cached_get(url: str, params: dict) -> dict:
     )
     response.raise_for_status()
     data = response.json()
+    if "error" in data:
+        raise RuntimeError(f"SK stocking: ArcGIS error: {data['error']}")
     cache_file.write_text(json.dumps(data))
     return data
 
