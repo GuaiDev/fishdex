@@ -12,10 +12,10 @@ from src.services.area_ingest import DEFAULT_AREAS_PATH, load_areas
 
 
 def test_committed_area_list_loads_and_matches_the_old_workflow():
-    """The 33 curl steps of the retired GitHub Action became 25 areas."""
+    """The 33 curl steps of the retired GitHub Action became 25 areas (+3 QC adapter runs)."""
     areas = load_areas(DEFAULT_AREAS_PATH)
     assert len(areas) == 25
-    assert sum(len(a.sources) for a in areas) == 33
+    assert sum(len(a.sources) for a in areas) == 36
     assert len({a.label for a in areas}) == 25
     by_label = {a.label: a for a in areas}
     bronte = by_label["Bronte Creek Oakville"]
