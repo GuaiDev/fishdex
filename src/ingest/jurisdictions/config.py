@@ -254,16 +254,40 @@ register(JurisdictionConfig(
         CronArea("Assiniboine River",       50.07,  -99.95,  40),
     ],
     data_sources={
-        "hydro_network":     False,  # no public WFS found
-        "fish_observations": False,  # MB Wildlife Atlas not publicly accessible
-        "water_quality":     False,  # DataStream covers some MB watersheds (ca_national/)
-        "stocking":          False,  # not publicly available
+        "hydro_network":     True,   # WaLLAS Reference "Watercourses (NTS 1:20,000)"
+        "fish_observations": False,  # no provincial fish-observation layer (see notes)
+        "water_quality":     False,  # beach monitoring only; DataStream covers Lake Winnipeg
+        "stocking":          True,   # Manitoba Waterbody Stocking Records (ArcGIS)
         "regulations":       False,  # not yet built
         "benthic":           True,   # CABIN (federal; all provinces)
     },
+    api_endpoints={
+        "hydro_network": (
+            "https://web43.gov.mb.ca/arcgis/rest/services/WALLAS/"
+            "WaLLAS_REFERENCE/MapServer/18"
+        ),
+        "stocking": (
+            "https://services.arcgis.com/mMUesHYPkXjaFGfS/arcgis/rest/services/"
+            "Manitoba_Waterbody_Stocking_Records/FeatureServer/0"
+        ),
+    },
     notes=(
-        "Global sources (iNat, GBIF, WSC, OSM, eBird) cover Manitoba adequately. "
-        "DataStream water quality covers Lake Winnipeg basin — use ca_national/ adapter."
+        "Global sources (iNat, GBIF, WSC, OSM, eBird) cover Manitoba. "
+        "HYDRO: WaLLAS Reference 'Watercourses (NTS 1:20,000)' MapServer layer 18 — "
+        "the province's queryable 1:20k network; a mixed feature class, so the adapter "
+        "filters to F_TYPE LIKE 'RIVER/STREAM%' (excludes beaver dams). FEAT_NAME is "
+        "blank for most segments and ORDER_NUM is often 0, so those fields are "
+        "frequently NULL rather than fabricated. web43.gov.mb.ca is an older 10.51 "
+        "ArcGIS Server and is occasionally slow. "
+        "STOCKING: Manitoba Waterbody Stocking Records FeatureServer/0 — one point per "
+        "event with real DATE, species, size and quantity; rows with no coordinates are "
+        "kept with NULL lat/lng. "
+        "WATER QUALITY: provincial stream/lake chemistry is by request; the only public "
+        "layer is beach E. coli/microcystin monitoring (public-health, not habitat "
+        "chemistry) — see ca_mb/water_quality.py. DataStream covers the Lake Winnipeg "
+        "basin (ca_national/). "
+        "FISH OBSERVATIONS: none public — Waterbody Data SPECIES field is empty and the "
+        "Wildlife Atlas is internal."
     ),
 ))
 
@@ -276,16 +300,43 @@ register(JurisdictionConfig(
         CronArea("Churchill River",                    55.75, -108.45, 50),
     ],
     data_sources={
-        "hydro_network":     False,  # no public WFS found
-        "fish_observations": False,  # SK Fish and Wildlife not publicly accessible
-        "water_quality":     False,  # DataStream covers some SK watersheds (ca_national/)
-        "stocking":          False,  # not publicly available
+        "hydro_network":     True,   # SaskGIS Hydrography watercourse layer (MapServer 121)
+        "fish_observations": True,   # SK Fish Atlas (FishAtlasHabiSask + Species Info)
+        "water_quality":     True,   # Long Term Water Chemistry (historical WSA)
+        "stocking":          True,   # SK Fish Stocking History
         "regulations":       False,  # not yet built
         "benthic":           True,   # CABIN (federal; all provinces)
     },
+    api_endpoints={
+        "hydro_network": (
+            "https://gis.saskatchewan.ca/arcgis/rest/services/Hydrography/MapServer/121"
+        ),
+        "fish_observations": (
+            "https://gis.saskatchewan.ca/arcgis/rest/services/Fisheries/FeatureServer/3"
+        ),
+        "stocking": (
+            "https://gis.saskatchewan.ca/arcgis/rest/services/Fisheries/FeatureServer/4"
+        ),
+        "water_quality": (
+            "https://services3.arcgis.com/zcv98lgAl8xQ04cW/arcgis/rest/services/"
+            "LongTermWaterChemistry/FeatureServer/0"
+        ),
+    },
     notes=(
-        "Global sources (iNat, GBIF, WSC, OSM, eBird) cover Saskatchewan adequately. "
-        "DataStream water quality may cover some SK watersheds — use ca_national/ adapter."
+        "Global sources (iNat, GBIF, WSC, OSM, eBird) cover Saskatchewan. "
+        "HYDRO: SaskGIS Hydrography MapServer 121 (NHN-derived watercourse network); "
+        "tiers 107/115/121/123 return the same data. Stream order is not published, so "
+        "stream_order is NULL (use OSM/width for order elsewhere). "
+        "FISH OBSERVATIONS: SK Fish Atlas — FishAtlasHabiSask (FeatureServer/3, no "
+        "geometry) joined to Species Info points (FeatureServer/1) via NRCANCODE→"
+        "LOCATIONID. No observation date exists, so observed_on uses the shared "
+        "1900-01-01 sentinel. "
+        "STOCKING: Fish Stocking History (FeatureServer/4, no geometry) joined the same "
+        "way; STOCKING_DATE reaches back before 1970, so epoch values can be negative. "
+        "WATER QUALITY: Long Term Water Chemistry — historical (1920s–1990s) lake/stream "
+        "chemistry; most fields are text with NA/ND/Trace sentinels. No temperature "
+        "column (temp_c NULL); conductivity is µmho/cm == µS/cm; Turbidity is Jackson "
+        "units (JTU ≠ FNU) so turbidity_fnu is left NULL rather than mis-united."
     ),
 ))
 

@@ -12,10 +12,14 @@ from src.services.area_ingest import DEFAULT_AREAS_PATH, load_areas
 
 
 def test_committed_area_list_loads_and_matches_the_old_workflow():
-    """The 33 curl steps of the retired GitHub Action became 25 areas (+3 QC adapter runs)."""
+    """The 33 curl steps of the retired GitHub Action became 25 areas.
+
+    MB and SK areas each gained one province adapter source and three QC areas
+    gained the qc adapter (42 = 33 + 6 + 3).
+    """
     areas = load_areas(DEFAULT_AREAS_PATH)
     assert len(areas) == 25
-    assert sum(len(a.sources) for a in areas) == 36
+    assert sum(len(a.sources) for a in areas) == 42
     assert len({a.label for a in areas}) == 25
     by_label = {a.label: a for a in areas}
     bronte = by_label["Bronte Creek Oakville"]
@@ -27,6 +31,8 @@ def test_committed_area_list_loads_and_matches_the_old_workflow():
     )
     assert by_label["Miramichi River NB"].radius_for(IngestSource.TIDAL) == 100
     assert IngestSource.BC in by_label["Skeena River Terrace"].sources
+    assert IngestSource.MB in by_label["Red River Winnipeg"].sources
+    assert IngestSource.SK in by_label["South Saskatchewan River Saskatoon"].sources
 
 
 def test_load_areas_rejects_a_malformed_area(tmp_path):

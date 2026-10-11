@@ -504,10 +504,28 @@ exists in the source, contrary to what this note used to say.
 Water quality: MELCCFP Réseau-rivières live (see Quebec adapters above).
 Regulations: still a stub, deferred to separate Regpec work.
 
-### Manitoba + Saskatchewan 📋
-3 cron areas each. Global sources only (iNat, GBIF, WSC, OSM).
-DataStream covers some MB/SK watersheds via /ingest/data-national.
-No province-specific adapters with public APIs found as of 2026.
+### Manitoba 🔨 (province adapters added Oct 2026)
+3 cron areas (Red River/Winnipeg, Lake Winnipeg South, Assiniboine).
+Stocking (Manitoba Waterbody Stocking Records, ArcGIS FeatureServer) and the
+WaLLAS "Watercourses (NTS 1:20,000)" stream network (ArcGIS MapServer layer 18)
+are live. WaLLAS is a mixed feature class (it also holds beaver dams), so the
+adapter filters to `F_TYPE LIKE 'RIVER/STREAM%'`; names/orders are usually blank
+in the source.
+Water quality: stubbed — the only public layer is beach E. coli/microcystin
+monitoring (public-health, not habitat chemistry); provincial stream/lake
+chemistry is by request. DataStream covers the Lake Winnipeg basin.
+Fish observations: no public layer (Waterbody Data SPECIES field is empty,
+Wildlife Atlas is internal).
+
+### Saskatchewan 🔨 (province adapters added Oct 2026)
+3 cron areas (South Saskatchewan/Saskatoon, Qu'Appelle, Churchill River).
+Hydro (SaskGIS Hydrography MapServer 121), fish observations (SK Fish Atlas —
+FishAtlasHabiSask joined to Species Info points via NRCANCODE→LOCATIONID),
+stocking (Fish Stocking History, same join), and historical water chemistry
+(Long Term Water Chemistry, 1920s–1990s) are live. The Fish Atlas has no
+observation date; observed_on uses the shared 1900-01-01 sentinel. Stream order
+is not published. Turbidity is Jackson units (JTU ≠ FNU) so turbidity_fnu is
+left NULL.
 
 ### Maritimes (NS, NB, PEI) 📋
 4 cron areas (Miramichi NB, Saint John NB, Annapolis NS, Margaree NS).

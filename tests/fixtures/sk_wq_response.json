@@ -1,0 +1,52 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 8001,
+        "CGNDB_ID": "HAXX",
+        "Geographical_Name": "Lake A",
+        "YYYY_collected": 1965,
+        "MM_collected": 6,
+        "DD_collected": 15,
+        "Latitude_WGS84": 52.13,
+        "Longitude_WGS84": -106.67,
+        "Oxygen_mgL": "8.4",
+        "pH": "7.8",
+        "pH_in_field": "7.6",
+        "Spec_conductivity_micromho_ppm": "420"
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 8002,
+        "CGNDB_ID": "NA",
+        "Geographical_Name": "Lake B",
+        "YYYY_collected": 1972,
+        "MM_collected": 3,
+        "DD_collected": "",
+        "Latitude_WGS84": 52.0,
+        "Longitude_WGS84": -106.5,
+        "Oxygen_mgL": "ND",
+        "pH": "NA",
+        "pH_in_field": "7.1",
+        "Spec_conductivity_micromho_ppm": "Trace"
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 8003,
+        "CGNDB_ID": "HYYY",
+        "Geographical_Name": "Lake C",
+        "YYYY_collected": "NA",
+        "MM_collected": 1,
+        "DD_collected": 1,
+        "Latitude_WGS84": 52.1,
+        "Longitude_WGS84": -106.6,
+        "Oxygen_mgL": "5",
+        "pH": "6.5",
+        "Spec_conductivity_micromho_ppm": "100"
+      }
+    }
+  ],
+  "exceededTransferLimit": false
+}
