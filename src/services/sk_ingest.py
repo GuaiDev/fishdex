@@ -42,9 +42,6 @@ def ingest_sk_hydro_network(
     logger.info("SK hydro: %d segments fetched", len(segments))
 
     now = datetime.utcnow().isoformat()
-    if "stream_segments" in db.table_names():
-        db["stream_segments"].delete_where("jurisdiction = ?", ["CA-SK"])
-
     seg_rows = [
         {
             "ogf_id": s.ogf_id,

@@ -130,11 +130,9 @@ def _fetch_waterbody_points(lat: float, lng: float, radius_km: float) -> dict[st
         "returnGeometry": "true",
         "outSR": "4326",
         "f": "geojson",
-        "resultRecordCount": _PAGE_SIZE,
     }
-    data = _cached_get(_POINTS_URL, params)
     locations: dict[str, dict] = {}
-    for feat in data.get("features", []):
+    for feat in _paginate(_POINTS_URL, params):
         props = feat.get("properties") or {}
         geom = feat.get("geometry") or {}
         code = (props.get("LOCATIONID") or "").strip()
@@ -165,13 +163,24 @@ def _fetch_species_rows(codes: list[str]) -> list[dict]:
         "outFields": "OBJECTID,S_PRIMARY_COMMON_NAME,WATERBODY,NRCANCODE",
         "returnGeometry": "false",
         "f": "json",
-        "resultRecordCount": _PAGE_SIZE,
     }
-    data = _cached_get(_SPECIES_URL, params)
-    if "error" in data:
-        logger.error("SK Fish Atlas: ArcGIS error querying species rows: %s", data["error"])
-        return []
-    return [feat.get("attributes") or {} for feat in data.get("features", [])]
+    return [feat.get("attributes") or {} for feat in _paginate(_SPECIES_URL, params)]
+
+
+def _paginate(url: str, base_params: dict) -> list[dict]:
+    """Page through an ArcGIS query. Raises on any error so a partial read never looks complete."""
+    features: list[dict] = []
+    offset = 0
+    while True:
+        params = {**base_params, "resultOffset": offset, "resultRecordCount": _PAGE_SIZE}
+        data = _cached_get(url, params)
+        if "error" in data:
+            raise RuntimeError(f"SK Fish Atlas: ArcGIS error at offset={offset}: {data['error']}")
+        page = data.get("features", [])
+        features.extend(page)
+        if len(page) < _PAGE_SIZE:
+            return features
+        offset += _PAGE_SIZE
 
 
 # ── HTTP + file cache ──────────────────────────────────────────────────────────

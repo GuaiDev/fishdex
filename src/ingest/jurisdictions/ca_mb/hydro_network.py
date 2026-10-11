@@ -106,14 +106,9 @@ def _query_paginate(url: str, base_params: dict) -> list[dict]:
             "resultOffset": offset,
             "resultRecordCount": _PAGE_SIZE,
         }
-        try:
-            data = _cached_get(url, params)
-        except Exception as exc:
-            logger.error("WaLLAS: ArcGIS request failed at offset=%d: %s", offset, exc)
-            break
+        data = _cached_get(url, params)
         if "error" in data:
-            logger.error("WaLLAS: ArcGIS error at offset=%d: %s", offset, data["error"])
-            break
+            raise RuntimeError(f"WaLLAS: ArcGIS error at offset={offset}: {data['error']}")
         page = data.get("features", [])
         features.extend(page)
         logger.debug("WaLLAS: offset=%d → %d features", offset, len(page))

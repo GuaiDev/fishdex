@@ -42,9 +42,6 @@ def ingest_mb_hydro_network(
     logger.info("WaLLAS: %d segments fetched", len(segments))
 
     now = datetime.utcnow().isoformat()
-    if "stream_segments" in db.table_names():
-        db["stream_segments"].delete_where("jurisdiction = ?", ["CA-MB"])
-
     seg_rows = [
         {
             "ogf_id": s.ogf_id,
