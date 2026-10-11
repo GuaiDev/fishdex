@@ -16,9 +16,10 @@ table (`FishAtlasHabiSask`) with no geometry. Each row carries an `NRCANCODE`
 
 Observations are stored in the shared `observations` table with
 source='SKFishAtlas' and jurisdiction='CA-SK'. The table's OBJECTID (a
-provincial integer, ~6 digits) is used as observation_id — the same
-native-integer convention as FISS; see JURISDICTION_TEMPLATE.md for the
-cross-source collision note.
+provincial integer, ~6 digits) is offset by SK_OBSERVATION_ID_OFFSET to form
+observation_id. BC FISS stores its raw provincial integers in the same
+primary-key column, so an un-offset SK id would silently replace a BC row
+with the same number. The offset sits far above iNaturalist and FISS ids.
 
 The source has no observation date, so observed_on uses the shared
 "unknown date" sentinel (1900-01-01). Waterbody codes beginning "HXX" are the
@@ -49,6 +50,7 @@ _CACHE_TTL_SECONDS = 30 * 86400
 _USER_AGENT = "fishbot/1.0 (personal fishing exploration bot)"
 
 # The source publishes no catch/observation date.
+SK_OBSERVATION_ID_OFFSET = 30_000_000_000
 _UNKNOWN_DATE = date(1900, 1, 1)
 
 logger = logging.getLogger(__name__)
@@ -86,7 +88,7 @@ def fetch_observations(
             seen.add(fid)
             observations.append(
                 Observation(
-                    observation_id=int(fid),
+                    observation_id=SK_OBSERVATION_ID_OFFSET + int(fid),
                     species=species,
                     common_name=species,
                     taxon_id=None,

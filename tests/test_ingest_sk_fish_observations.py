@@ -41,14 +41,20 @@ def test_fetch_returns_observations_and_skips_blank_species(tmp_path):
         observations = fish_observations.fetch_observations(52.13, -106.67, radius_km=50)
 
     assert len(observations) == 3
-    assert {o.observation_id for o in observations} == {9001, 9002, 9003}
+    assert {o.observation_id for o in observations} == {
+        fish_observations.SK_OBSERVATION_ID_OFFSET + i for i in (9001, 9002, 9003)
+    }
 
 
 def test_observation_fields_mapped(tmp_path):
     with patch(_HTTPX, side_effect=_server), patch(_CACHE, tmp_path):
         observations = fish_observations.fetch_observations(52.13, -106.67, radius_km=50)
 
-    obs = next(o for o in observations if o.observation_id == 9001)
+    obs = next(
+        o
+        for o in observations
+        if o.observation_id == fish_observations.SK_OBSERVATION_ID_OFFSET + 9001
+    )
     assert obs.species == "Northern Pike"
     assert obs.lat == 52.13
     assert obs.lng == -106.67
@@ -86,3 +92,21 @@ def test_service_stores_observations(tmp_path, monkeypatch):
     )
     assert {o.source for o in stored} == {"SKFishAtlas"}
     assert {o.jurisdiction for o in stored} == {"CA-SK"}
+
+
+def test_sk_and_bc_rows_with_same_raw_id_both_survive(tmp_path):
+    from src.storage.observations import upsert_observations
+
+    with patch(_HTTPX, side_effect=_server), patch(_CACHE, tmp_path):
+        sk_obs = fish_observations.fetch_observations(52.13, -106.67, radius_km=50)
+    sk = next(o for o in sk_obs if o.species == "Northern Pike")
+    raw_id = sk.observation_id - fish_observations.SK_OBSERVATION_ID_OFFSET
+    bc = sk.model_copy(update={"observation_id": raw_id, "jurisdiction": "CA-BC", "source": "FISS"})
+
+    db = get_db(tmp_path / "t.db")
+    upsert_observations(db, [bc])
+    upsert_observations(db, sk_obs)
+
+    rows = {r["observation_id"]: r["source"] for r in db["observations"].rows}
+    assert rows[raw_id] == "FISS"
+    assert rows[sk.observation_id] == "SKFishAtlas"
