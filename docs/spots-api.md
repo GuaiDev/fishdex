@@ -211,6 +211,8 @@ GeoJSON `FeatureCollection` of points, light enough to load for a whole viewport
 | `kind` | One or more of `river_mouth`, `creek_junction`, `below_dam`, `public_fishing`, `quiet_water`, comma-separated. Omit for all. |
 | `tier` | The highest tier to include, **cumulative**: `1` headline spots only, `2` adds the normal ones (**default**), `3` everything, including junctions of small unnamed creeks that are hidden by default. A sensible mapping is tier 1 at province zoom, 2 at regional zoom, 3 at street zoom. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
+| `species` | Scientific/common name. A spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
+| `near` | `lat,lon` or `lat,lon,radius_km`. Results sorted by distance; radius capped at 200 km. |
 
 `meta.kind_counts` counts the spots in view for **every** kind, ignoring the `kind`
 filter, so the chips can show how many each would add. `meta.count` is how many
@@ -551,6 +553,8 @@ river quietly behind them, and let someone browse by water.
 | `bbox` | `min_lon,min_lat,max_lon,max_lat`. A river or creek is in view when its **line** crosses the box (not merely its overall box, which can cover a whole watershed). A lake is in view when the box of the river mouths that open onto it overlaps. Omit for everywhere. |
 | `type` | One or more of `river`, `creek`, `lake`, `pond`, `great_lake`, comma-separated. Omit for all. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
+| `species` | Scientific/common name. A spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
+| `near` | `lat,lon` or `lat,lon,radius_km`. Results sorted by distance; radius capped at 200 km. |
 
 `meta.type_counts` counts every type in view, ignoring the `type` filter, so a filter row can
 show what each would add. Features come in type order (rivers, creeks, lakes, ponds, Great

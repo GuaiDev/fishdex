@@ -1545,8 +1545,10 @@ def _parse_bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
 
 
 def _parse_spot_filters(
-    bbox: str | None, kind: str | None, tier: int
-) -> tuple[tuple[float, float, float, float] | None, list[str] | None]:
+    bbox: str | None, kind: str | None, tier: int,
+    species: str | None = None,
+    near: str | None = None,
+) -> tuple[tuple[float, float, float, float] | None, list[str] | None, str | None, tuple[float, float, float | None] | None]:
     from src.models.spot import SpotKind
 
     box = _parse_bbox(bbox)
@@ -1561,7 +1563,18 @@ def _parse_spot_filters(
             )
     if tier not in (1, 2, 3):
         raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
-    return box, kinds
+    near_t = None
+    if near:
+        try:
+            parts = tuple(float(p.strip()) for p in near.split(','))
+            if len(parts) != 2 and len(parts) != 3:
+                raise ValueError
+            nlat, nlon = parts[0], parts[1]
+            nr = parts[2] if len(parts) == 3 else None
+            near_t = (nlat, nlon, nr)
+        except Exception:
+            raise HTTPException(status_code=422, detail="near must be lat,lon or lat,lon,radius_km")
+    return box, kinds, species, near_t
 
 
 @app.get("/map/spots/labels")
@@ -1579,6 +1592,8 @@ def get_map_spots(
     kind: str | None = None,
     tier: int = 2,
     jurisdiction: str | None = None,
+    species: str | None = None,
+    near: str | None = None,
     user: dict = Depends(get_current_user),
 ):
     """Spots for the explore map, as GeoJSON points.
@@ -1592,8 +1607,8 @@ def get_map_spots(
     from src.services.spots import spots_geojson
     from src.storage.database import get_db
 
-    box, kinds = _parse_spot_filters(bbox, kind, tier)
-    return spots_geojson(get_db(), box, kinds, tier, jurisdiction)
+    box, kinds, species_f, near_f = _parse_spot_filters(bbox, kind, tier, species, near)
+    return spots_geojson(get_db(), box, kinds, tier, jurisdiction, species=species_f, near=near_f)
 
 
 @app.get("/map/spots/{spot_id}")
@@ -1658,6 +1673,32 @@ def get_map_water_body(water_body_id: str, user: dict = Depends(get_current_user
         raise HTTPException(status_code=404, detail=f"No water body with id {water_body_id!r}")
     return detail
 
+
+
+@app.get("/map/layers/getting-there")
+def get_map_layers_getting_there(
+    bbox: str | None = None,
+    jurisdiction: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    from src.services.spots import getting_there_geojson
+    from src.storage.database import get_db
+
+    box = _parse_bbox(bbox)
+    return getting_there_geojson(get_db(), box, jurisdiction)
+
+
+@app.get("/map/layers/bridges")
+def get_map_layers_bridges(
+    bbox: str | None = None,
+    jurisdiction: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    from src.services.spots import bridges_geojson
+    from src.storage.database import get_db
+
+    box = _parse_bbox(bbox)
+    return bridges_geojson(get_db(), box, jurisdiction)
 
 @app.get("/map/my-stops")
 def get_my_stops(user: dict = Depends(get_current_user)):

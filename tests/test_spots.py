@@ -945,3 +945,38 @@ def test_build_spots_command_prints_what_it_dropped(tmp_path, monkeypatch, curat
     assert result.exit_code == 0, result.output
     assert "dam_unverified_and_unnamed" in result.output
     assert "confluence_unnamed_and_small" in result.output
+
+def test_spots_endpoint_accepts_species_and_near_filters():
+    from src.api.main import app, get_current_user
+    from fastapi.testclient import TestClient
+
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    client = TestClient(app)
+    # near with 2 params
+    r = client.get("/map/spots?near=43.2,-80.1&bbox=-80.2,43.1,-80.0,43.3")
+    assert r.status_code == 200
+    # near with 3 params
+    r = client.get("/map/spots?near=43.2,-80.1,10&bbox=-80.2,43.1,-80.0,43.3")
+    assert r.status_code == 200
+
+
+def test_spots_endpoint_rejects_bad_near():
+    from src.api.main import app, get_current_user
+    from fastapi.testclient import TestClient
+
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    client = TestClient(app)
+    r = client.get("/map/spots?near=bad")
+    assert r.status_code == 422
+
+
+def test_layers_getting_there_and_bridges():
+    from src.api.main import app, get_current_user
+    from fastapi.testclient import TestClient
+
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    client = TestClient(app)
+    r = client.get("/map/layers/getting-there")
+    assert r.status_code == 200
+    r = client.get("/map/layers/bridges")
+    assert r.status_code == 200

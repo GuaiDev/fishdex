@@ -737,12 +737,22 @@ def build_spots(db: Database, curation_path: Path = DEFAULT_CURATION_PATH) -> Sp
 # ── read side ─────────────────────────────────────────────────────────────────
 
 
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return 6371.0 * c
+
+
 def spots_geojson(
     db: Database,
     bbox: tuple[float, float, float, float] | None = None,
     kinds: list[str] | None = None,
     max_tier: int = 2,
     jurisdiction: str | None = None,
+    species: str | None = None,
+    near: tuple[float, float, float | None] | None = None,
 ) -> dict:
     """Spots as a GeoJSON FeatureCollection of points, light enough for a whole map.
 
@@ -755,7 +765,23 @@ def spots_geojson(
     for s in in_view:
         counts[s.kind] += 1
     shown = [s for s in in_view if not kinds or s.kind in kinds]
-    shown.sort(key=lambda s: (s.tier, _KIND_ORDER[s.kind], s.spot_id))
+    if species:
+        species_l = species.strip().lower()
+        # avoid naming matches that reveal listed status - just filter by records presence
+        allowed = set(_species_within_2km(db, species_l)) if species_l else set()
+        shown = [s for s in shown if s.spot_id in allowed] if allowed else []
+    if near:
+        nlat, nlon, nr = near
+        if nr is None:
+            nr = 50.0
+        if nr > 200.0:
+            nr = 200.0  # sensible max
+        shown = sorted(
+            (s for s in shown if _haversine_km(nlat, nlon, s.lat, s.lng) <= nr),
+            key=lambda s: _haversine_km(nlat, nlon, s.lat, s.lng),
+        )
+    else:
+        shown.sort(key=lambda s: (s.tier, _KIND_ORDER[s.kind], s.spot_id))
     return {
         "type": "FeatureCollection",
         "meta": {"count": len(shown), "kind_counts": counts, "max_tier": max_tier},
@@ -811,6 +837,63 @@ def get_spot_detail(db: Database, spot_id: str) -> dict | None:
     }
 
 
+
+def _species_within_2km(db: Database, species_l: str) -> list[str]:
+    """Return spot_ids where the given species has records within 2 km."""
+    from src.storage.observations import query_observations
+    from src.storage.gbif_observations import query_gbif_observations
+    from src.services.context import species as species_ctx
+    from src.services.context import slices
+
+    # check if species is listed (status_known_listed) - if so, return empty
+    try:
+        sc = species_ctx.get_species_context(db, species_l)
+        if sc.status_known_listed:
+            return []
+    except Exception:
+        pass
+
+    spot_ids = []
+    # get all spots and test - but could be many; for now scan in_view of current call is expensive
+    # easier: get all spots, check in batches? or just search near each spot
+    # but keep small: get all spots
+    for spot in list_spots(db, max_tier=3):
+        found = False
+        try:
+            obs, _ = query_observations(db, lat=spot.lat, lng=spot.lng, radius_km=2.0, days_back=3650, species_filter=species_l, limit=5)
+            if obs:
+                found = True
+        except Exception:
+            pass
+        if not found:
+            try:
+                gb = query_gbif_observations(db, lat=spot.lat, lng=spot.lng, radius_km=2.0, species_filter=species_l)
+                if gb:
+                    found = True
+            except Exception:
+                pass
+        if not found:
+            try:
+                deg = 2.0 / 111.0
+                rows = list(db.execute(
+                    "SELECT st.species_caught FROM stops st JOIN sessions s ON st.session_id = s.id "
+                    "WHERE st.lat BETWEEN ? AND ? AND st.lng BETWEEN ? AND ?",
+                    [spot.lat - deg, spot.lat + deg, spot.lng - deg, spot.lng + deg],
+                ).fetchall())
+                for r in rows:
+                    for sp in slices._load_species_list(r[0]) if hasattr(slices, '_load_species_list') else []:
+                        if sp.strip().lower() == species_l:
+                            found = True
+                            break
+                    if found:
+                        break
+            except Exception:
+                pass
+        if found:
+            spot_ids.append(spot.spot_id)
+    return spot_ids
+
+
 def _water_body_ref(db: Database, water_body_id: str | None) -> dict | None:
     """The short form of a water body for a spot card: enough to name it and link to it."""
     wb = get_water_body(db, water_body_id) if water_body_id else None
@@ -823,3 +906,95 @@ def _water_body_ref(db: Database, water_body_id: str | None) -> dict | None:
         "name_source": wb.name_source,
         "type": wb.type,
     }
+
+def species_within_2km_of_spot(db: Database, lat: float, lng: float, species: str) -> bool:
+    """Small helper: does the species have records within 2 km of (lat,lng)?"""
+    from src.storage.observations import query_observations
+    from src.storage.gbif_observations import query_gbif_observations
+    from src.services.context import species as species_ctx
+
+    try:
+        sc = species_ctx.get_species_context(db, species)
+        if sc.status_known_listed:
+            return False
+    except Exception:
+        pass
+    try:
+        obs, _ = query_observations(db, lat=lat, lng=lng, radius_km=2.0, days_back=3650, species_filter=species, limit=1)
+        if obs:
+            return True
+    except Exception:
+        pass
+    try:
+        gb = query_gbif_observations(db, lat=lat, lng=lng, radius_km=2.0, species_filter=species)
+        if gb:
+            return True
+    except Exception:
+        pass
+    try:
+        from src.services.context import slices
+        deg = 2.0 / 111.0
+        rows = list(db.execute(
+            "SELECT st.species_caught FROM stops st JOIN sessions s ON st.session_id = s.id "
+            "WHERE st.lat BETWEEN ? AND ? AND st.lng BETWEEN ? AND ?",
+            [lat - deg, lat + deg, lng - deg, lng + deg],
+        ).fetchall())
+        sl = species.strip().lower()
+        for r in rows:
+            for sp in slices._load_species_list(r[0]) if hasattr(slices, '_load_species_list') else []:
+                if sp.strip().lower() == sl:
+                    return True
+    except Exception:
+        pass
+    return False
+
+def getting_there_geojson(
+    db: Database,
+    bbox: tuple[float, float, float, float] | None = None,
+    jurisdiction: str | None = None,
+) -> dict:
+    spots = list_spots(db, bbox=bbox, max_tier=3, jurisdiction=jurisdiction)
+    features = []
+    for spot in spots:
+        for a in spot.getting_there:
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [a.lng, a.lat]},
+                    "properties": {
+                        "kind": a.kind,
+                        "name": a.name,
+                        "distance_m": a.distance_m,
+                        "spot_id": spot.spot_id,
+                        "spot_title": spot.title,
+                        "attributes": a.attributes,
+                    },
+                }
+            )
+    return {"type": "FeatureCollection", "features": features}
+
+
+def bridges_geojson(
+    db: Database,
+    bbox: tuple[float, float, float, float] | None = None,
+    jurisdiction: str | None = None,
+) -> dict:
+    spots = list_spots(db, bbox=bbox, max_tier=3, jurisdiction=jurisdiction)
+    features = []
+    for spot in spots:
+        for a in spot.bridges:
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [a.lng, a.lat]},
+                    "properties": {
+                        "kind": a.kind,
+                        "name": a.name,
+                        "distance_m": a.distance_m,
+                        "spot_id": spot.spot_id,
+                        "spot_title": spot.title,
+                        "attributes": a.attributes,
+                    },
+                }
+            )
+    return {"type": "FeatureCollection", "features": features}
