@@ -11,13 +11,27 @@ import json
 from sqlite_utils.db import Database
 
 from src.models.spot import Spot
+from src.models.water_body import WaterBody
+from src.storage.water_bodies import write_water_bodies
 
 
-def replace_spots(db: Database, jurisdiction: str, spots: list[Spot]) -> int:
-    """Swap in a jurisdiction's spots. Returns spots now stored."""
+def replace_spots(
+    db: Database,
+    jurisdiction: str,
+    spots: list[Spot],
+    water_bodies: list[WaterBody] | None = None,
+) -> int:
+    """Swap in a jurisdiction's spots, and its water bodies when given. Returns spots stored.
+
+    Both go in one transaction: spots point at water bodies, so a half-written
+    rebuild must never leave one without the other. `water_bodies=None` leaves
+    the stored ones alone.
+    """
     rows = [_spot_row(s) for s in spots]
     conn = db.conn
     with conn:
+        if water_bodies is not None:
+            write_water_bodies(conn, jurisdiction, water_bodies)
         conn.execute("DELETE FROM spots WHERE jurisdiction = ?", [jurisdiction])
         if rows:
             cols = list(rows[0])
@@ -43,8 +57,13 @@ def list_spots(
     max_tier: int = 3,
     jurisdiction: str | None = None,
     water_id: str | None = None,
+    water_body_id: str | None = None,
 ) -> list[Spot]:
-    """Spots in a (min_lon, min_lat, max_lon, max_lat) box, up to a tier, in id order."""
+    """Spots in a (min_lon, min_lat, max_lon, max_lat) box, up to a tier, in id order.
+
+    `water_body_id` matches the spots that are children of that water body; spots
+    that are also on it (a mouth on its lake) are found by `list_spots_also_on`.
+    """
     clauses, params = ["tier <= ?"], [max_tier]
     if bbox is not None:
         min_lon, min_lat, max_lon, max_lat = bbox
@@ -56,10 +75,22 @@ def list_spots(
     if water_id is not None:
         clauses.append("water_id = ?")
         params.append(water_id)
+    if water_body_id is not None:
+        clauses.append("water_body_id = ?")
+        params.append(water_body_id)
     rows = db.execute_returning_dicts(
         f"SELECT * FROM spots WHERE {' AND '.join(clauses)} ORDER BY spot_id", params
     )
     return [_row_to_spot(r) for r in rows]
+
+
+def list_spots_also_on(db: Database, water_body_id: str) -> list[Spot]:
+    """Spots that belong to another water body but are also on this one, in id order."""
+    rows = db.execute_returning_dicts(
+        "SELECT * FROM spots WHERE also_on_water_body_ids_json LIKE ? ORDER BY spot_id",
+        [f'%"{water_body_id}"%'],
+    )
+    return [s for s in map(_row_to_spot, rows) if water_body_id in s.also_on_water_body_ids]
 
 
 def get_spot(db: Database, spot_id: str) -> Spot | None:
@@ -80,6 +111,8 @@ def _spot_row(s: Spot) -> dict:
         "lng": s.lng,
         "water_id": s.water_id,
         "water_name": s.water_name,
+        "water_body_id": s.water_body_id,
+        "also_on_water_body_ids_json": _dumps(s.also_on_water_body_ids),
         "title": s.title,
         "subtitle": s.subtitle,
         "tier": s.tier,
@@ -102,6 +135,8 @@ def _row_to_spot(r: dict) -> Spot:
         lng=r["lng"],
         water_id=r["water_id"],
         water_name=r["water_name"],
+        water_body_id=r["water_body_id"],
+        also_on_water_body_ids=json.loads(r["also_on_water_body_ids_json"]),
         title=r["title"],
         subtitle=r["subtitle"],
         tier=r["tier"],

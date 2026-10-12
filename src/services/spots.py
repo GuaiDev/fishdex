@@ -54,9 +54,11 @@ from src.models.stretch_anchor import StretchAnchor
 from src.services import spot_labels as words
 from src.services.stretch_anchors import DAM_MERGE_M, _coord_key
 from src.services.stretches import DEFAULT_CURATION_PATH, load_curation
+from src.services.water_bodies import LakeRef, WaterBodySet, derive_water_bodies
 from src.storage.spots import get_spot, list_spots, replace_spots
 from src.storage.stretch_anchors import list_anchors
 from src.storage.stretches import list_stretches
+from src.storage.water_bodies import get_water_body
 
 logger = logging.getLogger(__name__)
 
@@ -168,12 +170,13 @@ def classify(
     final = sorted(by_id.values(), key=lambda s: (_KIND_ORDER[s.kind], s.tier, s.spot_id))
 
     _attach_access(ctx, final, anchors)
+    water_bodies = _link_water_bodies(ctx, final)
 
     for spot in final:
         report.by_kind[spot.kind] = report.by_kind.get(spot.kind, 0) + 1
         report.by_tier[str(spot.tier)] = report.by_tier.get(str(spot.tier), 0) + 1
     report.spots_total = len(final)
-    return SpotClassification(spots=final, report=report)
+    return SpotClassification(spots=final, water_bodies=water_bodies.bodies, report=report)
 
 
 @dataclass
@@ -267,7 +270,14 @@ def _river_mouths(ctx: _Context, mouths: list[StretchAnchor]) -> list[Spot]:
         first = group[0]
         ctx.report.drop("river_mouth_duplicate_location", len(group) - 1)
         out.append(
-            _mouth_spot(ctx, first, group, (first.lat, first.lon), first.name, "ohn_topology")
+            _mouth_spot(
+                ctx,
+                first,
+                group,
+                (first.lat, first.lon),
+                first.name,
+                "curation" if first.source == "curated" else "ohn_topology",
+            )
         )
 
     # A curated mouth fills in for a stretch the topology found none on; it
@@ -291,10 +301,18 @@ def _mouth_spot(
 ) -> Spot:
     stretch_id = stretch_id or (anchor.stretch_id if anchor else None)
     assert stretch_id is not None
-    lake = ctx.hints.get(stretch_id, StretchHints()).lake or shore_name
+    lake = ctx.hints.get(stretch_id, StretchHints()).lake
+    lake_source = "curated" if lake else None
+    if lake is None and shore_name:
+        # A curated mouth anchor carries the lake name the curation file gave it.
+        lake, lake_source = (
+            shore_name,
+            "curated" if anchor and anchor.source == "curated" else "ohn",
+        )
     if lake is None:
         region = ctx.stretches[stretch_id].region if stretch_id in ctx.stretches else None
-        lake = region if region in LAKE_NAMES else None
+        if region in LAKE_NAMES:
+            lake, lake_source = region, "curated_region"
     river = _the(ctx.river(stretch_id))
     if lake:
         title = words.TITLES["river_mouth"].format(river=river, lake=_lake_phrase(lake))
@@ -312,6 +330,7 @@ def _mouth_spot(
         "lake_mouth",
         {
             "lake": lake,
+            "lake_name_source": lake_source,
             **({"shore_ogf_ids": anchor.attributes.get("shore_ogf_ids", [])} if anchor else {}),
         },
         {"named": lake is not None},
@@ -630,6 +649,52 @@ def _access_ref(a: StretchAnchor, distance_m: float) -> AccessRef:
     )
 
 
+# ── water bodies ──────────────────────────────────────────────────────────────
+
+
+def _link_water_bodies(ctx: _Context, spots: list[Spot]) -> WaterBodySet:
+    """Derive the water bodies and hang each spot off its river, creek or lake.
+
+    A spot is a child of the river its stretch belongs to. A river mouth is also
+    on the lake it opens onto, and a junction listed under two stretches is also on
+    the other one's river. The spot's own `water_id` (the stretch) is left as it is.
+    """
+    lakes = [
+        LakeRef(
+            name=lake,
+            name_source=s.structure_attrs.get("lake_name_source") or "curated",
+            stretch_id=s.water_id,
+            lat=s.lat,
+            lon=s.lng,
+        )
+        for s in spots
+        if s.kind == "river_mouth" and s.water_id and (lake := s.structure_attrs.get("lake"))
+    ]
+    bodies = derive_water_bodies(
+        list(ctx.stretches.values()), lakes, ctx.jurisdiction, ctx.built_at
+    )
+
+    for spot in spots:
+        spot.water_body_id = bodies.river_id(spot.water_id)
+        also = {bodies.river_id(sid) for sid in spot.structure_attrs.get("also_on_water_ids", [])}
+        if spot.kind == "river_mouth":
+            also.add(bodies.lake_id(spot.structure_attrs.get("lake")))
+        spot.also_on_water_body_ids = sorted(i for i in also if i and i != spot.water_body_id)
+        if spot.water_body_id:
+            ctx.report.spots_linked += 1
+        else:
+            ctx.report.spots_without_water_body += 1
+
+    report = ctx.report
+    report.water_bodies_total = len(bodies.bodies)
+    for wb in bodies.bodies:
+        report.water_bodies_by_type[wb.type] = report.water_bodies_by_type.get(wb.type, 0) + 1
+        report.water_body_names[wb.name_source] = report.water_body_names.get(wb.name_source, 0) + 1
+        if wb.geometry is None:
+            report.water_bodies_without_geometry += 1
+    return bodies
+
+
 # ── build ─────────────────────────────────────────────────────────────────────
 
 
@@ -646,13 +711,19 @@ def build_spots(db: Database, curation_path: Path = DEFAULT_CURATION_PATH) -> Sp
     anchors = list_anchors(db, jurisdiction=jurisdiction)
     stretches = list_stretches(db, jurisdiction)
     result = classify(anchors, stretches, jurisdiction, load_stretch_hints(curation_path))
-    replace_spots(db, jurisdiction, result.spots)
+    replace_spots(db, jurisdiction, result.spots, result.water_bodies)
 
     report = result.report
     if not anchors:
         logger.warning(
             "no stretch anchors stored for %s: spots are empty; run build-stretches first",
             jurisdiction,
+        )
+    if report.spots_without_water_body:
+        logger.warning(
+            "%d of %d spots have no water body (their stretch is unknown to the build)",
+            report.spots_without_water_body,
+            report.spots_total,
         )
     if n := report.title_fallbacks.get("river_mouth_no_lake_name"):
         logger.warning(
@@ -702,6 +773,7 @@ def spots_geojson(
                     "jurisdiction": s.jurisdiction,
                     "water_id": s.water_id,
                     "water_name": s.water_name,
+                    "water_body_id": s.water_body_id,
                     "signals": s.signals,
                 },
             }
@@ -721,4 +793,25 @@ def get_spot_detail(db: Database, spot_id: str) -> dict | None:
         if s.spot_id != spot.spot_id and spot.water_id
     ]
     others.sort(key=lambda o: (o["tier"], _KIND_ORDER[o["kind"]], o["spot_id"]))
-    return {**spot.model_dump(), "more_on_this_water": others}
+    return {
+        **spot.model_dump(),
+        "water_body": _water_body_ref(db, spot.water_body_id),
+        "also_on_water_bodies": [
+            ref for i in spot.also_on_water_body_ids if (ref := _water_body_ref(db, i))
+        ],
+        "more_on_this_water": others,
+    }
+
+
+def _water_body_ref(db: Database, water_body_id: str | None) -> dict | None:
+    """The short form of a water body for a spot card: enough to name it and link to it."""
+    wb = get_water_body(db, water_body_id) if water_body_id else None
+    if wb is None:
+        return None
+    return {
+        "water_body_id": wb.water_body_id,
+        "name": wb.name,
+        "display_name": wb.name or words.WATER_BODY_TYPES[wb.type]["unnamed"],
+        "name_source": wb.name_source,
+        "type": wb.type,
+    }

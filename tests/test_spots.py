@@ -677,36 +677,6 @@ def test_the_real_curation_file_loads_without_hints_or_errors():
 # ── storage, build, API ──────────────────────────────────────────────────────
 
 
-@pytest.fixture(scope="module")
-def _template_db(tmp_path_factory):
-    """Schema setup costs over a second; build it once and copy the file per test."""
-    from src.storage.database import get_db
-
-    path = tmp_path_factory.mktemp("template") / "template.db"
-    get_db(path).conn.close()
-    return path
-
-
-@pytest.fixture
-def db(tmp_path, _template_db):
-    import shutil
-
-    from src.storage.database import get_db
-
-    path = tmp_path / "spots.db"
-    shutil.copy(_template_db, path)
-    return get_db(path)
-
-
-@pytest.fixture
-def curation(tmp_path):
-    path = tmp_path / "curation.toml"
-    path.write_text(
-        'version = 1\njurisdiction = "CA-ON"\nbuild_bbox = [-80.5, 42.9, -79.0, 44.0]\n'
-    )
-    return path
-
-
 def store(db, anchors, stretches):
     from src.storage.stretch_anchors import replace_anchors
     from src.storage.stretches import replace_stretches
@@ -895,6 +865,8 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
     import json
     from pathlib import Path
 
+    from src.models.water_body import WaterBody
+
     path = Path(__file__).parent / "fixtures" / "spots_api_responses.json"
     entries = json.loads(path.read_text())["requests"]
     assert {e["status"] for e in entries} == {200, 404, 422}
@@ -904,15 +876,36 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
             assert set(e["response"]) == {"detail"}
         elif route == "/map/spots/labels":
             assert e["response"] == spot_labels.labels_payload()
+        elif route.startswith("/map/water-bodies/"):
+            detail = {
+                k: v
+                for k, v in e["response"].items()
+                if k not in ("display_name", "spots", "also_here_spots")
+            }
+            assert WaterBody.model_validate(detail).water_body_id == route.removeprefix(
+                "/map/water-bodies/"
+            )
+        elif route.startswith("/map/water-bodies"):
+            assert e["response"]["type"] == "FeatureCollection"
+            for f in e["response"]["features"]:
+                assert f["id"] == f["properties"]["water_body_id"]
+                assert f["properties"]["jurisdiction"]
+                assert f["properties"]["name_source"] in spot_labels.NAME_SOURCE_LABELS
+                assert f["properties"]["type"] in spot_labels.WATER_BODY_TYPES
         elif route.startswith("/map/spots/"):
-            detail = dict(e["response"])
-            detail.pop("more_on_this_water")
+            detail = {
+                k: v
+                for k, v in e["response"].items()
+                if k not in ("more_on_this_water", "water_body", "also_on_water_bodies")
+            }
             assert Spot.model_validate(detail).spot_id == route.removeprefix("/map/spots/")
+            assert e["response"]["water_body"]["water_body_id"] == detail["water_body_id"]
         else:
             assert e["response"]["type"] == "FeatureCollection"
             for f in e["response"]["features"]:
                 assert f["id"] == f["properties"]["spot_id"]
                 assert f["properties"]["jurisdiction"]
+                assert f["properties"]["water_body_id"]
                 assert not JARGON.search(f["properties"]["title"])
 
 

@@ -123,6 +123,35 @@ LAYERS: dict[str, dict] = {
     },
 }
 
+# ── water bodies ──────────────────────────────────────────────────────────────
+# The rivers, creeks and lakes the spots sit on. `chip` is the plural for a filter,
+# `label` the singular for a card, `unnamed` what to show when no source gave the
+# water a name (the API never sends a made-up name; it sends this phrase beside a
+# null one).
+
+WATER_BODY_TYPE_ORDER = ("river", "creek", "lake", "pond", "great_lake")
+WATER_BODY_TYPES: dict[str, dict[str, str]] = {
+    "river": {"chip": "Rivers", "label": "River", "unnamed": "A river with no name on file"},
+    "creek": {"chip": "Creeks", "label": "Creek", "unnamed": "A creek with no name on file"},
+    "lake": {"chip": "Lakes", "label": "Lake", "unnamed": "A lake with no name on file"},
+    "pond": {"chip": "Ponds", "label": "Pond", "unnamed": "A pond with no name on file"},
+    "great_lake": {
+        "chip": "Great Lakes",
+        "label": "Great Lake",
+        "unnamed": "A Great Lake with no name on file",
+    },
+}
+# Where a water's name came from, in words for a "source" line under a name.
+NAME_SOURCE_LABELS: dict[str, str] = {
+    "curated": "Named in this app's own list of fishing waters",
+    "curated_region": "Taken from the area the river runs through",
+    "ohn": "Ontario government water map",
+    "osm": "OpenStreetMap volunteers",
+    "unknown": "No name on file",
+}
+# A lake or pond with no outline on file is shown as a place, not a shape.
+NO_OUTLINE_NOTE = "No outline is on file for this water, so it has no shape on the map yet."
+
 # ── titles ────────────────────────────────────────────────────────────────────
 # Filled in by services/spots.py. {river} and {tributary} already carry their
 # article ("the Credit River", "Sheldon Creek"). A title is never built from a
@@ -167,6 +196,9 @@ def labels_payload() -> dict:
             for kind in KIND_ORDER
         ],
         "river_mouth_subline": RIVER_MOUTH_SUBLINE,
+        "water_body_types": [{"type": t, **WATER_BODY_TYPES[t]} for t in WATER_BODY_TYPE_ORDER],
+        "name_sources": NAME_SOURCE_LABELS,
+        "no_outline_note": NO_OUTLINE_NOTE,
         "layers": LAYERS,
         "access_labels": ACCESS_LABELS,
     }
@@ -178,6 +210,9 @@ def all_strings() -> list[str]:
     for entry in KINDS.values():
         out += [entry["chip"], entry["one_liner"], entry["why_fish_gather"]]
     out += list(ACCESS_LABELS.values())
+    for entry in WATER_BODY_TYPES.values():
+        out += list(entry.values())
+    out += list(NAME_SOURCE_LABELS.values()) + [NO_OUTLINE_NOTE]
     for layer in LAYERS.values():
         out += [layer["label"], layer["note"]]
     out += list(TITLES.values()) + list(UNNAMED_TRIBUTARY.values()) + [UNNAMED_LARGER_RIVER]

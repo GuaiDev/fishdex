@@ -63,6 +63,46 @@
           }
         ],
         "river_mouth_subline": "Where a river meets a lake",
+        "water_body_types": [
+          {
+            "type": "river",
+            "chip": "Rivers",
+            "label": "River",
+            "unnamed": "A river with no name on file"
+          },
+          {
+            "type": "creek",
+            "chip": "Creeks",
+            "label": "Creek",
+            "unnamed": "A creek with no name on file"
+          },
+          {
+            "type": "lake",
+            "chip": "Lakes",
+            "label": "Lake",
+            "unnamed": "A lake with no name on file"
+          },
+          {
+            "type": "pond",
+            "chip": "Ponds",
+            "label": "Pond",
+            "unnamed": "A pond with no name on file"
+          },
+          {
+            "type": "great_lake",
+            "chip": "Great Lakes",
+            "label": "Great Lake",
+            "unnamed": "A Great Lake with no name on file"
+          }
+        ],
+        "name_sources": {
+          "curated": "Named in this app's own list of fishing waters",
+          "curated_region": "Taken from the area the river runs through",
+          "ohn": "Ontario government water map",
+          "osm": "OpenStreetMap volunteers",
+          "unknown": "No name on file"
+        },
+        "no_outline_note": "No outline is on file for this water, so it has no shape on the map yet.",
         "layers": {
           "getting_there": {
             "label": "Getting there",
@@ -128,6 +168,7 @@
               "jurisdiction": "CA-ON",
               "water_id": "grand-cambridge-paris",
               "water_name": "Cambridge to Paris",
+              "water_body_id": "river:grand-river",
               "signals": {
                 "named": true,
                 "nearest_bridge_m": 187,
@@ -155,6 +196,7 @@
               "jurisdiction": "CA-ON",
               "water_id": "grand-cambridge-paris",
               "water_name": "Cambridge to Paris",
+              "water_body_id": "river:grand-river",
               "signals": {
                 "named": true,
                 "nearest_bridge_m": 171,
@@ -202,6 +244,7 @@
               "jurisdiction": "CA-ON",
               "water_id": "credit-streetsville-port-credit",
               "water_name": "Lower Credit — Streetsville to Port Credit",
+              "water_body_id": "river:credit-river",
               "signals": {
                 "named": true
               }
@@ -226,6 +269,7 @@
               "jurisdiction": "CA-ON",
               "water_id": "credit-streetsville-port-credit",
               "water_name": "Lower Credit — Streetsville to Port Credit",
+              "water_body_id": "river:credit-river",
               "signals": {
                 "named": true,
                 "size_class": "medium"
@@ -251,6 +295,7 @@
               "jurisdiction": "CA-ON",
               "water_id": "sixteen-mile-milton-oakville",
               "water_name": "Sixteen Mile Creek — Milton to Oakville Harbour",
+              "water_body_id": "creek:sixteen-mile-creek",
               "signals": {
                 "named": true,
                 "size_class": "medium"
@@ -276,6 +321,7 @@
               "jurisdiction": "CA-ON",
               "water_id": "credit-glen-williams-streetsville",
               "water_name": "Middle Credit — Glen Williams to Streetsville",
+              "water_body_id": "river:credit-river",
               "signals": {
                 "named": true,
                 "size_class": "medium"
@@ -322,6 +368,7 @@
               "jurisdiction": "CA-ON",
               "water_id": "grand-dunnville-port-maitland",
               "water_name": "Dunnville to Port Maitland",
+              "water_body_id": "river:grand-river",
               "signals": {
                 "named": false,
                 "nearest_launch_m": 210,
@@ -348,6 +395,7 @@
               "jurisdiction": "CA-ON",
               "water_id": "grand-dunnville-port-maitland",
               "water_name": "Dunnville to Port Maitland",
+              "water_body_id": "river:grand-river",
               "signals": {
                 "named": false,
                 "nearest_bridge_m": 153,
@@ -371,6 +419,8 @@
         "lng": -80.38314,
         "water_id": "grand-cambridge-paris",
         "water_name": "Cambridge to Paris",
+        "water_body_id": "river:grand-river",
+        "also_on_water_body_ids": [],
         "title": "Below the Paris Dam",
         "subtitle": "Grand River · Cambridge to Paris",
         "tier": 1,
@@ -429,7 +479,7 @@
             "anchor_ids": [
               "grand-cambridge-paris:tailwater:osm-way-248706708"
             ],
-            "built_at": "2026-10-11T17:21:53+00:00"
+            "built_at": "2026-10-12T20:30:44+00:00"
           },
           {
             "kind": "osm",
@@ -437,10 +487,18 @@
             "anchor_ids": [
               "grand-cambridge-paris:dam:osm-way-248706708"
             ],
-            "built_at": "2026-10-11T17:21:53+00:00"
+            "built_at": "2026-10-12T20:30:44+00:00"
           }
         ],
-        "built_at": "2026-10-11T17:21:53+00:00",
+        "built_at": "2026-10-12T20:30:44+00:00",
+        "water_body": {
+          "water_body_id": "river:grand-river",
+          "name": "Grand River",
+          "display_name": "Grand River",
+          "name_source": "curated",
+          "type": "river"
+        },
+        "also_on_water_bodies": [],
         "more_on_this_water": [
           {
             "spot_id": "creek_junction:n8038226_4319286",
@@ -475,6 +533,10 @@
         "lng": -80.38226,
         "water_id": "grand-cambridge-paris",
         "water_name": "Cambridge to Paris",
+        "water_body_id": "river:grand-river",
+        "also_on_water_body_ids": [
+          "river:nith-river"
+        ],
         "title": "Where the Nith River joins the Grand River",
         "subtitle": "Grand River · Cambridge to Paris",
         "tier": 1,
@@ -553,7 +615,7 @@
             "anchor_ids": [
               "grand-cambridge-paris:confluence:n8038226_4319286"
             ],
-            "built_at": "2026-10-11T17:21:53+00:00"
+            "built_at": "2026-10-12T20:30:44+00:00"
           },
           {
             "kind": "ohn_topology",
@@ -561,10 +623,26 @@
             "anchor_ids": [
               "nith-ayr-paris:confluence:n8038226_4319286"
             ],
-            "built_at": "2026-10-11T17:21:53+00:00"
+            "built_at": "2026-10-12T20:30:44+00:00"
           }
         ],
-        "built_at": "2026-10-11T17:21:53+00:00",
+        "built_at": "2026-10-12T20:30:44+00:00",
+        "water_body": {
+          "water_body_id": "river:grand-river",
+          "name": "Grand River",
+          "display_name": "Grand River",
+          "name_source": "curated",
+          "type": "river"
+        },
+        "also_on_water_bodies": [
+          {
+            "water_body_id": "river:nith-river",
+            "name": "Nith River",
+            "display_name": "Nith River",
+            "name_source": "curated",
+            "type": "river"
+          }
+        ],
         "more_on_this_water": [
           {
             "spot_id": "below_dam:n8038314_4319587",
@@ -599,12 +677,17 @@
         "lng": -79.57731,
         "water_id": "credit-streetsville-port-credit",
         "water_name": "Lower Credit — Streetsville to Port Credit",
+        "water_body_id": "river:credit-river",
+        "also_on_water_body_ids": [
+          "great_lake:lake-ontario"
+        ],
         "title": "Where the Credit River meets Lake Ontario",
         "subtitle": "Credit River · Lower Credit — Streetsville to Port Credit",
         "tier": 1,
         "structure_type": "lake_mouth",
         "structure_attrs": {
           "lake": "Lake Ontario",
+          "lake_name_source": "curated",
           "shore_ogf_ids": [
             214624516,
             214624565
@@ -622,10 +705,26 @@
             "anchor_ids": [
               "credit-streetsville-port-credit:lake_mouth:n7957731_4354567"
             ],
-            "built_at": "2026-10-11T17:21:53+00:00"
+            "built_at": "2026-10-12T20:30:44+00:00"
           }
         ],
-        "built_at": "2026-10-11T17:21:53+00:00",
+        "built_at": "2026-10-12T20:30:44+00:00",
+        "water_body": {
+          "water_body_id": "river:credit-river",
+          "name": "Credit River",
+          "display_name": "Credit River",
+          "name_source": "curated",
+          "type": "river"
+        },
+        "also_on_water_bodies": [
+          {
+            "water_body_id": "great_lake:lake-ontario",
+            "name": "Lake Ontario",
+            "display_name": "Lake Ontario",
+            "name_source": "curated",
+            "type": "great_lake"
+          }
+        ],
         "more_on_this_water": [
           {
             "spot_id": "creek_junction:n7966741_4355566",
@@ -666,6 +765,8 @@
         "lng": -79.5786218,
         "water_id": "grand-dunnville-port-maitland",
         "water_name": "Dunnville to Port Maitland",
+        "water_body_id": "river:grand-river",
+        "also_on_water_body_ids": [],
         "title": "Public fishing spot on the Grand River",
         "subtitle": "Grand River · Dunnville to Port Maitland",
         "tier": 1,
@@ -727,15 +828,23 @@
             "anchor_ids": [
               "grand-dunnville-port-maitland:fishing_spot:osm-node-6762811052"
             ],
-            "built_at": "2026-10-11T17:21:53+00:00"
+            "built_at": "2026-10-12T20:30:44+00:00"
           }
         ],
-        "built_at": "2026-10-11T17:21:53+00:00",
+        "built_at": "2026-10-12T20:30:44+00:00",
+        "water_body": {
+          "water_body_id": "river:grand-river",
+          "name": "Grand River",
+          "display_name": "Grand River",
+          "name_source": "curated",
+          "type": "river"
+        },
+        "also_on_water_bodies": [],
         "more_on_this_water": [
           {
             "spot_id": "river_mouth:n7957763_4284817",
             "kind": "river_mouth",
-            "title": "Where the Grand River flows into the lake",
+            "title": "Where the Grand River meets Lake Erie",
             "tier": 1
           },
           {
@@ -772,6 +881,3313 @@
       }
     },
     {
+      "request": "GET /map/water-bodies?bbox=-79.75,43.40,-79.60,43.50",
+      "note": "every water body whose box overlaps a box around Oakville: two creeks, the Credit River and the lake they run into",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "count": 3,
+          "type_counts": {
+            "river": 0,
+            "creek": 2,
+            "lake": 0,
+            "pond": 0,
+            "great_lake": 1
+          }
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "creek:bronte-creek",
+            "geometry": {
+              "coordinates": [
+                [
+                  [
+                    -79.85031,
+                    43.42883
+                  ],
+                  [
+                    -79.84866,
+                    43.42726
+                  ],
+                  [
+                    -79.84584,
+                    43.42793
+                  ],
+                  [
+                    -79.84537,
+                    43.42573
+                  ],
+                  [
+                    -79.84344,
+                    43.4256
+                  ],
+                  [
+                    -79.83929,
+                    43.42828
+                  ],
+                  [
+                    -79.83903,
+                    43.42754
+                  ],
+                  [
+                    -79.83727,
+                    43.42746
+                  ],
+                  [
+                    -79.83492,
+                    43.42424
+                  ],
+                  [
+                    -79.83369,
+                    43.42398
+                  ],
+                  [
+                    -79.83055,
+                    43.42515
+                  ],
+                  [
+                    -79.82738,
+                    43.42239
+                  ],
+                  [
+                    -79.82113,
+                    43.42224
+                  ],
+                  [
+                    -79.8203,
+                    43.4204
+                  ],
+                  [
+                    -79.81731,
+                    43.42067
+                  ],
+                  [
+                    -79.81536,
+                    43.4188
+                  ],
+                  [
+                    -79.8126,
+                    43.41881
+                  ],
+                  [
+                    -79.81437,
+                    43.41692
+                  ],
+                  [
+                    -79.81442,
+                    43.41535
+                  ],
+                  [
+                    -79.81149,
+                    43.41668
+                  ],
+                  [
+                    -79.80996,
+                    43.41935
+                  ],
+                  [
+                    -79.80766,
+                    43.41886
+                  ],
+                  [
+                    -79.80387,
+                    43.4201
+                  ],
+                  [
+                    -79.80188,
+                    43.41777
+                  ],
+                  [
+                    -79.79958,
+                    43.41721
+                  ],
+                  [
+                    -79.80228,
+                    43.41632
+                  ],
+                  [
+                    -79.80257,
+                    43.41497
+                  ],
+                  [
+                    -79.79809,
+                    43.41435
+                  ],
+                  [
+                    -79.79824,
+                    43.41224
+                  ],
+                  [
+                    -79.79453,
+                    43.41269
+                  ],
+                  [
+                    -79.78938,
+                    43.41114
+                  ],
+                  [
+                    -79.78731,
+                    43.41185
+                  ],
+                  [
+                    -79.78686,
+                    43.40938
+                  ],
+                  [
+                    -79.78405,
+                    43.40898
+                  ],
+                  [
+                    -79.78102,
+                    43.41163
+                  ],
+                  [
+                    -79.77943,
+                    43.41175
+                  ],
+                  [
+                    -79.77608,
+                    43.41015
+                  ],
+                  [
+                    -79.77407,
+                    43.41217
+                  ],
+                  [
+                    -79.76989,
+                    43.41151
+                  ],
+                  [
+                    -79.76791,
+                    43.41359
+                  ],
+                  [
+                    -79.76409,
+                    43.41274
+                  ],
+                  [
+                    -79.76103,
+                    43.41408
+                  ],
+                  [
+                    -79.75759,
+                    43.41361
+                  ],
+                  [
+                    -79.75371,
+                    43.41482
+                  ],
+                  [
+                    -79.75198,
+                    43.41344
+                  ],
+                  [
+                    -79.74861,
+                    43.41354
+                  ],
+                  [
+                    -79.74421,
+                    43.41004
+                  ],
+                  [
+                    -79.73923,
+                    43.40784
+                  ],
+                  [
+                    -79.74158,
+                    43.40521
+                  ],
+                  [
+                    -79.73757,
+                    43.40402
+                  ],
+                  [
+                    -79.73592,
+                    43.40177
+                  ],
+                  [
+                    -79.73383,
+                    43.40078
+                  ],
+                  [
+                    -79.7344,
+                    43.39941
+                  ],
+                  [
+                    -79.73325,
+                    43.39808
+                  ],
+                  [
+                    -79.72781,
+                    43.39849
+                  ],
+                  [
+                    -79.72402,
+                    43.39581
+                  ],
+                  [
+                    -79.72116,
+                    43.39502
+                  ],
+                  [
+                    -79.72018,
+                    43.39325
+                  ],
+                  [
+                    -79.71567,
+                    43.39451
+                  ],
+                  [
+                    -79.71355,
+                    43.39164
+                  ],
+                  [
+                    -79.71016,
+                    43.39334
+                  ],
+                  [
+                    -79.70625,
+                    43.39276
+                  ],
+                  [
+                    -79.70095,
+                    43.38322
+                  ],
+                  [
+                    -79.6854,
+                    43.37634
+                  ]
+                ]
+              ],
+              "type": "MultiLineString"
+            },
+            "properties": {
+              "water_body_id": "creek:bronte-creek",
+              "name": "Bronte Creek",
+              "display_name": "Bronte Creek",
+              "name_source": "curated",
+              "type": "creek",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -79.85031,
+                43.37634,
+                -79.6854,
+                43.42883
+              ],
+              "spot_counts": {
+                "creek_junction": 2,
+                "river_mouth": 1
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "creek:sixteen-mile-creek",
+            "geometry": {
+              "coordinates": [
+                [
+                  [
+                    -79.87115,
+                    43.50984
+                  ],
+                  [
+                    -79.86395,
+                    43.5051
+                  ],
+                  [
+                    -79.86216,
+                    43.50452
+                  ],
+                  [
+                    -79.8615,
+                    43.50507
+                  ],
+                  [
+                    -79.85812,
+                    43.50364
+                  ],
+                  [
+                    -79.8578,
+                    43.50266
+                  ],
+                  [
+                    -79.85637,
+                    43.50252
+                  ],
+                  [
+                    -79.85209,
+                    43.49908
+                  ],
+                  [
+                    -79.84642,
+                    43.49895
+                  ],
+                  [
+                    -79.83844,
+                    43.49484
+                  ],
+                  [
+                    -79.83447,
+                    43.49403
+                  ],
+                  [
+                    -79.83274,
+                    43.49552
+                  ],
+                  [
+                    -79.83129,
+                    43.49443
+                  ],
+                  [
+                    -79.83197,
+                    43.49317
+                  ],
+                  [
+                    -79.83082,
+                    43.49279
+                  ],
+                  [
+                    -79.82796,
+                    43.48905
+                  ],
+                  [
+                    -79.82408,
+                    43.49021
+                  ],
+                  [
+                    -79.82275,
+                    43.4894
+                  ],
+                  [
+                    -79.82201,
+                    43.48749
+                  ],
+                  [
+                    -79.8191,
+                    43.48702
+                  ],
+                  [
+                    -79.81578,
+                    43.48771
+                  ],
+                  [
+                    -79.81487,
+                    43.48556
+                  ],
+                  [
+                    -79.81261,
+                    43.48619
+                  ],
+                  [
+                    -79.81154,
+                    43.48531
+                  ],
+                  [
+                    -79.80836,
+                    43.48499
+                  ],
+                  [
+                    -79.80787,
+                    43.4839
+                  ],
+                  [
+                    -79.80527,
+                    43.48349
+                  ],
+                  [
+                    -79.80248,
+                    43.48166
+                  ],
+                  [
+                    -79.80335,
+                    43.48049
+                  ],
+                  [
+                    -79.80269,
+                    43.47989
+                  ],
+                  [
+                    -79.79939,
+                    43.48057
+                  ],
+                  [
+                    -79.79747,
+                    43.47706
+                  ],
+                  [
+                    -79.79871,
+                    43.47529
+                  ],
+                  [
+                    -79.79811,
+                    43.47384
+                  ],
+                  [
+                    -79.79698,
+                    43.47321
+                  ],
+                  [
+                    -79.79494,
+                    43.47432
+                  ],
+                  [
+                    -79.79385,
+                    43.47613
+                  ],
+                  [
+                    -79.79242,
+                    43.47634
+                  ],
+                  [
+                    -79.79011,
+                    43.47521
+                  ],
+                  [
+                    -79.79099,
+                    43.47379
+                  ],
+                  [
+                    -79.79044,
+                    43.47228
+                  ],
+                  [
+                    -79.78867,
+                    43.47144
+                  ],
+                  [
+                    -79.78705,
+                    43.47181
+                  ],
+                  [
+                    -79.78534,
+                    43.46989
+                  ],
+                  [
+                    -79.78704,
+                    43.46928
+                  ],
+                  [
+                    -79.78695,
+                    43.4686
+                  ],
+                  [
+                    -79.78555,
+                    43.46834
+                  ],
+                  [
+                    -79.78805,
+                    43.46696
+                  ],
+                  [
+                    -79.78769,
+                    43.46618
+                  ],
+                  [
+                    -79.78301,
+                    43.46688
+                  ],
+                  [
+                    -79.78065,
+                    43.46624
+                  ],
+                  [
+                    -79.78057,
+                    43.46174
+                  ],
+                  [
+                    -79.7775,
+                    43.4615
+                  ],
+                  [
+                    -79.77603,
+                    43.4623
+                  ],
+                  [
+                    -79.7739,
+                    43.4608
+                  ],
+                  [
+                    -79.76921,
+                    43.46232
+                  ],
+                  [
+                    -79.76833,
+                    43.45996
+                  ],
+                  [
+                    -79.76695,
+                    43.45875
+                  ],
+                  [
+                    -79.76348,
+                    43.45988
+                  ],
+                  [
+                    -79.76206,
+                    43.46128
+                  ],
+                  [
+                    -79.75729,
+                    43.46118
+                  ],
+                  [
+                    -79.75619,
+                    43.46187
+                  ],
+                  [
+                    -79.74852,
+                    43.45768
+                  ],
+                  [
+                    -79.74308,
+                    43.45817
+                  ],
+                  [
+                    -79.74183,
+                    43.45747
+                  ],
+                  [
+                    -79.7382,
+                    43.45818
+                  ],
+                  [
+                    -79.73679,
+                    43.45757
+                  ],
+                  [
+                    -79.73407,
+                    43.45431
+                  ],
+                  [
+                    -79.73004,
+                    43.457
+                  ],
+                  [
+                    -79.72844,
+                    43.45574
+                  ],
+                  [
+                    -79.72765,
+                    43.45353
+                  ],
+                  [
+                    -79.7267,
+                    43.45343
+                  ],
+                  [
+                    -79.72451,
+                    43.4543
+                  ],
+                  [
+                    -79.7229,
+                    43.45769
+                  ],
+                  [
+                    -79.71997,
+                    43.45799
+                  ],
+                  [
+                    -79.71829,
+                    43.45479
+                  ],
+                  [
+                    -79.71613,
+                    43.45343
+                  ],
+                  [
+                    -79.71349,
+                    43.45393
+                  ],
+                  [
+                    -79.71232,
+                    43.45514
+                  ],
+                  [
+                    -79.7107,
+                    43.45498
+                  ],
+                  [
+                    -79.70779,
+                    43.45086
+                  ],
+                  [
+                    -79.70513,
+                    43.45272
+                  ],
+                  [
+                    -79.70246,
+                    43.4528
+                  ],
+                  [
+                    -79.70002,
+                    43.45128
+                  ],
+                  [
+                    -79.69409,
+                    43.4524
+                  ],
+                  [
+                    -79.69236,
+                    43.45147
+                  ],
+                  [
+                    -79.69116,
+                    43.44935
+                  ],
+                  [
+                    -79.6899,
+                    43.44912
+                  ],
+                  [
+                    -79.68856,
+                    43.4501
+                  ],
+                  [
+                    -79.68898,
+                    43.45149
+                  ],
+                  [
+                    -79.69037,
+                    43.4525
+                  ],
+                  [
+                    -79.69015,
+                    43.45329
+                  ],
+                  [
+                    -79.68833,
+                    43.4532
+                  ],
+                  [
+                    -79.6878,
+                    43.45155
+                  ],
+                  [
+                    -79.68571,
+                    43.45005
+                  ],
+                  [
+                    -79.68408,
+                    43.45033
+                  ],
+                  [
+                    -79.68086,
+                    43.45287
+                  ],
+                  [
+                    -79.67818,
+                    43.45261
+                  ],
+                  [
+                    -79.67239,
+                    43.45
+                  ],
+                  [
+                    -79.67011,
+                    43.44816
+                  ],
+                  [
+                    -79.67102,
+                    43.44621
+                  ],
+                  [
+                    -79.6747,
+                    43.44563
+                  ],
+                  [
+                    -79.67434,
+                    43.44385
+                  ],
+                  [
+                    -79.67031,
+                    43.44262
+                  ],
+                  [
+                    -79.66654,
+                    43.44066
+                  ],
+                  [
+                    -79.66544,
+                    43.43856
+                  ],
+                  [
+                    -79.64903,
+                    43.43105
+                  ]
+                ]
+              ],
+              "type": "MultiLineString"
+            },
+            "properties": {
+              "water_body_id": "creek:sixteen-mile-creek",
+              "name": "Sixteen Mile Creek",
+              "display_name": "Sixteen Mile Creek",
+              "name_source": "curated",
+              "type": "creek",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -79.87115,
+                43.43105,
+                -79.64903,
+                43.50984
+              ],
+              "spot_counts": {
+                "creek_junction": 3,
+                "river_mouth": 1
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "great_lake:lake-ontario",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "great_lake:lake-ontario",
+              "name": "Lake Ontario",
+              "display_name": "Lake Ontario",
+              "name_source": "curated",
+              "type": "great_lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -79.6854,
+                43.19108,
+                -78.29204,
+                43.93725
+              ],
+              "spot_counts": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/water-bodies?type=great_lake,lake",
+      "note": "type filter: lakes have geometry null (no outline on file) and a box from their mouths",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "count": 10,
+          "type_counts": {
+            "river": 31,
+            "creek": 10,
+            "lake": 6,
+            "pond": 0,
+            "great_lake": 4
+          }
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "lake:bay-of-quinte",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "lake:bay-of-quinte",
+              "name": "Bay of Quinte",
+              "display_name": "Bay of Quinte",
+              "name_source": "curated",
+              "type": "lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -77.57587,
+                44.1037,
+                -77.37973,
+                44.14834
+              ],
+              "spot_counts": {}
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "lake:humber-bay",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "lake:humber-bay",
+              "name": "Humber Bay",
+              "display_name": "Humber Bay",
+              "name_source": "curated",
+              "type": "lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -79.4675,
+                43.63037,
+                -79.4675,
+                43.63037
+              ],
+              "spot_counts": {}
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "lake:lake-st-clair",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "lake:lake-st-clair",
+              "name": "Lake St. Clair",
+              "display_name": "Lake St. Clair",
+              "name_source": "curated",
+              "type": "lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -82.46017,
+                42.33967,
+                -82.46017,
+                42.33967
+              ],
+              "spot_counts": {}
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "lake:long-point-bay",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "lake:long-point-bay",
+              "name": "Long Point Bay",
+              "display_name": "Long Point Bay",
+              "name_source": "curated",
+              "type": "lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -80.44586,
+                42.60255,
+                -80.44586,
+                42.60255
+              ],
+              "spot_counts": {}
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "lake:owen-sound",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "lake:owen-sound",
+              "name": "Owen Sound",
+              "display_name": "Owen Sound",
+              "name_source": "curated",
+              "type": "lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -80.93917,
+                44.58183,
+                -80.93917,
+                44.58183
+              ],
+              "spot_counts": {}
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "lake:rice-lake",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "lake:rice-lake",
+              "name": "Rice Lake",
+              "display_name": "Rice Lake",
+              "name_source": "curated",
+              "type": "lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -78.24095,
+                44.19156,
+                -78.24095,
+                44.19156
+              ],
+              "spot_counts": {}
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "great_lake:georgian-bay",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "great_lake:georgian-bay",
+              "name": "Georgian Bay",
+              "display_name": "Georgian Bay",
+              "name_source": "curated",
+              "type": "great_lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -80.5787,
+                44.54422,
+                -79.72501,
+                44.79575
+              ],
+              "spot_counts": {}
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "great_lake:lake-erie",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "great_lake:lake-erie",
+              "name": "Lake Erie",
+              "display_name": "Lake Erie",
+              "name_source": "curated",
+              "type": "great_lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -83.11473,
+                42.09986,
+                -79.57763,
+                42.84817
+              ],
+              "spot_counts": {}
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "great_lake:lake-huron",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "great_lake:lake-huron",
+              "name": "Lake Huron",
+              "display_name": "Lake Huron",
+              "name_source": "curated",
+              "type": "great_lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -81.91622,
+                43.25015,
+                -81.37628,
+                44.50217
+              ],
+              "spot_counts": {}
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "great_lake:lake-ontario",
+            "geometry": null,
+            "properties": {
+              "water_body_id": "great_lake:lake-ontario",
+              "name": "Lake Ontario",
+              "display_name": "Lake Ontario",
+              "name_source": "curated",
+              "type": "great_lake",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -79.6854,
+                43.19108,
+                -78.29204,
+                43.93725
+              ],
+              "spot_counts": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/water-bodies?type=creek&bbox=-79.9,43.3,-79.5,43.6",
+      "note": "creeks only, in a box around Oakville",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "count": 2,
+          "type_counts": {
+            "river": 1,
+            "creek": 2,
+            "lake": 0,
+            "pond": 0,
+            "great_lake": 1
+          }
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "creek:bronte-creek",
+            "geometry": {
+              "coordinates": [
+                [
+                  [
+                    -79.85031,
+                    43.42883
+                  ],
+                  [
+                    -79.84866,
+                    43.42726
+                  ],
+                  [
+                    -79.84584,
+                    43.42793
+                  ],
+                  [
+                    -79.84537,
+                    43.42573
+                  ],
+                  [
+                    -79.84344,
+                    43.4256
+                  ],
+                  [
+                    -79.83929,
+                    43.42828
+                  ],
+                  [
+                    -79.83903,
+                    43.42754
+                  ],
+                  [
+                    -79.83727,
+                    43.42746
+                  ],
+                  [
+                    -79.83492,
+                    43.42424
+                  ],
+                  [
+                    -79.83369,
+                    43.42398
+                  ],
+                  [
+                    -79.83055,
+                    43.42515
+                  ],
+                  [
+                    -79.82738,
+                    43.42239
+                  ],
+                  [
+                    -79.82113,
+                    43.42224
+                  ],
+                  [
+                    -79.8203,
+                    43.4204
+                  ],
+                  [
+                    -79.81731,
+                    43.42067
+                  ],
+                  [
+                    -79.81536,
+                    43.4188
+                  ],
+                  [
+                    -79.8126,
+                    43.41881
+                  ],
+                  [
+                    -79.81437,
+                    43.41692
+                  ],
+                  [
+                    -79.81442,
+                    43.41535
+                  ],
+                  [
+                    -79.81149,
+                    43.41668
+                  ],
+                  [
+                    -79.80996,
+                    43.41935
+                  ],
+                  [
+                    -79.80766,
+                    43.41886
+                  ],
+                  [
+                    -79.80387,
+                    43.4201
+                  ],
+                  [
+                    -79.80188,
+                    43.41777
+                  ],
+                  [
+                    -79.79958,
+                    43.41721
+                  ],
+                  [
+                    -79.80228,
+                    43.41632
+                  ],
+                  [
+                    -79.80257,
+                    43.41497
+                  ],
+                  [
+                    -79.79809,
+                    43.41435
+                  ],
+                  [
+                    -79.79824,
+                    43.41224
+                  ],
+                  [
+                    -79.79453,
+                    43.41269
+                  ],
+                  [
+                    -79.78938,
+                    43.41114
+                  ],
+                  [
+                    -79.78731,
+                    43.41185
+                  ],
+                  [
+                    -79.78686,
+                    43.40938
+                  ],
+                  [
+                    -79.78405,
+                    43.40898
+                  ],
+                  [
+                    -79.78102,
+                    43.41163
+                  ],
+                  [
+                    -79.77943,
+                    43.41175
+                  ],
+                  [
+                    -79.77608,
+                    43.41015
+                  ],
+                  [
+                    -79.77407,
+                    43.41217
+                  ],
+                  [
+                    -79.76989,
+                    43.41151
+                  ],
+                  [
+                    -79.76791,
+                    43.41359
+                  ],
+                  [
+                    -79.76409,
+                    43.41274
+                  ],
+                  [
+                    -79.76103,
+                    43.41408
+                  ],
+                  [
+                    -79.75759,
+                    43.41361
+                  ],
+                  [
+                    -79.75371,
+                    43.41482
+                  ],
+                  [
+                    -79.75198,
+                    43.41344
+                  ],
+                  [
+                    -79.74861,
+                    43.41354
+                  ],
+                  [
+                    -79.74421,
+                    43.41004
+                  ],
+                  [
+                    -79.73923,
+                    43.40784
+                  ],
+                  [
+                    -79.74158,
+                    43.40521
+                  ],
+                  [
+                    -79.73757,
+                    43.40402
+                  ],
+                  [
+                    -79.73592,
+                    43.40177
+                  ],
+                  [
+                    -79.73383,
+                    43.40078
+                  ],
+                  [
+                    -79.7344,
+                    43.39941
+                  ],
+                  [
+                    -79.73325,
+                    43.39808
+                  ],
+                  [
+                    -79.72781,
+                    43.39849
+                  ],
+                  [
+                    -79.72402,
+                    43.39581
+                  ],
+                  [
+                    -79.72116,
+                    43.39502
+                  ],
+                  [
+                    -79.72018,
+                    43.39325
+                  ],
+                  [
+                    -79.71567,
+                    43.39451
+                  ],
+                  [
+                    -79.71355,
+                    43.39164
+                  ],
+                  [
+                    -79.71016,
+                    43.39334
+                  ],
+                  [
+                    -79.70625,
+                    43.39276
+                  ],
+                  [
+                    -79.70095,
+                    43.38322
+                  ],
+                  [
+                    -79.6854,
+                    43.37634
+                  ]
+                ]
+              ],
+              "type": "MultiLineString"
+            },
+            "properties": {
+              "water_body_id": "creek:bronte-creek",
+              "name": "Bronte Creek",
+              "display_name": "Bronte Creek",
+              "name_source": "curated",
+              "type": "creek",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -79.85031,
+                43.37634,
+                -79.6854,
+                43.42883
+              ],
+              "spot_counts": {
+                "creek_junction": 2,
+                "river_mouth": 1
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "creek:sixteen-mile-creek",
+            "geometry": {
+              "coordinates": [
+                [
+                  [
+                    -79.87115,
+                    43.50984
+                  ],
+                  [
+                    -79.86395,
+                    43.5051
+                  ],
+                  [
+                    -79.86216,
+                    43.50452
+                  ],
+                  [
+                    -79.8615,
+                    43.50507
+                  ],
+                  [
+                    -79.85812,
+                    43.50364
+                  ],
+                  [
+                    -79.8578,
+                    43.50266
+                  ],
+                  [
+                    -79.85637,
+                    43.50252
+                  ],
+                  [
+                    -79.85209,
+                    43.49908
+                  ],
+                  [
+                    -79.84642,
+                    43.49895
+                  ],
+                  [
+                    -79.83844,
+                    43.49484
+                  ],
+                  [
+                    -79.83447,
+                    43.49403
+                  ],
+                  [
+                    -79.83274,
+                    43.49552
+                  ],
+                  [
+                    -79.83129,
+                    43.49443
+                  ],
+                  [
+                    -79.83197,
+                    43.49317
+                  ],
+                  [
+                    -79.83082,
+                    43.49279
+                  ],
+                  [
+                    -79.82796,
+                    43.48905
+                  ],
+                  [
+                    -79.82408,
+                    43.49021
+                  ],
+                  [
+                    -79.82275,
+                    43.4894
+                  ],
+                  [
+                    -79.82201,
+                    43.48749
+                  ],
+                  [
+                    -79.8191,
+                    43.48702
+                  ],
+                  [
+                    -79.81578,
+                    43.48771
+                  ],
+                  [
+                    -79.81487,
+                    43.48556
+                  ],
+                  [
+                    -79.81261,
+                    43.48619
+                  ],
+                  [
+                    -79.81154,
+                    43.48531
+                  ],
+                  [
+                    -79.80836,
+                    43.48499
+                  ],
+                  [
+                    -79.80787,
+                    43.4839
+                  ],
+                  [
+                    -79.80527,
+                    43.48349
+                  ],
+                  [
+                    -79.80248,
+                    43.48166
+                  ],
+                  [
+                    -79.80335,
+                    43.48049
+                  ],
+                  [
+                    -79.80269,
+                    43.47989
+                  ],
+                  [
+                    -79.79939,
+                    43.48057
+                  ],
+                  [
+                    -79.79747,
+                    43.47706
+                  ],
+                  [
+                    -79.79871,
+                    43.47529
+                  ],
+                  [
+                    -79.79811,
+                    43.47384
+                  ],
+                  [
+                    -79.79698,
+                    43.47321
+                  ],
+                  [
+                    -79.79494,
+                    43.47432
+                  ],
+                  [
+                    -79.79385,
+                    43.47613
+                  ],
+                  [
+                    -79.79242,
+                    43.47634
+                  ],
+                  [
+                    -79.79011,
+                    43.47521
+                  ],
+                  [
+                    -79.79099,
+                    43.47379
+                  ],
+                  [
+                    -79.79044,
+                    43.47228
+                  ],
+                  [
+                    -79.78867,
+                    43.47144
+                  ],
+                  [
+                    -79.78705,
+                    43.47181
+                  ],
+                  [
+                    -79.78534,
+                    43.46989
+                  ],
+                  [
+                    -79.78704,
+                    43.46928
+                  ],
+                  [
+                    -79.78695,
+                    43.4686
+                  ],
+                  [
+                    -79.78555,
+                    43.46834
+                  ],
+                  [
+                    -79.78805,
+                    43.46696
+                  ],
+                  [
+                    -79.78769,
+                    43.46618
+                  ],
+                  [
+                    -79.78301,
+                    43.46688
+                  ],
+                  [
+                    -79.78065,
+                    43.46624
+                  ],
+                  [
+                    -79.78057,
+                    43.46174
+                  ],
+                  [
+                    -79.7775,
+                    43.4615
+                  ],
+                  [
+                    -79.77603,
+                    43.4623
+                  ],
+                  [
+                    -79.7739,
+                    43.4608
+                  ],
+                  [
+                    -79.76921,
+                    43.46232
+                  ],
+                  [
+                    -79.76833,
+                    43.45996
+                  ],
+                  [
+                    -79.76695,
+                    43.45875
+                  ],
+                  [
+                    -79.76348,
+                    43.45988
+                  ],
+                  [
+                    -79.76206,
+                    43.46128
+                  ],
+                  [
+                    -79.75729,
+                    43.46118
+                  ],
+                  [
+                    -79.75619,
+                    43.46187
+                  ],
+                  [
+                    -79.74852,
+                    43.45768
+                  ],
+                  [
+                    -79.74308,
+                    43.45817
+                  ],
+                  [
+                    -79.74183,
+                    43.45747
+                  ],
+                  [
+                    -79.7382,
+                    43.45818
+                  ],
+                  [
+                    -79.73679,
+                    43.45757
+                  ],
+                  [
+                    -79.73407,
+                    43.45431
+                  ],
+                  [
+                    -79.73004,
+                    43.457
+                  ],
+                  [
+                    -79.72844,
+                    43.45574
+                  ],
+                  [
+                    -79.72765,
+                    43.45353
+                  ],
+                  [
+                    -79.7267,
+                    43.45343
+                  ],
+                  [
+                    -79.72451,
+                    43.4543
+                  ],
+                  [
+                    -79.7229,
+                    43.45769
+                  ],
+                  [
+                    -79.71997,
+                    43.45799
+                  ],
+                  [
+                    -79.71829,
+                    43.45479
+                  ],
+                  [
+                    -79.71613,
+                    43.45343
+                  ],
+                  [
+                    -79.71349,
+                    43.45393
+                  ],
+                  [
+                    -79.71232,
+                    43.45514
+                  ],
+                  [
+                    -79.7107,
+                    43.45498
+                  ],
+                  [
+                    -79.70779,
+                    43.45086
+                  ],
+                  [
+                    -79.70513,
+                    43.45272
+                  ],
+                  [
+                    -79.70246,
+                    43.4528
+                  ],
+                  [
+                    -79.70002,
+                    43.45128
+                  ],
+                  [
+                    -79.69409,
+                    43.4524
+                  ],
+                  [
+                    -79.69236,
+                    43.45147
+                  ],
+                  [
+                    -79.69116,
+                    43.44935
+                  ],
+                  [
+                    -79.6899,
+                    43.44912
+                  ],
+                  [
+                    -79.68856,
+                    43.4501
+                  ],
+                  [
+                    -79.68898,
+                    43.45149
+                  ],
+                  [
+                    -79.69037,
+                    43.4525
+                  ],
+                  [
+                    -79.69015,
+                    43.45329
+                  ],
+                  [
+                    -79.68833,
+                    43.4532
+                  ],
+                  [
+                    -79.6878,
+                    43.45155
+                  ],
+                  [
+                    -79.68571,
+                    43.45005
+                  ],
+                  [
+                    -79.68408,
+                    43.45033
+                  ],
+                  [
+                    -79.68086,
+                    43.45287
+                  ],
+                  [
+                    -79.67818,
+                    43.45261
+                  ],
+                  [
+                    -79.67239,
+                    43.45
+                  ],
+                  [
+                    -79.67011,
+                    43.44816
+                  ],
+                  [
+                    -79.67102,
+                    43.44621
+                  ],
+                  [
+                    -79.6747,
+                    43.44563
+                  ],
+                  [
+                    -79.67434,
+                    43.44385
+                  ],
+                  [
+                    -79.67031,
+                    43.44262
+                  ],
+                  [
+                    -79.66654,
+                    43.44066
+                  ],
+                  [
+                    -79.66544,
+                    43.43856
+                  ],
+                  [
+                    -79.64903,
+                    43.43105
+                  ]
+                ]
+              ],
+              "type": "MultiLineString"
+            },
+            "properties": {
+              "water_body_id": "creek:sixteen-mile-creek",
+              "name": "Sixteen Mile Creek",
+              "display_name": "Sixteen Mile Creek",
+              "name_source": "curated",
+              "type": "creek",
+              "jurisdiction": "CA-ON",
+              "bbox": [
+                -79.87115,
+                43.43105,
+                -79.64903,
+                43.50984
+              ],
+              "spot_counts": {
+                "creek_junction": 3,
+                "river_mouth": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/water-bodies/river:credit-river",
+      "note": "a river in full: its line, its stretches, the spots on it",
+      "status": 200,
+      "response": {
+        "water_body_id": "river:credit-river",
+        "jurisdiction": "CA-ON",
+        "name": "Credit River",
+        "name_source": "curated",
+        "type": "river",
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                -79.98834,
+                43.80977
+              ],
+              [
+                -79.97764,
+                43.80647
+              ],
+              [
+                -79.97519,
+                43.80644
+              ],
+              [
+                -79.97338,
+                43.80692
+              ],
+              [
+                -79.97043,
+                43.81066
+              ],
+              [
+                -79.96628,
+                43.81321
+              ],
+              [
+                -79.96461,
+                43.81345
+              ]
+            ],
+            [
+              [
+                -79.96461,
+                43.81345
+              ],
+              [
+                -79.96423,
+                43.8139
+              ]
+            ],
+            [
+              [
+                -79.96461,
+                43.81345
+              ],
+              [
+                -79.96423,
+                43.8139
+              ]
+            ],
+            [
+              [
+                -79.96423,
+                43.8139
+              ],
+              [
+                -79.96307,
+                43.81495
+              ],
+              [
+                -79.95875,
+                43.81619
+              ],
+              [
+                -79.95071,
+                43.81501
+              ],
+              [
+                -79.94979,
+                43.81291
+              ],
+              [
+                -79.94665,
+                43.81008
+              ],
+              [
+                -79.94386,
+                43.80975
+              ],
+              [
+                -79.94036,
+                43.81068
+              ],
+              [
+                -79.93626,
+                43.80856
+              ],
+              [
+                -79.93433,
+                43.80861
+              ],
+              [
+                -79.9336,
+                43.80657
+              ],
+              [
+                -79.93232,
+                43.80592
+              ],
+              [
+                -79.92929,
+                43.80068
+              ],
+              [
+                -79.92816,
+                43.80005
+              ],
+              [
+                -79.92822,
+                43.79926
+              ],
+              [
+                -79.93032,
+                43.79868
+              ],
+              [
+                -79.92843,
+                43.79537
+              ],
+              [
+                -79.9274,
+                43.79491
+              ],
+              [
+                -79.92795,
+                43.79448
+              ],
+              [
+                -79.92752,
+                43.79376
+              ],
+              [
+                -79.92877,
+                43.79346
+              ],
+              [
+                -79.92893,
+                43.79163
+              ],
+              [
+                -79.93038,
+                43.79018
+              ],
+              [
+                -79.92941,
+                43.78943
+              ],
+              [
+                -79.93144,
+                43.78483
+              ],
+              [
+                -79.93068,
+                43.78325
+              ],
+              [
+                -79.92684,
+                43.7798
+              ],
+              [
+                -79.92801,
+                43.77894
+              ],
+              [
+                -79.92669,
+                43.77622
+              ],
+              [
+                -79.92634,
+                43.77126
+              ],
+              [
+                -79.92387,
+                43.76907
+              ],
+              [
+                -79.92441,
+                43.76699
+              ],
+              [
+                -79.92158,
+                43.76342
+              ],
+              [
+                -79.91993,
+                43.75966
+              ],
+              [
+                -79.92471,
+                43.75833
+              ],
+              [
+                -79.92465,
+                43.75643
+              ],
+              [
+                -79.9225,
+                43.75517
+              ],
+              [
+                -79.9227,
+                43.75213
+              ],
+              [
+                -79.92095,
+                43.75008
+              ],
+              [
+                -79.92097,
+                43.74907
+              ],
+              [
+                -79.9233,
+                43.74624
+              ],
+              [
+                -79.92345,
+                43.74476
+              ],
+              [
+                -79.92679,
+                43.74434
+              ],
+              [
+                -79.92664,
+                43.74284
+              ],
+              [
+                -79.92346,
+                43.74055
+              ],
+              [
+                -79.9282,
+                43.73619
+              ],
+              [
+                -79.92864,
+                43.73477
+              ],
+              [
+                -79.92694,
+                43.7332
+              ],
+              [
+                -79.9267,
+                43.7288
+              ],
+              [
+                -79.92844,
+                43.72801
+              ],
+              [
+                -79.93041,
+                43.72565
+              ],
+              [
+                -79.93178,
+                43.72136
+              ],
+              [
+                -79.9309,
+                43.72076
+              ],
+              [
+                -79.93397,
+                43.71823
+              ],
+              [
+                -79.93704,
+                43.71299
+              ],
+              [
+                -79.93679,
+                43.70933
+              ],
+              [
+                -79.93305,
+                43.70664
+              ],
+              [
+                -79.93226,
+                43.70432
+              ],
+              [
+                -79.93491,
+                43.70242
+              ],
+              [
+                -79.93358,
+                43.70078
+              ],
+              [
+                -79.9336,
+                43.69878
+              ],
+              [
+                -79.9369,
+                43.6966
+              ],
+              [
+                -79.93407,
+                43.69408
+              ],
+              [
+                -79.92854,
+                43.69302
+              ],
+              [
+                -79.92802,
+                43.69112
+              ],
+              [
+                -79.92589,
+                43.68991
+              ],
+              [
+                -79.92684,
+                43.68575
+              ],
+              [
+                -79.93088,
+                43.68408
+              ],
+              [
+                -79.93056,
+                43.68122
+              ],
+              [
+                -79.93279,
+                43.67823
+              ],
+              [
+                -79.92878,
+                43.67491
+              ],
+              [
+                -79.92483,
+                43.6731
+              ],
+              [
+                -79.92828,
+                43.67102
+              ]
+            ],
+            [
+              [
+                -79.92828,
+                43.67102
+              ],
+              [
+                -79.92742,
+                43.66882
+              ],
+              [
+                -79.92416,
+                43.66725
+              ],
+              [
+                -79.91869,
+                43.66282
+              ],
+              [
+                -79.91687,
+                43.66213
+              ],
+              [
+                -79.91364,
+                43.66331
+              ],
+              [
+                -79.90772,
+                43.66145
+              ],
+              [
+                -79.90542,
+                43.65991
+              ],
+              [
+                -79.90271,
+                43.66031
+              ],
+              [
+                -79.89968,
+                43.65969
+              ],
+              [
+                -79.89922,
+                43.65862
+              ],
+              [
+                -79.9013,
+                43.65759
+              ],
+              [
+                -79.9006,
+                43.65677
+              ],
+              [
+                -79.89598,
+                43.6587
+              ],
+              [
+                -79.8939,
+                43.65623
+              ],
+              [
+                -79.89258,
+                43.6567
+              ],
+              [
+                -79.89122,
+                43.65862
+              ],
+              [
+                -79.88637,
+                43.65699
+              ],
+              [
+                -79.88321,
+                43.65792
+              ],
+              [
+                -79.87838,
+                43.65728
+              ],
+              [
+                -79.87577,
+                43.65383
+              ],
+              [
+                -79.87156,
+                43.65302
+              ],
+              [
+                -79.8676,
+                43.65344
+              ],
+              [
+                -79.86537,
+                43.65148
+              ],
+              [
+                -79.86556,
+                43.64943
+              ],
+              [
+                -79.86174,
+                43.64739
+              ],
+              [
+                -79.85927,
+                43.64788
+              ],
+              [
+                -79.85794,
+                43.64977
+              ],
+              [
+                -79.85632,
+                43.64779
+              ],
+              [
+                -79.85598,
+                43.64426
+              ],
+              [
+                -79.85491,
+                43.64384
+              ],
+              [
+                -79.85045,
+                43.64528
+              ],
+              [
+                -79.84917,
+                43.64738
+              ],
+              [
+                -79.84768,
+                43.64752
+              ],
+              [
+                -79.84461,
+                43.64607
+              ],
+              [
+                -79.84281,
+                43.64669
+              ],
+              [
+                -79.84089,
+                43.64868
+              ],
+              [
+                -79.83887,
+                43.64789
+              ],
+              [
+                -79.8382,
+                43.64475
+              ],
+              [
+                -79.83654,
+                43.64321
+              ],
+              [
+                -79.83444,
+                43.64373
+              ],
+              [
+                -79.83257,
+                43.643
+              ],
+              [
+                -79.83005,
+                43.64345
+              ],
+              [
+                -79.82648,
+                43.64281
+              ],
+              [
+                -79.82449,
+                43.64381
+              ],
+              [
+                -79.81923,
+                43.6432
+              ],
+              [
+                -79.81934,
+                43.64567
+              ],
+              [
+                -79.81862,
+                43.64661
+              ],
+              [
+                -79.81086,
+                43.64494
+              ],
+              [
+                -79.80844,
+                43.6451
+              ],
+              [
+                -79.80611,
+                43.64391
+              ],
+              [
+                -79.80228,
+                43.64545
+              ],
+              [
+                -79.79207,
+                43.64387
+              ],
+              [
+                -79.78616,
+                43.64712
+              ],
+              [
+                -79.7825,
+                43.64645
+              ],
+              [
+                -79.78132,
+                43.64519
+              ],
+              [
+                -79.77869,
+                43.64426
+              ],
+              [
+                -79.77917,
+                43.64321
+              ],
+              [
+                -79.77626,
+                43.64444
+              ],
+              [
+                -79.77104,
+                43.64315
+              ],
+              [
+                -79.76954,
+                43.64189
+              ],
+              [
+                -79.76829,
+                43.6423
+              ],
+              [
+                -79.76231,
+                43.6364
+              ],
+              [
+                -79.76234,
+                43.63453
+              ],
+              [
+                -79.75554,
+                43.63174
+              ],
+              [
+                -79.75154,
+                43.63415
+              ],
+              [
+                -79.74835,
+                43.63255
+              ],
+              [
+                -79.7453,
+                43.62849
+              ],
+              [
+                -79.74325,
+                43.62886
+              ],
+              [
+                -79.73909,
+                43.63314
+              ],
+              [
+                -79.73711,
+                43.63295
+              ],
+              [
+                -79.73586,
+                43.63127
+              ],
+              [
+                -79.73733,
+                43.62835
+              ],
+              [
+                -79.73461,
+                43.6269
+              ],
+              [
+                -79.73438,
+                43.62467
+              ],
+              [
+                -79.73217,
+                43.62511
+              ],
+              [
+                -79.73338,
+                43.62251
+              ],
+              [
+                -79.73235,
+                43.62092
+              ],
+              [
+                -79.73098,
+                43.62054
+              ],
+              [
+                -79.73191,
+                43.61928
+              ],
+              [
+                -79.72855,
+                43.61626
+              ],
+              [
+                -79.72807,
+                43.61411
+              ],
+              [
+                -79.72931,
+                43.61261
+              ],
+              [
+                -79.72846,
+                43.61126
+              ],
+              [
+                -79.72133,
+                43.60717
+              ],
+              [
+                -79.71768,
+                43.60952
+              ],
+              [
+                -79.7151,
+                43.60981
+              ],
+              [
+                -79.71236,
+                43.60768
+              ],
+              [
+                -79.71499,
+                43.605
+              ],
+              [
+                -79.71806,
+                43.60355
+              ],
+              [
+                -79.71868,
+                43.60076
+              ],
+              [
+                -79.72378,
+                43.60095
+              ],
+              [
+                -79.72485,
+                43.60033
+              ],
+              [
+                -79.72295,
+                43.59633
+              ],
+              [
+                -79.71756,
+                43.59418
+              ],
+              [
+                -79.71711,
+                43.59084
+              ],
+              [
+                -79.71533,
+                43.58956
+              ],
+              [
+                -79.71692,
+                43.58755
+              ],
+              [
+                -79.7124,
+                43.58411
+              ],
+              [
+                -79.70873,
+                43.5835
+              ],
+              [
+                -79.70846,
+                43.58096
+              ],
+              [
+                -79.70327,
+                43.57721
+              ],
+              [
+                -79.69979,
+                43.57799
+              ],
+              [
+                -79.69838,
+                43.57598
+              ],
+              [
+                -79.69383,
+                43.57433
+              ]
+            ],
+            [
+              [
+                -79.69383,
+                43.57433
+              ],
+              [
+                -79.69287,
+                43.57258
+              ],
+              [
+                -79.69354,
+                43.57058
+              ],
+              [
+                -79.6909,
+                43.56871
+              ],
+              [
+                -79.69084,
+                43.56689
+              ],
+              [
+                -79.68801,
+                43.56692
+              ],
+              [
+                -79.68302,
+                43.5651
+              ],
+              [
+                -79.68431,
+                43.56257
+              ],
+              [
+                -79.68363,
+                43.56151
+              ],
+              [
+                -79.67962,
+                43.56283
+              ],
+              [
+                -79.67751,
+                43.56172
+              ],
+              [
+                -79.67383,
+                43.5619
+              ],
+              [
+                -79.66741,
+                43.55566
+              ],
+              [
+                -79.66367,
+                43.5558
+              ],
+              [
+                -79.6613,
+                43.5532
+              ],
+              [
+                -79.65784,
+                43.55197
+              ],
+              [
+                -79.65502,
+                43.54895
+              ],
+              [
+                -79.65843,
+                43.54382
+              ],
+              [
+                -79.65757,
+                43.54286
+              ],
+              [
+                -79.65301,
+                43.54217
+              ],
+              [
+                -79.65218,
+                43.5406
+              ],
+              [
+                -79.65019,
+                43.53952
+              ],
+              [
+                -79.64807,
+                43.54258
+              ],
+              [
+                -79.64855,
+                43.5447
+              ],
+              [
+                -79.64721,
+                43.54657
+              ],
+              [
+                -79.64078,
+                43.54635
+              ],
+              [
+                -79.64069,
+                43.54741
+              ],
+              [
+                -79.64252,
+                43.54929
+              ],
+              [
+                -79.64119,
+                43.55054
+              ],
+              [
+                -79.63054,
+                43.54813
+              ],
+              [
+                -79.62947,
+                43.54851
+              ],
+              [
+                -79.62794,
+                43.5517
+              ],
+              [
+                -79.62153,
+                43.55438
+              ],
+              [
+                -79.60966,
+                43.55663
+              ],
+              [
+                -79.60617,
+                43.55484
+              ],
+              [
+                -79.60104,
+                43.55489
+              ],
+              [
+                -79.59735,
+                43.5527
+              ],
+              [
+                -79.58647,
+                43.55073
+              ],
+              [
+                -79.57731,
+                43.54567
+              ]
+            ]
+          ],
+          "type": "MultiLineString"
+        },
+        "geometry_source": "stretch_union",
+        "bbox": [
+          -79.98834,
+          43.53952,
+          -79.57731,
+          43.81619
+        ],
+        "stretch_ids": [
+          "credit-forks-glen-williams",
+          "credit-glen-williams-streetsville",
+          "credit-streetsville-port-credit"
+        ],
+        "attributes": {
+          "type_basis": "name_suffix"
+        },
+        "built_at": "2026-10-12T20:30:44+00:00",
+        "display_name": "Credit River",
+        "spots": [
+          {
+            "spot_id": "river_mouth:n7957731_4354567",
+            "kind": "river_mouth",
+            "title": "Where the Credit River meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.54567,
+            "lng": -79.57731
+          },
+          {
+            "spot_id": "creek_junction:n7966741_4355566",
+            "kind": "creek_junction",
+            "title": "Where Mullet Creek joins the Credit River",
+            "tier": 1,
+            "lat": 43.55566,
+            "lng": -79.66741
+          },
+          {
+            "spot_id": "creek_junction:n7971768_4360952",
+            "kind": "creek_junction",
+            "title": "Where Fletchers Creek joins the Credit River",
+            "tier": 1,
+            "lat": 43.60952,
+            "lng": -79.71768
+          },
+          {
+            "spot_id": "creek_junction:n7986378_4364837",
+            "kind": "creek_junction",
+            "title": "Where Black Creek joins the Credit River",
+            "tier": 1,
+            "lat": 43.64837,
+            "lng": -79.86378
+          },
+          {
+            "spot_id": "creek_junction:n7992945_4379759",
+            "kind": "creek_junction",
+            "title": "Where the Little Credit River joins the Credit River",
+            "tier": 1,
+            "lat": 43.79759,
+            "lng": -79.92945
+          },
+          {
+            "spot_id": "creek_junction:n7993701_4371236",
+            "kind": "creek_junction",
+            "title": "Where Rogers Creek joins the Credit River",
+            "tier": 1,
+            "lat": 43.71236,
+            "lng": -79.93701
+          },
+          {
+            "spot_id": "creek_junction:n7959213_4355165",
+            "kind": "creek_junction",
+            "title": "Where Mary Fix Creek joins the Credit River",
+            "tier": 2,
+            "lat": 43.55165,
+            "lng": -79.59213
+          },
+          {
+            "spot_id": "creek_junction:n7965757_4354286",
+            "kind": "creek_junction",
+            "title": "Where Sawmill Creek joins the Credit River",
+            "tier": 2,
+            "lat": 43.54286,
+            "lng": -79.65757
+          },
+          {
+            "spot_id": "creek_junction:n7969383_4357433",
+            "kind": "creek_junction",
+            "title": "Where Carolyn Creek joins the Credit River",
+            "tier": 2,
+            "lat": 43.57433,
+            "lng": -79.69383
+          },
+          {
+            "spot_id": "creek_junction:n7978988_4364540",
+            "kind": "creek_junction",
+            "title": "Where a creek joins the Credit River",
+            "tier": 2,
+            "lat": 43.6454,
+            "lng": -79.78988
+          },
+          {
+            "spot_id": "creek_junction:n7994036_4381068",
+            "kind": "creek_junction",
+            "title": "Where Black Creek joins the Credit River",
+            "tier": 2,
+            "lat": 43.81068,
+            "lng": -79.94036
+          },
+          {
+            "spot_id": "creek_junction:n7976707_4364057",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Credit River",
+            "tier": 3,
+            "lat": 43.64057,
+            "lng": -79.76707
+          },
+          {
+            "spot_id": "creek_junction:n7977626_4364444",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Credit River",
+            "tier": 3,
+            "lat": 43.64444,
+            "lng": -79.77626
+          },
+          {
+            "spot_id": "creek_junction:n7984665_4364705",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Credit River",
+            "tier": 3,
+            "lat": 43.64705,
+            "lng": -79.84665
+          },
+          {
+            "spot_id": "creek_junction:n7991364_4366331",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Credit River",
+            "tier": 3,
+            "lat": 43.66331,
+            "lng": -79.91364
+          },
+          {
+            "spot_id": "creek_junction:n7992716_4373248",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Credit River",
+            "tier": 3,
+            "lat": 43.73248,
+            "lng": -79.92716
+          },
+          {
+            "spot_id": "creek_junction:n7993604_4371405",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Credit River",
+            "tier": 3,
+            "lat": 43.71405,
+            "lng": -79.93604
+          }
+        ],
+        "also_here_spots": []
+      }
+    },
+    {
+      "request": "GET /map/water-bodies/great_lake:lake-ontario",
+      "note": "a lake: no geometry, with the river mouths that open onto it",
+      "status": 200,
+      "response": {
+        "water_body_id": "great_lake:lake-ontario",
+        "jurisdiction": "CA-ON",
+        "name": "Lake Ontario",
+        "name_source": "curated",
+        "type": "great_lake",
+        "geometry": null,
+        "geometry_source": "none",
+        "bbox": [
+          -79.6854,
+          43.19108,
+          -78.29204,
+          43.93725
+        ],
+        "stretch_ids": [
+          "bowmanville-soper",
+          "bronte-lowville-bronte",
+          "credit-streetsville-port-credit",
+          "duffins-pickering-ajax",
+          "ganaraska-garden-hill-port-hope",
+          "niagara-lower-queenston-notl",
+          "rouge-lower",
+          "sixteen-mile-milton-oakville",
+          "twenty-mile-balls-falls-jordan",
+          "wilmot-newcastle"
+        ],
+        "attributes": {
+          "bbox_basis": "river_mouths",
+          "type_basis": "great_lakes_list"
+        },
+        "built_at": "2026-10-12T20:30:44+00:00",
+        "display_name": "Lake Ontario",
+        "spots": [],
+        "also_here_spots": [
+          {
+            "spot_id": "river_mouth:n7829204_4393725",
+            "kind": "river_mouth",
+            "title": "Where the Ganaraska River meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.93725,
+            "lng": -78.29204
+          },
+          {
+            "spot_id": "river_mouth:n7859506_4389124",
+            "kind": "river_mouth",
+            "title": "Where Wilmot Creek meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.89124,
+            "lng": -78.59506
+          },
+          {
+            "spot_id": "river_mouth:n7865768_4387791",
+            "kind": "river_mouth",
+            "title": "Where Bowmanville Creek meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.87791,
+            "lng": -78.65768
+          },
+          {
+            "spot_id": "river_mouth:n7903376_4381408",
+            "kind": "river_mouth",
+            "title": "Where Duffins Creek meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.81408,
+            "lng": -79.03376
+          },
+          {
+            "spot_id": "river_mouth:n7906666_4325985",
+            "kind": "river_mouth",
+            "title": "Where the Niagara River meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.25985,
+            "lng": -79.06666
+          },
+          {
+            "spot_id": "river_mouth:n7911321_4379191",
+            "kind": "river_mouth",
+            "title": "Where the Rouge River meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.79191,
+            "lng": -79.11321
+          },
+          {
+            "spot_id": "river_mouth:n7937293_4319108",
+            "kind": "river_mouth",
+            "title": "Where Twenty Mile Creek meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.19108,
+            "lng": -79.37293
+          },
+          {
+            "spot_id": "river_mouth:n7957731_4354567",
+            "kind": "river_mouth",
+            "title": "Where the Credit River meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.54567,
+            "lng": -79.57731
+          },
+          {
+            "spot_id": "river_mouth:n7964903_4343105",
+            "kind": "river_mouth",
+            "title": "Where Sixteen Mile Creek meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.43105,
+            "lng": -79.64903
+          },
+          {
+            "spot_id": "river_mouth:n7968540_4337634",
+            "kind": "river_mouth",
+            "title": "Where Bronte Creek meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.37634,
+            "lng": -79.6854
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/water-bodies/creek:bronte-creek",
+      "note": "a creek",
+      "status": 200,
+      "response": {
+        "water_body_id": "creek:bronte-creek",
+        "jurisdiction": "CA-ON",
+        "name": "Bronte Creek",
+        "name_source": "curated",
+        "type": "creek",
+        "geometry": {
+          "coordinates": [
+            [
+              [
+                -79.85031,
+                43.42883
+              ],
+              [
+                -79.84866,
+                43.42726
+              ],
+              [
+                -79.84584,
+                43.42793
+              ],
+              [
+                -79.84537,
+                43.42573
+              ],
+              [
+                -79.84344,
+                43.4256
+              ],
+              [
+                -79.83929,
+                43.42828
+              ],
+              [
+                -79.83903,
+                43.42754
+              ],
+              [
+                -79.83727,
+                43.42746
+              ],
+              [
+                -79.83492,
+                43.42424
+              ],
+              [
+                -79.83369,
+                43.42398
+              ],
+              [
+                -79.83055,
+                43.42515
+              ],
+              [
+                -79.82738,
+                43.42239
+              ],
+              [
+                -79.82113,
+                43.42224
+              ],
+              [
+                -79.8203,
+                43.4204
+              ],
+              [
+                -79.81731,
+                43.42067
+              ],
+              [
+                -79.81536,
+                43.4188
+              ],
+              [
+                -79.8126,
+                43.41881
+              ],
+              [
+                -79.81437,
+                43.41692
+              ],
+              [
+                -79.81442,
+                43.41535
+              ],
+              [
+                -79.81149,
+                43.41668
+              ],
+              [
+                -79.80996,
+                43.41935
+              ],
+              [
+                -79.80766,
+                43.41886
+              ],
+              [
+                -79.80387,
+                43.4201
+              ],
+              [
+                -79.80188,
+                43.41777
+              ],
+              [
+                -79.79958,
+                43.41721
+              ],
+              [
+                -79.80228,
+                43.41632
+              ],
+              [
+                -79.80257,
+                43.41497
+              ],
+              [
+                -79.79809,
+                43.41435
+              ],
+              [
+                -79.79824,
+                43.41224
+              ],
+              [
+                -79.79453,
+                43.41269
+              ],
+              [
+                -79.78938,
+                43.41114
+              ],
+              [
+                -79.78731,
+                43.41185
+              ],
+              [
+                -79.78686,
+                43.40938
+              ],
+              [
+                -79.78405,
+                43.40898
+              ],
+              [
+                -79.78102,
+                43.41163
+              ],
+              [
+                -79.77943,
+                43.41175
+              ],
+              [
+                -79.77608,
+                43.41015
+              ],
+              [
+                -79.77407,
+                43.41217
+              ],
+              [
+                -79.76989,
+                43.41151
+              ],
+              [
+                -79.76791,
+                43.41359
+              ],
+              [
+                -79.76409,
+                43.41274
+              ],
+              [
+                -79.76103,
+                43.41408
+              ],
+              [
+                -79.75759,
+                43.41361
+              ],
+              [
+                -79.75371,
+                43.41482
+              ],
+              [
+                -79.75198,
+                43.41344
+              ],
+              [
+                -79.74861,
+                43.41354
+              ],
+              [
+                -79.74421,
+                43.41004
+              ],
+              [
+                -79.73923,
+                43.40784
+              ],
+              [
+                -79.74158,
+                43.40521
+              ],
+              [
+                -79.73757,
+                43.40402
+              ],
+              [
+                -79.73592,
+                43.40177
+              ],
+              [
+                -79.73383,
+                43.40078
+              ],
+              [
+                -79.7344,
+                43.39941
+              ],
+              [
+                -79.73325,
+                43.39808
+              ],
+              [
+                -79.72781,
+                43.39849
+              ],
+              [
+                -79.72402,
+                43.39581
+              ],
+              [
+                -79.72116,
+                43.39502
+              ],
+              [
+                -79.72018,
+                43.39325
+              ],
+              [
+                -79.71567,
+                43.39451
+              ],
+              [
+                -79.71355,
+                43.39164
+              ],
+              [
+                -79.71016,
+                43.39334
+              ],
+              [
+                -79.70625,
+                43.39276
+              ],
+              [
+                -79.70095,
+                43.38322
+              ],
+              [
+                -79.6854,
+                43.37634
+              ]
+            ]
+          ],
+          "type": "MultiLineString"
+        },
+        "geometry_source": "stretch_union",
+        "bbox": [
+          -79.85031,
+          43.37634,
+          -79.6854,
+          43.42883
+        ],
+        "stretch_ids": [
+          "bronte-lowville-bronte"
+        ],
+        "attributes": {
+          "type_basis": "name_suffix"
+        },
+        "built_at": "2026-10-12T20:30:44+00:00",
+        "display_name": "Bronte Creek",
+        "spots": [
+          {
+            "spot_id": "river_mouth:n7968540_4337634",
+            "kind": "river_mouth",
+            "title": "Where Bronte Creek meets Lake Ontario",
+            "tier": 1,
+            "lat": 43.37634,
+            "lng": -79.6854
+          },
+          {
+            "spot_id": "creek_junction:n7970095_4338322",
+            "kind": "creek_junction",
+            "title": "Where Sheldon Creek joins Bronte Creek",
+            "tier": 1,
+            "lat": 43.38322,
+            "lng": -79.70095
+          },
+          {
+            "spot_id": "creek_junction:n7985031_4342883",
+            "kind": "creek_junction",
+            "title": "Where a creek joins Bronte Creek",
+            "tier": 2,
+            "lat": 43.42883,
+            "lng": -79.85031
+          },
+          {
+            "spot_id": "creek_junction:n7984537_4342573",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins Bronte Creek",
+            "tier": 3,
+            "lat": 43.42573,
+            "lng": -79.84537
+          }
+        ],
+        "also_here_spots": []
+      }
+    },
+    {
       "request": "GET /map/spots?kind=lake",
       "note": "an unknown kind is a 422",
       "status": 422,
@@ -785,6 +4201,22 @@
       "status": 404,
       "response": {
         "detail": "No spot with id 'creek_junction:n0_0'"
+      }
+    },
+    {
+      "request": "GET /map/water-bodies?type=ocean",
+      "note": "an unknown water body type is a 422",
+      "status": 422,
+      "response": {
+        "detail": "unknown type 'ocean'; one of ['creek', 'great_lake', 'lake', 'pond', 'river']"
+      }
+    },
+    {
+      "request": "GET /map/water-bodies/river:no-such-river",
+      "note": "an unknown water body id is a 404",
+      "status": 404,
+      "response": {
+        "detail": "No water body with id 'river:no-such-river'"
       }
     }
   ]

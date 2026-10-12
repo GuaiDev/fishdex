@@ -1,0 +1,586 @@
+"""Water bodies: the model, derivation from stretches and mouth lakes, linking spots, storage, API.
+
+Derivation is pure, so most tests hand it stretches and anchors and read the
+water bodies back. Nothing touches the network; the storage and API tests use
+throwaway databases, never the real one.
+"""
+
+import pytest
+from pydantic import ValidationError
+
+from src.models.spot import SpotBuildReport
+from src.models.water_body import WaterBody
+from src.services import spot_labels
+from src.services.spots import StretchHints, build_spots, classify, get_spot_detail
+from src.services.water_bodies import (
+    LakeRef,
+    derive_water_bodies,
+    get_water_body_detail,
+    lake_type,
+    river_type,
+    slugify,
+    water_bodies_geojson,
+)
+from src.storage.water_bodies import get_water_body, list_water_bodies
+from tests.test_spots import (  # noqa: F401  (fixtures are used by name)
+    BUILT,
+    JARGON,
+    JURISDICTION,
+    anchor,
+    confluence,
+    mouth,
+    run,
+    sample_anchors,
+    store,
+    stretch,
+)
+
+
+def wb_kwargs(**over):
+    base = dict(
+        water_body_id="river:credit-river",
+        jurisdiction="CA-ON",
+        name="Credit River",
+        name_source="curated",
+        type="river",
+        geometry={"type": "LineString", "coordinates": [[-79.6, 43.5], [-79.5, 43.6]]},
+        geometry_source="stretch_union",
+        built_at=BUILT,
+    )
+    return {**base, **over}
+
+
+# ── model ─────────────────────────────────────────────────────────────────────
+
+
+def test_water_body_requires_a_jurisdiction():
+    kwargs = wb_kwargs()
+    del kwargs["jurisdiction"]
+    with pytest.raises(ValidationError):
+        WaterBody(**kwargs)
+
+
+@pytest.mark.parametrize("name", ["", "  ", "Unnamed lake", "unnamed creek"])
+def test_a_name_is_real_or_absent_never_unnamed(name):
+    with pytest.raises(ValidationError):
+        WaterBody(**wb_kwargs(name=name))
+
+
+def test_an_unknown_name_stays_empty_and_says_so():
+    wb = WaterBody(**wb_kwargs(name=None, name_source="unknown"))
+    assert wb.name is None
+    with pytest.raises(ValidationError):
+        WaterBody(**wb_kwargs(name=None, name_source="curated"))
+    with pytest.raises(ValidationError):
+        WaterBody(**wb_kwargs(name="Credit River", name_source="unknown"))
+
+
+@pytest.mark.parametrize("water_body_id", ["river:", "Credit River", "bay:credit", "river:A_b"])
+def test_water_body_id_must_be_a_type_and_a_slug(water_body_id):
+    with pytest.raises(ValidationError):
+        WaterBody(**wb_kwargs(water_body_id=water_body_id))
+
+
+def test_water_body_id_must_start_with_its_type():
+    with pytest.raises(ValidationError):
+        WaterBody(**wb_kwargs(water_body_id="lake:credit-river"))
+
+
+def test_geometry_and_its_source_agree():
+    with pytest.raises(ValidationError):
+        WaterBody(**wb_kwargs(geometry=None))
+    with pytest.raises(ValidationError):
+        WaterBody(**wb_kwargs(geometry_source="none"))
+    with pytest.raises(ValidationError):
+        WaterBody(**wb_kwargs(geometry={"type": "Point", "coordinates": [0, 0]}))
+
+
+def test_water_body_round_trips_through_json():
+    wb = WaterBody(**wb_kwargs(bbox=(-79.6, 43.5, -79.5, 43.6), stretch_ids=["a"]))
+    assert WaterBody.model_validate_json(wb.model_dump_json()) == wb
+
+
+# ── typing and ids ────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("Credit River", "river"),
+        ("Bronte Creek", "creek"),
+        ("Sixteen Mile Creek", "creek"),
+        ("Sydenham River (Owen Sound)", "river"),
+        ("Niagara River", "river"),
+    ],
+)
+def test_a_river_or_creek_is_read_from_its_name(name, expected):
+    assert river_type(name) == expected
+
+
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("Lake Ontario", "great_lake"),
+        ("Georgian Bay", "great_lake"),
+        ("Lake St. Clair", "lake"),
+        ("Lake Simcoe", "lake"),
+        ("Bay of Quinte", "lake"),
+        ("Mill Pond", "pond"),
+    ],
+)
+def test_a_lake_type_comes_from_the_great_lakes_list_or_its_name(name, expected):
+    assert lake_type(name)[0] == expected
+
+
+def test_slugs_are_stable_ascii():
+    assert slugify("St. Clair River") == "st-clair-river"
+    assert slugify("Sydenham River (Owen Sound)") == "sydenham-river-owen-sound"
+
+
+# ── derivation ────────────────────────────────────────────────────────────────
+
+
+def line(x0, y0, x1, y1):
+    return {"type": "LineString", "coordinates": [[x0, y0], [x1, y1]]}
+
+
+def stretch_on(sid, river, geom, bbox, order=0, region=None):
+    s = stretch(sid, sid.title(), river, region)
+    return s.model_copy(update={"geometry": geom, "bbox": bbox, "sort_order": order})
+
+
+def test_stretches_of_one_river_are_one_water_body_drawn_as_their_union():
+    stretches = [
+        stretch_on(
+            "grand-b", "Grand River", line(-80.4, 43.4, -80.3, 43.5), (-80.4, 43.4, -80.3, 43.5), 1
+        ),
+        stretch_on(
+            "grand-a", "Grand River", line(-80.5, 43.6, -80.4, 43.4), (-80.5, 43.4, -80.4, 43.6), 0
+        ),
+        stretch_on(
+            "bronte", "Bronte Creek", line(-79.8, 43.4, -79.7, 43.5), (-79.8, 43.4, -79.7, 43.5), 2
+        ),
+    ]
+    out = derive_water_bodies(stretches, [], JURISDICTION, BUILT)
+    assert [b.water_body_id for b in out.bodies] == ["river:grand-river", "creek:bronte-creek"]
+    grand = out.bodies[0]
+    assert grand.stretch_ids == ["grand-a", "grand-b"]
+    assert grand.geometry["type"] == "MultiLineString"
+    assert len(grand.geometry["coordinates"]) == 2
+    assert grand.bbox == (-80.5, 43.4, -80.3, 43.6)
+    assert grand.name_source == "curated"
+    assert grand.attributes["type_basis"] == "name_suffix"
+    assert out.river_id("grand-a") == out.river_id("grand-b") == "river:grand-river"
+    assert out.river_id("nowhere") is None
+
+
+def test_a_multilinestring_stretch_keeps_all_its_parts():
+    multi = {"type": "MultiLineString", "coordinates": [[[0, 0], [1, 1]], [[2, 2], [3, 3]]]}
+    out = derive_water_bodies(
+        [stretch_on("a", "Credit River", multi, (0, 0, 3, 3))], [], JURISDICTION, BUILT
+    )
+    assert len(out.bodies[0].geometry["coordinates"]) == 2
+
+
+def test_a_lake_has_no_geometry_and_sits_where_its_mouths_are():
+    lakes = [
+        LakeRef("Lake Ontario", "curated", "a", 43.5, -79.6),
+        LakeRef("Lake Ontario", "curated_region", "b", 43.7, -79.2),
+    ]
+    out = derive_water_bodies([], lakes, JURISDICTION, BUILT)
+    (lake,) = out.bodies
+    assert lake.water_body_id == "great_lake:lake-ontario"
+    assert lake.type == "great_lake"
+    assert lake.geometry is None and lake.geometry_source == "none"
+    assert lake.bbox == (-79.6, 43.5, -79.2, 43.7)
+    assert lake.name_source == "curated"  # the strongest source wins
+    assert lake.stretch_ids == ["a", "b"]
+    assert lake.attributes["bbox_basis"] == "river_mouths"
+    assert out.lake_id("Lake Ontario") == lake.water_body_id
+    assert out.lake_id(None) is None
+
+
+def test_a_bay_records_the_lake_it_belongs_to():
+    out = derive_water_bodies(
+        [], [LakeRef("Georgian Bay", "curated", "a", 44.5, -80.0)], JURISDICTION, BUILT
+    )
+    assert out.bodies[0].attributes["part_of"] == "Lake Huron"
+
+
+def test_lake_spellings_that_share_a_slug_are_one_lake_and_the_others_are_kept():
+    lakes = [
+        LakeRef("Lake St. Clair", "curated", "a", 42.3, -82.5),
+        LakeRef("Lake St Clair", "ohn", "b", 42.4, -82.4),
+    ]
+    (lake,) = derive_water_bodies([], lakes, JURISDICTION, BUILT).bodies
+    assert lake.name == "Lake St. Clair"
+    assert lake.attributes["also_spelled"] == ["Lake St Clair"]
+
+
+# ── linking spots ─────────────────────────────────────────────────────────────
+
+
+def test_every_spot_is_a_child_of_its_rivers_water_body():
+    result = run(sample_anchors())
+    assert {s.water_body_id for s in result.spots} == {"river:credit-river"}
+    assert result.report.spots_linked == len(result.spots)
+    assert result.report.spots_without_water_body == 0
+    assert [b.water_body_id for b in result.water_bodies] == ["river:credit-river"]
+    assert result.report.water_bodies_total == 1
+    assert result.report.water_bodies_by_type == {"river": 1}
+
+
+def test_a_river_mouth_is_on_its_river_and_also_on_its_lake_and_the_names_agree():
+    result = run([mouth()], hints={"credit-lower": StretchHints(lake="Lake Ontario")})
+    (spot,) = result.spots
+    lake = next(b for b in result.water_bodies if b.type == "great_lake")
+    assert spot.water_body_id == "river:credit-river"
+    assert spot.also_on_water_body_ids == [lake.water_body_id]
+    assert spot.structure_attrs["lake"] == lake.name == "Lake Ontario"
+    assert spot.structure_attrs["lake_name_source"] == lake.name_source == "curated"
+
+
+def test_the_lake_name_source_follows_where_the_name_came_from():
+    curated = mouth().model_copy(update={"name": "Lake Erie", "source": "curated"})
+    (spot,) = run([curated]).spots
+    assert spot.structure_attrs["lake_name_source"] == "curated"
+    assert spot.sources[0].kind == "curation"
+
+    (from_ohn,) = run([mouth(name="Lake Erie")]).spots
+    assert from_ohn.structure_attrs["lake_name_source"] == "ohn"
+
+    result = run([mouth()], [stretch(region="Lake Huron")])
+    assert result.spots[0].structure_attrs["lake_name_source"] == "curated_region"
+    assert [b.name_source for b in result.water_bodies if b.type == "great_lake"] == [
+        "curated_region"
+    ]
+
+
+def test_a_mouth_with_no_lake_name_makes_no_lake_and_invents_none():
+    result = run([mouth()])
+    (spot,) = result.spots
+    assert spot.structure_attrs["lake"] is None
+    assert spot.also_on_water_body_ids == []
+    assert {b.type for b in result.water_bodies} == {"river"}
+
+
+def test_a_junction_listed_under_two_stretches_is_also_on_the_other_river():
+    stretches = [stretch(), stretch("sheldon", "Sheldon", "Sheldon Creek")]
+    anchors = [
+        confluence("a", 43.5, -79.6, 30.0, name="Sheldon Creek"),
+        confluence("b", 43.5, -79.6, 30.0, sid="sheldon", flows_on=False),
+    ]
+    (spot,) = run(anchors, stretches).spots
+    assert spot.water_body_id == "river:credit-river"
+    assert spot.also_on_water_body_ids == ["creek:sheldon-creek"]
+
+
+def test_a_spot_whose_stretch_is_unknown_is_counted_unlinked_not_hidden():
+    anchors = [confluence("a", 43.5, -79.6, 30.0, name="X Creek", sid="ghost")]
+    result = run(anchors, [stretch()])
+    (spot,) = result.spots
+    assert spot.water_body_id is None
+    assert result.report.spots_without_water_body == 1
+    assert result.report.spots_linked == 0
+
+
+def test_water_body_ids_come_from_the_name_not_from_stretch_ids():
+    a = derive_water_bodies([stretch("credit-lower", "Lower Credit")], [], JURISDICTION, BUILT)
+    b = derive_water_bodies(
+        [stretch("credit-renamed", "Credit, lower end")], [], JURISDICTION, BUILT
+    )
+    assert [w.water_body_id for w in a.bodies] == [w.water_body_id for w in b.bodies]
+    assert a.bodies[0].stretch_ids != b.bodies[0].stretch_ids
+
+
+def test_the_report_counts_names_by_source_and_outlines():
+    report = run([mouth()], hints={"credit-lower": StretchHints(lake="Lake Ontario")}).report
+    assert report.water_body_names == {"curated": 2}
+    assert report.water_bodies_without_geometry == 1
+    assert SpotBuildReport(jurisdiction=JURISDICTION).water_bodies_total == 0
+
+
+def test_existing_kinds_and_titles_are_unchanged_by_linking():
+    result = run([mouth()], hints={"credit-lower": StretchHints(lake="Lake Ontario")})
+    (spot,) = result.spots
+    assert spot.kind == "river_mouth"
+    assert spot.title == "Where the Credit River meets Lake Ontario"
+    assert spot.water_id == "credit-lower"
+
+
+# ── storage and build ─────────────────────────────────────────────────────────
+
+
+def built(db, curation):
+    store(db, sample_anchors(), [stretch(region="Lake Ontario")])
+    return build_spots(db, curation)
+
+
+def test_build_stores_water_bodies_and_links_spots(db, curation):
+    report = built(db, curation)
+    assert report.spots_without_water_body == 0
+    ids = {wb.water_body_id for wb in list_water_bodies(db)}
+    assert ids == {"river:credit-river", "great_lake:lake-ontario"}
+    linked = {r[0] for r in db.execute("SELECT DISTINCT water_body_id FROM spots").fetchall()}
+    assert linked == {"river:credit-river"}
+
+
+def test_stored_water_bodies_read_back_equal(db, curation):
+    built(db, curation)
+    expected = {
+        wb.water_body_id: wb
+        for wb in classify(
+            sample_anchors(),
+            [stretch(region="Lake Ontario")],
+            JURISDICTION,
+            built_at=BUILT,
+        ).water_bodies
+    }
+    for wb in list_water_bodies(db):
+        assert wb.model_dump(exclude={"built_at"}) == expected[wb.water_body_id].model_dump(
+            exclude={"built_at"}
+        )
+    assert get_water_body(db, "nope:nope") is None
+
+
+def test_rebuilding_replaces_water_bodies_and_leaves_none_stale(db, curation):
+    built(db, curation)
+    store(db, sample_anchors()[:1], [stretch()])  # the mouth, and so the lake, are gone
+    build_spots(db, curation)
+    assert {wb.water_body_id for wb in list_water_bodies(db)} == {"river:credit-river"}
+
+
+def test_a_failed_write_leaves_spots_and_water_bodies_as_they_were(db, curation):
+    from src.storage.spots import replace_spots
+
+    built(db, curation)
+    before = db.execute("SELECT COUNT(*) FROM spots").fetchone()[0]
+    result = classify(sample_anchors(), [stretch()], JURISDICTION, built_at=BUILT)
+    result.spots[0].tier = 9  # violates nothing in the model, so break the table instead
+    db.execute("CREATE TRIGGER boom BEFORE INSERT ON spots BEGIN SELECT RAISE(ABORT, 'boom'); END")
+    with pytest.raises(Exception, match="boom"):
+        replace_spots(db, JURISDICTION, result.spots, result.water_bodies)
+    assert db.execute("SELECT COUNT(*) FROM spots").fetchone()[0] == before
+    assert {wb.water_body_id for wb in list_water_bodies(db)} == {
+        "river:credit-river",
+        "great_lake:lake-ontario",
+    }
+
+
+def test_filters_by_bbox_and_type(db, curation):
+    built(db, curation)
+    far = list_water_bodies(db, bbox=(10, 10, 11, 11))
+    assert far == []
+    near_mouth = list_water_bodies(db, bbox=(-79.52, 43.39, -79.48, 43.41))
+    assert "great_lake:lake-ontario" in {wb.water_body_id for wb in near_mouth}
+    assert [wb.type for wb in list_water_bodies(db, types=["river"])] == ["river"]
+    assert list_water_bodies(db, jurisdiction="US-MI") == []
+
+
+def test_a_spots_table_from_before_water_bodies_is_brought_up_to_date(tmp_path):
+    import sqlite3
+
+    from sqlite_utils.db import Database
+
+    from src.storage.database import _ensure_spots
+
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.execute(
+        "CREATE TABLE spots (spot_id TEXT PRIMARY KEY, kind TEXT NOT NULL,"
+        " jurisdiction TEXT NOT NULL, lat REAL NOT NULL, lng REAL NOT NULL, water_id TEXT,"
+        " water_name TEXT, title TEXT NOT NULL,"
+        " subtitle TEXT, tier INTEGER NOT NULL, structure_type TEXT NOT NULL,"
+        " structure_attrs_json TEXT NOT NULL DEFAULT '{}', signals_json TEXT NOT NULL DEFAULT '{}',"
+        " getting_there_json TEXT NOT NULL DEFAULT '[]', bridges_json TEXT NOT NULL DEFAULT '[]',"
+        " sources_json TEXT NOT NULL DEFAULT '[]', built_at TEXT NOT NULL)"
+    )
+    conn.commit()
+    db = Database(conn)
+    _ensure_spots(db)
+    _ensure_spots(db)  # idempotent
+    cols = {c.name for c in db["spots"].columns}
+    assert {"water_body_id", "also_on_water_body_ids_json"} <= cols
+    assert "water_bodies" in db.table_names()
+
+
+# ── read side ─────────────────────────────────────────────────────────────────
+
+
+def test_geojson_lists_rivers_with_lines_and_lakes_without(db, curation):
+    built(db, curation)
+    body = water_bodies_geojson(db)
+    assert body["meta"]["count"] == 2
+    assert body["meta"]["type_counts"]["river"] == 1
+    by_id = {f["id"]: f for f in body["features"]}
+    river = by_id["river:credit-river"]
+    assert river["geometry"]["type"] == "MultiLineString"
+    assert river["properties"]["display_name"] == "Credit River"
+    assert river["properties"]["spot_counts"]
+    assert river["properties"]["jurisdiction"] == JURISDICTION
+    lake = by_id["great_lake:lake-ontario"]
+    assert lake["geometry"] is None
+    assert lake["properties"]["name_source"] == "curated_region"
+    assert [f["properties"]["type"] for f in body["features"]] == ["river", "great_lake"]
+
+
+def test_a_rivers_line_must_cross_the_view_not_just_its_overall_box(db):
+    from src.storage.spots import replace_spots
+
+    # An L-shaped river: its box covers the whole square, its line only two edges.
+    elbow = {"type": "LineString", "coordinates": [[0, 0], [0, 10], [10, 10]]}
+    river = WaterBody(**wb_kwargs(geometry=elbow, bbox=(0, 0, 10, 10)))
+    replace_spots(db, JURISDICTION, [], [river])
+    assert water_bodies_geojson(db, bbox=(1, 1, 9, 9))["features"] == []
+    assert len(water_bodies_geojson(db, bbox=(-1, 4, 1, 6))["features"]) == 1
+    # a long segment with no vertex in the view still counts when it crosses it
+    assert len(water_bodies_geojson(db, bbox=(4, 9, 6, 11))["features"]) == 1
+
+
+def test_geojson_type_filter_leaves_the_counts_alone(db, curation):
+    built(db, curation)
+    body = water_bodies_geojson(db, types=["great_lake"])
+    assert [f["id"] for f in body["features"]] == ["great_lake:lake-ontario"]
+    assert body["meta"]["type_counts"]["river"] == 1
+
+
+def test_an_unnamed_water_body_reads_as_unnamed_in_words_with_a_null_name(db):
+    from src.storage.spots import replace_spots
+
+    nameless = WaterBody(
+        **wb_kwargs(
+            water_body_id="lake:pond-1",
+            type="lake",
+            name=None,
+            name_source="unknown",
+            geometry=None,
+            geometry_source="none",
+            bbox=(0, 0, 1, 1),
+        )
+    )
+    replace_spots(db, JURISDICTION, [], [nameless])
+    (feature,) = water_bodies_geojson(db)["features"]
+    assert feature["properties"]["name"] is None
+    assert feature["properties"]["display_name"] == "A lake with no name on file"
+    assert not feature["properties"]["display_name"].lower().startswith("unnamed")
+
+
+def test_detail_lists_the_spots_on_a_water_body_and_those_also_there(db, curation):
+    built(db, curation)
+    river = get_water_body_detail(db, "river:credit-river")
+    assert river["name"] == "Credit River"
+    assert river["stretch_ids"] == ["credit-lower"]
+    assert {s["kind"] for s in river["spots"]} >= {"river_mouth", "below_dam"}
+    assert river["also_here_spots"] == []
+    lake = get_water_body_detail(db, "great_lake:lake-ontario")
+    assert lake["spots"] == []
+    assert [s["kind"] for s in lake["also_here_spots"]] == ["river_mouth"]
+    assert get_water_body_detail(db, "river:nope") is None
+
+
+def test_spot_detail_names_its_water_body_and_the_lake_it_is_also_on(db, curation):
+    built(db, curation)
+    mouth_id = next(
+        r[0] for r in db.execute("SELECT spot_id FROM spots WHERE kind='river_mouth'").fetchall()
+    )
+    detail = get_spot_detail(db, mouth_id)
+    assert detail["water_body"]["water_body_id"] == "river:credit-river"
+    assert detail["water_body"]["name_source"] == "curated"
+    assert [w["water_body_id"] for w in detail["also_on_water_bodies"]] == [
+        "great_lake:lake-ontario"
+    ]
+    assert detail["more_on_this_water"]  # the stretch-level list is still served
+
+
+# ── API ───────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def wb_client(tmp_path, monkeypatch, curation, _template_db):
+    import shutil
+
+    from fastapi.testclient import TestClient
+
+    import src.storage.database as database
+    from src.api.main import app, get_current_user
+
+    shutil.copy(_template_db, tmp_path / "api.db")
+    monkeypatch.setattr(database, "DB_PATH", tmp_path / "api.db")
+    api_db = database.get_db()
+    built(api_db, curation)
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_water_bodies_endpoint_returns_a_feature_collection(wb_client):
+    body = wb_client.get("/map/water-bodies").json()
+    assert body["type"] == "FeatureCollection"
+    assert body["meta"]["count"] == 2
+    assert {"water_body_id", "name", "name_source", "type", "jurisdiction"} <= set(
+        body["features"][0]["properties"]
+    )
+
+
+def test_water_bodies_endpoint_filters(wb_client):
+    rivers = wb_client.get("/map/water-bodies?type=river,creek").json()
+    assert [f["properties"]["type"] for f in rivers["features"]] == ["river"]
+    inside = wb_client.get("/map/water-bodies?bbox=-80,43,-79,44").json()
+    assert inside["meta"]["count"] == 2
+    assert wb_client.get("/map/water-bodies?bbox=10,10,11,11").json()["features"] == []
+    assert wb_client.get("/map/water-bodies?jurisdiction=US-MI").json()["features"] == []
+
+
+@pytest.mark.parametrize("query", ["bbox=1,2,3", "bbox=5,5,1,1", "type=ocean"])
+def test_water_bodies_endpoint_rejects_bad_filters(wb_client, query):
+    assert wb_client.get(f"/map/water-bodies?{query}").status_code == 422
+
+
+def test_water_body_endpoint_returns_the_full_record(wb_client):
+    body = wb_client.get("/map/water-bodies/river:credit-river").json()
+    assert body["name"] == "Credit River"
+    assert body["geometry"]["type"] == "MultiLineString"
+    assert body["spots"]
+    assert wb_client.get("/map/water-bodies/river:nope").status_code == 404
+
+
+def test_spots_geojson_carries_the_water_body_id(wb_client):
+    props = wb_client.get("/map/spots?tier=3").json()["features"][0]["properties"]
+    assert props["water_body_id"] == "river:credit-river"
+
+
+def test_water_body_endpoints_require_auth(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    import src.storage.database as database
+    from src.api.main import app
+
+    monkeypatch.setattr(database, "DB_PATH", tmp_path / "api.db")
+    client = TestClient(app)
+    for path in ("/map/water-bodies", "/map/water-bodies/river:credit-river"):
+        assert client.get(path).status_code in (401, 403)
+
+
+# ── the words ─────────────────────────────────────────────────────────────────
+
+
+def test_labels_serve_the_water_body_vocabulary():
+    payload = spot_labels.labels_payload()
+    assert [t["type"] for t in payload["water_body_types"]] == [
+        "river",
+        "creek",
+        "lake",
+        "pond",
+        "great_lake",
+    ]
+    assert set(payload["name_sources"]) == {"curated", "curated_region", "ohn", "osm", "unknown"}
+    assert payload["no_outline_note"]
+
+
+def test_the_water_body_words_carry_no_jargon_or_unnamed_titles():
+    for text in spot_labels.all_strings():
+        assert not JARGON.search(text), text
+    for entry in spot_labels.WATER_BODY_TYPES.values():
+        assert not entry["unnamed"].lower().startswith("unnamed")

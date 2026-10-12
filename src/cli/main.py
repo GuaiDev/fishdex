@@ -1590,6 +1590,18 @@ def _print_spot_report(report) -> None:
         table.add_row(f"[yellow]generic title: {reason}[/yellow]", f"[yellow]{n}[/yellow]")
     table.add_row("getting-there anchors", str(report.access_anchors))
     table.add_row("spots with no access nearby", str(report.spots_without_access))
+    table.add_row("water bodies", str(report.water_bodies_total))
+    for wb_type, n in sorted(report.water_bodies_by_type.items()):
+        table.add_row(f"  {wb_type}", str(n))
+    for source, n in sorted(report.water_body_names.items()):
+        table.add_row(f"  name from {source}", str(n))
+    table.add_row("water bodies with no outline", str(report.water_bodies_without_geometry))
+    table.add_row("spots linked to a water body", str(report.spots_linked))
+    if report.spots_without_water_body:
+        table.add_row(
+            "[yellow]spots with no water body[/yellow]",
+            f"[yellow]{report.spots_without_water_body}[/yellow]",
+        )
     console.print(table)
 
 

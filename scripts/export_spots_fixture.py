@@ -37,9 +37,31 @@ LISTS = [
     ),
 ]
 DETAIL_KINDS = ("below_dam", "creek_junction", "river_mouth", "public_fishing")
+# Water bodies: the rivers, creeks and lakes the spots hang off.
+WATER_BODY_LISTS = [
+    (
+        "/map/water-bodies?bbox=-79.75,43.40,-79.60,43.50",
+        "every water body whose line crosses a box around Oakville: two creeks and the lake",
+    ),
+    (
+        "/map/water-bodies?type=great_lake,lake",
+        "type filter: lakes have geometry null (no outline on file) and a box from their mouths",
+    ),
+    (
+        "/map/water-bodies?type=creek&bbox=-79.9,43.3,-79.5,43.6",
+        "creeks only, in a box around Oakville",
+    ),
+]
+WATER_BODY_DETAILS = [
+    ("river:credit-river", "a river in full: its line, its stretches, the spots on it"),
+    ("great_lake:lake-ontario", "a lake: no geometry, with the river mouths that open onto it"),
+    ("creek:bronte-creek", "a creek"),
+]
 ERRORS = [
     ("/map/spots?kind=lake", "an unknown kind is a 422"),
     ("/map/spots/creek_junction:n0_0", "an unknown spot id is a 404"),
+    ("/map/water-bodies?type=ocean", "an unknown water body type is a 422"),
+    ("/map/water-bodies/river:no-such-river", "an unknown water body id is a 404"),
 ]
 
 
@@ -75,6 +97,10 @@ def main() -> None:
     for kind in DETAIL_KINDS:
         if kind in seen:
             capture(f"/map/spots/{seen[kind]}", f"one {kind} spot in full")
+    for path, note in WATER_BODY_LISTS:
+        capture(path, note)
+    for water_body_id, note in WATER_BODY_DETAILS:
+        capture(f"/map/water-bodies/{water_body_id}", note)
     for path, note in ERRORS:
         capture(path, note)
 

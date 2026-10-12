@@ -22,6 +22,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.models.jurisdiction import JurisdictionCode
+from src.models.water_body import WaterBody
 
 SpotKind = Literal["river_mouth", "creek_junction", "below_dam", "quiet_water", "public_fishing"]
 SpotTier = Literal[1, 2, 3]
@@ -79,6 +80,12 @@ class Spot(BaseModel):
     # one of them here and the other in structure_attrs["also_on_water_ids"].
     water_id: str | None = None
     water_name: str | None = None
+    # The water body (river, creek or lake) the spot is a child of. None only when
+    # its stretch is unknown to the build; the report counts those.
+    water_body_id: str | None = None
+    # Other water bodies it also belongs to: the lake a river mouth opens onto, the
+    # river a creek's last stretch joins.
+    also_on_water_body_ids: list[str] = Field(default_factory=list)
     title: str = Field(min_length=1)
     subtitle: str | None = None
     tier: SpotTier
@@ -140,6 +147,15 @@ class SpotBuildReport(BaseModel):
     # Access anchors attached to spots, and spots with no access found nearby.
     access_anchors: int = 0
     spots_without_access: int = 0
+    # Water bodies derived, and how the spots hang off them. A spot with no water
+    # body is a spot whose stretch the build could not find, never a quiet default.
+    water_bodies_total: int = 0
+    water_bodies_by_type: dict[str, int] = Field(default_factory=dict)
+    # Where each water body's name came from; "unknown" counts names left empty.
+    water_body_names: dict[str, int] = Field(default_factory=dict)
+    water_bodies_without_geometry: int = 0
+    spots_linked: int = 0
+    spots_without_water_body: int = 0
 
     def drop(self, reason: str, n: int = 1) -> None:
         if n > 0:  # a zero would read as a reason that fired
@@ -158,4 +174,5 @@ class SpotClassification(BaseModel):
     """classify()'s return: the spots and the account of how they were chosen."""
 
     spots: list[Spot]
+    water_bodies: list[WaterBody] = Field(default_factory=list)
     report: SpotBuildReport
