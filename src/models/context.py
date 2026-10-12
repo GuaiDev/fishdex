@@ -205,6 +205,13 @@ class SpeciesRecord(BaseModel):
     is_obscured: bool = False
     """iNaturalist geoprivacy — the point is fuzzed to ~22km, not precise."""
 
+    survey_record: Provenance | None = None
+    """The most recent record of this species that came from a standardised
+    survey (known gear, an event id, a named programme) rather than a photo or a
+    specimen, or None when none did. Kept apart from `provenance`, which is the
+    most recent record of any kind: a surveyed haul outranks a casual photo even
+    when the photo is newer, and the reader needs to be able to cite either."""
+
 
 # ── describe() slices ─────────────────────────────────────────────────────────
 

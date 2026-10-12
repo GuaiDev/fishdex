@@ -20,6 +20,11 @@ Rendering rules, applied uniformly:
     specimen and a 2022 sighting are not peers and must not read as peers.
 """
 
+import re
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import NamedTuple
+
 from src.models.context import (
     AccessSlice,
     ConditionsSlice,
@@ -36,6 +41,23 @@ from src.models.context import (
     UserLayer,
     WaterSlice,
 )
+from src.models.spot import AccessRef, Spot
+from src.models.spot_card import (
+    AccessItem,
+    CardFact,
+    CardHook,
+    CardMeta,
+    CardSpecies,
+    CrownLandFlag,
+    GeneralReasoning,
+    GettingThereBlock,
+    GlossaryTerm,
+    MightFindBlock,
+    SpotCard,
+    WhyGatherBlock,
+)
+from src.services import spot_labels
+from src.services.context import translate
 
 # A record older than this is called out in the rendering. Not a cutoff and not
 # a confidence penalty — the angler weighs it. We only make sure the date is
@@ -481,3 +503,454 @@ def render_recorded_insight(insight: RecordedInsight) -> str:
     if insight.recommendation:
         line += f"\n  recommendation: {insight.recommendation}"
     return line
+
+
+# -- the spot card ---------------------------------------------------------------
+#
+# Everything a person reads on a tapped spot is produced here, from the Spot, the
+# describe() slices and the static dictionary in translate.py. No model call: a
+# map tap is free and the card cannot drift between runs. The fixed strings are
+# constants so a lint test can read them all.
+
+CARD_TITLES = {
+    "hook": "Why it's interesting",
+    "might_find": "You might find",
+    "why_gather": "Why fish gather here",
+    "getting_there": "Getting there",
+}
+CARE_MESSAGE = (
+    "Protected fish have been recorded near here. Handle any fish with care and release it."
+)
+HONEST_EMPTY = "No fish records within {radius} km, so this is a place to find out."
+HONEST_EMPTY_IMPRECISE = (
+    "Fish records near here are too fuzzy to place, so this is a place to find out."
+)
+MIGHT_FIND_CAVEAT = "Recorded nearby, not a catch guarantee."
+NO_RECORDS = "No fish records within {radius} km."
+NO_OTHER_RECORDS = "No other fish records within {radius} km."
+NO_RECORDS_TO_CHECK = "We hold no fish records for this area yet."
+FEW_LOOKERS = (
+    "That says nothing about whether fish are there; it may only mean few people have looked."
+)
+PROTECTED_NOTE = "Protected species recorded nearby are not listed."
+IMPRECISE_NOTE = "Records with a deliberately fuzzy location are left out."
+FACTS_TITLE = "What our records say about this spot"
+UNVERIFIED_TITLE = "Not checked on the ground"
+NO_ACCESS = "No parking, trailhead or boat launch found within {radius} km in our map data."
+OLDER_RECORD = "Older record"
+UNVERIFIED_ALWAYS = "Fishing rules and permission to cross private land are not checked here."
+UNVERIFIED_OSM = (
+    "Parking, trails, launches and road crossings come from OpenStreetMap, which "
+    "volunteers map. A missing one may just be unmapped."
+)
+UNVERIFIED_DISTANCE = "Distances are in a straight line, not by road or trail."
+UNVERIFIED_DAM = (
+    "We could not confirm which side of the {kind} the water runs away from, so the "
+    "spot sits at the {kind} itself."
+)
+CROWN_MAPPED = (
+    "Crown land is mapped within {radius} km. Public access is generally allowed, "
+    "but check local rules before you go."
+)
+CROWN_NONE = "No Crown land found within {radius} km in our data."
+CROWN_UNCHECKED = "We have no Crown land data for this area."
+TOP_SPECIES = 5
+_SOURCE_OHN = "Ontario Hydro Network"
+_SOURCE_OSM = "OpenStreetMap"
+_SOURCE_CURATION = "Fishdex's own list of rivers"
+_YOUR_CATCH = "your logged catch"
+
+
+@dataclass
+class _Species:
+    """One recorded species as the card ranks it, before it becomes a CardSpecies."""
+
+    line: CardSpecies
+    count: int
+
+
+@dataclass
+class _CardInputs:
+    spot: Spot
+    ctx: PlaceContext | None
+    radius_km: float
+    shown: list[CardSpecies]  # every species that may be named, ranked
+    shown_records: int  # records behind `shown`
+    n_protected: int
+    n_imprecise: int
+
+    @property
+    def radius(self) -> str:
+        return f"{self.radius_km:g}"
+
+
+class HookRule(NamedTuple):
+    """One rule in the hook chain. `build` is None for a slot not yet implemented."""
+
+    kind: str
+    build: Callable[[_CardInputs], str | None] | None
+
+
+def _hook_protected(c: _CardInputs) -> str | None:
+    return CARE_MESSAGE if c.n_protected else None
+
+
+def _hook_structure(c: _CardInputs) -> str | None:
+    """One plain sentence about the water, only where a record supports it."""
+    attrs = c.spot.structure_attrs
+    if c.spot.kind == "creek_junction":
+        sizes = _junction_sizes(attrs)
+        if sizes:
+            return (
+                f"Two streams meet here, one fed by about {_km(sizes[0])} km of channel "
+                f"upstream and the other by about {_km(sizes[1])} km."
+            )
+    elif c.spot.kind == "river_mouth" and attrs.get("lake"):
+        return f"A river running out into {attrs['lake']}."
+    elif c.spot.kind == "below_dam" and attrs.get("dam_kind") and attrs.get("tailwater_verified"):
+        return f"The water just downstream of a {attrs['dam_kind']}."
+    return None
+
+
+def _hook_honest_empty(c: _CardInputs) -> str | None:
+    if c.shown or c.n_protected:
+        return None
+    if c.n_imprecise:
+        return HONEST_EMPTY_IMPRECISE
+    return HONEST_EMPTY.format(radius=c.radius)
+
+
+# First rule that has data wins. "new_to_you" needs the logged-in user (phase 5)
+# and "distinctive" needs frequency along the river (phase 6); the card is the
+# same for everyone, so both are empty slots. They show nothing, not even a
+# placeholder, until their phase fills `build`.
+HOOK_CHAIN: tuple[HookRule, ...] = (
+    HookRule("protected_species", _hook_protected),
+    HookRule("new_to_you", None),
+    HookRule("distinctive", None),
+    HookRule("structure", _hook_structure),
+    HookRule("honest_empty", _hook_honest_empty),
+)
+
+
+def _choose_hook(c: _CardInputs) -> CardHook:
+    for rule in HOOK_CHAIN:
+        text = rule.build(c) if rule.build else None
+        if text:
+            return CardHook(title=CARD_TITLES["hook"], kind=rule.kind, text=text)
+    # Records exist, but nothing above has anything specific to say: say what
+    # the kind of place is rather than leave the block blank.
+    return CardHook(
+        title=CARD_TITLES["hook"],
+        kind="kind_description",
+        text=spot_labels.KINDS[c.spot.kind]["one_liner"],
+    )
+
+
+def _km(value: float) -> str:
+    return f"{value:.0f}" if value >= 10 else f"{value:.1f}".removesuffix(".0")
+
+
+def _junction_sizes(attrs: dict) -> tuple[float, float] | None:
+    """(smaller, larger) upstream channel length at a junction, when both are known."""
+    joining = float(attrs.get("joining_upstream_km") or 0)
+    stretch = float(attrs.get("stretch_upstream_km") or 0)
+    if joining <= 0 or stretch <= 0:
+        return None
+    return (min(joining, stretch), max(joining, stretch))
+
+
+def _distance(metres: int) -> str:
+    if metres >= 1000:
+        return f"about {metres / 1000:.1f} km"
+    return f"about {max(10, round(metres, -1))} m"
+
+
+def _species_line(rec) -> _Species | None:
+    prov = rec.survey_record or rec.provenance
+    if prov.kind.value != "record" or prov.source == _YOUR_CATCH:
+        return None  # a card is the same for everyone and never leans on web or personal data
+    common = rec.common_name or rec.species
+    if common == common.lower():
+        common = common.title()
+    scientific = rec.species if rec.species.lower() != common.lower() else None
+    note = OLDER_RECORD if prov.date and _is_stale(prov.date, None) else None
+    return _Species(
+        line=CardSpecies(
+            name=common,
+            scientific_name=scientific,
+            source=prov.source or "record",
+            date=prov.date,
+            evidence="survey" if rec.survey_record else "sighting",
+            cite=prov.describe(),
+            note=note,
+        ),
+        count=rec.count,
+    )
+
+
+def _rank(rows: list[_Species]) -> list[_Species]:
+    """Survey records first, then the most recent, then the most often recorded."""
+    rows = sorted(rows, key=lambda r: r.line.name.lower())
+    rows.sort(key=lambda r: -r.count)
+    rows.sort(key=lambda r: r.line.date or "", reverse=True)
+    rows.sort(key=lambda r: 0 if r.line.evidence == "survey" else 1)
+    return rows
+
+
+def _more(left: int) -> str | None:
+    if left <= 0:
+        return None
+    return (
+        f"and {left} more species recorded nearby"
+        if left > 1
+        else "and 1 more species recorded nearby"
+    )
+
+
+def _might_find(c: _CardInputs) -> MightFindBlock:
+    top = c.shown[:TOP_SPECIES]
+    left = len(c.shown) - len(top)
+    empty = None
+    if not c.shown:
+        reason = c.ctx.records.empty_reason if c.ctx and c.ctx.records else None
+        if c.n_protected:
+            empty = NO_OTHER_RECORDS.format(radius=c.radius)
+        elif reason is not None and reason.value == "source_does_not_cover_area":
+            empty = NO_RECORDS_TO_CHECK
+        else:
+            empty = f"{NO_RECORDS.format(radius=c.radius)} {FEW_LOOKERS}"
+    notes = [
+        n for n, flag in ((PROTECTED_NOTE, c.n_protected), (IMPRECISE_NOTE, c.n_imprecise)) if flag
+    ]
+    return MightFindBlock(
+        title=CARD_TITLES["might_find"],
+        species=top,
+        more_text=f"and {left} more species recorded nearby"
+        if left > 1
+        else "and 1 more species recorded nearby"
+        if left == 1
+        else None,
+        caveat=MIGHT_FIND_CAVEAT,
+        empty_text=empty,
+        note=" ".join(notes) or None,
+        radius_km=c.radius_km,
+    )
+
+
+def _why_gather(c: _CardInputs) -> WhyGatherBlock:
+    kind = c.spot.kind
+    general = translate.why_fish_gather(kind)
+    facts = _spot_facts(c)
+    return WhyGatherBlock(
+        title=CARD_TITLES["why_gather"],
+        what_it_is=spot_labels.KINDS[kind]["one_liner"],
+        general=GeneralReasoning(
+            text=str(general.value),
+            label=general.meaning or translate.GENERAL_REASONING_LABEL,
+        ),
+        facts_title=FACTS_TITLE,
+        facts=facts,
+    )
+
+
+def _spot_facts(c: _CardInputs) -> list[CardFact]:
+    """What the data says about this spot, one fact per line, each tagged with its source."""
+    spot, attrs = c.spot, c.spot.structure_attrs
+    facts: list[CardFact] = []
+    if spot.kind == "creek_junction":
+        sizes = _junction_sizes(attrs)
+        if sizes:
+            facts.append(
+                CardFact(
+                    text=(
+                        f"The smaller stream has about {_km(sizes[0])} km of channel upstream "
+                        f"of this point; the larger has about {_km(sizes[1])} km."
+                    ),
+                    source=_SOURCE_OHN,
+                )
+            )
+    elif spot.kind == "river_mouth" and attrs.get("lake"):
+        facts.append(
+            CardFact(text=f"The river runs out into {attrs['lake']}.", source=_SOURCE_CURATION)
+        )
+    elif spot.kind == "below_dam":
+        kind = attrs.get("dam_kind")
+        if kind:
+            facts.append(CardFact(text=f"Mapped as a {kind}.", source=_SOURCE_OSM))
+        if attrs.get("operator"):
+            facts.append(CardFact(text=f"Run by {attrs['operator']}.", source=_SOURCE_OSM))
+    elif spot.kind == "public_fishing":
+        facts.append(CardFact(text="Marked on the map as a place to fish.", source=_SOURCE_OSM))
+
+    link = c.ctx.structure.waterbody_connection if c.ctx and c.ctx.structure else None
+    if link is not None and link.value is True:
+        facts.append(
+            CardFact(text="The water here connects to a lake or pond.", source=_SOURCE_OHN)
+        )
+
+    if c.shown:
+        sources = sorted({_source_name(s.source) for s in c.shown})
+        facts.append(
+            CardFact(
+                text=(
+                    f"{c.shown_records} fish records within {c.radius} km, "
+                    f"covering {len(c.shown)} species."
+                ),
+                source=", ".join(sources),
+            )
+        )
+    return facts
+
+
+def _source_name(source: str) -> str:
+    return source.split("/", 1)[0]
+
+
+def _access_details(ref: AccessRef) -> list[str]:
+    a = ref.attributes
+    out: list[str] = []
+    if str(a.get("access", "")).lower() in {"yes", "public", "permissive"}:
+        out.append("mapped as open to the public")
+    elif str(a.get("access", "")).lower() in {"private", "no", "customers"}:
+        out.append(f"mapped as {'for customers only' if a['access'] == 'customers' else 'private'}")
+    if str(a.get("fee", "")).lower() == "no":
+        out.append("mapped as free")
+    elif str(a.get("fee", "")).lower() == "yes":
+        out.append("mapped as paid")
+    if str(a.get("capacity", "")).isdigit():
+        out.append(f"about {a['capacity']} spaces")
+    if a.get("surface"):
+        out.append(str(a["surface"]))
+    if a.get("operator"):
+        out.append(f"run by {a['operator']}")
+    return out
+
+
+def _access_item(ref: AccessRef) -> AccessItem:
+    label = spot_labels.ACCESS_LABELS[ref.kind]
+    base = "Public road crossing" if ref.kind == "road_crossing" else label
+    named = f"{base} ({ref.name})" if ref.name else base
+    return AccessItem(
+        kind=ref.kind,
+        label=label,
+        text=f"{named} {_distance(ref.distance_m)} away",
+        distance_m=ref.distance_m,
+        details=_access_details(ref),
+    )
+
+
+def _crown_land(c: _CardInputs) -> CrownLandFlag:
+    field = c.ctx.access.crown_land if c.ctx and c.ctx.access else None
+    if field is not None and not field.is_empty:
+        return CrownLandFlag(
+            state="mapped",
+            text=CROWN_MAPPED.format(radius=c.radius),
+            source=field.provenance.source if field.provenance else None,
+        )
+    if (
+        field is not None
+        and field.empty_reason
+        and field.empty_reason.value == "no_records_in_radius"
+    ):
+        return CrownLandFlag(state="none_found", text=CROWN_NONE.format(radius=c.radius))
+    return CrownLandFlag(state="not_checked", text=CROWN_UNCHECKED)
+
+
+def _getting_there(c: _CardInputs) -> GettingThereBlock:
+    spot = c.spot
+    nearest: dict[str, AccessRef] = {}
+    for ref in sorted(
+        spot.getting_there + spot.bridges, key=lambda r: (r.distance_m, r.source_ref)
+    ):
+        nearest.setdefault(ref.kind, ref)
+    items = [
+        _access_item(nearest[k])
+        for k in ("parking", "trail_head", "boat_launch", "road_crossing")
+        if k in nearest
+    ]
+
+    unverified = [UNVERIFIED_OSM]
+    if items:
+        unverified.append(UNVERIFIED_DISTANCE)
+    if spot.kind == "below_dam" and spot.structure_attrs.get("tailwater_verified") is False:
+        unverified.append(UNVERIFIED_DAM.format(kind=spot.structure_attrs.get("dam_kind", "dam")))
+    unverified.append(UNVERIFIED_ALWAYS)
+
+    return GettingThereBlock(
+        title=CARD_TITLES["getting_there"],
+        items=items,
+        empty_text=None if items else NO_ACCESS.format(radius="1.5"),
+        crown_land=_crown_land(c),
+        unverified_title=UNVERIFIED_TITLE,
+        unverified=unverified,
+    )
+
+
+def _terms_used(*texts: str) -> list[GlossaryTerm]:
+    """Glossary entries for the hard words that actually appear in this card's text."""
+    body = " ".join(texts)
+    return [
+        GlossaryTerm(term=term, text=text)
+        for term, text in translate.GLOSSARY.items()
+        if re.search(rf"\b{term}\b", body, re.IGNORECASE)
+    ]
+
+
+def render_spot(
+    spot: Spot,
+    ctx: PlaceContext | None,
+    protected: frozenset[str] = frozenset(),
+    unchecked: int = 0,
+) -> SpotCard:
+    """The whole tap card for one spot: four blocks, every string already written.
+
+    `ctx` is `describe(..., caller="map_tap", radius_km=2)` for the spot. It is
+    the only source of fish records, so a card can never say more than the
+    corpus holds. `protected` names the recorded species (lowercased scientific
+    names) that carry an affirmative listing signal; the caller decides that
+    with `status_known_listed`, never `sar_alert`. Those species are not named
+    anywhere in the card, are not counted, and turn the hook into a care message.
+    `unchecked` is how many recorded species were not in the species file.
+
+    The card is the same for every user. Nothing here reads a person's history.
+    """
+    radius = ctx.place.radius_km if ctx else 2.0
+    rows: list[_Species] = []
+    n_protected = n_imprecise = 0
+    for rec in ctx.records.species if ctx and ctx.records else []:
+        if rec.species.strip().lower() in protected:
+            n_protected += 1
+        elif rec.is_obscured:
+            n_imprecise += 1  # ~22 km of fuzz is not "within 2 km"
+        elif (row := _species_line(rec)) is not None:
+            rows.append(row)
+    ranked = _rank(rows)
+    inputs = _CardInputs(
+        spot=spot,
+        ctx=ctx,
+        radius_km=radius,
+        shown=[r.line for r in ranked],
+        shown_records=sum(r.count for r in ranked),
+        n_protected=n_protected,
+        n_imprecise=n_imprecise,
+    )
+    hook = _choose_hook(inputs)
+    getting_there = _getting_there(inputs)
+    why_gather = _why_gather(inputs)
+    return SpotCard(
+        spot_id=spot.spot_id,
+        hook=hook,
+        might_find=_might_find(inputs),
+        why_gather=why_gather,
+        getting_there=getting_there,
+        terms=_terms_used(spot.title, hook.text, *(f.text for f in why_gather.facts)),
+        meta=CardMeta(
+            records_radius_km=radius,
+            species_shown=len(ranked),
+            species_withheld_protected=n_protected,
+            species_withheld_imprecise=n_imprecise,
+            species_status_unchecked=unchecked,
+            cache_key=f"{spot.spot_id}@{spot.built_at}",
+        ),
+    )

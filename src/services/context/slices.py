@@ -58,6 +58,8 @@ def build_records(
         _merge(found, rec)
     for rec in _gbif_records(db, place, species_filter):
         _merge(found, rec)
+    for rec in _survey_records(db, place, species_filter):
+        _merge(found, rec)
     for rec in _user_catch_records(db, place, species_filter, user_id):
         _merge(found, rec)
 
@@ -170,6 +172,7 @@ def _merge(found: dict[str, SpeciesRecord], rec: SpeciesRecord) -> None:
         found[key] = rec
         return
     existing.count += rec.count
+    existing.survey_record = _latest_survey(existing.survey_record, rec.survey_record)
 
     # Date, source and obscured flag are one coherent triple: they all describe
     # the single most recent record we hold for this species here. Moving them
@@ -184,6 +187,13 @@ def _merge(found: dict[str, SpeciesRecord], rec: SpeciesRecord) -> None:
         existing.most_recent = rec.most_recent
         existing.provenance = rec.provenance
         existing.is_obscured = rec.is_obscured
+
+
+def _latest_survey(a: Provenance | None, b: Provenance | None) -> Provenance | None:
+    """The more recent of two survey provenances; a dated one beats an undated one."""
+    if a is None or b is None:
+        return a or b
+    return b if (b.date or "") > (a.date or "") else a
 
 
 def _inat_records(
@@ -245,19 +255,73 @@ def _gbif_records(
         logger.warning("GBIF slice failed", exc_info=True)
         return []
 
-    return [
-        SpeciesRecord(
-            species=o.species,
-            common_name=getattr(o, "common_name", None),
-            most_recent=str(getattr(o, "observed_on", "") or "") or None,
-            provenance=Provenance(
-                kind=ProvenanceKind.RECORD,
-                source=f"GBIF/{getattr(o, 'dataset_name', '') or 'occurrence'}",
-                date=str(getattr(o, "observed_on", "") or "") or None,
-            ),
+    out = []
+    for o in obs:
+        provenance = Provenance(
+            kind=ProvenanceKind.RECORD,
+            source=f"GBIF/{getattr(o, 'dataset_name', '') or 'occurrence'}",
+            date=str(getattr(o, "observed_on", "") or "") or None,
         )
-        for o in obs
-    ]
+        # A sampling protocol or an event id means the row came out of a
+        # structured survey, not a casual sighting.
+        is_survey = bool(getattr(o, "sampling_protocol", None) or getattr(o, "event_id", None))
+        out.append(
+            SpeciesRecord(
+                species=o.species,
+                common_name=getattr(o, "common_name", None),
+                most_recent=provenance.date,
+                provenance=provenance,
+                survey_record=provenance if is_survey else None,
+            )
+        )
+    return out
+
+
+def _survey_records(db: Database, place: Place, species_filter: str | None) -> list[SpeciesRecord]:
+    """Standardised fish surveys (e.g. TRCA electrofishing) within the radius.
+
+    Empty until a survey adapter has been run, which is the common case today.
+    """
+    if "fish_surveys" not in db.table_names():
+        return []
+    deg = place.radius_km / _KM_PER_DEGREE
+    try:
+        rows = list(
+            db["fish_surveys"].rows_where(
+                "lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?",
+                [place.lat - deg, place.lat + deg, place.lng - deg, place.lng + deg],
+                order_by="visit_date desc",
+                limit=500,
+            )
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning("fish survey slice failed", exc_info=True)
+        return []
+
+    out = []
+    for r in rows:
+        name = r.get("species_scientific_name") or r.get("species_common_name")
+        common = r.get("species_common_name")
+        if not name:
+            continue
+        if species_filter and species_filter.lower() not in f"{name} {common}".lower():
+            continue
+        date = r.get("visit_date") or (str(r["sample_year"]) if r.get("sample_year") else None)
+        provenance = Provenance(
+            kind=ProvenanceKind.RECORD,
+            source=r.get("survey_program") or "fish survey",
+            date=date,
+        )
+        out.append(
+            SpeciesRecord(
+                species=name,
+                common_name=common,
+                most_recent=date,
+                provenance=provenance,
+                survey_record=provenance,
+            )
+        )
+    return out
 
 
 def _user_catch_records(
@@ -579,14 +643,12 @@ def _confluence_and_waterbody(
         ContextField.recorded(
             is_conf,
             source="OHN confluence analysis",
-            meaning="streams meet here — fish congregate below the junction"
-            if is_conf
-            else None,
+            meaning="two streams meet in this reach" if is_conf else None,
         ),
         ContextField.recorded(
             wb,
             source="OHN connectivity",
-            meaning="connects to a lake or pond — fish move in from it" if wb else None,
+            meaning="connects to a lake or pond" if wb else None,
         ),
     )
 
@@ -708,7 +770,9 @@ def _access_note(out: AccessSlice) -> ContextField:
 
 
 def _crown_land(db: Database, place: Place) -> ContextField:
-    if "crown_land" not in db.table_names():
+    # An empty table means the schema exists, not that the data was ingested:
+    # "no Crown land nearby" would be a claim from no evidence at all.
+    if not _table_has_rows(db, "crown_land"):
         return ContextField.empty(EmptyReason.SOURCE_DOES_NOT_COVER_AREA)
     deg = place.radius_km / _KM_PER_DEGREE
     rows = list(
