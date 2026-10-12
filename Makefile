@@ -1,4 +1,4 @@
-.PHONY: run serve test lint format ingest weekly-ingest ingest-hydat ingest-trca harvest-ca recent build-features train-sdm compute-access compute-untapped build-stretches build-anchors export-map
+.PHONY: run serve test lint format ingest weekly-ingest ingest-hydat ingest-trca harvest-ca recent build-features train-sdm compute-access compute-untapped build-stretches build-anchors build-spots export-map
 
 run:
 	uv run python -m src.cli.main run
@@ -72,6 +72,10 @@ build-stretches:
 
 build-anchors:
 	uv run python -m src.cli.main build-anchors
+
+# Spots are derived from the stored anchors; build-anchors already runs this at the end.
+build-spots:
+	uv run python -m src.cli.main build-spots
 
 export-map:
 	uv run python -m src.cli.export_map

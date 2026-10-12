@@ -108,6 +108,7 @@ def _ensure_fishing_stretches(db: Database) -> None:
         "CREATE INDEX IF NOT EXISTS idx_stretch_segments_stretch ON stretch_segments(stretch_id)"
     )
     _ensure_stretch_anchors(db)
+    _ensure_spots(db)
     db.conn.commit()
 
 
@@ -151,6 +152,85 @@ def _ensure_stretch_anchors(db: Database) -> None:
     db.execute(
         "CREATE INDEX IF NOT EXISTS idx_stretch_segment_lines_stretch "
         "ON stretch_segment_lines(stretch_id)"
+    )
+
+
+def _ensure_spots(db: Database) -> None:
+    """Create the explore map's spots table. Idempotent.
+
+    Spots are derived from stretch_anchors and rebuilt wholesale, so there is no
+    foreign key: a spot's water_id is context, and its id is built from
+    coordinates so it survives a stretch being renamed or rebuilt. The anchors it
+    was merged from are named in sources_json.
+    """
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS spots (
+            spot_id              TEXT PRIMARY KEY,
+            kind                 TEXT NOT NULL,
+            jurisdiction         TEXT NOT NULL,
+            lat                  REAL NOT NULL,
+            lng                  REAL NOT NULL,
+            water_id             TEXT,
+            water_name           TEXT,
+            water_body_id        TEXT,
+            also_on_water_body_ids_json TEXT NOT NULL DEFAULT '[]',
+            title                TEXT NOT NULL,
+            subtitle             TEXT,
+            tier                 INTEGER NOT NULL,
+            structure_type       TEXT NOT NULL,
+            structure_attrs_json TEXT NOT NULL DEFAULT '{}',
+            signals_json         TEXT NOT NULL DEFAULT '{}',
+            getting_there_json   TEXT NOT NULL DEFAULT '[]',
+            bridges_json         TEXT NOT NULL DEFAULT '[]',
+            sources_json         TEXT NOT NULL DEFAULT '[]',
+            built_at             TEXT NOT NULL
+        )
+    """)
+    db.execute("CREATE INDEX IF NOT EXISTS idx_spots_jurisdiction ON spots(jurisdiction, kind)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_spots_position ON spots(lat, lng)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_spots_water ON spots(water_id)")
+    # Spots stored before water bodies existed lack these two columns. Nothing is
+    # backfilled: they are rows of a derived table, and the next build fills both.
+    for col, decl in (
+        ("water_body_id", "TEXT"),
+        ("also_on_water_body_ids_json", "TEXT NOT NULL DEFAULT '[]'"),
+    ):
+        try:
+            db.execute(f"ALTER TABLE spots ADD COLUMN {col} {decl}")
+        except Exception:
+            pass  # column already exists
+    db.execute("CREATE INDEX IF NOT EXISTS idx_spots_water_body ON spots(water_body_id)")
+    _ensure_water_bodies(db)
+
+
+def _ensure_water_bodies(db: Database) -> None:
+    """Create the water_bodies table. Idempotent.
+
+    Derived from the curated stretches and the spot classifier's lake names and
+    rebuilt wholesale with the spots, so there is no foreign key: a spot's
+    water_body_id is read back, and the build writes both in one transaction.
+    """
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS water_bodies (
+            water_body_id  TEXT PRIMARY KEY,
+            jurisdiction   TEXT NOT NULL,
+            name           TEXT,
+            name_source    TEXT NOT NULL,
+            type           TEXT NOT NULL,
+            geometry_geojson TEXT,
+            geometry_source  TEXT NOT NULL,
+            bbox_min_lng   REAL,
+            bbox_min_lat   REAL,
+            bbox_max_lng   REAL,
+            bbox_max_lat   REAL,
+            stretch_ids_json TEXT NOT NULL DEFAULT '[]',
+            attributes_json  TEXT NOT NULL DEFAULT '{}',
+            built_at       TEXT NOT NULL
+        )
+    """)
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_water_bodies_jurisdiction "
+        "ON water_bodies(jurisdiction, type)"
     )
 
 

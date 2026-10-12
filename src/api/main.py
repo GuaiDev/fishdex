@@ -1531,6 +1531,127 @@ def get_map_stretch_anchors(stretch_id: str, user: dict = Depends(get_current_us
     return collection
 
 
+def _parse_bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
+    if not bbox:
+        return None
+    try:
+        parts = tuple(float(p) for p in bbox.split(","))
+    except ValueError:
+        parts = ()
+    if len(parts) != 4 or not (parts[0] < parts[2] and parts[1] < parts[3]):
+        raise HTTPException(status_code=422, detail="bbox must be min_lon,min_lat,max_lon,max_lat")
+    return parts
+
+
+def _parse_spot_filters(
+    bbox: str | None, kind: str | None, tier: int
+) -> tuple[tuple[float, float, float, float] | None, list[str] | None]:
+    from src.models.spot import SpotKind
+
+    box = _parse_bbox(bbox)
+    kinds = None
+    if kind:
+        kinds = [k.strip() for k in kind.split(",") if k.strip()]
+        valid = set(SpotKind.__args__)
+        bad = [k for k in kinds if k not in valid]
+        if bad:
+            raise HTTPException(
+                status_code=422, detail=f"unknown kind {bad[0]!r}; one of {sorted(valid)}"
+            )
+    if tier not in (1, 2, 3):
+        raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
+    return box, kinds
+
+
+@app.get("/map/spots/labels")
+def get_map_spot_labels(user: dict = Depends(get_current_user)):
+    """Every user-facing word the spots map shows: chips, one-liners, layer names, and the
+    labelled general-reasoning paragraph per kind. The web app reads this; it hardcodes none."""
+    from src.services.spot_labels import labels_payload
+
+    return labels_payload()
+
+
+@app.get("/map/spots")
+def get_map_spots(
+    bbox: str | None = None,
+    kind: str | None = None,
+    tier: int = 2,
+    jurisdiction: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Spots for the explore map, as GeoJSON points.
+
+    `bbox` is min_lon,min_lat,max_lon,max_lat. `kind` is one or more comma-separated
+    kinds (river_mouth, creek_junction, below_dam, public_fishing, quiet_water).
+    `tier` is the highest tier to include, cumulative: 1 headline spots only, 2 adds
+    the normal ones (default), 3 everything. Built by `make build-spots` (and at the
+    end of `make build-anchors`); an empty collection means it has not been run.
+    """
+    from src.services.spots import spots_geojson
+    from src.storage.database import get_db
+
+    box, kinds = _parse_spot_filters(bbox, kind, tier)
+    return spots_geojson(get_db(), box, kinds, tier, jurisdiction)
+
+
+@app.get("/map/spots/{spot_id}")
+def get_map_spot(spot_id: str, user: dict = Depends(get_current_user)):
+    """One spot in full: title, structure facts, separate signals, nearby parking and
+    bridges, sources, and the other spots on the same river. 404 for an unknown id."""
+    from src.services.spots import get_spot_detail
+    from src.storage.database import get_db
+
+    detail = get_spot_detail(get_db(), spot_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"No spot with id {spot_id!r}")
+    return detail
+
+
+@app.get("/map/water-bodies")
+def get_map_water_bodies(
+    bbox: str | None = None,
+    type: str | None = None,
+    jurisdiction: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """The rivers, creeks and lakes spots sit on, as GeoJSON.
+
+    `bbox` is min_lon,min_lat,max_lon,max_lat; a water body is in view when its box
+    overlaps it. `type` is one or more comma-separated types (river, creek, lake, pond,
+    great_lake). A river's geometry is its simplified line; a lake with no outline on
+    file has `geometry: null`. Built with the spots by `make build-spots`.
+    """
+    from src.models.water_body import WaterBodyType
+    from src.services.water_bodies import water_bodies_geojson
+    from src.storage.database import get_db
+
+    box = _parse_bbox(bbox)
+    types = None
+    if type:
+        types = [t.strip() for t in type.split(",") if t.strip()]
+        valid = set(WaterBodyType.__args__)
+        bad = [t for t in types if t not in valid]
+        if bad:
+            raise HTTPException(
+                status_code=422, detail=f"unknown type {bad[0]!r}; one of {sorted(valid)}"
+            )
+    return water_bodies_geojson(get_db(), box, types, jurisdiction)
+
+
+@app.get("/map/water-bodies/{water_body_id}")
+def get_map_water_body(water_body_id: str, user: dict = Depends(get_current_user)):
+    """One water body in full: name and where the name came from, its shape, the
+    curated stretches it is made of, and every spot on it. 404 for an unknown id."""
+    from src.services.water_bodies import get_water_body_detail
+    from src.storage.database import get_db
+
+    detail = get_water_body_detail(get_db(), water_body_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"No water body with id {water_body_id!r}")
+    return detail
+
+
 @app.get("/map/my-stops")
 def get_my_stops(user: dict = Depends(get_current_user)):
     """Return all of the user's logged stops with coordinates for personal map mode."""
