@@ -980,3 +980,16 @@ def test_layers_getting_there_and_bridges():
     assert r.status_code == 200
     r = client.get("/map/layers/bridges")
     assert r.status_code == 200
+
+
+def test_species_filter_returns_nothing_for_a_listed_species(tmp_path, monkeypatch):
+    from sqlite_utils import Database
+
+    from src.services import spots as spots_mod
+    from src.services.context.species import SpeciesContext
+
+    monkeypatch.setattr(
+        "src.services.context.species.describe_species",
+        lambda db, name: SpeciesContext.model_construct(status_known_listed=True),
+    )
+    assert spots_mod._species_within_2km(Database(tmp_path / "t.db"), "clinostomus elongatus") == []

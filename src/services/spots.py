@@ -842,16 +842,12 @@ def _species_within_2km(db: Database, species_l: str) -> list[str]:
     """Return spot_ids where the given species has records within 2 km."""
     from src.storage.observations import query_observations
     from src.storage.gbif_observations import query_gbif_observations
-    from src.services.context import species as species_ctx
+    from src.services.context.species import describe_species
     from src.services.context import slices
 
     # check if species is listed (status_known_listed) - if so, return empty
-    try:
-        sc = species_ctx.get_species_context(db, species_l)
-        if sc.status_known_listed:
-            return []
-    except Exception:
-        pass
+    if describe_species(db, species_l).status_known_listed:
+        return []
 
     spot_ids = []
     # get all spots and test - but could be many; for now scan in_view of current call is expensive
@@ -911,14 +907,10 @@ def species_within_2km_of_spot(db: Database, lat: float, lng: float, species: st
     """Small helper: does the species have records within 2 km of (lat,lng)?"""
     from src.storage.observations import query_observations
     from src.storage.gbif_observations import query_gbif_observations
-    from src.services.context import species as species_ctx
+    from src.services.context.species import describe_species
 
-    try:
-        sc = species_ctx.get_species_context(db, species)
-        if sc.status_known_listed:
-            return False
-    except Exception:
-        pass
+    if describe_species(db, species).status_known_listed:
+        return False
     try:
         obs, _ = query_observations(db, lat=lat, lng=lng, radius_km=2.0, days_back=3650, species_filter=species, limit=1)
         if obs:
