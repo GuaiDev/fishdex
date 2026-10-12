@@ -292,6 +292,63 @@ def test_curation_requires_at_least_one_reach():
         StretchCuration.model_validate(_curation_dict(stretch=[entry]))
 
 
+def test_curation_accepts_a_lake_and_a_curated_mouth():
+    entry = {
+        "id": "mouth",
+        "name": "Lower Test — to the Big Bay",
+        "river": "Test River",
+        "lake": "Big Bay",
+        "mouth": {"lat": 43.0, "lon": -80.0, "lake": "Big Bay"},
+        "reach": [{"from": {"lat": 43.1, "lon": -80.0}, "to": {"lat": 43.0, "lon": -80.0}}],
+    }
+    s = StretchCuration.model_validate(_curation_dict(stretch=[entry])).stretches[0]
+    assert s.lake == "Big Bay"
+    assert s.mouth is not None and s.mouth.lat == 43.0
+    assert s.mouth.lon == -80.0 and s.mouth.lake == "Big Bay"
+    assert s.model_dump(exclude_none=True)["lake"] == "Big Bay"
+
+
+def test_curation_allows_a_mouth_that_names_its_own_lake():
+    entry = {
+        "id": "mouth",
+        "name": "Lower Test — to the Big Bay",
+        "river": "Test River",
+        "mouth": {"lat": 43.0, "lon": -80.0, "lake": "Big Bay"},
+        "reach": [{"from": {"lat": 43.1, "lon": -80.0}, "to": {"lat": 43.0, "lon": -80.0}}],
+    }
+    s = StretchCuration.model_validate(_curation_dict(stretch=[entry])).stretches[0]
+    assert s.lake is None and s.mouth.lake == "Big Bay"
+
+
+def test_curation_rejects_a_mouth_that_disagrees_with_its_lake():
+    entry = {
+        "id": "mouth",
+        "name": "A",
+        "river": "R",
+        "lake": "Big Bay",
+        "mouth": {"lat": 43.0, "lon": -80.0, "lake": "Small Cove"},
+        "reach": [{"from": {"lat": 43.1, "lon": -80.0}, "to": {"lat": 43.0, "lon": -80.0}}],
+    }
+    with pytest.raises(ValueError, match="conflicts with lake"):
+        StretchCuration.model_validate(_curation_dict(stretch=[entry]))
+
+
+def test_curation_rejects_a_mouth_out_of_coordinate_range_or_with_extra_keys():
+    base = {
+        "id": "mouth",
+        "name": "A",
+        "river": "R",
+        "reach": [{"from": {"lat": 43.1, "lon": -80.0}, "to": {"lat": 43.0, "lon": -80.0}}],
+    }
+    for bad in (
+        {"lat": 91, "lon": -80.0},
+        {"lat": 43.0, "lon": -181},
+        {"lat": 43.0, "lon": -80.0, "extra": 1},
+    ):
+        with pytest.raises(ValueError):
+            StretchCuration.model_validate(_curation_dict(stretch=[{**base, "mouth": bad}]))
+
+
 def test_fishing_stretch_requires_line_geometry():
     base = dict(
         stretch_id="a",
@@ -312,6 +369,33 @@ def test_fishing_stretch_requires_line_geometry():
         )
     with pytest.raises(ValueError):
         FishingStretch(**base, jurisdiction="Ontario", geometry=line)
+
+
+def test_shipped_stretches_named_to_a_lake_have_a_curated_mouth():
+    """A stretch whose name claims it runs 'to <a lake/bay/harbour>' must say where.
+
+    The name is the file asserting the river ends in that water; a mouth must
+    back the claim, or the "River mouths" filter is naming places that have no
+    located mouth to show.
+    """
+    import re
+
+    from src.services.stretches import DEFAULT_CURATION_PATH, load_curation
+
+    cur = load_curation(DEFAULT_CURATION_PATH)
+    claimed = [
+        s
+        for s in cur.stretches
+        if re.search(
+            r"\bto\s+(?:the\s+)?(?:\w+\s+)*(?:Lake|Bay|Harbou?r|Sound)\b",
+            s.name,
+            re.I,
+        )
+    ]
+    assert len(claimed) >= 6  # the measured gap was 40 stretches; keep a real bar
+    for s in claimed:
+        assert s.mouth is not None, f"{s.id} ({s.name!r}) is named 'to a lake' but has no mouth"
+        assert s.mouth.lake or s.lake, f"{s.id}: a lake mouth should name the water it meets"
 
 
 def test_shipped_curation_file_is_valid_and_covers_the_named_rivers():

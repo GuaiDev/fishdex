@@ -84,6 +84,9 @@ CROSSING_MERGE_M = 120.0
 # The reach below a dam: how far to follow the flow, and where the marker sits.
 TAILWATER_REACH_M = 400.0
 TAILWATER_MARKER_M = 100.0
+# A curated mouth owns its stretch's mouth: any mouth the topology finds this
+# close to it is the same mouth, and is not published a second time.
+CURATED_MOUTH_DUPLICATE_M = 300.0
 
 _NOT_PUBLIC = {"private", "no", "customers", "delivery", "permit", "residents"}
 _NOT_OUTDOOR_PARKING = {"multi-storey", "underground", "rooftop"}
@@ -128,6 +131,7 @@ def build_anchors(
     """
     curation = load_curation(curation_path)
     jurisdiction = curation.jurisdiction
+    curated_by_id = {s.id: s for s in curation.stretches}
     if segments is None:
         segments = load_network(curation)
     if fetch_corridor is None:
@@ -160,7 +164,9 @@ def build_anchors(
             continue
         lines.extend(_segment_lines(network, stretch, ids))
         found = _confluences(ctx, stretch, ids, built_at, report)
-        found += _lake_mouths(ctx, stretch, ids, built_at, report)
+        found += _lake_mouths(
+            ctx, stretch, ids, built_at, report, curated=curated_by_id.get(stretch.stretch_id)
+        )
         if consecutive_failures >= _GIVE_UP_AFTER:
             # Each failed fetch has already spent its retries; do not spend
             # them sixty more times against a service that is down.
@@ -379,6 +385,7 @@ def _lake_mouths(
     ids: list[int],
     built_at: str,
     report: AnchorBuildReport,
+    curated=None,
 ) -> list[StretchAnchor]:
     """The node where the stretch's water runs out into a Great Lakes shore line.
 
@@ -387,10 +394,48 @@ def _lake_mouths(
     through: one flowing in from along the shore and one flowing on. A river
     simply continuing downstream has only the second, and a tributary that
     ends in another river is a confluence, not a mouth.
+
+    A curated mouth (`mouth = { lat, lon, lake }` in the curation file) is the
+    authority for a river whose mouth the topology cannot find — an inland
+    lake has no Great Lakes shore line for it to recognise. When one is
+    present it is published as the stretch's mouth, named from the file, and
+    any mouth the topology finds within CURATED_MOUTH_DUPLICATE_M of it is the
+    same mouth, not published twice. Topology mouths take their name from the
+    shore line, falling back to the file's `lake` key.
     """
     network = ctx.network
     member = set(ids)
     out: list[StretchAnchor] = []
+
+    curated_mouth = curated.mouth if curated is not None else None
+    if curated_mouth is not None:
+        # The model forbids mouth.lake disagreeing with lake, so this is
+        # unambiguous: the mouth's own name, else the stretch's.
+        lake_name = curated_mouth.lake or curated.lake
+    else:
+        lake_name = curated.lake if curated is not None else None
+
+    if curated_mouth is not None:
+        m = curated_mouth
+        geoms = {i: network.geoms[i] for i in ids}
+        hit = _nearest_member(geoms, m.lat, m.lon)
+        out.append(
+            StretchAnchor(
+                anchor_id=f"{stretch.stretch_id}:lake_mouth:{_coord_key(m.lon, m.lat)}",
+                stretch_id=stretch.stretch_id,
+                jurisdiction=stretch.jurisdiction,
+                anchor_type="lake_mouth",
+                name=lake_name,
+                lat=round(m.lat, 6),
+                lon=round(m.lon, 6),
+                source="curated",
+                source_ref=f"curation:{stretch.stretch_id}",
+                ogf_id=None if hit is None else hit[0],
+                snap_distance_m=None if hit is None else hit[1],
+                built_at=built_at,
+            )
+        )
+
     for node in sorted(_member_nodes(network, ids)):
         stretch_in = [i for i in ctx.incoming.get(node, ()) if i in member]
         stretch_out = [i for i in ctx.outgoing.get(node, ()) if i in member]
@@ -407,6 +452,13 @@ def _lake_mouths(
         if not (shore_in and shore_out):
             continue
         lon, lat = _node_lonlat(node)
+        if (
+            curated_mouth is not None
+            and _metres(Point(curated_mouth.lon, curated_mouth.lat), Point(lon, lat))
+            <= CURATED_MOUTH_DUPLICATE_M
+        ):
+            report.drop("lake_mouth_suppressed_by_curated")
+            continue
         lake = next(
             (n for i in shore_in + shore_out if (n := display_name(network.segments[i].name))),
             None,
@@ -417,7 +469,7 @@ def _lake_mouths(
                 stretch_id=stretch.stretch_id,
                 jurisdiction=stretch.jurisdiction,
                 anchor_type="lake_mouth",
-                name=lake,
+                name=lake or lake_name,
                 lat=lat,
                 lon=lon,
                 source="ohn_topology",
