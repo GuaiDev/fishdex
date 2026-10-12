@@ -4,7 +4,7 @@ Orchestrates CA-AB adapters:
   - AB stocking records (planned stocking XLSX from Open Alberta)
   - AB regulations (stub — see ca_ab/regulations.py)
   - AB water quality (stub — no public API as of 2026)
-  - AB hydro network (stub — NHN tile download not yet implemented)
+  - AB hydro network (FWMIS Simplified Hydro Arcs via Geospatial Alberta)
 
 Global sources (iNat, GBIF, WSC, OSM) are handled by the standard pipeline.
 NuSEDS salmon escapement is BC-only (not applicable to AB).
@@ -17,6 +17,12 @@ from datetime import datetime
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
+
+# stream_segments has one primary key (ogf_id) shared by every jurisdiction, and
+# FWMIS OBJECTIDs are small integers in the same range as OHN/BC ids. Offsetting
+# AB ids into a range no other source reaches guarantees replace=True can only
+# ever overwrite a previous AB row, with no change to shared schema or readers.
+AB_SEGMENT_ID_OFFSET = 10**12
 
 
 def ingest_ab_stocking() -> int:
@@ -31,6 +37,53 @@ def ingest_ab_stocking() -> int:
         db["stocking_records"].upsert_all(rows, pk="record_id")
     logger.info("AB stocking: %d records stored", len(rows))
     return len(rows)
+
+
+def ingest_ab_hydro_network(
+    lat: float,
+    lng: float,
+    radius_km: float = 50.0,
+) -> tuple[int, int]:
+    """Fetch and store FWMIS stream segments for an AB location. Returns (seg_count, 0).
+
+    Barriers are not separately indexed in FWMIS (no equivalent to the OHN
+    barrier layer), so barrier_count is always 0.
+    """
+    _mod = importlib.import_module("src.ingest.jurisdictions.ca_ab.hydro_network")
+    db = get_db()
+
+    logger.info(
+        "FWMIS: fetching stream segments — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km
+    )
+    segments = _mod.fetch_watercourses(lat, lng, radius_km)
+    logger.info("FWMIS: %d segments fetched from FeatureServer", len(segments))
+
+    now = datetime.utcnow().isoformat()
+
+    seg_rows = [
+        {
+            "ogf_id": AB_SEGMENT_ID_OFFSET + s.ogf_id,
+            "watercourse_type": s.watercourse_type,
+            "name": s.name,
+            "flow_verified": int(s.flow_verified),
+            "permanency": s.permanency,
+            "flow_classification": s.flow_classification,
+            "stream_order": s.stream_order,
+            "length_m": s.length_m,
+            "geom_wkt": s.geom_wkt,
+            "start_node": s.start_node,
+            "end_node": s.end_node,
+            "jurisdiction": s.jurisdiction,
+            "segment_source": s.segment_source,
+            "ingested_at": now,
+        }
+        for s in segments
+    ]
+    if seg_rows:
+        db["stream_segments"].insert_all(seg_rows, pk="ogf_id", replace=True)
+
+    logger.info("FWMIS: %d segments stored to DB", len(segments))
+    return len(segments), 0
 
 
 def ingest_ab_regulations() -> int:
@@ -70,10 +123,13 @@ def ingest_ab_data(
     radius_km: float = 50.0,
 ) -> dict[str, int]:
     """Run all Alberta-specific ingest adapters. Returns counts per source."""
+    hydro_segs, hydro_barriers = ingest_ab_hydro_network(lat, lng, radius_km)
     stocking = ingest_ab_stocking()
     regulations = ingest_ab_regulations()
     wq = ingest_ab_water_quality(lat, lng, radius_km)
     return {
+        "ab_hydro_segments": hydro_segs,
+        "ab_hydro_barriers": hydro_barriers,
         "ab_stocking": stocking,
         "ab_regulations": regulations,
         "ab_water_quality": wq,

@@ -40,16 +40,6 @@ class BoundaryPoint(BaseModel):
     ogf_id: int | None = None
 
 
-class CuratedMouth(BaseModel):
-    """Where a stretch meets its lake, for a mouth the stream network does not show."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    lat: float = Field(ge=-90, le=90)
-    lon: float = Field(ge=-180, le=180)
-    lake: str | None = None
-
-
 class CuratedReach(BaseModel):
     """One continuous run of channel, from one boundary point to another.
 
@@ -69,11 +59,29 @@ class CuratedReach(BaseModel):
         return [self.from_, *self.via, self.to]
 
 
+class CuratedMouth(BaseModel):
+    """Where a stretch's river meets a lake, bay or harbour, as written in the file.
+
+    The coordinate comes from the OHN trace's downstream end; `lake` names the
+    water the river runs into (used when the topology does not name one).
+    Without this entry the anchor builder finds the mouth by topology and may
+    not (an inland lake has no Great Lakes shore line for it to recognise).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    lake: str | None = None
+
+
 class CuratedStretch(BaseModel):
     """One published stretch, as written in the curation file.
 
     Several reaches in one stretch is a merge; one river cut into two entries
-    that share a boundary point is a split.
+    that share a boundary point is a split. `lake` names the water the river
+    ends in (the mouth's name when topology finds the mouth but no name for
+    it); `mouth` adds the coordinate too, for a mouth topology cannot find.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -82,14 +90,28 @@ class CuratedStretch(BaseModel):
     name: str = Field(min_length=1)
     river: str = Field(min_length=1)
     region: str | None = None
-    lake: str | None = None  # the water the river mouth opens onto
-    mouth: CuratedMouth | None = None
     reaches: list[CuratedReach] = Field(alias="reach", min_length=1)
     include_ogf_ids: list[int] = Field(default_factory=list)
     exclude_ogf_ids: list[int] = Field(default_factory=list)
     max_snap_m: float = Field(default=400.0, gt=0, le=5000)
+    lake: str | None = None  # the lake/bay/harbour the river ends in
+    mouth: CuratedMouth | None = None  # its mouth's coordinate, when curated
     enabled: bool = True
     notes: str | None = None  # where and why curation was needed
+
+    @model_validator(mode="after")
+    def _mouth_within_reach_area(self):
+        """A curated mouth must not contradict its own `lake` key.
+
+        When both name the receiving water they must agree; two names on one
+        mouth is the file arguing with itself.
+        """
+        if self.mouth is not None and self.mouth.lake and self.lake:
+            if self.mouth.lake != self.lake:
+                raise ValueError(
+                    f"mouth.lake ({self.mouth.lake!r}) conflicts with lake ({self.lake!r})"
+                )
+        return self
 
 
 class StretchCuration(BaseModel):

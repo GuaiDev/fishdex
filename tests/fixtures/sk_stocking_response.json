@@ -1,0 +1,48 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 7001,
+        "SPECIES": "Rainbow Trout",
+        "SIZE_": "Fingerlings",
+        "STOCKING_DATE": 1609459200000,
+        "WATERBODY": "Lake A",
+        "NUMBER_": 5000,
+        "NRCAN": "ABC01"
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 7002,
+        "SPECIES": "Walleye",
+        "SIZE_": "Fry",
+        "STOCKING_DATE": -156729600000,
+        "WATERBODY": "Lake B",
+        "NUMBER_": 1000,
+        "NRCAN": "ABC02"
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 7003,
+        "SPECIES": "",
+        "SIZE_": "Fry",
+        "STOCKING_DATE": 1609459200000,
+        "WATERBODY": "Lake A",
+        "NUMBER_": 10,
+        "NRCAN": "ABC01"
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 7004,
+        "SPECIES": "Brown Trout",
+        "SIZE_": "Yearlings",
+        "STOCKING_DATE": 1609459200000,
+        "WATERBODY": "Unknown Lake",
+        "NUMBER_": 200,
+        "NRCAN": "ZZZ99"
+      }
+    }
+  ]
+}

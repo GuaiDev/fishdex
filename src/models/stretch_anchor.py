@@ -3,8 +3,9 @@
 An anchor is a feature worth tapping once the map has zoomed into a stretch:
 a confluence, a dam and the tailwater below it, the lake mouth, a place to
 park or cross the water. Each belongs to one stretch and says where it came
-from — the OHN network's topology, or OpenStreetMap — so a later step that
-explains an anchor can tell a surveyed fact from a derived one.
+from — the OHN network's topology, OpenStreetMap, or the curation file (a
+curated mouth) — so a later step that explains an anchor can tell a surveyed
+fact from a derived one.
 
 Anchors are located features, not fish predictions. Nothing here says a
 confluence holds fish; it says two channels meet there.
@@ -24,7 +25,7 @@ AnchorType = Literal["confluence", "dam", "tailwater", "lake_mouth", "access_poi
 DamKind = Literal["dam", "weir", "lock"]
 AccessKind = Literal["parking", "trail_head", "boat_launch", "fishing_spot", "road_crossing"]
 
-AnchorSource = Literal["ohn_topology", "osm"]
+AnchorSource = Literal["ohn_topology", "osm", "curated"]
 
 
 class StretchAnchor(BaseModel):

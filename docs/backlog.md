@@ -300,9 +300,15 @@ download as a recurring ingest (hosting is being moved separately).
 - `stocking.py` ✅ tested live July 17 2026, 527 records — see Bug fixes — session 6.
   NOTE: an earlier version of this note said AB stocking has no coordinates — that
   was wrong; the real file does have lat/lng.
-- `hydro_network.py` — stub; NHN has no queryable WFS (FTP tiles only); OSM covers AB adequately
+- `hydro_network.py` ✅ implemented 2026-10-09 — FWMIS Simplified Hydro Arcs
+  FeatureServer (fwmis_hydrography layer 0), WGS84 in/out, paginated via
+  resultOffset / exceededTransferLimit; 5,013 segments for Bow River Calgary 50km
+  radius; stream orders 0–9 populated; no barrier layer (barrier_count=0 for CA-AB).
+  Bow + NS Edmonton + Oldman areas wired into weekly ingest.
 - `regulations.py` ✅ implemented July 17 2026, 10 chunks — see Bug fixes — session 6
-- `water_quality.py` — stub (AEMERA portal is map-only; DataStream covers some AB watersheds)
+- `water_quality.py` — stub (AEMERA portal is map-only; open.alberta.ca has no
+  surface-water chemistry; federal national dataset has only 13 AB sites, none near
+  the AB areas — re-checked 2026-10-09)
 
 **Quebec** (`src/ingest/jurisdictions/ca_qc/`):
 - `species_ranges.py` ✅ tested live July 17 2026, 118 species — see Bug fixes —
@@ -493,7 +499,8 @@ Stocking (planned dates XLSX) live — real file rebuilt to match actual structu
 does have coordinates (an earlier version of this note was wrong about that).
 Regulations now implemented (10 watershed-unit chunks, not the ~100-WMU scheme
 originally assumed).
-Hydro, water quality: still stubbed.
+Hydro network: FWMIS Simplified Hydro Arcs live 2026-10-09 (full implementation,
+see Phase 2 — AB above). Water quality still stubbed (no machine-readable source).
 DataStream covers some AB watersheds via /ingest/data-national.
 
 ### Quebec 🔨 (June 28 2026; species_ranges fixed July 17 2026)
@@ -504,10 +511,28 @@ exists in the source, contrary to what this note used to say.
 Water quality: MELCCFP Réseau-rivières live (see Quebec adapters above).
 Regulations: still a stub, deferred to separate Regpec work.
 
-### Manitoba + Saskatchewan 📋
-3 cron areas each. Global sources only (iNat, GBIF, WSC, OSM).
-DataStream covers some MB/SK watersheds via /ingest/data-national.
-No province-specific adapters with public APIs found as of 2026.
+### Manitoba 🔨 (province adapters added Oct 2026)
+3 cron areas (Red River/Winnipeg, Lake Winnipeg South, Assiniboine).
+Stocking (Manitoba Waterbody Stocking Records, ArcGIS FeatureServer) and the
+WaLLAS "Watercourses (NTS 1:20,000)" stream network (ArcGIS MapServer layer 18)
+are live. WaLLAS is a mixed feature class (it also holds beaver dams), so the
+adapter filters to `F_TYPE LIKE 'RIVER/STREAM%'`; names/orders are usually blank
+in the source.
+Water quality: stubbed — the only public layer is beach E. coli/microcystin
+monitoring (public-health, not habitat chemistry); provincial stream/lake
+chemistry is by request. DataStream covers the Lake Winnipeg basin.
+Fish observations: no public layer (Waterbody Data SPECIES field is empty,
+Wildlife Atlas is internal).
+
+### Saskatchewan 🔨 (province adapters added Oct 2026)
+3 cron areas (South Saskatchewan/Saskatoon, Qu'Appelle, Churchill River).
+Hydro (SaskGIS Hydrography MapServer 121), fish observations (SK Fish Atlas —
+FishAtlasHabiSask joined to Species Info points via NRCANCODE→LOCATIONID),
+stocking (Fish Stocking History, same join), and historical water chemistry
+(Long Term Water Chemistry, 1920s–1990s) are live. The Fish Atlas has no
+observation date; observed_on uses the shared 1900-01-01 sentinel. Stream order
+is not published. Turbidity is Jackson units (JTU ≠ FNU) so turbidity_fnu is
+left NULL.
 
 ### Maritimes (NS, NB, PEI) 📋
 4 cron areas (Miramichi NB, Saint John NB, Annapolis NS, Margaree NS).

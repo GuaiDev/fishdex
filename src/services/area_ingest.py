@@ -171,6 +171,32 @@ def run_qc_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaI
     return result
 
 
+def run_mb_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
+    """Run Manitoba-specific ingest adapters."""
+    from src.services.mb_ingest import ingest_mb_data
+
+    _log.info(
+        "[%s] MB ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
+    )
+    ensure_schema(get_db())
+    result = AreaIngestResult(label=label, source=IngestSource.MB)
+    _attempt(result, "MB adapters", lambda: ingest_mb_data(lat, lng, radius_km))
+    return result
+
+
+def run_sk_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
+    """Run Saskatchewan-specific ingest adapters."""
+    from src.services.sk_ingest import ingest_sk_data
+
+    _log.info(
+        "[%s] SK ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
+    )
+    ensure_schema(get_db())
+    result = AreaIngestResult(label=label, source=IngestSource.SK)
+    _attempt(result, "SK adapters", lambda: ingest_sk_data(lat, lng, radius_km))
+    return result
+
+
 def run_tidal_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
     """Run CHS tidal predictions ingest."""
     from src.ingest.jurisdictions.ca_national.tidal import fetch_tidal_readings
@@ -196,6 +222,8 @@ _RUNNERS = {
     IngestSource.BC: run_bc_ingest,
     IngestSource.AB: run_ab_ingest,
     IngestSource.QC: run_qc_ingest,
+    IngestSource.MB: run_mb_ingest,
+    IngestSource.SK: run_sk_ingest,
     IngestSource.TIDAL: run_tidal_ingest,
 }
 
