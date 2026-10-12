@@ -698,16 +698,6 @@ def _rank(rows: list[_Species]) -> list[_Species]:
     return rows
 
 
-def _more(left: int) -> str | None:
-    if left <= 0:
-        return None
-    return (
-        f"and {left} more species recorded nearby"
-        if left > 1
-        else "and 1 more species recorded nearby"
-    )
-
-
 def _might_find(c: _CardInputs) -> MightFindBlock:
     top = c.shown[:TOP_SPECIES]
     left = len(c.shown) - len(top)
@@ -726,11 +716,13 @@ def _might_find(c: _CardInputs) -> MightFindBlock:
     return MightFindBlock(
         title=CARD_TITLES["might_find"],
         species=top,
-        more_text=f"and {left} more species recorded nearby"
-        if left > 1
-        else "and 1 more species recorded nearby"
-        if left == 1
-        else None,
+        more_text=(
+            f"and {left} more species recorded nearby"
+            if left > 1
+            else "and 1 more species recorded nearby"
+            if left == 1
+            else None
+        ),
         caveat=MIGHT_FIND_CAVEAT,
         empty_text=empty,
         note=" ".join(notes) or None,
@@ -921,7 +913,7 @@ def render_spot(
     for rec in ctx.records.species if ctx and ctx.records else []:
         if rec.species.strip().lower() in protected:
             n_protected += 1
-        elif rec.is_obscured:
+        elif rec.is_obscured and not rec.survey_record:
             n_imprecise += 1  # ~22 km of fuzz is not "within 2 km"
         elif (row := _species_line(rec)) is not None:
             rows.append(row)
