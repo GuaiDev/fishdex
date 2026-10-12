@@ -152,6 +152,54 @@ NAME_SOURCE_LABELS: dict[str, str] = {
 # A lake or pond with no outline on file is shown as a place, not a shape.
 NO_OUTLINE_NOTE = "No outline is on file for this water, so it has no shape on the map yet."
 
+
+# ── shoreline features ─────────────────────────────────────────────────────────
+# The inlets, outlets, islands, points and peninsulas a lake's outline shows.
+# `label` is the singular name on a card, `chip` the plural legend entry,
+# `one_liner` the sentence under the feature. A shape read off the outline's
+# edge says so ("from the shoreline outline"); a stream junction is its own line
+# ending at the shore.
+
+FEATURE_KIND_ORDER = ("inlet", "outlet", "island", "point", "peninsula")
+FEATURE_KINDS: dict[str, dict[str, str]] = {
+    "inlet": {
+        "label": "Inlet",
+        "chip": "Inlets",
+        "one_liner": "A mapped stream flows in here.",
+    },
+    "outlet": {
+        "label": "Outlet",
+        "chip": "Outlets",
+        "one_liner": "The lake drains out here.",
+    },
+    "island": {"label": "Island", "chip": "Islands", "one_liner": "Land inside the water."},
+    "point": {"label": "Point", "chip": "Points", "one_liner": "A point of land reaches out."},
+    "peninsula": {
+        "label": "Peninsula",
+        "chip": "Peninsulas",
+        "one_liner": "A long point of land reaches out.",
+    },
+}
+# What a derivation is, in words. Both come from the same Ontario government
+# water map; the outline is the water's own edge, a stream its own line.
+FEATURE_DERIVATION_LABELS: dict[str, str] = {
+    "shoreline_outline": "from the shoreline outline",
+    "watercourse_endpoint": "where a mapped stream meets the shore",
+}
+FEATURE_READ_FROM_OUTLINE = "Read from the shoreline outline"
+FEATURE_READ_FROM_MAP = "Read from the Ontario government water map"
+
+
+def shoreline_feature_note(kind: str, derivation: str, name: str | None = None) -> str:
+    """The sentence shown under a shoreline feature, assembled from the vocabulary."""
+    base = FEATURE_KINDS[kind]["one_liner"]
+    if derivation == "watercourse_endpoint":
+        if name:
+            return f"{base} {name} is mapped here. {FEATURE_READ_FROM_MAP}."
+        return f"{base} {FEATURE_READ_FROM_MAP}."
+    return f"{base} {FEATURE_READ_FROM_OUTLINE}."
+
+
 # ── titles ────────────────────────────────────────────────────────────────────
 # Filled in by services/spots.py. {river} and {tributary} already carry their
 # article ("the Credit River", "Sheldon Creek"). A title is never built from a
@@ -199,6 +247,10 @@ def labels_payload() -> dict:
         "water_body_types": [{"type": t, **WATER_BODY_TYPES[t]} for t in WATER_BODY_TYPE_ORDER],
         "name_sources": NAME_SOURCE_LABELS,
         "no_outline_note": NO_OUTLINE_NOTE,
+        "shoreline_features": [
+            {"kind": kind, **FEATURE_KINDS[kind]} for kind in FEATURE_KIND_ORDER
+        ],
+        "shoreline_derivations": FEATURE_DERIVATION_LABELS,
         "layers": LAYERS,
         "access_labels": ACCESS_LABELS,
     }
@@ -213,6 +265,10 @@ def all_strings() -> list[str]:
     for entry in WATER_BODY_TYPES.values():
         out += list(entry.values())
     out += list(NAME_SOURCE_LABELS.values()) + [NO_OUTLINE_NOTE]
+    for entry in FEATURE_KINDS.values():
+        out += list(entry.values())
+    out += list(FEATURE_DERIVATION_LABELS.values())
+    out += [FEATURE_READ_FROM_OUTLINE, FEATURE_READ_FROM_MAP]
     for layer in LAYERS.values():
         out += [layer["label"], layer["note"]]
     out += list(TITLES.values()) + list(UNNAMED_TRIBUTARY.values()) + [UNNAMED_LARGER_RIVER]

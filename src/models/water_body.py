@@ -32,8 +32,11 @@ WaterBodyType = Literal["river", "creek", "lake", "pond", "great_lake"]
 #   unknown          no source gave one; `name` is None
 NameSource = Literal["curated", "curated_region", "ohn", "osm", "unknown"]
 
-# Where the drawn shape came from. Lakes have none until an outline is sourced.
-GeometrySource = Literal["stretch_union", "none"]
+# Where the drawn shape came from.
+#   stretch_union  a river or creek: the simplified lines of its curated stretches
+#   ohn_waterbody  a lake: matched from an OHN Waterbody polygon (OGL-Ontario)
+#   none           no shape on file yet; the water is placed by its river mouths
+GeometrySource = Literal["stretch_union", "ohn_waterbody", "none"]
 
 _ID_PATTERN = re.compile(r"^(river|creek|lake|pond|great_lake):[a-z0-9]+(-[a-z0-9]+)*$")
 

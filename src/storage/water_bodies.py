@@ -10,6 +10,7 @@ import sqlite3
 
 from sqlite_utils.db import Database
 
+from src.models.shoreline_feature import ShorelineFeature
 from src.models.water_body import WaterBody
 
 
@@ -23,6 +24,21 @@ def write_water_bodies(
         cols = list(rows[0])
         conn.executemany(
             f"INSERT INTO water_bodies ({', '.join(cols)}) "
+            f"VALUES ({', '.join(':' + c for c in cols)})",
+            rows,
+        )
+
+
+def write_shoreline_features(
+    conn: sqlite3.Connection, jurisdiction: str, features: list[ShorelineFeature]
+) -> None:
+    """Swap in a jurisdiction's shoreline features. The caller commits."""
+    conn.execute("DELETE FROM shoreline_features WHERE jurisdiction = ?", [jurisdiction])
+    rows = [_feature_row(f) for f in features]
+    if rows:
+        cols = list(rows[0])
+        conn.executemany(
+            f"INSERT INTO shoreline_features ({', '.join(cols)}) "
             f"VALUES ({', '.join(':' + c for c in cols)})",
             rows,
         )
@@ -71,6 +87,30 @@ def get_water_body(db: Database, water_body_id: str) -> WaterBody | None:
     return _from_row(rows[0]) if rows else None
 
 
+def count_shoreline_features(db: Database, jurisdiction: str | None = None) -> int:
+    if jurisdiction is None:
+        return db.execute("SELECT COUNT(*) FROM shoreline_features").fetchone()[0]
+    return db.execute(
+        "SELECT COUNT(*) FROM shoreline_features WHERE jurisdiction = ?", [jurisdiction]
+    ).fetchone()[0]
+
+
+def list_shoreline_features(
+    db: Database, water_body_id: str, kinds: list[str] | None = None
+) -> list[ShorelineFeature]:
+    """A water body's shoreline features, in id order. Optionally one or more kinds."""
+    clauses = ["water_body_id = ?"]
+    params: list = [water_body_id]
+    if kinds:
+        clauses.append(f"kind IN ({', '.join('?' * len(kinds))})")
+        params += kinds
+    rows = db.execute_returning_dicts(
+        f"SELECT * FROM shoreline_features WHERE {' AND '.join(clauses)} ORDER BY feature_id",
+        params,
+    )
+    return [_feature_from_row(r) for r in rows]
+
+
 def _dumps(value) -> str:
     return json.dumps(value, separators=(",", ":"), sort_keys=True)
 
@@ -108,5 +148,43 @@ def _from_row(r: dict) -> WaterBody:
         bbox=box if None not in box else None,
         stretch_ids=json.loads(r["stretch_ids_json"]),
         attributes=json.loads(r["attributes_json"]),
+        built_at=r["built_at"],
+    )
+
+
+def _feature_row(f: ShorelineFeature) -> dict:
+    return {
+        "feature_id": f.feature_id,
+        "water_body_id": f.water_body_id,
+        "jurisdiction": f.jurisdiction,
+        "kind": f.kind,
+        "name": f.name,
+        "geometry_geojson": _dumps(f.geometry),
+        "source": f.source,
+        "source_date": f.source_date,
+        "provenance": f.provenance,
+        "derivation": f.derivation,
+        "note": f.note,
+        "area_m2": f.area_m2,
+        "length_m": f.length_m,
+        "built_at": f.built_at,
+    }
+
+
+def _feature_from_row(r: dict) -> ShorelineFeature:
+    return ShorelineFeature(
+        feature_id=r["feature_id"],
+        water_body_id=r["water_body_id"],
+        jurisdiction=r["jurisdiction"],
+        kind=r["kind"],
+        name=r["name"],
+        geometry=json.loads(r["geometry_geojson"]),
+        source=r["source"],
+        source_date=r["source_date"],
+        provenance=r["provenance"],
+        derivation=r["derivation"],
+        note=r["note"],
+        area_m2=r["area_m2"],
+        length_m=r["length_m"],
         built_at=r["built_at"],
     )

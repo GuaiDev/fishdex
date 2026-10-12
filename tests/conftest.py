@@ -31,3 +31,19 @@ def curation(tmp_path):
         'version = 1\njurisdiction = "CA-ON"\nbuild_bbox = [-80.5, 42.9, -79.0, 44.0]\n'
     )
     return path
+
+
+@pytest.fixture(autouse=True)
+def _no_live_ohn(monkeypatch):
+    """`build_spots` reaches the OHN service by default; no test is allowed to.
+
+    Both entry points are stubbed at the module where `spots._lake_outline_inputs`
+    resolves them at call time, so a build in a test resolves no outlines and
+    reads no watercourses. A test that wants outlines injects its own resolver
+    through `build_spots` instead.
+    """
+    from src.ingest.jurisdictions.ca_on import hydro_network
+    from src.services import lake_outlines
+
+    monkeypatch.setattr(lake_outlines, "resolve_lake_outlines", lambda mouths, **k: {})
+    monkeypatch.setattr(hydro_network, "fetch_watercourses_bbox", lambda *_a: [])

@@ -8,6 +8,8 @@ throwaway databases, never the real one.
 import pytest
 from pydantic import ValidationError
 
+from src.models.lake_outline import MATCH_NAME, LakeOutline
+from src.models.shoreline_feature import ShorelineFeature
 from src.models.spot import SpotBuildReport
 from src.models.water_body import WaterBody
 from src.services import spot_labels
@@ -20,8 +22,14 @@ from src.services.water_bodies import (
     river_type,
     slugify,
     water_bodies_geojson,
+    water_body_features_geojson,
 )
-from src.storage.water_bodies import get_water_body, list_water_bodies
+from src.storage.water_bodies import (
+    count_shoreline_features,
+    get_water_body,
+    list_shoreline_features,
+    list_water_bodies,
+)
 from tests.test_spots import (  # noqa: F401  (fixtures are used by name)
     BUILT,
     JARGON,
@@ -215,6 +223,65 @@ def test_lake_spellings_that_share_a_slug_are_one_lake_and_the_others_are_kept()
     (lake,) = derive_water_bodies([], lakes, JURISDICTION, BUILT).bodies
     assert lake.name == "Lake St. Clair"
     assert lake.attributes["also_spelled"] == ["Lake St Clair"]
+
+
+# ── lake outlines ─────────────────────────────────────────────────────────────
+
+
+def outline(**over):
+    base = dict(
+        curated_name="Rice Lake",
+        matched=True,
+        geometry={
+            "type": "Polygon",
+            "coordinates": [
+                [[-78.3, 44.1], [-78.3, 44.3], [-78.1, 44.3], [-78.1, 44.1], [-78.3, 44.1]]
+            ],
+        },
+        ogf_ids=[124215626],
+        ohn_name="Rice Lake",
+        effective_datetime="2020-10-07",
+        match_basis=MATCH_NAME,
+        distance_m=0.0,
+        licence="Open Government Licence – Ontario",
+        licence_url="https://www.ontario.ca/page/open-government-licence-ontario",
+        note="",
+    )
+    return LakeOutline(**{**base, **over})
+
+
+def test_a_matched_outline_becomes_the_lakes_geometry_and_bbox():
+    (lake,) = derive_water_bodies(
+        [],
+        [LakeRef("Rice Lake", "curated", "a", 44.2, -78.24)],
+        JURISDICTION,
+        BUILT,
+        outlines={"Rice Lake": outline()},
+    ).bodies
+    assert lake.geometry["type"] == "Polygon"
+    assert lake.geometry_source == "ohn_waterbody"
+    assert lake.bbox == (-78.3, 44.1, -78.1, 44.3)
+    assert lake.attributes["bbox_basis"] == "outline"
+    assert lake.attributes["outline_source"] == "OHN Waterbody"
+    assert lake.attributes["outline_ogf_ids"] == [124215626]
+    assert lake.attributes["outline_ohn_name"] == "Rice Lake"
+    assert lake.attributes["outline_effective_datetime"] == "2020-10-07"
+    assert lake.attributes["outline_match_basis"] == MATCH_NAME
+    assert lake.attributes["outline_licence"] == "Open Government Licence – Ontario"
+    assert lake.attributes["outline_licence_url"].endswith("open-government-licence-ontario")
+
+
+def test_an_unmatched_outline_falls_back_to_the_mouths():
+    (lake,) = derive_water_bodies(
+        [],
+        [LakeRef("Lake Simcoe", "curated", "a", 44.4, -79.4)],
+        JURISDICTION,
+        BUILT,
+        outlines={"Lake Simcoe": outline(curated_name="Lake Simcoe", matched=False, geometry=None)},
+    ).bodies
+    assert lake.geometry is None
+    assert lake.geometry_source == "none"
+    assert lake.attributes["bbox_basis"] == "river_mouths"
 
 
 # ── linking spots ─────────────────────────────────────────────────────────────
@@ -559,8 +626,125 @@ def test_water_body_endpoints_require_auth(tmp_path, monkeypatch):
 
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "api.db")
     client = TestClient(app)
-    for path in ("/map/water-bodies", "/map/water-bodies/river:credit-river"):
+    for path in (
+        "/map/water-bodies",
+        "/map/water-bodies/river:credit-river",
+        "/map/water-bodies/river:credit-river/features",
+    ):
         assert client.get(path).status_code in (401, 403)
+
+
+# ── shoreline features: storage, endpoint, words ──────────────────────────────
+
+
+def feature(**over):
+    base = dict(
+        feature_id="great_lake:lake-ontario#inlet:1",
+        water_body_id="great_lake:lake-ontario",
+        jurisdiction=JURISDICTION,
+        kind="inlet",
+        name="Credit River",
+        geometry={"type": "Point", "coordinates": [-79.5, 43.5]},
+        source="OHN Watercourse",
+        derivation="watercourse_endpoint",
+        provenance="record",
+        built_at=BUILT,
+    )
+    return ShorelineFeature(**{**base, **over})
+
+
+def lake_body(**over):
+    base = wb_kwargs(
+        water_body_id="great_lake:lake-ontario",
+        name="Lake Ontario",
+        name_source="curated",
+        type="great_lake",
+        geometry=None,
+        geometry_source="none",
+        bbox=(-79.8, 43.3, -79.0, 43.8),
+    )
+    return WaterBody(**{**base, **over})
+
+
+def test_shoreline_features_round_trip_through_storage(db):
+    from src.storage.spots import replace_spots
+
+    replace_spots(db, JURISDICTION, [], [lake_body()], [feature()])
+    (read,) = list_shoreline_features(db, "great_lake:lake-ontario")
+    assert read == feature()
+    assert count_shoreline_features(db) == 1
+    assert count_shoreline_features(db, jurisdiction=JURISDICTION) == 1
+    assert list_shoreline_features(db, "great_lake:lake-ontario", kinds=["island"]) == []
+
+
+def test_a_rebuild_with_no_features_clears_the_stored_ones(db):
+    from src.storage.spots import replace_spots
+
+    replace_spots(db, JURISDICTION, [], [lake_body()], [feature()])
+    replace_spots(db, JURISDICTION, [], [lake_body()], [])
+    assert list_shoreline_features(db, "great_lake:lake-ontario") == []
+
+
+def test_features_geojson_is_none_for_an_unknown_body(db):
+    assert water_body_features_geojson(db, "great_lake:nope") is None
+
+
+def test_a_river_has_no_features_and_an_empty_collection_is_the_answer(db):
+    from src.storage.spots import replace_spots
+
+    replace_spots(db, JURISDICTION, [], [WaterBody(**wb_kwargs())], [])
+    body = water_body_features_geojson(db, "river:credit-river")
+    assert body["type"] == "FeatureCollection"
+    assert body["features"] == []
+    assert body["meta"]["count"] == 0
+
+
+@pytest.fixture
+def feature_client(tmp_path, monkeypatch, _template_db):
+    import shutil
+
+    from fastapi.testclient import TestClient
+
+    import src.storage.database as database
+    from src.api.main import app, get_current_user
+    from src.storage.spots import replace_spots
+
+    shutil.copy(_template_db, tmp_path / "api.db")
+    monkeypatch.setattr(database, "DB_PATH", tmp_path / "api.db")
+    api_db = database.get_db()
+    replace_spots(api_db, JURISDICTION, [], [lake_body(), WaterBody(**wb_kwargs())], [feature()])
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_features_endpoint_returns_a_feature_collection(feature_client):
+    body = feature_client.get("/map/water-bodies/great_lake:lake-ontario/features").json()
+    assert body["type"] == "FeatureCollection"
+    assert body["meta"]["count"] == 1
+    (f,) = body["features"]
+    assert f["geometry"]["type"] == "Point"
+    assert f["properties"]["kind"] == "inlet"
+    assert f["properties"]["derivation"] == "watercourse_endpoint"
+    assert f["properties"]["provenance"] == "record"
+    assert f["properties"]["note"]
+
+
+def test_features_endpoint_is_empty_for_a_river_and_404_for_an_unknown(feature_client):
+    empty = feature_client.get("/map/water-bodies/river:credit-river/features").json()
+    assert empty["features"] == []
+    assert feature_client.get("/map/water-bodies/river:nope/features").status_code == 404
+
+
+def test_labels_serve_the_shoreline_feature_vocabulary():
+    payload = spot_labels.labels_payload()
+    kinds = [e["kind"] for e in payload["shoreline_features"]]
+    assert kinds == list(spot_labels.FEATURE_KIND_ORDER)
+    for entry in payload["shoreline_features"]:
+        assert entry["label"] and entry["chip"] and entry["one_liner"]
+    assert set(payload["shoreline_derivations"]) == {"shoreline_outline", "watercourse_endpoint"}
 
 
 # ── the words ─────────────────────────────────────────────────────────────────

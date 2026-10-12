@@ -1652,6 +1652,19 @@ def get_map_water_body(water_body_id: str, user: dict = Depends(get_current_user
     return detail
 
 
+@app.get("/map/water-bodies/{water_body_id}/features")
+def get_map_water_body_features(water_body_id: str, user: dict = Depends(get_current_user)):
+    """A lake's shoreline features as GeoJSON: inlets, outlets, islands, points
+    and peninsulas, derived from its OHN outline. 404 for an unknown water body."""
+    from src.services.water_bodies import water_body_features_geojson
+    from src.storage.database import get_db
+
+    out = water_body_features_geojson(get_db(), water_body_id)
+    if out is None:
+        raise HTTPException(status_code=404, detail=f"No water body with id {water_body_id!r}")
+    return out
+
+
 @app.get("/map/my-stops")
 def get_my_stops(user: dict = Depends(get_current_user)):
     """Return all of the user's logged stops with coordinates for personal map mode."""

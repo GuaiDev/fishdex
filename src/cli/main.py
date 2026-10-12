@@ -1558,8 +1558,9 @@ def build_spots_cmd(
     """Rebuild the explore map's spots from the stored stretch anchors.
 
     Spots are what the map shows: river mouths, where creeks join, below dams and
-    public fishing spots. No network: it reads the anchors `build-anchors` stored,
-    so run that first. `build-stretches` and `build-anchors` run this at the end.
+    public fishing spots. It reads the anchors `build-anchors` stored, so run that
+    first; `build-stretches` and `build-anchors` run this at the end. Lake outlines
+    and watercourses come through the API cache, so a warm build is offline.
     """
     from pathlib import Path
 
@@ -1596,6 +1597,17 @@ def _print_spot_report(report) -> None:
     for source, n in sorted(report.water_body_names.items()):
         table.add_row(f"  name from {source}", str(n))
     table.add_row("water bodies with no outline", str(report.water_bodies_without_geometry))
+    table.add_row("lakes with an OHN outline", str(report.lakes_with_outline))
+    if report.lakes_without_outline:
+        table.add_row(
+            "[yellow]lakes with no outline[/yellow]",
+            f"[yellow]{report.lakes_without_outline}[/yellow]",
+        )
+    table.add_row("shoreline features", str(report.shoreline_features_total))
+    for kind, n in sorted(report.shoreline_features_by_kind.items()):
+        table.add_row(f"  {kind}", str(n))
+    for reason, n in sorted(report.shoreline_features_dropped.items()):
+        table.add_row(f"[dim]feature not kept: {reason}[/dim]", f"[dim]{n}[/dim]")
     table.add_row("spots linked to a water body", str(report.spots_linked))
     if report.spots_without_water_body:
         table.add_row(

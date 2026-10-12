@@ -33,13 +33,17 @@ import logging
 import math
 import re
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlite_utils.db import Database
 
+from src.models.hydrology import StreamSegment
 from src.models.jurisdiction import JurisdictionCode
+from src.models.lake_outline import LakeOutline
+from src.models.shoreline_feature import ShorelineFeature
 from src.models.spot import (
     AccessRef,
     Spot,
@@ -52,6 +56,7 @@ from src.models.spot import (
 from src.models.stretch import FishingStretch
 from src.models.stretch_anchor import StretchAnchor
 from src.services import spot_labels as words
+from src.services.shoreline_features import derive_shoreline_features
 from src.services.stretch_anchors import DAM_MERGE_M, _coord_key
 from src.services.stretches import DEFAULT_CURATION_PATH, load_curation
 from src.services.water_bodies import LakeRef, WaterBodySet, derive_water_bodies
@@ -134,14 +139,22 @@ def classify(
     jurisdiction: JurisdictionCode,
     hints: dict[str, StretchHints] | None = None,
     built_at: str | None = None,
+    outlines: dict[str, LakeOutline] | None = None,
+    watercourses: list[StreamSegment] | None = None,
 ) -> SpotClassification:
     """Spots from anchors: merged, deduped, titled, gated and tiered. Pure.
 
     Returns the spots and a report counting what was dropped, what was held
     back at tier 3, and which titles had to fall back to a generic word.
+
+    `outlines` maps a curated lake name to its resolved OHN outline and
+    `watercourses` is the OHN watercourse layer, both supplied by the caller
+    (build_spots does the network) so this function stays pure. With them, the
+    lakes get their shore geometry and their shoreline features.
     """
     built_at = built_at or datetime.now(UTC).isoformat(timespec="seconds")
     hints = hints or {}
+    outlines = outlines or {}
     report = SpotBuildReport(jurisdiction=jurisdiction, anchors_in=len(anchors))
     ctx = _Context(
         stretches={s.stretch_id: s for s in stretches},
@@ -170,13 +183,18 @@ def classify(
     final = sorted(by_id.values(), key=lambda s: (_KIND_ORDER[s.kind], s.tier, s.spot_id))
 
     _attach_access(ctx, final, anchors)
-    water_bodies = _link_water_bodies(ctx, final)
+    water_bodies, features = _link_water_bodies(ctx, final, outlines, watercourses or [])
 
     for spot in final:
         report.by_kind[spot.kind] = report.by_kind.get(spot.kind, 0) + 1
         report.by_tier[str(spot.tier)] = report.by_tier.get(str(spot.tier), 0) + 1
     report.spots_total = len(final)
-    return SpotClassification(spots=final, water_bodies=water_bodies.bodies, report=report)
+    return SpotClassification(
+        spots=final,
+        water_bodies=water_bodies.bodies,
+        shoreline_features=features,
+        report=report,
+    )
 
 
 @dataclass
@@ -652,12 +670,21 @@ def _access_ref(a: StretchAnchor, distance_m: float) -> AccessRef:
 # ── water bodies ──────────────────────────────────────────────────────────────
 
 
-def _link_water_bodies(ctx: _Context, spots: list[Spot]) -> WaterBodySet:
+def _link_water_bodies(
+    ctx: _Context,
+    spots: list[Spot],
+    outlines: dict[str, LakeOutline],
+    watercourses: list[StreamSegment],
+) -> tuple[WaterBodySet, list[ShorelineFeature]]:
     """Derive the water bodies and hang each spot off its river, creek or lake.
 
     A spot is a child of the river its stretch belongs to. A river mouth is also
     on the lake it opens onto, and a junction listed under two stretches is also on
     the other one's river. The spot's own `water_id` (the stretch) is left as it is.
+
+    The lakes' outlines (`outlines`) give the lake bodies their geometry, and the
+    shoreline features are derived from those outlines next (`watercourses` names
+    the inlets and outlets).
     """
     lakes = [
         LakeRef(
@@ -671,7 +698,7 @@ def _link_water_bodies(ctx: _Context, spots: list[Spot]) -> WaterBodySet:
         if s.kind == "river_mouth" and s.water_id and (lake := s.structure_attrs.get("lake"))
     ]
     bodies = derive_water_bodies(
-        list(ctx.stretches.values()), lakes, ctx.jurisdiction, ctx.built_at
+        list(ctx.stretches.values()), lakes, ctx.jurisdiction, ctx.built_at, outlines
     )
 
     for spot in spots:
@@ -692,26 +719,69 @@ def _link_water_bodies(ctx: _Context, spots: list[Spot]) -> WaterBodySet:
         report.water_body_names[wb.name_source] = report.water_body_names.get(wb.name_source, 0) + 1
         if wb.geometry is None:
             report.water_bodies_without_geometry += 1
-    return bodies
+
+    features: list[ShorelineFeature] = []
+    if outlines:
+        lake_to_wb_id = {name: bodies.lake_id(name) for name in outlines}
+        feature_set = derive_shoreline_features(
+            outlines,
+            {name: wb_id for name, wb_id in lake_to_wb_id.items() if wb_id},
+            ctx.jurisdiction,
+            ctx.built_at,
+            watercourses,
+        )
+        features = feature_set.features
+        report.lakes_with_outline = feature_set.lakes_with_outline
+        report.lakes_without_outline = feature_set.lakes_without_outline
+        report.shoreline_features_total = len(features)
+        for feature in features:
+            report.shoreline_features_by_kind[feature.kind] = (
+                report.shoreline_features_by_kind.get(feature.kind, 0) + 1
+            )
+        for reason, n in feature_set.dropped.items():
+            report.shoreline_features_dropped[reason] = (
+                report.shoreline_features_dropped.get(reason, 0) + n
+            )
+    return bodies, features
 
 
 # ── build ─────────────────────────────────────────────────────────────────────
 
 
-def build_spots(db: Database, curation_path: Path = DEFAULT_CURATION_PATH) -> SpotBuildReport:
+def build_spots(
+    db: Database,
+    curation_path: Path = DEFAULT_CURATION_PATH,
+    *,
+    outline_resolver: Callable[[dict[str, list[tuple[float, float]]]], dict[str, LakeOutline]]
+    | None = None,
+    watercourse_fetcher: Callable[[float, float, float, float], list[StreamSegment]] | None = None,
+) -> SpotBuildReport:
     """Rebuild every spot for the curation file's jurisdiction from the stored anchors.
 
     Run it after `build_anchors` (the CLI does). A rebuild replaces the
     jurisdiction's spots wholesale, in one transaction: a spot that stopped
     being derived leaves the map, and the map never reads a half-written one.
     Ids come from coordinates, so rebuilding twice gives the same spots.
+
+    The network work — matching each lake's outline from OHN Waterbody and
+    reading the watercourses that name its inlets and outlets — happens here,
+    through the cached adapters, so a second build is offline. Tests inject
+    `outline_resolver` and `watercourse_fetcher` so they never touch the network.
     """
     curation = load_curation(curation_path)
     jurisdiction = curation.jurisdiction
     anchors = list_anchors(db, jurisdiction=jurisdiction)
     stretches = list_stretches(db, jurisdiction)
-    result = classify(anchors, stretches, jurisdiction, load_stretch_hints(curation_path))
-    replace_spots(db, jurisdiction, result.spots, result.water_bodies)
+    outlines, watercourses = _lake_outline_inputs(anchors, outline_resolver, watercourse_fetcher)
+    result = classify(
+        anchors,
+        stretches,
+        jurisdiction,
+        load_stretch_hints(curation_path),
+        outlines=outlines,
+        watercourses=watercourses,
+    )
+    replace_spots(db, jurisdiction, result.spots, result.water_bodies, result.shoreline_features)
 
     report = result.report
     if not anchors:
@@ -731,7 +801,57 @@ def build_spots(db: Database, curation_path: Path = DEFAULT_CURATION_PATH) -> Sp
             n,
             report.by_kind.get("river_mouth", 0),
         )
+    if report.lakes_without_outline:
+        logger.warning(
+            "%d curated lakes have no OHN outline; they stay placed by their mouths",
+            report.lakes_without_outline,
+        )
     return report
+
+
+def _lake_outline_inputs(
+    anchors: list[StretchAnchor],
+    outline_resolver: Callable[[dict[str, list[tuple[float, float]]]], dict[str, LakeOutline]]
+    | None = None,
+    watercourse_fetcher: Callable[[float, float, float, float], list[StreamSegment]] | None = None,
+) -> tuple[dict[str, LakeOutline], list[StreamSegment]]:
+    """Named lake mouths in the anchors → outlines plus the watercourses for their inlets.
+
+    Every call in here goes through a cache, so this stays cheap offline after
+    the first build. A lake with no curated name gets no outline (an unnamed
+    mouth is not enough to match a polygon). The resolver and fetcher are
+    injected in tests; the defaults are the cached OHN adapters.
+    """
+    from shapely.geometry import shape as _shape
+
+    mouths_by_lake: dict[str, list[tuple[float, float]]] = {}
+    for a in anchors:
+        if a.anchor_type == "lake_mouth" and a.name:
+            mouths_by_lake.setdefault(a.name, []).append((a.lat, a.lon))
+    if not mouths_by_lake:
+        return {}, []
+
+    if outline_resolver is None:
+        from src.services.lake_outlines import resolve_lake_outlines
+
+        outline_resolver = resolve_lake_outlines
+    if watercourse_fetcher is None:
+        from src.ingest.jurisdictions.ca_on.hydro_network import fetch_watercourses_bbox
+
+        watercourse_fetcher = fetch_watercourses_bbox
+    outlines = outline_resolver(mouths_by_lake)
+
+    watercourses: list[StreamSegment] = []
+    seen_ogf: set[int] = set()
+    for outline in outlines.values():
+        if not outline.matched or not outline.geometry:
+            continue
+        min_lon, min_lat, max_lon, max_lat = _shape(outline.geometry).bounds
+        for seg in watercourse_fetcher(min_lon, min_lat, max_lon, max_lat):
+            if seg.ogf_id not in seen_ogf:
+                seen_ogf.add(seg.ogf_id)
+                watercourses.append(seg)
+    return outlines, watercourses
 
 
 # ── read side ─────────────────────────────────────────────────────────────────
