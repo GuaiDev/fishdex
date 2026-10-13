@@ -123,3 +123,79 @@ def test_caught_species_uses_canonical_capitalization_from_pool(tmp_path):
 
     data = get_fishdex_data(db, user_id=1, jurisdiction="CA-ON")
     assert data["caughtSpecies"][0]["commonName"] == "Smallmouth Bass"
+
+
+def _range(common, sci):
+    return SpeciesRange(
+        species=common, scientific_name=sci, native_to_ontario=True,
+        native_to_great_lakes=True, general_range="Ontario", jurisdictions_present=["CA-ON"],
+    )
+
+
+def test_every_species_carries_one_image_shape(tmp_path):
+    db = get_db(path=tmp_path / "test.db")
+    upsert_species_ranges(db, [
+        _range("Smallmouth Bass", "Micropterus dolomieu"),
+        _range("Northern Pike", "Esox lucius"),
+    ])
+    session_id, stop_id = _session_and_stop(db)
+    insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
+    insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="northern pike")
+
+    data = get_fishdex_data(db, user_id=1, jurisdiction="CA-ON")
+
+    for entry in data["caughtSpecies"] + data["regionSpeciesPool"]:
+        assert set(entry["image"]) == {"url", "thumbUrl", "status", "creator", "licence"}
+
+
+def test_species_with_an_approved_image_gets_it_and_the_rest_get_the_placeholder(tmp_path):
+    db = get_db(path=tmp_path / "test.db")
+    upsert_species_ranges(db, [
+        _range("Smallmouth Bass", "Micropterus dolomieu"),
+        _range("Northern Pike", "Esox lucius"),
+    ])
+    session_id, stop_id = _session_and_stop(db)
+    insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
+    insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="northern pike")
+
+    data = get_fishdex_data(db, user_id=1, jurisdiction="CA-ON")
+    caught = {c["commonName"]: c["image"] for c in data["caughtSpecies"]}
+    pool = {s["commonName"]: s["image"] for s in data["regionSpeciesPool"]}
+
+    bass = caught["Smallmouth Bass"]
+    assert bass["status"] == "approved"
+    assert bass["url"] == "/static/species/micropterus-dolomieu-carousel.webp"
+    assert bass["thumbUrl"] == "/static/species/micropterus-dolomieu-tile.webp"
+    assert "Raver" in bass["creator"]
+    assert "public domain" in bass["licence"].lower()
+    assert pool["Smallmouth Bass"] == bass  # one image per species, wherever it appears
+
+    pike = caught["Northern Pike"]
+    assert pike["status"] == "placeholder"
+    assert pike["url"] == pike["thumbUrl"] == "/static/species/silhouette.svg"
+    assert pike["creator"] is None and pike["licence"] is None
+
+
+def test_a_catch_the_species_list_does_not_know_gets_the_placeholder(tmp_path):
+    db = get_db(path=tmp_path / "test.db")
+    session_id, stop_id = _session_and_stop(db)
+    insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="mystery fish")
+
+    image = get_fishdex_data(db, user_id=1, jurisdiction="CA-ON")["caughtSpecies"][0]["image"]
+
+    assert image["status"] == "placeholder"
+
+
+def test_every_image_url_points_at_a_file_the_static_mount_serves(tmp_path):
+    from pathlib import Path
+
+    db = get_db(path=tmp_path / "test.db")
+    upsert_species_ranges(db, [_range("Smallmouth Bass", "Micropterus dolomieu")])
+    session_id, stop_id = _session_and_stop(db)
+    insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
+
+    image = get_fishdex_data(db, user_id=1, jurisdiction="CA-ON")["caughtSpecies"][0]["image"]
+
+    static = Path(__file__).resolve().parent.parent / "src" / "api" / "static"
+    for url in (image["url"], image["thumbUrl"]):
+        assert (static / url.removeprefix("/static/")).is_file()

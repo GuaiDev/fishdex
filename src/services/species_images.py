@@ -112,6 +112,48 @@ def sync_species_images(db: Database) -> list[SpeciesImage]:
     return images
 
 
+# ── API payload ────────────────────────────────────────────────────────────
+
+STATIC_URL_PREFIX = "/static/"
+
+
+def images_by_id(db: Database) -> dict[str, SpeciesImage]:
+    """The species_image rows, filling the table from the committed files if it is empty.
+
+    The table is derived, so an empty one (a fresh database) is rebuilt rather
+    than served as "no images". After adding or approving an image, rerun
+    `sync-species-images` to refresh it.
+    """
+    images = store.get_species_images(db)
+    if not images:
+        sync_species_images(db)
+        images = store.get_species_images(db)
+    return images
+
+
+def image_payload(image: SpeciesImage | None) -> dict:
+    """The `image` object GET /fishdex carries for one species.
+
+    A species with no row (a catch the species list does not know) gets the
+    shared placeholder, never a missing field, so the UI has one shape to read.
+    """
+    if image is None:
+        return {
+            "url": STATIC_URL_PREFIX + PLACEHOLDER_PATH,
+            "thumbUrl": STATIC_URL_PREFIX + PLACEHOLDER_PATH,
+            "status": "placeholder",
+            "creator": None,
+            "licence": None,
+        }
+    return {
+        "url": STATIC_URL_PREFIX + image.image_path,
+        "thumbUrl": STATIC_URL_PREFIX + image.thumb_path,
+        "status": image.status,
+        "creator": image.creator or None,
+        "licence": image.licence or None,
+    }
+
+
 # ── credits page ───────────────────────────────────────────────────────────
 
 _CREDITS_CSS = """

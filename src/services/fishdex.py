@@ -5,6 +5,11 @@ handoff (design_handoff_fishdex_collection/README.md, "State Management")
 specifies: caughtSpecies[] and regionSpeciesPool[], both carrying a `family`
 so the frontend can compute the flat/grouped adaptive layout and per-family
 completion counts. See species_family.py for the family classification.
+
+Every species in both lists also carries `image`: the one reference illustration
+every viewer sees for that species (or the shared placeholder). It is separate
+from `representativePhotoUrl`, which is the user's own catch photo. See
+species_images.py and docs/api/fishdex-species-image.md.
 """
 
 from typing import Any
@@ -12,6 +17,7 @@ from typing import Any
 from sqlite_utils.db import Database
 
 from src.services.species_family import canonical_scientific_name, get_family
+from src.services.species_images import image_payload, images_by_id
 from src.services.species_mapping import COMMON_TO_SCIENTIFIC
 from src.storage.catches import get_all_catches_for_user, get_personal_best
 from src.storage.species_ranges import query_deduped_species_ranges_for_jurisdiction
@@ -36,6 +42,8 @@ def get_fishdex_data(db: Database, user_id: int, jurisdiction: str = "CA-ON") ->
         for sr in pool_rows
         if sr.scientific_name
     }
+
+    images = images_by_id(db)
 
     by_species: dict[str, list[dict]] = {}
     for c in catches:
@@ -102,6 +110,7 @@ def get_fishdex_data(db: Database, user_id: int, jurisdiction: str = "CA-ON") ->
             # "newly added to the dex" instead of inventing dismissal state.
             "isNewFind": len(rows) == 1,
             "representativePhotoUrl": representative_photo_url,
+            "image": image_payload(images.get(scientific_name or "")),
         })
 
     region_species_pool = []
@@ -117,6 +126,7 @@ def get_fishdex_data(db: Database, user_id: int, jurisdiction: str = "CA-ON") ->
             "scientificName": sci,
             "family": family,
             "familyCommonName": family_common_name,
+            "image": image_payload(images.get(sci or "")),
         })
 
     return {
