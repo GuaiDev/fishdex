@@ -840,10 +840,10 @@ def get_spot_detail(db: Database, spot_id: str) -> dict | None:
 
 def _species_within_2km(db: Database, species_l: str) -> list[str]:
     """Return spot_ids where the given species has records within 2 km."""
-    from src.storage.observations import query_observations
-    from src.storage.gbif_observations import query_gbif_observations
-    from src.services.context.species import describe_species
     from src.services.context import slices
+    from src.services.context.species import describe_species
+    from src.storage.gbif_observations import query_gbif_observations
+    from src.storage.observations import query_observations
 
     spot_ids = []
     for spot in list_spots(db, max_tier=3):
@@ -913,9 +913,9 @@ def _water_body_ref(db: Database, water_body_id: str | None) -> dict | None:
 
 def species_within_2km_of_spot(db: Database, lat: float, lng: float, species: str) -> bool:
     """Small helper: does the species have records within 2 km of (lat,lng)?"""
-    from src.storage.observations import query_observations
-    from src.storage.gbif_observations import query_gbif_observations
     from src.services.context.species import describe_species
+    from src.storage.gbif_observations import query_gbif_observations
+    from src.storage.observations import query_observations
 
     if describe_species(db, species).status_known_listed:
         return False

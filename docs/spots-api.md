@@ -554,8 +554,6 @@ river quietly behind them, and let someone browse by water.
 | `bbox` | `min_lon,min_lat,max_lon,max_lat`. A river or creek is in view when its **line** crosses the box (not merely its overall box, which can cover a whole watershed). A lake is in view when the box of the river mouths that open onto it overlaps. Omit for everywhere. |
 | `type` | One or more of `river`, `creek`, `lake`, `pond`, `great_lake`, comma-separated. Omit for all. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
-| `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
-| `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, radius capped at 200 km. |
 
 
 `meta.type_counts` counts every type in view, ignoring the `type` filter, so a filter row can
@@ -1109,9 +1107,6 @@ fish recorded nearby are still listed:
 - **Lake features** (inlets, outlets, points, drop-offs, humps) are proposed, not built.
 - **Quiet water** spots (a ranking of reaches, not a located structure). The kind and its
   chip exist in `labels` so the filter row can be designed now; no spot has that kind.
-- **Filters** other than `bbox`, `kind`, `tier` and `jurisdiction`.
-- **Layer endpoints** for Getting there and Bridges as map pins. The nearest ones are
-  already on each spot.
 
 ## About the example data
 

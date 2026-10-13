@@ -947,8 +947,9 @@ def test_build_spots_command_prints_what_it_dropped(tmp_path, monkeypatch, curat
     assert "confluence_unnamed_and_small" in result.output
 
 def test_spots_endpoint_accepts_species_and_near_filters():
-    from src.api.main import app, get_current_user
     from fastapi.testclient import TestClient
+
+    from src.api.main import app, get_current_user
 
     app.dependency_overrides[get_current_user] = lambda: {"id": 1}
     client = TestClient(app)
@@ -961,8 +962,9 @@ def test_spots_endpoint_accepts_species_and_near_filters():
 
 
 def test_spots_endpoint_rejects_bad_near():
-    from src.api.main import app, get_current_user
     from fastapi.testclient import TestClient
+
+    from src.api.main import app, get_current_user
 
     app.dependency_overrides[get_current_user] = lambda: {"id": 1}
     client = TestClient(app)
@@ -971,8 +973,9 @@ def test_spots_endpoint_rejects_bad_near():
 
 
 def test_layers_getting_there_and_bridges():
-    from src.api.main import app, get_current_user
     from fastapi.testclient import TestClient
+
+    from src.api.main import app, get_current_user
 
     app.dependency_overrides[get_current_user] = lambda: {"id": 1}
     client = TestClient(app)
@@ -983,10 +986,9 @@ def test_layers_getting_there_and_bridges():
 
 
 def test_species_filter_returns_nothing_for_a_listed_species(tmp_path, monkeypatch):
-    from src.storage.database import get_db
-
     from src.services import spots as spots_mod
     from src.services.context.species import SpeciesContext
+    from src.storage.database import get_db
 
     monkeypatch.setattr(
         "src.services.context.species.describe_species",
