@@ -971,6 +971,8 @@ def test_spots_endpoint_rejects_bad_near():
     client = TestClient(app)
     r = client.get("/map/spots?near=bad")
     assert r.status_code == 422
+    for bad in ("nan,1,2", "inf,1,2", "999,1", "43,-79,0", "43,-79,-5", "43,200"):
+        assert client.get("/map/spots", params={"near": bad}).status_code == 422, bad
 
 
 def test_layers_getting_there_and_bridges():

@@ -6,6 +6,7 @@ Start with: uv run fishbot serve
 
 import json
 import logging
+import math
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -1575,10 +1576,12 @@ def _parse_spot_filters(
     if near:
         try:
             parts = tuple(float(p.strip()) for p in near.split(","))
-            if len(parts) != 2 and len(parts) != 3:
+            if len(parts) not in (2, 3) or not all(math.isfinite(p) for p in parts):
                 raise ValueError
             nlat, nlon = parts[0], parts[1]
             nr = parts[2] if len(parts) == 3 else None
+            if not (-90 <= nlat <= 90 and -180 <= nlon <= 180) or (nr is not None and nr <= 0):
+                raise ValueError
             near_t = (nlat, nlon, nr)
         except Exception:
             raise HTTPException(status_code=422, detail="near must be lat,lon or lat,lon,radius_km")
