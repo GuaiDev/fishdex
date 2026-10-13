@@ -264,7 +264,7 @@ def _stream_junctions(
                 name=seg.name,
                 geometry=mapping(touch),
                 source=_STREAM_SOURCE,
-                source_date=None,
+                source_date=seg.effective_date,
                 provenance=ProvenanceKind.RECORD,
                 derivation="watercourse_endpoint",
                 note=None,

@@ -24,14 +24,17 @@ Attribution travels with every polygon that reaches the map:
 
 import logging
 import re
-from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
 from shapely.geometry import MultiPolygon, Polygon, mapping
 from shapely.geometry.polygon import orient
 
-from src.ingest.jurisdictions.ca_on.hydro_network import _SERVICE_BASE, _cached_get
+from src.ingest.jurisdictions.ca_on.hydro_network import (
+    _SERVICE_BASE,
+    _cached_get,
+    parse_effective_date,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -215,15 +218,6 @@ def _point_geometry(lon: float, lat: float) -> str:
     return f'{{"x":{lon},"y":{lat},"spatialReference":{{"wkid":4326}}}}'
 
 
-def _parse_effective(ms: Any) -> str | None:
-    if not isinstance(ms, (int, float)) or ms <= 0:
-        return None
-    try:
-        return datetime.fromtimestamp(ms / 1000, tz=UTC).date().isoformat()
-    except (OverflowError, OSError, ValueError):
-        return None
-
-
 def _parse_features(features: list[dict]) -> list[OhnWaterbody]:
     out: list[OhnWaterbody] = []
     skipped = 0
@@ -245,7 +239,7 @@ def _parse_features(features: list[dict]) -> list[OhnWaterbody]:
                 raw_name=raw_name,
                 name=strip_bilingual(raw_name),
                 area_m2=_as_float(attrs.get("SYSTEM_CALCULATED_AREA")),
-                effective_datetime=_parse_effective(attrs.get("EFFECTIVE_DATETIME")),
+                effective_datetime=parse_effective_date(attrs.get("EFFECTIVE_DATETIME")),
                 geometry=geometry,
             )
         )

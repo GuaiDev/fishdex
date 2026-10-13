@@ -49,7 +49,7 @@ def derive(outline, wb_id="lake:test-lake", segments=()):
     )
 
 
-def seg(ogf_id, name, start, end, verified=True):
+def seg(ogf_id, name, start, end, verified=True, effective_date=None):
     return StreamSegment(
         ogf_id=ogf_id,
         watercourse_type="Stream",
@@ -59,6 +59,7 @@ def seg(ogf_id, name, start, end, verified=True):
         flow_classification=None,
         stream_order=3,
         length_m=100.0,
+        effective_date=effective_date,
         geom_wkt="LINESTRING (0 0, 1 1)",
         start_node=start,
         end_node=end,
@@ -241,3 +242,13 @@ def test_a_line_is_not_a_shoreline_feature_geometry():
             derivation="watercourse_endpoint",
             built_at=BUILT,
         )
+
+
+def test_a_stream_feature_carries_the_watercourse_effective_date():
+    result = derive(
+        outline_of(BASE),
+        segments=[seg(1, "Inlet Creek", "2.0,0.0", "0.01,0.0", effective_date="2019-04-02")],
+    )
+    (f,) = [x for x in result.features if x.kind in ("inlet", "outlet")]
+    assert f.source == "OHN Watercourse"
+    assert str(f.source_date) == "2019-04-02"

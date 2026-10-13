@@ -460,3 +460,15 @@ def test_a_clean_index_does_not_warn(caplog):
 
     assert index is not None
     assert not [r for r in caplog.records if r.levelname == "WARNING"]
+
+
+def test_parse_segment_carries_the_effective_date():
+    from src.ingest.jurisdictions.ca_on.hydro_network import _parse_segment
+
+    feat = {
+        "attributes": {"OGF_ID": 7, "EFFECTIVE_DATETIME": 1554163200000},
+        "geometry": {"paths": [[[-79.8, 43.3], [-79.7, 43.4]]]},
+    }
+    assert _parse_segment(feat).effective_date == "2019-04-02"
+    feat["attributes"]["EFFECTIVE_DATETIME"] = None
+    assert _parse_segment(feat).effective_date is None
