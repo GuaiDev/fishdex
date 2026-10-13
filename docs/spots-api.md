@@ -12,6 +12,7 @@ as the other `/map/*` endpoints. The older `/map/stretches` and
 You can build the whole UI without a running server: **`tests/fixtures/spots_api_responses.json`**
 holds real responses from every endpoint below (the examples in this file are copied
 from it). Each entry is `{request, note, status, response}`.
+The species, near, getting-there and bridges examples will be captured at the next fixture refresh from a full build.
 
 ## The flow
 
