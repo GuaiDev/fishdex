@@ -211,8 +211,9 @@ GeoJSON `FeatureCollection` of points, light enough to load for a whole viewport
 | `kind` | One or more of `river_mouth`, `creek_junction`, `below_dam`, `public_fishing`, `quiet_water`, comma-separated. Omit for all. |
 | `tier` | The highest tier to include, **cumulative**: `1` headline spots only, `2` adds the normal ones (**default**), `3` everything, including junctions of small unnamed creeks that are hidden by default. A sensible mapping is tier 1 at province zoom, 2 at regional zoom, 3 at street zoom. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
-| `species` | Scientific/common name. A spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
-| `near` | `lat,lon` or `lat,lon,radius_km`. Results sorted by distance; radius capped at 200 km. |
+| `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
+| `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, radius capped at 200 km. |
+
 
 `meta.kind_counts` counts the spots in view for **every** kind, ignoring the `kind`
 filter, so the chips can show how many each would add. `meta.count` is how many
@@ -553,8 +554,9 @@ river quietly behind them, and let someone browse by water.
 | `bbox` | `min_lon,min_lat,max_lon,max_lat`. A river or creek is in view when its **line** crosses the box (not merely its overall box, which can cover a whole watershed). A lake is in view when the box of the river mouths that open onto it overlaps. Omit for everywhere. |
 | `type` | One or more of `river`, `creek`, `lake`, `pond`, `great_lake`, comma-separated. Omit for all. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
-| `species` | Scientific/common name. A spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
-| `near` | `lat,lon` or `lat,lon,radius_km`. Results sorted by distance; radius capped at 200 km. |
+| `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
+| `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, radius capped at 200 km. |
+
 
 `meta.type_counts` counts every type in view, ignoring the `type` filter, so a filter row can
 show what each would add. Features come in type order (rivers, creeks, lakes, ponds, Great
@@ -1139,3 +1141,11 @@ produces the same payload.
 - User-facing words for the map live in `src/services/spot_labels.py`. The card's words
   are written by `render_spot()` in `src/services/context/render.py`, and the "why fish
   gather here" text is in `src/services/context/translate.py`. Nothing else writes any.
+
+## `GET /map/layers/getting-there`
+
+Returns GeoJSON point features (FeatureCollection) for parking, trailheads and boat launches attached to spots in view. Parameters: `bbox` (optional, `min_lon,min_lat,max_lon,max_lat`) and `jurisdiction` (optional, ISO 3166-2). Labels come from the labels endpoint's `layers.getting_there` and `access_labels`. Properties: `kind`, `name`, `distance_m`, `spot_id`, `spot_title`, `attributes`.
+
+## `GET /map/layers/bridges`
+
+Returns GeoJSON point features (FeatureCollection) for road crossings attached to spots in view. Bridges are off by default in the UI. Parameters: `bbox` (optional) and `jurisdiction` (optional). Labels come from `layers.bridges` and `access_labels`. Properties: `kind`, `name`, `distance_m`, `spot_id`, `spot_title`, `attributes`.
