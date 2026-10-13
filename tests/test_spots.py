@@ -946,6 +946,7 @@ def test_build_spots_command_prints_what_it_dropped(tmp_path, monkeypatch, curat
     assert "dam_unverified_and_unnamed" in result.output
     assert "confluence_unnamed_and_small" in result.output
 
+
 def test_spots_endpoint_accepts_species_and_near_filters():
     from fastapi.testclient import TestClient
 
