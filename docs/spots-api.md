@@ -13,6 +13,7 @@ the private [weed reports](#weed-reports) the user writes themselves. The older 
 You can build the whole UI without a running server: **`tests/fixtures/spots_api_responses.json`**
 holds real responses from every endpoint below (the examples in this file are copied
 from it). Each entry is `{request, note, status, response}`.
+The species, near, getting-there and bridges examples will be captured at the next fixture refresh from a full build.
 
 ## The flow
 
@@ -261,6 +262,8 @@ GeoJSON `FeatureCollection` of points, light enough to load for a whole viewport
 | `kind` | One or more of `river_mouth`, `creek_junction`, `below_dam`, `public_fishing`, `quiet_water`, comma-separated. Omit for all. |
 | `tier` | The highest tier to include, **cumulative**: `1` headline spots only, `2` adds the normal ones (**default**), `3` everything, including junctions of small unnamed creeks that are hidden by default. A sensible mapping is tier 1 at province zoom, 2 at regional zoom, 3 at street zoom. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
+| `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
+| `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, nearest first. Radius defaults to 50 km and is capped at 200 km. |
 
 `meta.kind_counts` counts the spots in view for **every** kind, ignoring the `kind`
 filter, so the chips can show how many each would add. `meta.count` is how many
@@ -1606,9 +1609,6 @@ id nobody has used. Their layer and list are simply empty of it.
   none is derived, and none appears on a spot, a card or a water body.
 - **Quiet water** spots (a ranking of reaches, not a located structure). The kind and its
   chip exist in `labels` so the filter row can be designed now; no spot has that kind.
-- **Filters** other than `bbox`, `kind`, `tier` and `jurisdiction`.
-- **Layer endpoints** for Getting there and Bridges as map pins. The nearest ones are
-  already on each spot.
 
 ## About the example data
 
@@ -1644,3 +1644,11 @@ produces the same payload.
 - User-facing words for the map live in `src/services/spot_labels.py`. The card's words
   are written by `render_spot()` in `src/services/context/render.py`, and the "why fish
   gather here" text is in `src/services/context/translate.py`. Nothing else writes any.
+
+## `GET /map/layers/getting-there`
+
+Returns GeoJSON point features (FeatureCollection) for parking, trailheads and boat launches. Parameters: `bbox` (optional, `min_lon,min_lat,max_lon,max_lat`) and `jurisdiction` (optional, ISO 3166-2). The bbox is applied to the access points themselves, and a point shared by several spots appears once. Labels come from the labels endpoint's `layers.getting_there` and `access_labels`. Properties: `kind`, `name`, `attributes`.
+
+## `GET /map/layers/bridges`
+
+Returns GeoJSON point features (FeatureCollection) for road crossings. Bridges are off by default in the UI. Parameters: `bbox` (optional) and `jurisdiction` (optional), filtered and de-duplicated as for getting-there. Labels come from `layers.bridges` and `access_labels`. Properties: `kind`, `name`, `attributes`.

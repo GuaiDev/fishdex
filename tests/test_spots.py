@@ -945,3 +945,71 @@ def test_build_spots_command_prints_what_it_dropped(tmp_path, monkeypatch, curat
     assert result.exit_code == 0, result.output
     assert "dam_unverified_and_unnamed" in result.output
     assert "confluence_unnamed_and_small" in result.output
+
+
+def test_spots_endpoint_accepts_species_and_near_filters():
+    from fastapi.testclient import TestClient
+
+    from src.api.main import app, get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    client = TestClient(app)
+    # near with 2 params
+    r = client.get("/map/spots?near=43.2,-80.1&bbox=-80.2,43.1,-80.0,43.3")
+    assert r.status_code == 200
+    # near with 3 params
+    r = client.get("/map/spots?near=43.2,-80.1,10&bbox=-80.2,43.1,-80.0,43.3")
+    assert r.status_code == 200
+
+
+def test_spots_endpoint_rejects_bad_near():
+    from fastapi.testclient import TestClient
+
+    from src.api.main import app, get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    client = TestClient(app)
+    r = client.get("/map/spots?near=bad")
+    assert r.status_code == 422
+    for bad in ("nan,1,2", "inf,1,2", "999,1", "43,-79,0", "43,-79,-5", "43,200"):
+        assert client.get("/map/spots", params={"near": bad}).status_code == 422, bad
+
+
+def test_layers_getting_there_and_bridges():
+    from fastapi.testclient import TestClient
+
+    from src.api.main import app, get_current_user
+
+    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    client = TestClient(app)
+    r = client.get("/map/layers/getting-there")
+    assert r.status_code == 200
+    r = client.get("/map/layers/bridges")
+    assert r.status_code == 200
+
+
+def test_species_filter_returns_nothing_for_a_listed_species(tmp_path, monkeypatch):
+    from src.services import spots as spots_mod
+    from src.services.context.species import SpeciesContext
+    from src.storage.database import get_db
+
+    monkeypatch.setattr(
+        "src.services.context.species.describe_species",
+        lambda db, name: SpeciesContext.model_construct(status_known_listed=True),
+    )
+    db = get_db(tmp_path / "t.db")
+    assert spots_mod._species_within_2km(db, "clinostomus elongatus") == []
+
+
+def test_species_filter_matches_an_observation_by_common_name(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from src.services import spots as spots_mod
+    from src.storage.database import get_db
+
+    spot = SimpleNamespace(spot_id="river_mouth:1", lat=43.5, lng=-79.5)
+    obs = SimpleNamespace(species="Etheostoma caeruleum", common_name="Rainbow Darter")
+    monkeypatch.setattr(spots_mod, "list_spots", lambda db, max_tier=3: [spot])
+    monkeypatch.setattr("src.storage.observations.query_observations", lambda db, **kw: ([obs], 1))
+    db = get_db(tmp_path / "t.db")
+    assert spots_mod._species_within_2km(db, "rainbow darter") == ["river_mouth:1"]

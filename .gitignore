@@ -41,3 +41,4 @@ __pycache__/
 # IS committed — that is config. This is the report, which is a fact about one
 # moment and regenerated for free by `make harvest-ca`.
 data/processed/ca_harvest_report.json
+fishing.db

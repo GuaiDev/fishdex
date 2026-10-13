@@ -61,6 +61,10 @@ WATER_BODY_LISTS = [
         "creeks only, in a box around Oakville",
     ),
 ]
+LAYERS = [
+    ("/map/layers/getting-there?bbox=-80.40,43.17,-80.30,43.25", "getting there features in box"),
+    ("/map/layers/bridges?bbox=-80.40,43.17,-80.30,43.25", "bridges features in box"),
+]
 WATER_BODY_DETAILS = [
     ("river:credit-river", "a river in full: its line, its stretches, the spots on it"),
     ("great_lake:lake-ontario", "a lake: its outline, its shoreline features, the mouths onto it"),
@@ -264,6 +268,15 @@ def main() -> None:
 
     for path, note in WATER_BODY_LISTS:
         capture(path, note)
+    for path, note in LAYERS:
+        capture(path, note)
+    # include examples with filters if they don't error
+    try:
+        capture(
+            "/map/spots?near=43.20,-80.35&bbox=-80.40,43.17,-80.30,43.25", "near filter example"
+        )
+    except Exception:
+        pass
     for water_body_id, note in WATER_BODY_DETAILS:
         detail = capture(f"/map/water-bodies/{water_body_id}", note)
         # Only a lake with an outline has shoreline features to capture.
