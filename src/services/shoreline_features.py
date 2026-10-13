@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 
 from shapely.geometry import Point, Polygon, mapping, shape
 from shapely.geometry.polygon import orient
+from shapely.prepared import prep
 
 from src.models.context import ProvenanceKind
 from src.models.hydrology import StreamSegment
@@ -228,12 +229,15 @@ def _stream_junctions(
 ) -> list[ShorelineFeature]:
     boundary = geom.boundary
     tol = STREAM_JUNCTION_TOLERANCE_M / M_PER_DEG
+    near_shore = prep(boundary.buffer(tol))
     seen: set[tuple[float, float]] = set()
     out: list[ShorelineFeature] = []
     for seg in segments:
         start = _node(seg.start_node)
         end = _node(seg.end_node)
         if start is None or end is None:
+            continue
+        if not (near_shore.contains(start) or near_shore.contains(end)):
             continue
         d_start = boundary.distance(start)
         d_end = boundary.distance(end)

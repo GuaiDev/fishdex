@@ -150,7 +150,7 @@ def derive_water_bodies(
     without one keeps `geometry_source == "none"` and is placed by its mouths.
     """
     built_at = built_at or datetime.now(UTC).isoformat(timespec="seconds")
-    outlines = outlines or {}
+    outlines = {slugify(name): o for name, o in (outlines or {}).items()}
     out = WaterBodySet()
 
     # Rivers and creeks: one per curated river name, in curation order.
@@ -201,7 +201,7 @@ def derive_water_bodies(
             attrs["also_spelled"] = spellings
         if part_of := PART_OF.get(lead.name.strip().lower()):
             attrs["part_of"] = part_of
-        outline = outlines.get(lead.name.strip())
+        outline = outlines.get(slug)
         if outline is not None and outline.matched and outline.geometry:
             geometry = outline.geometry
             geometry_source = "ohn_waterbody"

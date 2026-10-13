@@ -59,7 +59,7 @@ from src.services import spot_labels as words
 from src.services.shoreline_features import derive_shoreline_features
 from src.services.stretch_anchors import DAM_MERGE_M, _coord_key
 from src.services.stretches import DEFAULT_CURATION_PATH, load_curation
-from src.services.water_bodies import LakeRef, WaterBodySet, derive_water_bodies
+from src.services.water_bodies import LakeRef, WaterBodySet, derive_water_bodies, slugify
 from src.storage.spots import get_spot, list_spots, replace_spots
 from src.storage.stretch_anchors import list_anchors
 from src.storage.stretches import list_stretches
@@ -697,6 +697,7 @@ def _link_water_bodies(
         for s in spots
         if s.kind == "river_mouth" and s.water_id and (lake := s.structure_attrs.get("lake"))
     ]
+    outlines = {slugify(name): outline for name, outline in outlines.items() if slugify(name)}
     bodies = derive_water_bodies(
         list(ctx.stretches.values()), lakes, ctx.jurisdiction, ctx.built_at, outlines
     )
@@ -722,10 +723,10 @@ def _link_water_bodies(
 
     features: list[ShorelineFeature] = []
     if outlines:
-        lake_to_wb_id = {name: bodies.lake_id(name) for name in outlines}
+        lake_to_wb_id = {slug: bodies.lake_id(slug) for slug in outlines}
         feature_set = derive_shoreline_features(
             outlines,
-            {name: wb_id for name, wb_id in lake_to_wb_id.items() if wb_id},
+            {slug: wb_id for slug, wb_id in lake_to_wb_id.items() if wb_id},
             ctx.jurisdiction,
             ctx.built_at,
             watercourses,
@@ -827,7 +828,8 @@ def _lake_outline_inputs(
     mouths_by_lake: dict[str, list[tuple[float, float]]] = {}
     for a in anchors:
         if a.anchor_type == "lake_mouth" and a.name:
-            mouths_by_lake.setdefault(a.name, []).append((a.lat, a.lon))
+            lake = next((n for n in mouths_by_lake if slugify(n) == slugify(a.name)), a.name)
+            mouths_by_lake.setdefault(lake, []).append((a.lat, a.lon))
     if not mouths_by_lake:
         return {}, []
 
@@ -846,12 +848,36 @@ def _lake_outline_inputs(
     for outline in outlines.values():
         if not outline.matched or not outline.geometry:
             continue
-        min_lon, min_lat, max_lon, max_lat = _shape(outline.geometry).bounds
-        for seg in watercourse_fetcher(min_lon, min_lat, max_lon, max_lat):
-            if seg.ogf_id not in seen_ogf:
-                seen_ogf.add(seg.ogf_id)
-                watercourses.append(seg)
+        for cell in _shore_cells(_shape(outline.geometry).boundary):
+            for seg in watercourse_fetcher(*cell):
+                if seg.ogf_id not in seen_ogf:
+                    seen_ogf.add(seg.ogf_id)
+                    watercourses.append(seg)
     return outlines, watercourses
+
+
+def _shore_cells(boundary, cell_deg: float = 0.5) -> list[tuple[float, float, float, float]]:
+    """Grid cells the shoreline passes through, inset a hair so each asks for one tile.
+
+    Inlets and outlets sit on the shore, so a big lake's open water is never fetched.
+    """
+    from shapely.geometry import box
+    from shapely.prepared import prep
+
+    min_lon, min_lat, max_lon, max_lat = boundary.bounds
+    shore = prep(boundary.buffer(0.001))
+    eps = 1e-6
+    cells: list[tuple[float, float, float, float]] = []
+    lat = math.floor(min_lat / cell_deg) * cell_deg
+    while lat <= max_lat:
+        lon = math.floor(min_lon / cell_deg) * cell_deg
+        while lon <= max_lon:
+            cell = (lon + eps, lat + eps, lon + cell_deg - eps, lat + cell_deg - eps)
+            if shore.intersects(box(*cell)):
+                cells.append(cell)
+            lon += cell_deg
+        lat += cell_deg
+    return cells
 
 
 # ── read side ─────────────────────────────────────────────────────────────────

@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 _WATERBODY_LAYER = 25
 _PAGE_SIZE = 1000
+_MAX_PAGES = 20
 
 # The layer's own `copyrightText`. The Open Government Licence – Ontario lets us
 # copy and adapt with attribution, so the attribution is not optional.
@@ -161,7 +162,7 @@ def fetch_waterbodies_near(
         "resultRecordCount": str(_PAGE_SIZE),
         "f": "json",
     }
-    return _parse_features(_cached_get(url, params).get("features", []))
+    return _parse_features(_fetch_all_pages(url, params))
 
 
 def fetch_waterbodies_by_name(name: str) -> list[OhnWaterbody]:
@@ -180,7 +181,29 @@ def fetch_waterbodies_by_name(name: str) -> list[OhnWaterbody]:
         "resultRecordCount": str(_PAGE_SIZE),
         "f": "json",
     }
-    return _parse_features(_cached_get(url, params).get("features", []))
+    return _parse_features(_fetch_all_pages(url, params))
+
+
+def _fetch_all_pages(url: str, params: dict) -> list[dict]:
+    """Every feature of a query, following `exceededTransferLimit` page by page.
+
+    The service silently returns a thinned subset when a query is bigger than one
+    page, so a lake match made on page one could pick the wrong polygon without
+    a sign. A query still truncated at the page cap is logged at WARNING.
+    """
+    features: list[dict] = []
+    for page in range(_MAX_PAGES):
+        data = _cached_get(url, {**params, "resultOffset": str(page * _PAGE_SIZE)})
+        batch = data.get("features", [])
+        features.extend(batch)
+        if not data.get("exceededTransferLimit") or not batch:
+            return features
+    logger.warning(
+        "OHN waterbody: query still truncated after %d pages (%d features); matches may be wrong",
+        _MAX_PAGES,
+        len(features),
+    )
+    return features
 
 
 def _escape_like(value: str) -> str:
