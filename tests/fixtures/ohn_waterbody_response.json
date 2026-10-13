@@ -1,0 +1,75 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OGF_ID": 321509934,
+        "WATERBODY_TYPE": "Lake",
+        "OFFICIAL_NAME_LABEL": "Lake Ontario (lac Ontario)",
+        "GEL_NAME_IDENT": 12345,
+        "SYSTEM_CALCULATED_AREA": 2583000000.0,
+        "EFFECTIVE_DATETIME": 1602028800000
+      },
+      "geometry": {
+        "rings": [
+          [
+            [-79.9, 43.2],
+            [-79.9, 43.4],
+            [-79.7, 43.4],
+            [-79.7, 43.2],
+            [-79.9, 43.2]
+          ],
+          [
+            [-79.85, 43.28],
+            [-79.83, 43.28],
+            [-79.83, 43.3],
+            [-79.85, 43.3],
+            [-79.85, 43.28]
+          ]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OGF_ID": 124215626,
+        "WATERBODY_TYPE": "Lake",
+        "OFFICIAL_NAME_LABEL": "Rice Lake",
+        "GEL_NAME_IDENT": 67890,
+        "SYSTEM_CALCULATED_AREA": 92300000.0,
+        "EFFECTIVE_DATETIME": 1602028800000
+      },
+      "geometry": {
+        "rings": [
+          [
+            [-78.3, 44.1],
+            [-78.3, 44.25],
+            [-78.15, 44.25],
+            [-78.15, 44.1],
+            [-78.3, 44.1]
+          ]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OGF_ID": 124212064,
+        "WATERBODY_TYPE": "Pond",
+        "OFFICIAL_NAME_LABEL": null,
+        "GEL_NAME_IDENT": null,
+        "SYSTEM_CALCULATED_AREA": 12752.0,
+        "EFFECTIVE_DATETIME": 1602028800000
+      },
+      "geometry": {
+        "rings": [
+          [
+            [-78.24, 44.19],
+            [-78.24, 44.191],
+            [-78.239, 44.191],
+            [-78.239, 44.19],
+            [-78.24, 44.19]
+          ]
+        ]
+      }
+    }
+  ],
+  "exceededTransferLimit": false
+}

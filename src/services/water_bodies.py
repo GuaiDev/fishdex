@@ -29,6 +29,7 @@ from shapely.geometry import shape
 from sqlite_utils.db import Database
 
 from src.models.jurisdiction import JurisdictionCode
+from src.models.lake_outline import LakeOutline
 from src.models.spot import Spot
 from src.models.stretch import FishingStretch
 from src.models.water_body import NameSource, WaterBody, WaterBodyType
@@ -127,14 +128,29 @@ def _union_bbox(
     )
 
 
+def _geojson_bbox(geometry: dict) -> tuple[float, float, float, float] | None:
+    """(min_lon, min_lat, max_lon, max_lat) of a GeoJSON point or polygon, or None."""
+    if not geometry or not geometry.get("coordinates"):
+        return None
+    return tuple(shape(geometry).bounds)  # type: ignore[return-value]
+
+
 def derive_water_bodies(
     stretches: list[FishingStretch],
     lakes: list[LakeRef],
     jurisdiction: JurisdictionCode,
     built_at: str | None = None,
+    outlines: dict[str, LakeOutline] | None = None,
 ) -> WaterBodySet:
-    """Rivers and creeks from the stretches, lakes from the mouth lake names."""
+    """Rivers and creeks from the stretches, lakes from the mouth lake names.
+
+    `outlines` maps a curated lake name to its matched OHN outline (see
+    services/lake_outlines.py). A lake with an outline gets its polygon geometry
+    and the source facts (OGF_IDs, OHN name, effective date, licence); a lake
+    without one keeps `geometry_source == "none"` and is placed by its mouths.
+    """
     built_at = built_at or datetime.now(UTC).isoformat(timespec="seconds")
+    outlines = {slugify(name): o for name, o in (outlines or {}).items()}
     out = WaterBodySet()
 
     # Rivers and creeks: one per curated river name, in curation order.
@@ -185,21 +201,42 @@ def derive_water_bodies(
             attrs["also_spelled"] = spellings
         if part_of := PART_OF.get(lead.name.strip().lower()):
             attrs["part_of"] = part_of
-        attrs["bbox_basis"] = "river_mouths"
+        outline = outlines.get(slug)
+        if outline is not None and outline.matched and outline.geometry:
+            geometry = outline.geometry
+            geometry_source = "ohn_waterbody"
+            attrs["outline_source"] = "OHN Waterbody"
+            attrs["outline_ogf_ids"] = outline.ogf_ids
+            if outline.ohn_name:
+                attrs["outline_ohn_name"] = outline.ohn_name
+            if outline.effective_datetime:
+                attrs["outline_effective_datetime"] = outline.effective_datetime
+            attrs["outline_match_basis"] = outline.match_basis
+            if outline.licence:
+                attrs["outline_licence"] = outline.licence
+            if outline.licence_url:
+                attrs["outline_licence_url"] = outline.licence_url
+            attrs["bbox_basis"] = "outline"
+            bbox = _geojson_bbox(geometry)
+        else:
+            geometry = None
+            geometry_source = "none"
+            attrs["bbox_basis"] = "river_mouths"
+            bbox = (
+                min(r.lon for r in refs),
+                min(r.lat for r in refs),
+                max(r.lon for r in refs),
+                max(r.lat for r in refs),
+            )
         body = WaterBody(
             water_body_id=f"{wb_type}:{slug}",
             jurisdiction=jurisdiction,
             name=lead.name,
             name_source=lead.name_source,
             type=wb_type,
-            geometry=None,
-            geometry_source="none",
-            bbox=(
-                min(r.lon for r in refs),
-                min(r.lat for r in refs),
-                max(r.lon for r in refs),
-                max(r.lat for r in refs),
-            ),
+            geometry=geometry,
+            geometry_source=geometry_source,
+            bbox=bbox,
             stretch_ids=sorted({r.stretch_id for r in refs}),
             attributes=attrs,
             built_at=built_at,
@@ -315,4 +352,53 @@ def get_water_body_detail(db: Database, water_body_id: str) -> dict | None:
         "display_name": _display_name(wb),
         "spots": ranked(own),
         "also_here_spots": ranked(also),
+    }
+
+
+def water_body_features_geojson(db: Database, water_body_id: str) -> dict | None:
+    """A lake's shoreline features as a GeoJSON FeatureCollection. None for an unknown id.
+
+    The inlets, outlets, islands, points and peninsulas derived from the water
+    body's outline (services/shoreline_features.py). `derivation` says how the
+    shape was made: `watercourse_endpoint` (a mapped OHN stream at the shore) or
+    `shoreline_outline` (geometry read off the outline itself); the note sticks
+    to that either way. A river has no features, so an empty collection is the
+    honest answer, not an error.
+    """
+    from src.storage.water_bodies import list_shoreline_features
+
+    wb = get_water_body(db, water_body_id)
+    if wb is None:
+        return None
+    features = list_shoreline_features(db, water_body_id)
+    by_kind: dict[str, int] = {}
+    out = []
+    for f in features:
+        by_kind[f.kind] = by_kind.get(f.kind, 0) + 1
+        out.append(
+            {
+                "type": "Feature",
+                "id": f.feature_id,
+                "geometry": f.geometry,
+                "properties": {
+                    "feature_id": f.feature_id,
+                    "water_body_id": f.water_body_id,
+                    "kind": f.kind,
+                    "name": f.name,
+                    "derivation": f.derivation,
+                    "provenance": f.provenance,
+                    "source": f.source,
+                    "source_date": f.source_date,
+                    "note": words.shoreline_feature_note(f.kind, f.derivation, f.name),
+                    "area_m2": f.area_m2,
+                    "length_m": f.length_m,
+                },
+            }
+        )
+    return {
+        "type": "FeatureCollection",
+        "water_body_id": wb.water_body_id,
+        "water_body_name": wb.name,
+        "meta": {"count": len(out), "by_kind": by_kind},
+        "features": out,
     }

@@ -30,6 +30,7 @@ import json
 import logging
 import math
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -126,7 +127,7 @@ def fetch_watercourses_bbox(
         "outFields": (
             "OGF_ID,WATERCOURSE_TYPE,OFFICIAL_NAME_LABEL,"
             "FLOW_DIRECTION_VERIFIED_IND,PERMANENCY,"
-            "FLOW_CLASSIFICATION,SYSTEM_CALCULATED_LENGTH"
+            "FLOW_CLASSIFICATION,SYSTEM_CALCULATED_LENGTH,EFFECTIVE_DATETIME"
         ),
         "returnGeometry": "true",
         "outSR": "4326",
@@ -343,6 +344,16 @@ def _count_in_bbox(url: str, base_params: dict, bbox_str: str) -> int:
 # ── internal parsers ──────────────────────────────────────────────────────────
 
 
+def parse_effective_date(ms: object) -> str | None:
+    """EFFECTIVE_DATETIME (epoch ms) -> ISO date; None when absent or unreadable."""
+    if not isinstance(ms, (int, float)) or ms <= 0:
+        return None
+    try:
+        return datetime.fromtimestamp(ms / 1000, tz=UTC).date().isoformat()
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
 def _parse_segment(
     feat: dict,
     home_lat: float | None = None,
@@ -382,6 +393,7 @@ def _parse_segment(
             permanency=attrs.get("PERMANENCY") or "Permanent",
             flow_classification=attrs.get("FLOW_CLASSIFICATION") or None,
             length_m=float(attrs.get("SYSTEM_CALCULATED_LENGTH") or 0.0),
+            effective_date=parse_effective_date(attrs.get("EFFECTIVE_DATETIME")),
             geom_wkt=geom_wkt,
             start_node=f"{round(start[0], 5)},{round(start[1], 5)}",
             end_node=f"{round(end[0], 5)},{round(end[1], 5)}",

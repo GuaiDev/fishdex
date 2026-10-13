@@ -201,6 +201,7 @@ def _ensure_spots(db: Database) -> None:
             pass  # column already exists
     db.execute("CREATE INDEX IF NOT EXISTS idx_spots_water_body ON spots(water_body_id)")
     _ensure_water_bodies(db)
+    _ensure_shoreline_features(db)
 
 
 def _ensure_water_bodies(db: Database) -> None:
@@ -231,6 +232,38 @@ def _ensure_water_bodies(db: Database) -> None:
     db.execute(
         "CREATE INDEX IF NOT EXISTS idx_water_bodies_jurisdiction "
         "ON water_bodies(jurisdiction, type)"
+    )
+
+
+def _ensure_shoreline_features(db: Database) -> None:
+    """Create the shoreline_features table. Idempotent.
+
+    The inlets, outlets, islands, points and peninsulas derived from a lake's
+    outline (services/shoreline_features.py). Rebuilt wholesale with the water
+    bodies, in the same transaction, so a water body never points at a feature
+    the rebuild removed. No foreign key, for the same reason as water_bodies.
+    """
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS shoreline_features (
+            feature_id       TEXT PRIMARY KEY,
+            water_body_id    TEXT NOT NULL,
+            jurisdiction     TEXT NOT NULL,
+            kind             TEXT NOT NULL,
+            name             TEXT,
+            geometry_geojson TEXT NOT NULL,
+            source           TEXT,
+            source_date      TEXT,
+            provenance       TEXT NOT NULL,
+            derivation       TEXT NOT NULL,
+            note             TEXT,
+            area_m2          REAL,
+            length_m         REAL,
+            built_at         TEXT NOT NULL
+        )
+    """)
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shoreline_features_water "
+        "ON shoreline_features(water_body_id, kind)"
     )
 
 
@@ -265,6 +298,7 @@ def _apply_migrations(db: Database) -> None:
     migrate_dismissed_segments_user(db)
     migrate_user_patterns(db)
     migrate_pins(db)
+    migrate_weed_reports(db)
 
 
 def migrate_pins(db: Database) -> None:
@@ -274,6 +308,14 @@ def migrate_pins(db: Database) -> None:
     logged before this have no rating and no start or end time.
     """
     from src.storage.pins import ensure_tables
+
+    ensure_tables(db)
+
+
+def migrate_weed_reports(db: Database) -> None:
+    """Create the weed_reports table. Idempotent. Nothing is backfilled: weed edges
+    are only ever reported by a person, never derived from other data."""
+    from src.storage.weed_reports import ensure_tables
 
     ensure_tables(db)
 

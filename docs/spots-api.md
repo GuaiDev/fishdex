@@ -5,8 +5,9 @@ to one place on the water: where a river runs out into a lake, where a creek joi
 river, the water just below a dam, an official fishing spot. The map shows spots, not
 river lines; the river is context ("more spots on this river").
 
-Everything here is read-only, GET, and needs the same `Authorization: Bearer <token>`
-as the other `/map/*` endpoints. The older `/map/stretches` and
+The spots and water-body endpoints are read-only GETs, and every endpoint here needs the same
+`Authorization: Bearer <token>` as the other `/map/*` endpoints. The one exception to read-only is
+the private [weed reports](#weed-reports) the user writes themselves. The older `/map/stretches` and
 `/map/stretches/{id}/anchors` endpoints still work and are unchanged.
 
 You can build the whole UI without a running server: **`tests/fixtures/spots_api_responses.json`**
@@ -23,7 +24,12 @@ The species, near, getting-there and bridges examples will be captured at the ne
    **`card`**: the four blocks a tap reveals, already written. Render the card; do not
    fetch records, labels or access data yourself.
 4. `GET /map/water-bodies?bbox=…&type=…` to name and group the rivers, creeks and lakes the
-   spots sit on, and `GET /map/water-bodies/{water_body_id}` for "more spots on this river".
+   spots sit on, `GET /map/water-bodies/{water_body_id}` for "more spots on this river", and
+   `GET /map/water-bodies/{water_body_id}/features` for a lake's shoreline (inlets, outlets,
+   islands, points).
+5. `GET /map/weed-reports/layer?bbox=…` for the user's own reported weed edges, and
+   `POST /map/weed-reports` when they report one on a water body. Private to them; see
+   [Weed reports](#weed-reports).
 
 ## Rules the UI should keep
 
@@ -44,8 +50,10 @@ pressure from anglers, and a map must not blur them.
   (`layers.bridges.default_on`).
 - A water body's `name` can be `null` (no source named it). Show `display_name`, never invent a
   name, and never print "Unnamed …". A lake with `geometry: null` has no outline on file: draw
-  a label, not a shape.
-- Spot output is personal. Do not add export, sharing, or public counts.
+  a label, not a shape. A lake with a polygon has one.
+- Spot output is personal. Do not add export, sharing, or public counts. Weed reports are
+  stricter still: visible only to the user who made them, labelled "reported, not verified" on
+  every read, and never mixed into spot or card text.
 - On a card, show the text as given. Every sentence on it, including block titles, the
   "not a catch guarantee" line and the care message, comes from the API. A species is
   "recorded", never "here", "good" or "hot", and nothing on the card says how popular a
@@ -72,6 +80,12 @@ All user-facing strings, in display order (Quiet water last).
   (singular, for a card) and `unnamed` (the phrase to show when `name` is null).
 - `name_sources` — a plain-words line for each `name_source`, for a "source" caption under a name.
 - `no_outline_note` — what to say when a lake has no shape on the map.
+- `shoreline_features[]` — for each shoreline feature `kind` (`inlet`, `outlet`, `island`,
+  `point`, `peninsula`): `label` (singular, for a card), `chip` (plural, for a legend) and
+  `one_liner` (what it is, in beginner words).
+- `shoreline_derivations` — a plain-words phrase for each `derivation`, for the caption under a
+  shoreline feature: `shoreline_outline` (a shape read off the outline itself) or
+  `watercourse_endpoint` (a mapped stream that ends at the shore).
 
 ```json
 {
@@ -173,6 +187,42 @@ All user-facing strings, in display order (Quiet water last).
     "unknown": "No name on file"
   },
   "no_outline_note": "No outline is on file for this water, so it has no shape on the map yet.",
+  "shoreline_features": [
+    {
+      "kind": "inlet",
+      "label": "Inlet",
+      "chip": "Inlets",
+      "one_liner": "A mapped stream flows in here."
+    },
+    {
+      "kind": "outlet",
+      "label": "Outlet",
+      "chip": "Outlets",
+      "one_liner": "The lake drains out here."
+    },
+    {
+      "kind": "island",
+      "label": "Island",
+      "chip": "Islands",
+      "one_liner": "Land inside the water."
+    },
+    {
+      "kind": "point",
+      "label": "Point",
+      "chip": "Points",
+      "one_liner": "A point of land reaches out."
+    },
+    {
+      "kind": "peninsula",
+      "label": "Peninsula",
+      "chip": "Peninsulas",
+      "one_liner": "A long point of land reaches out."
+    }
+  ],
+  "shoreline_derivations": {
+    "shoreline_outline": "from the shoreline outline",
+    "watercourse_endpoint": "where a mapped stream meets the shore"
+  },
   "layers": {
     "getting_there": {
       "label": "Getting there",
@@ -573,10 +623,11 @@ Each feature's `properties`:
 | `bbox` | `[min_lon, min_lat, max_lon, max_lat]`, or null. |
 | `spot_counts` | Spots on this water by kind, for the default view (tier 1 and 2). A badge, not a ranking. |
 
-`geometry` is a simplified `MultiLineString` for a river or creek. A **lake has
-`geometry: null`**: no lake outline is on file yet, so draw it as a label at the river mouths
-that open onto it (their spots list it in `also_on_water_body_ids`), not as a shape, and show
-`labels.no_outline_note` if you need to explain why. Never fill in a made-up outline.
+`geometry` is a simplified `MultiLineString` for a river or creek. A **lake carries a
+`Polygon`** when its OHN Waterbody outline was matched at build time, or `geometry: null` when
+none was on file (then draw it as a label at the river mouths that open onto it — their spots
+list it in `also_on_water_body_ids` — and show `labels.no_outline_note` if you need to explain
+why). Never fill in a made-up outline.
 
 ```json
 {
@@ -717,9 +768,9 @@ made of, and every spot on it.
 | Field | Meaning |
 |---|---|
 | `water_body_id`, `name`, `display_name`, `name_source`, `type`, `jurisdiction`, `bbox` | As in the list. |
-| `geometry`, `geometry_source` | The line (`stretch_union`: the river's sections drawn together) or `null` / `none` for a lake with no outline on file. |
+| `geometry`, `geometry_source` | The line (`stretch_union`: the river's sections drawn together) or polygon (`ohn_waterbody`: the matched OHN Waterbody outline) — or `null` / `none` for a lake with no outline on file. |
 | `stretch_ids[]` | The river sections that make up a river or creek, or that open onto a lake. Their detail is at `/map/stretches`; the spot UI rarely needs them. |
-| `attributes` | How the row was made. `type_basis` says why it has this type (`name_suffix`, `great_lakes_list`, `default_for_a_named_lake`, `name_contains_pond`); `part_of` names the larger lake a bay belongs to; `also_spelled` lists other spellings that were folded into this one; `bbox_basis: "river_mouths"` means a lake's box comes from the mouths that open onto it. For code, not for display. |
+| `attributes` | How the row was made. `type_basis` says why it has this type (`name_suffix`, `great_lakes_list`, `default_for_a_named_lake`, `name_contains_pond`); `part_of` names the larger lake a bay belongs to; `also_spelled` lists other spellings that were folded into this one; `bbox_basis` is `"river_mouths"` (a lake's box comes from the mouths that open onto it) or `"outline"` (from the matched polygon). When an outline was matched: `outline_source`, `outline_ogf_ids[]`, `outline_ohn_name`, `outline_effective_datetime`, `outline_match_basis` and the `outline_licence` / `outline_licence_url` to credit. For code and attribution, not for display. |
 | `spots[]` | The spots that are children of this water body, headline-first, all tiers: `spot_id`, `kind`, `title`, `tier`, `lat`, `lng`. This is "more spots on this river". |
 | `also_here_spots[]` | Spots that belong to another water body but are also on this one, same shape: the river mouths that open onto a lake. |
 | `built_at` | When the row was built. |
@@ -815,7 +866,8 @@ made of, and every spot on it.
 }
 ```
 
-A lake has no geometry, and its spots are the river mouths that open onto it:
+A lake whose outline was not matched has no geometry, and its spots are the river mouths that
+open onto it:
 
 ```json
 {
@@ -887,6 +939,108 @@ Unknown id is a `404`:
 ```json
 {
   "detail": "No water body with id 'river:no-such-river'"
+}
+```
+
+## `GET /map/water-bodies/{water_body_id}/features`
+
+The shoreline features of one lake, as a GeoJSON `FeatureCollection`: where a mapped stream
+enters (`inlet`) or leaves (`outlet`), an island (`island`), and a point or peninsula of land
+reaching out (`point`, `peninsula`). These are read off the lake's OHN Waterbody outline and the
+OHN streams that end at its shore — a located thing to show, never a claim about fish. A river
+has no shoreline, so the honest answer is an **empty collection**, not an error; an unknown id
+is `404`.
+
+Each feature's `properties`:
+
+| Field | Meaning |
+|---|---|
+| `feature_id` | Stable id: `{water_body_id}:{kind}:{key}`, where the key comes from the feature's location (or the stream's OGF_ID for an inlet or outlet). |
+| `water_body_id` | The lake the feature belongs to. |
+| `kind` | `inlet`, `outlet`, `island`, `point` or `peninsula`. Words in `labels.shoreline_features`. |
+| `name` | The mapped stream's name for an inlet or outlet, else `null`. |
+| `derivation` | How it was obtained: `watercourse_endpoint` (a mapped OHN stream that ends at the shore) or `shoreline_outline` (a shape read off the outline's own edge). Phrase in `labels.shoreline_derivations`. |
+| `provenance` | `record` for an island (a ring inside the source polygon) or a stream junction; `inference` for a point or peninsula (a shape computed from the outline). |
+| `note` | A full sentence for the card, already assembled from the vocabulary. Safe to show as-is. |
+| `source`, `source_date` | The named source (`OHN Waterbody` or `OHN Watercourse`) and that record's effective date (`YYYY-MM-DD`, or `null` if the source gave none). Credit these. |
+| `area_m2` | An island's area, else `null`. |
+| `length_m` | How far a point or peninsula sticks out from the shore, in metres; else `null`. |
+| `geometry` | A `Point` for inlets, outlets, points and peninsulas; a `Polygon` for an island. |
+
+```json
+{
+  "type": "FeatureCollection",
+  "meta": {
+    "count": 2,
+    "by_kind": {
+      "inlet": 1,
+      "island": 1
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "great_lake:lake-ontario#inlet:1",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.57731,
+          43.54567
+        ]
+      },
+      "properties": {
+        "feature_id": "great_lake:lake-ontario#inlet:1",
+        "water_body_id": "great_lake:lake-ontario",
+        "kind": "inlet",
+        "name": "Credit River",
+        "derivation": "watercourse_endpoint",
+        "provenance": "record",
+        "note": "A mapped stream flows in here. Credit River is mapped here. Read from the Ontario government water map.",
+        "area_m2": null
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "great_lake:lake-ontario:island:-79.195_43.605",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -79.2,
+              43.6
+            ],
+            [
+              -79.19,
+              43.6
+            ],
+            [
+              -79.19,
+              43.61
+            ],
+            [
+              -79.2,
+              43.61
+            ],
+            [
+              -79.2,
+              43.6
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "feature_id": "great_lake:lake-ontario:island:-79.195_43.605",
+        "water_body_id": "great_lake:lake-ontario",
+        "kind": "island",
+        "name": null,
+        "derivation": "shoreline_outline",
+        "provenance": "record",
+        "note": "Land inside the water. Read from the shoreline outline.",
+        "area_m2": 590000.0
+      }
+    }
+  ]
 }
 ```
 
@@ -1095,16 +1249,365 @@ fish recorded nearby are still listed:
 }
 ```
 
+## Weed reports
+
+A **weed report** is one person's own sighting of where a weed edge runs on a water body:
+a point, or a short line along the edge, and the date they saw it. Weed edges are
+**user-reported only**. No data source locates submerged or emergent weed beds (wetland maps
+and plant records do not say where an edge runs), so nothing is derived, guessed or filled
+in: every weed edge on the map is one a person wrote down, and each says so.
+
+**They are private.** A report is visible only to the user who made it, like a personal pin.
+There is no sharing, no export, no public layer, and no count of reports anywhere: not on a
+water body, a spot, or the layer's `meta`. Another user's report answers `404`, exactly as an
+id nobody has used does. The reporter is always the login on the request; the body cannot name
+one.
+
+These routes need the same `Authorization: Bearer <token>` as the rest of `/map/*`. Unlike
+the endpoints above they write (`POST`, `PATCH`, `DELETE`).
+
+**`tests/fixtures/weed_reports_api_responses.json`** holds real responses from every route
+below, captured with real logins by `scripts/export_weed_reports_fixture.py` (the examples
+here are copied from it). Because reports are private there is no real data to capture:
+the water bodies are the real Credit River and Bronte Creek lines from the spots fixture, and
+the reports are **examples** laid on those lines, with example dates and notes. They are not
+sightings.
+
+### What the UI keeps
+
+- Show `caption` (or `kind_label`, `status_label` and `date_label` separately) as given. Every
+  report says **"reported, not verified"** and when it was seen. Never drop that wording, and
+  never style a weed edge as a fact about the water. The words all come from `GET /map/weed-reports/labels`.
+- A weed edge is a person's sighting, not a record and not a model output. Do not show it in
+  the same list as `provenance: "record"` things, and do not use it as a reason a spot is good.
+- Do not add sharing, export, or "N people reported" anywhere. None exists to read.
+- A report can only be placed on a water body that has a drawn shape (`geometry` not `null`), and
+  within a tolerance of it (below). Draw the water body, let the person tap or trace on it, and
+  send the `water_body_id` of the one they tapped.
+
+### `GET /map/weed-reports/labels`
+
+Every word and tolerance the UI needs: `kind_label` ("Weed edge"), `status_label`
+("reported, not verified"), `provenance_label`, the `layer` name and note, `shape_labels` per geometry
+type, and the checking tolerances (`near_line_m`: 150 for a river or creek line, `near_outline_m`: 100
+for a lake outline, `max_line_length_m`: 10000).
+
+```json
+{
+  "kind_label": "Weed edge",
+  "status_label": "reported, not verified",
+  "provenance_label": "Reported by you",
+  "layer": {
+    "label": "Your weed edges",
+    "note": "Weed edges you reported. Only you can see them. They are your sightings, not checked against anything else.",
+    "default_on": true
+  },
+  "shape_labels": {
+    "Point": "A spot on the edge",
+    "LineString": "A line along the edge"
+  },
+  "near_line_m": 150,
+  "near_outline_m": 100,
+  "max_line_length_m": 10000
+}
+```
+
+### `POST /map/weed-reports`
+
+Create a report. Body:
+
+| Field | Meaning |
+|---|---|
+| `water_body_id` | The water body the edge is on (from `/map/water-bodies`). |
+| `geometry` | A GeoJSON `Point` (`[lng, lat]`) or `LineString` (2 to 500 positions, at most 10 km long). |
+| `observed_on` | The day it was seen, `YYYY-MM-DD`. Not in the future. |
+| `note` | Optional, up to 2000 characters. |
+
+Any other field (`user_id`, `provenance`, `visibility`, …) is `422`. Returns `201` and the report.
+
+The position is checked against the water body's drawn shape: **every part of the point or line**
+must be within `near_line_m` of a river's or creek's line, or inside (or within `near_outline_m` of) a
+lake's outline. A water body with no outline on file cannot take a report.
+
+Request body and `201` response:
+
+```json
+{
+  "water_body_id": "river:credit-river",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -79.96423,
+      43.8139
+    ]
+  },
+  "observed_on": "2026-10-04",
+  "note": "Example: weeds thin out below the riffle."
+}
+```
+
+```json
+{
+  "weed_report_id": 1,
+  "water_body_id": "river:credit-river",
+  "water_body_name": "Credit River",
+  "jurisdiction": "CA-ON",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -79.96423,
+      43.8139
+    ]
+  },
+  "shape_label": "A spot on the edge",
+  "observed_on": "2026-10-04",
+  "note": "Example: weeds thin out below the riffle.",
+  "provenance": "user_reported",
+  "provenance_label": "Reported by you",
+  "kind_label": "Weed edge",
+  "status_label": "reported, not verified",
+  "date_label": "seen 2026-10-04",
+  "caption": "Weed edge · reported, not verified · seen 2026-10-04",
+  "created_at": "2026-10-13 16:05:09",
+  "updated_at": null
+}
+```
+
+A line works the same way; `geometry` is a `LineString` and `shape_label` reads "A line along the edge".
+
+Errors (`detail` is always shown to the person as given):
+
+- `404` unknown water body:
+```json
+{
+  "detail": "No water body with id 'river:no-such-river'"
+}
+```
+
+- `422` not on or near the water body:
+```json
+{
+  "detail": "That is 6,180 m from Credit River. A weed edge has to be on the water, within 150 m of its drawn line."
+}
+```
+
+- `422` the water body has no outline on file:
+```json
+{
+  "detail": "Lake Ontario has no outline on file, so a weed edge cannot be checked against it. Weed edges can only be reported on water that is drawn."
+}
+```
+
+- `422` a malformed body (a future date, a bad position, an extra field). FastAPI's list form:
+```json
+{
+  "detail": [
+    {
+      "type": "value_error",
+      "loc": [
+        "body",
+        "observed_on"
+      ],
+      "msg": "Value error, observed_on cannot be in the future"
+    }
+  ]
+}
+```
+
+### `GET /map/weed-reports`
+
+The caller's own reports, newest sighting first, as `{"weed_reports": [...]}`. Optional
+`water_body_id` and `bbox` (`min_lon,min_lat,max_lon,max_lat`, a report is in view when its own box
+overlaps it). An empty list is `{"weed_reports": []}`. No count field. One report (`GET /map/weed-reports/{id}`)
+is the same object as one item. The first of the two reports on the Credit River:
+
+```json
+{
+  "weed_reports": [
+    {
+      "weed_report_id": 1,
+      "water_body_id": "river:credit-river",
+      "water_body_name": "Credit River",
+      "jurisdiction": "CA-ON",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.96423,
+          43.8139
+        ]
+      },
+      "shape_label": "A spot on the edge",
+      "observed_on": "2026-10-04",
+      "note": "Example: weeds thin out below the riffle.",
+      "provenance": "user_reported",
+      "provenance_label": "Reported by you",
+      "kind_label": "Weed edge",
+      "status_label": "reported, not verified",
+      "date_label": "seen 2026-10-04",
+      "caption": "Weed edge · reported, not verified · seen 2026-10-04",
+      "created_at": "2026-10-13 16:05:09",
+      "updated_at": null
+    }
+  ]
+}
+```
+
+### `GET /map/weed-reports/layer`
+
+The map layer: the same reports as a GeoJSON `FeatureCollection`, with `water_body_id` and `bbox`
+narrowing it. Only the caller's own reports are ever in it. Every feature is labelled and dated; `meta`
+holds the layer's name and note and has no number in it. The `id` of a feature is its `weed_report_id`.
+(Two of the three example features shown.)
+
+```json
+{
+  "type": "FeatureCollection",
+  "meta": {
+    "layer": "Your weed edges",
+    "note": "Weed edges you reported. Only you can see them. They are your sightings, not checked against anything else.",
+    "visible_to": "you"
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": 1,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.96423,
+          43.8139
+        ]
+      },
+      "properties": {
+        "weed_report_id": 1,
+        "water_body_id": "river:credit-river",
+        "water_body_name": "Credit River",
+        "jurisdiction": "CA-ON",
+        "shape_label": "A spot on the edge",
+        "observed_on": "2026-10-04",
+        "note": "Example: weeds thin out below the riffle.",
+        "provenance": "user_reported",
+        "provenance_label": "Reported by you",
+        "kind_label": "Weed edge",
+        "status_label": "reported, not verified",
+        "date_label": "seen 2026-10-04",
+        "caption": "Weed edge · reported, not verified · seen 2026-10-04"
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2,
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -79.96423,
+            43.8139
+          ],
+          [
+            -79.96307,
+            43.81495
+          ]
+        ]
+      },
+      "properties": {
+        "weed_report_id": 2,
+        "water_body_id": "river:credit-river",
+        "water_body_name": "Credit River",
+        "jurisdiction": "CA-ON",
+        "shape_label": "A line along the edge",
+        "observed_on": "2026-09-21",
+        "note": null,
+        "provenance": "user_reported",
+        "provenance_label": "Reported by you",
+        "kind_label": "Weed edge",
+        "status_label": "reported, not verified",
+        "date_label": "seen 2026-09-21",
+        "caption": "Weed edge · reported, not verified · seen 2026-09-21"
+      }
+    }
+  ]
+}
+```
+
+### `PATCH /map/weed-reports/{report_id}`
+
+Change `geometry`, `observed_on` or `note`. Only the fields sent change; `"note": null` clears the note;
+`geometry` and `observed_on` cannot be cleared. A new `geometry` is checked against the report's water body
+again (`422` as above). The water body cannot change: delete the report and make a new one. `404` if the report
+is not the caller's.
+
+```json
+{
+  "observed_on": "2026-10-05",
+  "note": null
+}
+```
+
+```json
+{
+  "weed_report_id": 1,
+  "water_body_id": "river:credit-river",
+  "water_body_name": "Credit River",
+  "jurisdiction": "CA-ON",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -79.96423,
+      43.8139
+    ]
+  },
+  "shape_label": "A spot on the edge",
+  "observed_on": "2026-10-05",
+  "note": null,
+  "provenance": "user_reported",
+  "provenance_label": "Reported by you",
+  "kind_label": "Weed edge",
+  "status_label": "reported, not verified",
+  "date_label": "seen 2026-10-05",
+  "caption": "Weed edge · reported, not verified · seen 2026-10-05",
+  "created_at": "2026-10-13 16:05:09",
+  "updated_at": "2026-10-13T16:05:09"
+}
+```
+
+### `DELETE /map/weed-reports/{report_id}`
+
+Delete the caller's report. `404` if it is not theirs.
+
+```json
+{
+  "deleted": 2
+}
+```
+
+### Another user's report
+
+Asking for, editing or deleting a report that belongs to someone else is a `404`, the same as an
+id nobody has used. Their layer and list are simply empty of it.
+
+```json
+{
+  "detail": "No such weed report"
+}
+```
+
+
 ## What is not here yet
 
 - **"New to you"** and **"recorded more often here than along the rest of the river"**
   hooks. Both are slots in the hook chain with no text yet; "new to you" needs the
   logged-in user (phase 5) and the other needs frequency along the river (phase 6).
 - **Seasons and gear.** The card makes no claim about when or how to fish.
-- **Water body outlines.** A river's line exists; a lake has none (`geometry: null`) because no
-  lake outline is on file in this repo. Sourcing outlines is a data task, not an API change: the
-  field already allows a polygon.
-- **Lake features** (inlets, outlets, points, drop-offs, humps) are proposed, not built.
+- **Water body outlines** are built for the curated lakes: a lake's OHN Waterbody polygon is
+  matched by position at build time and served as `geometry`, with the source OGF_IDs, name,
+  effective date and licence on `attributes` (see `GET /map/water-bodies/{id}/features`). A lake
+  with no match stays `geometry: null`.
+- **Lake features** — inlets, outlets, islands, points and peninsulas — are built from a lake's
+  outline and served at `GET /map/water-bodies/{id}/features`. Deeper structure (drop-offs,
+  humps, weed lines) is not built: it needs bathymetry, not an outline. The only weed edges
+  anywhere are the private ones a user reports themselves (see [Weed reports](#weed-reports));
+  none is derived, and none appears on a spot, a card or a water body.
 - **Quiet water** spots (a ranking of reaches, not a located structure). The kind and its
   chip exist in `labels` so the filter row can be designed now; no spot has that kind.
 
@@ -1126,13 +1629,19 @@ produces the same payload.
 
 ## Building and refreshing
 
-- `make build-spots` rebuilds spots from the stored anchors, no network. `make build-anchors`
-  and `make build-stretches` run it at the end, and print what was dropped, held back at
-  tier 3, or given a generic title because the source had no name.
+- `make build-spots` rebuilds spots from the stored anchors. It reads the
+  cached OHN Waterbody outlines and streams the lakes need — the first run fetches
+  and caches, later runs are offline. `make build-anchors` and `make build-stretches`
+  run it at the end, and print what was dropped, held back at tier 3, or given a
+  generic title because the source had no name.
 - `uv run python scripts/export_spots_fixture.py [db]` recaptures the fixture from a database.
+- `uv run python scripts/export_weed_reports_fixture.py` recaptures the weed-report fixture. It builds a
+  throwaway database from the water bodies in the spots fixture and never touches the real one.
 - Water bodies are rebuilt with the spots, in the same transaction, from the curated river
-  sections and the lake names on river mouths; nothing else feeds them yet. The build prints how
-  many spots were linked to a water body and how many were not.
+  sections and the lake names on river mouths; each lake's outline comes from the OHN Waterbody
+  layer, matched by position and never by name alone. The build prints how many spots were
+  linked to a water body and how many were not, how many lakes got an outline, and how many
+  shoreline features were derived and dropped.
 - User-facing words for the map live in `src/services/spot_labels.py`. The card's words
   are written by `render_spot()` in `src/services/context/render.py`, and the "why fish
   gather here" text is in `src/services/context/translate.py`. Nothing else writes any.
