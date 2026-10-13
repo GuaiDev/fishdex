@@ -602,6 +602,26 @@ def ingest_hydat() -> None:
     console.print(f"Derived thermal regime for {count} stations from PWQMN water quality data")
 
 
+@app.command(name="audit-species-images")
+def audit_species_images(
+    out: str = typer.Option(
+        "data/species_images/coverage_audit.csv", help="Where to write the coverage CSV."
+    ),
+) -> None:
+    """Audit which species have a public-domain Raver illustration. Metadata only, no downloads."""
+    import importlib
+    from collections import Counter
+    from pathlib import Path
+
+    from src.services.species_image_audit import audit_species, write_csv
+
+    species = importlib.import_module("src.ingest.jurisdictions.ca_on.species_ranges")
+    rows = audit_species(species.load_species_database())
+    write_csv(rows, Path(out))
+    counts = Counter(r.status for r in rows)
+    console.print(f"{len(rows)} species -> {out}: {dict(counts)}")
+
+
 @app.command(name="build-features")
 def build_features() -> None:
     """Build the SDM feature matrix from all Phase 1 data layers."""
