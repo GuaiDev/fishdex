@@ -10,9 +10,10 @@ import json
 
 from sqlite_utils.db import Database
 
+from src.models.shoreline_feature import ShorelineFeature
 from src.models.spot import Spot
 from src.models.water_body import WaterBody
-from src.storage.water_bodies import write_water_bodies
+from src.storage.water_bodies import write_shoreline_features, write_water_bodies
 
 
 def replace_spots(
@@ -20,18 +21,22 @@ def replace_spots(
     jurisdiction: str,
     spots: list[Spot],
     water_bodies: list[WaterBody] | None = None,
+    shoreline_features: list[ShorelineFeature] | None = None,
 ) -> int:
-    """Swap in a jurisdiction's spots, and its water bodies when given. Returns spots stored.
+    """Swap in a jurisdiction's spots, water bodies and shoreline features.
 
-    Both go in one transaction: spots point at water bodies, so a half-written
-    rebuild must never leave one without the other. `water_bodies=None` leaves
-    the stored ones alone.
+    All three go in one transaction: spots point at water bodies, which point at
+    shoreline features, so a half-written rebuild must never leave one without
+    the others. `water_bodies=None` leaves the stored ones alone; likewise
+    `shoreline_features`.
     """
     rows = [_spot_row(s) for s in spots]
     conn = db.conn
     with conn:
         if water_bodies is not None:
             write_water_bodies(conn, jurisdiction, water_bodies)
+        if shoreline_features is not None:
+            write_shoreline_features(conn, jurisdiction, shoreline_features)
         conn.execute("DELETE FROM spots WHERE jurisdiction = ?", [jurisdiction])
         if rows:
             cols = list(rows[0])

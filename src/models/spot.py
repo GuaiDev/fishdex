@@ -22,6 +22,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.models.jurisdiction import JurisdictionCode
+from src.models.shoreline_feature import ShorelineFeature
 from src.models.water_body import WaterBody
 
 SpotKind = Literal["river_mouth", "creek_junction", "below_dam", "quiet_water", "public_fishing"]
@@ -156,6 +157,14 @@ class SpotBuildReport(BaseModel):
     water_bodies_without_geometry: int = 0
     spots_linked: int = 0
     spots_without_water_body: int = 0
+    # Lakes matched to an OHN outline, and lakes with no outline (placed by their
+    # mouths). Shoreline features derived from the outlines, by kind, and the
+    # reasons a feature was left out.
+    lakes_with_outline: int = 0
+    lakes_without_outline: int = 0
+    shoreline_features_total: int = 0
+    shoreline_features_by_kind: dict[str, int] = Field(default_factory=dict)
+    shoreline_features_dropped: dict[str, int] = Field(default_factory=dict)
 
     def drop(self, reason: str, n: int = 1) -> None:
         if n > 0:  # a zero would read as a reason that fired
@@ -175,4 +184,5 @@ class SpotClassification(BaseModel):
 
     spots: list[Spot]
     water_bodies: list[WaterBody] = Field(default_factory=list)
+    shoreline_features: list[ShorelineFeature] = Field(default_factory=list)
     report: SpotBuildReport

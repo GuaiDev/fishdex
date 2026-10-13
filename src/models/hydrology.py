@@ -12,6 +12,7 @@ class StreamSegment(BaseModel):
     flow_classification: str | None = None
     stream_order: int | None = None  # Strahler stream order (FWA: STREAM_ORDER)
     length_m: float
+    effective_date: str | None = None  # ISO date the source record took effect
     geom_wkt: str  # WKT LineString or MultiLineString, coords as (lon lat)
     start_node: str  # "lon,lat" rounded to 5 decimal places
     end_node: str  # "lon,lat" rounded to 5 decimal places

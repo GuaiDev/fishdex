@@ -54,7 +54,7 @@ WATER_BODY_LISTS = [
     ),
     (
         "/map/water-bodies?type=great_lake,lake",
-        "type filter: lakes have geometry null (no outline on file) and a box from their mouths",
+        "type filter: the lakes, with their geometry when an outline was matched and a box",
     ),
     (
         "/map/water-bodies?type=creek&bbox=-79.9,43.3,-79.5,43.6",
@@ -63,9 +63,12 @@ WATER_BODY_LISTS = [
 ]
 WATER_BODY_DETAILS = [
     ("river:credit-river", "a river in full: its line, its stretches, the spots on it"),
-    ("great_lake:lake-ontario", "a lake: no geometry, with the river mouths that open onto it"),
+    ("great_lake:lake-ontario", "a lake: its outline, its shoreline features, the mouths onto it"),
     ("creek:bronte-creek", "a creek"),
 ]
+# Shoreline features for a lake whose outline the build matched. Captured only
+# when the build actually has one, so the fixture never invents an empty set.
+FEATURE_LAKES = ("lake:rice-lake", "great_lake:lake-ontario")
 # Illustrative records, added to the throwaway copy only. Not observations: they
 # exist so the fixture can show a species list and the protected-species case.
 EXAMPLE_FISH = [  # (scientific, common, date, survey?)
@@ -84,6 +87,7 @@ ERRORS = [
     ("/map/spots/creek_junction:n0_0", "an unknown spot id is a 404"),
     ("/map/water-bodies?type=ocean", "an unknown water body type is a 422"),
     ("/map/water-bodies/river:no-such-river", "an unknown water body id is a 404"),
+    ("/map/water-bodies/river:no-such-river/features", "an unknown water body id is a 404"),
 ]
 
 
@@ -261,7 +265,23 @@ def main() -> None:
     for path, note in WATER_BODY_LISTS:
         capture(path, note)
     for water_body_id, note in WATER_BODY_DETAILS:
-        capture(f"/map/water-bodies/{water_body_id}", note)
+        detail = capture(f"/map/water-bodies/{water_body_id}", note)
+        # Only a lake with an outline has shoreline features to capture.
+        if isinstance(detail, dict) and detail.get("geometry"):
+            capture(
+                f"/map/water-bodies/{water_body_id}/features",
+                "a lake's shoreline features: inlets, outlets, islands, points, peninsulas",
+            )
+    for water_body_id in FEATURE_LAKES:
+        detail = client.get(f"/map/water-bodies/{water_body_id}")
+        if detail.status_code != 200:
+            continue
+        features = client.get(f"/map/water-bodies/{water_body_id}/features")
+        if features.status_code == 200 and features.json()["features"]:
+            capture(
+                f"/map/water-bodies/{water_body_id}/features",
+                "shoreline features derived from a matched lake outline",
+            )
     for path, note in ERRORS:
         capture(path, note)
 

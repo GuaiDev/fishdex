@@ -103,6 +103,42 @@
           "unknown": "No name on file"
         },
         "no_outline_note": "No outline is on file for this water, so it has no shape on the map yet.",
+        "shoreline_features": [
+          {
+            "kind": "inlet",
+            "label": "Inlet",
+            "chip": "Inlets",
+            "one_liner": "A mapped stream flows in here."
+          },
+          {
+            "kind": "outlet",
+            "label": "Outlet",
+            "chip": "Outlets",
+            "one_liner": "The lake drains out here."
+          },
+          {
+            "kind": "island",
+            "label": "Island",
+            "chip": "Islands",
+            "one_liner": "Land inside the water."
+          },
+          {
+            "kind": "point",
+            "label": "Point",
+            "chip": "Points",
+            "one_liner": "A point of land reaches out."
+          },
+          {
+            "kind": "peninsula",
+            "label": "Peninsula",
+            "chip": "Peninsulas",
+            "one_liner": "A long point of land reaches out."
+          }
+        ],
+        "shoreline_derivations": {
+          "shoreline_outline": "from the shoreline outline",
+          "watercourse_endpoint": "where a mapped stream meets the shore"
+        },
         "layers": {
           "getting_there": {
             "label": "Getting there",
