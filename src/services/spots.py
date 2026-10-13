@@ -1118,15 +1118,25 @@ def species_within_2km_of_spot(db: Database, lat: float, lng: float, species: st
     return False
 
 
-def getting_there_geojson(
+def _access_layer_geojson(
     db: Database,
-    bbox: tuple[float, float, float, float] | None = None,
-    jurisdiction: str | None = None,
+    attr: str,
+    bbox: tuple[float, float, float, float] | None,
+    jurisdiction: str | None,
 ) -> dict:
-    spots = list_spots(db, bbox=bbox, max_tier=3, jurisdiction=jurisdiction)
+    spots = list_spots(db, bbox=None, max_tier=3, jurisdiction=jurisdiction)
+    seen: set[tuple[str, float, float]] = set()
     features = []
     for spot in spots:
-        for a in spot.getting_there:
+        for a in getattr(spot, attr):
+            if bbox is not None:
+                min_lon, min_lat, max_lon, max_lat = bbox
+                if not (min_lon <= a.lng <= max_lon and min_lat <= a.lat <= max_lat):
+                    continue
+            key = (a.kind, a.lng, a.lat)
+            if key in seen:
+                continue
+            seen.add(key)
             features.append(
                 {
                     "type": "Feature",
@@ -1134,14 +1144,19 @@ def getting_there_geojson(
                     "properties": {
                         "kind": a.kind,
                         "name": a.name,
-                        "distance_m": a.distance_m,
-                        "spot_id": spot.spot_id,
-                        "spot_title": spot.title,
                         "attributes": a.attributes,
                     },
                 }
             )
     return {"type": "FeatureCollection", "features": features}
+
+
+def getting_there_geojson(
+    db: Database,
+    bbox: tuple[float, float, float, float] | None = None,
+    jurisdiction: str | None = None,
+) -> dict:
+    return _access_layer_geojson(db, "getting_there", bbox, jurisdiction)
 
 
 def bridges_geojson(
@@ -1149,22 +1164,4 @@ def bridges_geojson(
     bbox: tuple[float, float, float, float] | None = None,
     jurisdiction: str | None = None,
 ) -> dict:
-    spots = list_spots(db, bbox=bbox, max_tier=3, jurisdiction=jurisdiction)
-    features = []
-    for spot in spots:
-        for a in spot.bridges:
-            features.append(
-                {
-                    "type": "Feature",
-                    "geometry": {"type": "Point", "coordinates": [a.lng, a.lat]},
-                    "properties": {
-                        "kind": a.kind,
-                        "name": a.name,
-                        "distance_m": a.distance_m,
-                        "spot_id": spot.spot_id,
-                        "spot_title": spot.title,
-                        "attributes": a.attributes,
-                    },
-                }
-            )
-    return {"type": "FeatureCollection", "features": features}
+    return _access_layer_geojson(db, "bridges", bbox, jurisdiction)
