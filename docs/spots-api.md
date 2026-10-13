@@ -929,14 +929,16 @@ Each feature's `properties`:
 
 | Field | Meaning |
 |---|---|
-| `feature_id` | Stable id: `{water_body_id}#{kind}:{n}`. |
+| `feature_id` | Stable id: `{water_body_id}:{kind}:{key}`, where the key comes from the feature's location (or the stream's OGF_ID for an inlet or outlet). |
 | `water_body_id` | The lake the feature belongs to. |
 | `kind` | `inlet`, `outlet`, `island`, `point` or `peninsula`. Words in `labels.shoreline_features`. |
 | `name` | The mapped stream's name for an inlet or outlet, else `null`. |
 | `derivation` | How it was obtained: `watercourse_endpoint` (a mapped OHN stream that ends at the shore) or `shoreline_outline` (a shape read off the outline's own edge). Phrase in `labels.shoreline_derivations`. |
 | `provenance` | `record` for an island (a ring inside the source polygon) or a stream junction; `inference` for a point or peninsula (a shape computed from the outline). |
 | `note` | A full sentence for the card, already assembled from the vocabulary. Safe to show as-is. |
+| `source`, `source_date` | The named source (`OHN Waterbody` or `OHN Watercourse`) and that record's effective date (`YYYY-MM-DD`, or `null` if the source gave none). Credit these. |
 | `area_m2` | An island's area, else `null`. |
+| `length_m` | How far a point or peninsula sticks out from the shore, in metres; else `null`. |
 | `geometry` | A `Point` for inlets, outlets, points and peninsulas; a `Polygon` for an island. |
 
 ```json
@@ -973,7 +975,7 @@ Each feature's `properties`:
     },
     {
       "type": "Feature",
-      "id": "great_lake:lake-ontario#island:1",
+      "id": "great_lake:lake-ontario:island:-79.195_43.605",
       "geometry": {
         "type": "Polygon",
         "coordinates": [
@@ -1002,7 +1004,7 @@ Each feature's `properties`:
         ]
       },
       "properties": {
-        "feature_id": "great_lake:lake-ontario#island:1",
+        "feature_id": "great_lake:lake-ontario:island:-79.195_43.605",
         "water_body_id": "great_lake:lake-ontario",
         "kind": "island",
         "name": null,
