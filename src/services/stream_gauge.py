@@ -8,7 +8,7 @@ import importlib
 import json
 import math
 
-from src.models.stream_gauge import StreamGaugeSummary
+from src.models.stream_gauge import NearestGauge, StreamGaugeSummary
 from src.storage.database import cleanup_old_gauge_readings, get_db
 
 _wsc = importlib.import_module("src.ingest.global.wsc")
@@ -94,6 +94,40 @@ def get_stream_conditions_for_agent(
             ]
         }
     )
+
+
+def nearest_gauge(
+    lat: float,
+    lng: float,
+    radius_km: float = 50,
+    max_stations: int = 3,
+    timeout: float = 30,
+) -> NearestGauge | None:
+    """The nearest active station that has a current reading, with its distance.
+
+    Tries the closest `max_stations` in order and takes the first that reports,
+    because the closest gauge is sometimes offline. Returns None when no
+    station in range reports anything; raises (httpx errors) when WSC cannot be
+    reached, so callers can tell "nothing here" from "try again".
+    """
+    stations = _wsc.fetch_nearby_stations(lat, lng, radius_km, timeout=timeout)
+    ranked = []
+    for s in stations:
+        s_lat = s.get("LATITUDE") or s.get("latitude")
+        s_lng = s.get("LONGITUDE") or s.get("longitude")
+        station_id = s.get("STATION_NUMBER") or s.get("station_number")
+        if s_lat is None or s_lng is None or not station_id:
+            continue
+        ranked.append((_haversine_km(lat, lng, float(s_lat), float(s_lng)), station_id, s))
+    ranked.sort(key=lambda r: r[0])
+
+    for dist_km, station_id, s in ranked[:max_stations]:
+        s_lat = float(s.get("LATITUDE") or s.get("latitude"))
+        s_lng = float(s.get("LONGITUDE") or s.get("longitude"))
+        reading = _wsc.fetch_station_reading(station_id, s_lat, s_lng, timeout=timeout)
+        if reading is not None:
+            return NearestGauge(reading=reading, distance_km=round(dist_km, 1))
+    return None
 
 
 def fetch_and_store(lat: float, lng: float, radius_km: float = 50) -> int:

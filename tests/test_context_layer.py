@@ -591,7 +591,11 @@ def test_conditions_assigns_every_field_even_when_the_live_source_fails(db, monk
     def boom(**kwargs):
         raise RuntimeError("weather unreachable")
 
+    def gauge_down(*args, **kwargs):
+        raise RuntimeError("gauge unreachable")
+
     monkeypatch.setattr("src.services.weather.get_conditions_for_agent", boom)
+    monkeypatch.setattr("src.services.stream_gauge.nearest_gauge", gauge_down)
 
     ctx = describe(db, lat=43.5474, lng=-80.1973, caller="coach")
     for fname, f in ctx.conditions.__dict__.items():

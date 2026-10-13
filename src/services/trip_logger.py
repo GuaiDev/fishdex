@@ -164,6 +164,72 @@ def _maybe_update_personal_best(
         return False
 
 
+def _db_file(db_conn: Database) -> str | None:
+    """The file behind a connection, or None for an in-memory database."""
+    path = db_conn.conn.execute("PRAGMA database_list").fetchone()[2]
+    return path or None
+
+
+def _enrich_on_own_connection(path: str, *args, **kwargs) -> dict:
+    from src.services.trip_enrichment_conditions import enrich_session_conditions
+
+    own = Database(path)
+    try:
+        return enrich_session_conditions(own, *args, **kwargs)
+    finally:
+        own.conn.close()
+
+
+def _enrich_conditions(
+    db_conn: Database,
+    user_id: int,
+    session_id: int,
+    lat: float,
+    lng: float,
+    when: datetime,
+) -> dict:
+    """Fetch and store a trip's conditions, without holding the response up for long.
+
+    The fetch runs on a worker thread so a slow source cannot stall the reply.
+    A sqlite3 connection may only be used on the thread that opened it, so the
+    worker opens its own to the same file: handing it the caller's connection
+    made every database step of the enrichment fail (the PWQMN lookup, the
+    anomaly baseline and the final write), and no session_conditions row was
+    ever stored. After the wait the worker is left to finish and store the row
+    itself, which is what "queued" has always meant. An in-memory database
+    cannot be reopened, so it runs on the calling thread.
+    """
+    import concurrent.futures
+
+    try:
+        from src.services.trip_enrichment_conditions import enrich_session_conditions
+
+        path = _db_file(db_conn)
+        if path is None:
+            return enrich_session_conditions(
+                db_conn, session_id, lat, lng, when, timeout_seconds=3.0, user_id=user_id
+            )
+        db_conn.conn.commit()  # an open write transaction would lock the worker out
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(
+            _enrich_on_own_connection,
+            path,
+            session_id,
+            lat,
+            lng,
+            when,
+            timeout_seconds=3.0,
+            user_id=user_id,
+        )
+        executor.shutdown(wait=False)
+        try:
+            return future.result(timeout=3.5)
+        except concurrent.futures.TimeoutError:
+            return {"timeout": True, "queued": True}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def log_session(
     parsed_session: dict,
     db_conn: Database,
@@ -546,27 +612,9 @@ def log_session(
 
     conditions_result = None
     if enrich_lat is not None and enrich_dt is not None:
-        try:
-            import concurrent.futures
-
-            from src.services.trip_enrichment_conditions import enrich_session_conditions
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(
-                    enrich_session_conditions,
-                    db_conn,
-                    session_id,
-                    enrich_lat,
-                    enrich_lng,
-                    enrich_dt,
-                    timeout_seconds=3.0,
-                )
-                try:
-                    conditions_result = future.result(timeout=3.5)
-                except concurrent.futures.TimeoutError:
-                    conditions_result = {"timeout": True, "queued": True}
-        except Exception as e:
-            conditions_result = {"error": str(e)}
+        conditions_result = _enrich_conditions(
+            db_conn, user_id, session_id, enrich_lat, enrich_lng, enrich_dt
+        )
 
     # The derived layer is recomputed here, on the write, rather than on every
     # question that needs it. Its inputs just changed and nothing else will

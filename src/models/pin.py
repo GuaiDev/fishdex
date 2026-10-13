@@ -163,3 +163,36 @@ class TripPinRating(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     rating: Rating | None
+
+
+class PinConditionRow(BaseModel):
+    """One row of GET /pins/{id}/conditions.
+
+    Exactly one of `value` and `empty_reason` is set. A stale row still has its
+    value: it is shown, marked, and left out of any match against the user's
+    own history. `source`, `station`, `distance_km`, `observed_at` and `age_s`
+    say where the value came from and how old it is; a gauge or sampling
+    station can be on a different river from the pin, so its name and distance
+    are always given.
+    """
+
+    field: str
+    label: str
+    group: str
+    value: float | str | None = None
+    unit: str | None = None
+    meaning: str | None = None
+    source: str | None = None
+    station: str | None = None
+    distance_km: float | None = None
+    observed_at: str | None = None
+    age_s: int | None = None
+    age_label: str | None = None
+    stale: bool = False
+    empty_reason: str | None = None
+
+    @model_validator(mode="after")
+    def _value_or_reason(self) -> "PinConditionRow":
+        if (self.value is None) == (self.empty_reason is None):
+            raise ValueError("a row has a value or an empty_reason, never both and never neither")
+        return self

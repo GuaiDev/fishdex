@@ -40,7 +40,7 @@ The freshness check is deliberately one query. The first version issued six and 
 
 Registry exports for `verify-species-status` live in `data/registry/`. The command defaults to `data/registry/cosewic_2024.csv` and reads its citation from the file's own `source`/`source_url` columns — retyping a citation on the command line is how a run stamps the wrong one onto a status.
 
-Every value is a `ContextField`: value + `Provenance` (RECORD / WEB / INFERENCE) + `EmptyReason`. `WEB` is forced `verified=False` by a model validator. There are eight empty reasons and they are not interchangeable — each one has a different remedy for the reader.
+Every value is a `ContextField`: value + `Provenance` (RECORD / WEB / INFERENCE) + `EmptyReason`. `WEB` is forced `verified=False` by a model validator. There are nine empty reasons and they are not interchangeable — each one has a different remedy for the reader.
 
 **`sar_alert` vs `status_known_listed`.** All 69 species in the local file have unverified conservation status, so `sar_alert` is `True` for every one of them — correct for suppressing the corpus's own generated angling text, useless as a refusal gate. Gate hard refusals on `status_known_listed` (an affirmative listing signal from some authority, verified or not). A rule that fires on every fish in Ontario protects nothing.
 

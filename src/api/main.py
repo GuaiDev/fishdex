@@ -1905,6 +1905,22 @@ def get_pin_detail(pin_id: int, user: dict = Depends(get_current_user)):
     return detail
 
 
+@app.get("/pins/{pin_id}/conditions")
+def get_pin_conditions(pin_id: int, user: dict = Depends(get_current_user)):
+    """The pin's conditions panel: one row per fact, each with source and age.
+
+    Rows carry value, unit, source, station, distance_km, observed_at, age_s and
+    stale, or an empty_reason saying why there is no value. Wording for every
+    field and reason is in GET /pins/labels.
+    """
+    from src.services.pins.conditions import pin_conditions
+
+    rows = pin_conditions(_pin_db(), user["id"], pin_id)
+    if rows is None:
+        raise HTTPException(status_code=404, detail="No such pin")
+    return rows
+
+
 @app.patch("/pins/{pin_id}")
 def patch_pin(pin_id: int, body: PinUpdate, user: dict = Depends(get_current_user)):
     """Rename, edit notes, or set or clear the favourite flag."""

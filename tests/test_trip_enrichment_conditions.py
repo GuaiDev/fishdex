@@ -79,6 +79,7 @@ def test_session_conditions_stored(db_conn):
         db_conn, sid, 42.919, -79.767,
         datetime(2025, 6, 20, 10, 0, 0),
         timeout_seconds=0.01,
+        user_id=1,
     )
 
     assert isinstance(result, dict)

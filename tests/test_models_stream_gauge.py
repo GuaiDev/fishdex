@@ -113,3 +113,13 @@ def test_stream_gauge_summary_null_level_and_discharge():
 def test_invalid_trend_value_raises():
     with pytest.raises(Exception):
         _reading(level_trend="unknown")
+
+
+def test_nearest_gauge_pairs_a_reading_with_its_distance():
+    from src.models.stream_gauge import NearestGauge
+
+    near = NearestGauge(reading=_reading(), distance_km=8.2)
+    assert near.distance_km == 8.2
+    assert near.reading.station_id == "02HB001"
+    with pytest.raises(Exception):
+        NearestGauge(reading=_reading())  # the distance is not optional

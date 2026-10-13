@@ -146,7 +146,37 @@ def _compute_trend_from_readings(
     )
 
 
-def _cached_get(url: str, params: dict, ttl_seconds: int) -> dict:
+def get_archive_hourly(
+    lat: float,
+    lng: float,
+    start_date: str,
+    end_date: str,
+    variables: list[str],
+    timeout: float = 30,
+    wind_speed_unit: str | None = None,
+) -> dict:
+    """Hourly archive weather for a date range, through the cache (24 h).
+
+    Used when a trip is logged, where the caller has a short budget: the
+    politeness delay is skipped and the timeout is the caller's. Times come back
+    in America/Toronto, as the trip enrichment has always read them.
+    """
+    params = {
+        "latitude": lat,
+        "longitude": lng,
+        "start_date": start_date,
+        "end_date": end_date,
+        "hourly": ",".join(variables),
+        "timezone": "America/Toronto",
+    }
+    if wind_speed_unit:
+        params["wind_speed_unit"] = wind_speed_unit
+    return _cached_get(_ARCHIVE_URL, params, _TTL_HISTORY, timeout=timeout, delay=0.0)
+
+
+def _cached_get(
+    url: str, params: dict, ttl_seconds: int, timeout: float = 30, delay: float = 0.5
+) -> dict:
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     key_data = url + json.dumps(params, sort_keys=True)
     key = hashlib.sha256(key_data.encode()).hexdigest()[:16]
@@ -157,12 +187,13 @@ def _cached_get(url: str, params: dict, ttl_seconds: int) -> dict:
         if age < ttl_seconds:
             return json.loads(cache_file.read_text())
 
-    time.sleep(0.5)
+    if delay:
+        time.sleep(delay)
     response = httpx.get(
         url,
         params=params,
         headers={"User-Agent": _USER_AGENT},
-        timeout=30,
+        timeout=timeout,
     )
     response.raise_for_status()
     data = response.json()

@@ -36,3 +36,14 @@ class StreamGaugeSummary(BaseModel):
     distance_km: float
     reading_datetime: datetime
     fetched_at: datetime
+
+
+class NearestGauge(BaseModel):
+    """The closest active WSC station that has a current reading, and how far it is.
+
+    The nearest gauge is not always on the same river as the place asking, so
+    the distance travels with the reading.
+    """
+
+    reading: StreamGaugeReading
+    distance_km: float

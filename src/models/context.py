@@ -9,10 +9,13 @@ Prose guardrails erode as prompts grow — the 359-line system prompt had
 drifted into contradicting itself on tool budgets. Fields do not drift.
 """
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
+
+from src.models.freshness import is_stale, normalise_observed_at
 
 
 class ProvenanceKind(StrEnum):
@@ -73,6 +76,15 @@ class EmptyReason(StrEnum):
     ingesting more, and this is not fixed at all until the status is checked.
     """
 
+    NO_LIVE_SOURCE = "no_live_source"
+    """No source publishes this live, anywhere we can reach.
+
+    Water temperature is the case: there is no live stream-temperature feed,
+    only dated grab samples. When none of those exist near the place the field
+    is empty for that reason — not "the source does not cover this area" (no
+    source exists to cover it) and not "try again" (nothing will change).
+    """
+
     RECORDED_BUT_NOT_DECISION_RELEVANT = "recorded_but_not_decision_relevant"
     """A value exists but carries no "so what" for an angler.
 
@@ -93,6 +105,9 @@ _EMPTY_PHRASING: dict[EmptyReason, str] = {
     ),
     EmptyReason.FIELD_NOT_POPULATED_BY_SOURCE: (
         "we hold records here, but this field is not populated in them"
+    ),
+    EmptyReason.NO_LIVE_SOURCE: (
+        "no live source exists for this, and no dated sample is on record nearby"
     ),
     EmptyReason.RECORDED_BUT_NOT_DECISION_RELEVANT: (
         "measured, but unremarkable enough that the number would not change your plan"
@@ -116,6 +131,18 @@ class Provenance(BaseModel):
 
     url: str | None = None
 
+    observed_at: str | None = None
+    """When the underlying value was measured: ISO-8601 UTC, or a bare date when
+    that is all the source gives. Distinct from `date`, which only says which
+    record; this is what age and staleness are computed from."""
+
+    station: str | None = None
+    """The gauge or sampling station the value came from, when it is not at the
+    place itself. A river gauge can sit on a different river from the pin."""
+
+    distance_km: float | None = None
+    """How far that station is from the place."""
+
     verified: bool = True
     """Web provenance is never verified."""
 
@@ -127,7 +154,14 @@ class Provenance(BaseModel):
 
     def describe(self) -> str:
         """One-line human sourcing, e.g. 'iNaturalist, 2024-06-03'."""
-        bits = [b for b in (self.source, self.date) if b]
+        bits = [self.source] if self.source else []
+        if self.station and self.station not in (self.source or ""):
+            bits.append(self.station)
+        if self.distance_km is not None:
+            bits.append(f"{self.distance_km:g} km away")
+        when = self.observed_at or self.date
+        if when:
+            bits.append(f"observed {when}" if self.observed_at else when)
         text = ", ".join(bits) if bits else self.kind.value
         if self.kind is ProvenanceKind.WEB:
             return f"{text} (web, unverified)"
@@ -149,6 +183,13 @@ class ContextField(BaseModel):
     empty_reason: EmptyReason | None = None
     meaning: str | None = None
 
+    stale: bool = False
+    """Older than the stale limit for its source (src/models/freshness.py).
+
+    A stale value is still a value: it is shown, marked, and left out of any
+    match against the user's history. It is not an EmptyReason — emptying it
+    would hide a real reading to say the reading is old."""
+
     @property
     def is_empty(self) -> bool:
         return self.value is None
@@ -164,11 +205,27 @@ class ContextField(BaseModel):
         source: str,
         date: str | None = None,
         meaning: str | None = None,
+        observed_at: datetime | str | None = None,
+        stale_after_s: int | None = None,
+        station: str | None = None,
+        distance_km: float | None = None,
+        now: datetime | None = None,
     ) -> "ContextField":
+        """A sourced value. Give `observed_at` and `stale_after_s` together to
+        have staleness decided here, in one place, rather than per caller."""
+        when = normalise_observed_at(observed_at)
         return cls(
             value=value,
-            provenance=Provenance(kind=ProvenanceKind.RECORD, source=source, date=date),
+            provenance=Provenance(
+                kind=ProvenanceKind.RECORD,
+                source=source,
+                date=date,
+                observed_at=when,
+                station=station,
+                distance_km=distance_km,
+            ),
             meaning=meaning,
+            stale=stale_after_s is not None and is_stale(when, stale_after_s, now),
         )
 
     @classmethod
@@ -191,6 +248,8 @@ class ContextField(BaseModel):
             text = f"{text} — {self.meaning}"
         if self.provenance:
             text = f"{text} [{self.provenance.describe()}]"
+        if self.stale:
+            text = f"{text} (stale — too old to count as current)"
         return text
 
 
@@ -258,12 +317,36 @@ class AccessSlice(BaseModel):
 
 
 class ConditionsSlice(BaseModel):
-    """Live. Never cached beyond an hour."""
+    """What the water and weather are doing now, where a source exists.
 
-    flow_vs_median: ContextField = Field(default_factory=ContextField)
-    water_temp_c: ContextField = Field(default_factory=ContextField)
+    Live where a live source exists (weather, the nearest WSC gauge — never
+    cached beyond an hour) and the nearest *dated* sample where none does
+    (water temperature and chemistry come from PWQMN grab samples). Every value
+    carries `observed_at`, and `stale` once it is past its source's limit, so
+    the reader can tell a reading from this morning from one taken in 2024.
+
+    Flow is worded as a trend (rising / falling / steady) and never as
+    "normal": the gauge has no seasonal baseline here, and "normal" would be a
+    claim about one.
+    """
+
     air_temp_c: ContextField = Field(default_factory=ContextField)
+    wind_speed_kmh: ContextField = Field(default_factory=ContextField)
+    precipitation_mm: ContextField = Field(default_factory=ContextField)
+    pressure_hpa: ContextField = Field(default_factory=ContextField)
     pressure_trend: ContextField = Field(default_factory=ContextField)
+
+    flow_cms: ContextField = Field(default_factory=ContextField)
+    flow_trend: ContextField = Field(default_factory=ContextField)
+    level_m: ContextField = Field(default_factory=ContextField)
+    level_trend: ContextField = Field(default_factory=ContextField)
+
+    water_temp_c: ContextField = Field(default_factory=ContextField)
+    dissolved_oxygen_mgl: ContextField = Field(default_factory=ContextField)
+    ph: ContextField = Field(default_factory=ContextField)
+    """Unlike `WaterSlice.ph`, a mid-range reading is kept here. That slice
+    withholds numbers that tell an angler nothing; this one is a panel of
+    facts, and an unremarkable pH is still the pH."""
 
 
 class HistorySlice(BaseModel):
