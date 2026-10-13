@@ -18,7 +18,9 @@ from it). Each entry is `{request, note, status, response}`.
 1. `GET /map/spots/labels` once. Every word the UI shows comes from it. Do not hardcode
    chip names, one-liners or the "why fish gather" paragraphs.
 2. `GET /map/spots?bbox=…&kind=…&tier=…` whenever the map moves or a chip changes.
-3. `GET /map/spots/{spot_id}` when a spot is tapped.
+3. `GET /map/spots/{spot_id}` when a spot is tapped. It returns the spot and its
+   **`card`**: the four blocks a tap reveals, already written. Render the card; do not
+   fetch records, labels or access data yourself.
 4. `GET /map/water-bodies?bbox=…&type=…` to name and group the rivers, creeks and lakes the
    spots sit on, and `GET /map/water-bodies/{water_body_id}` for "more spots on this river".
 
@@ -43,6 +45,16 @@ pressure from anglers, and a map must not blur them.
   name, and never print "Unnamed …". A lake with `geometry: null` has no outline on file: draw
   a label, not a shape.
 - Spot output is personal. Do not add export, sharing, or public counts.
+- On a card, show the text as given. Every sentence on it, including block titles, the
+  "not a catch guarantee" line and the care message, comes from the API. A species is
+  "recorded", never "here", "good" or "hot", and nothing on the card says how popular a
+  place is.
+- Records and reasoning never share a line. `provenance: "record"` things carry a
+  `source`; the one `provenance: "inference"` thing is the general explanation, shown
+  with its `label`.
+- The card is the same for every user and can be cached by `meta.cache_key`
+  (`{spot_id}@{built_at}`). Nothing on it is per-user. "New to you" is a later phase and
+  has no field yet.
 
 ## `GET /map/spots/labels`
 
@@ -314,6 +326,7 @@ renamed, and contain no river or section id. Saving a spot means saving its id.
 | `water_body` | `{water_body_id, name, display_name, name_source, type}` for the river or creek the spot is a child of, or null. Enough for a breadcrumb; `GET /map/water-bodies/{id}` for the rest. |
 | `also_on_water_bodies[]` | The same short form for each id in `also_on_water_body_ids`. |
 | `more_on_this_water[]` | Other spots on the same river **section**: kept as it was. For "more spots on this river" across all its sections, use the water body's `spots`. |
+| `card` | The four resolved blocks a tap reveals. See "The spot card" below. |
 
 ```json
 {
@@ -426,6 +439,9 @@ renamed, and contain no river or section id. Saving a spot means saving its id.
   ]
 }
 ```
+
+(The `card` field is left out of the two examples in this section; it has its own section
+below, and the real thing is in the fixture.)
 
 A river mouth, whose lake name is read from the curation file when it has one:
 
@@ -870,11 +886,217 @@ Unknown id is a `404`:
 }
 ```
 
+## The spot card
+
+`card` on `GET /map/spots/{spot_id}` is one read model with four fixed blocks. Blocks 1
+and 2 are for the first tap (`default_open: true`); 3 and 4 expand (`default_open: false`).
+Every user-facing string is in it, including block titles.
+
+| Block | Field | What it holds |
+|---|---|---|
+| 1. Why it's interesting | `card.hook` | `title`, `kind`, `text`: at most two lines. The first rule with data wins: `protected_species` (a care message that replaces everything else), then `structure` (one plain sentence about the water, only where a record supports it), then `honest_empty` ("No fish records within 2 km, so this is a place to find out."). `kind_description` is used when fish are recorded but nothing above has anything specific to say; it is the kind's one-liner. `new_to_you` and `distinctive` are reserved for later phases and never appear yet. |
+| 2. You might find | `card.might_find` | `species[]` (top 5), `more_text`, `caveat` ("Recorded nearby, not a catch guarantee."), `empty_text` (why there is no list), `note` (why some recorded species are left out), `radius_km`. Each species has `name`, `scientific_name`, `source`, `date`, `evidence`, `cite` (`"iNaturalist, 2024-06-03"`, ready to show in brackets) and `note` (`"Older record"` for a record a decade old or more). Standardised surveys (`evidence: "survey"`) come first, then photos and sightings, each most recent first. |
+| 3. Why fish gather here | `card.why_gather` | `what_it_is` (the kind in plain words), `general` = `{text, label, provenance: "inference"}`: the kind's two sentences, shown with the label "General reasoning, not a record about this spot". Then `facts_title` and `facts[]`: facts about this spot, each `{text, provenance: "record", source}`. They are listed apart from the reasoning on purpose. |
+| 4. Getting there | `card.getting_there` | `items[]`: the nearest parking, trailhead, boat launch and public road crossing, each `{kind, label, text, distance_m, details[], source}` (`text` is "Parking about 150 m away"; `details` are mapped tags such as "mapped as free"). `empty_text` when there are none. `crown_land` = `{state, text, source}` where `state` is `mapped`, `none_found` or `not_checked`. `unverified_title` and `unverified[]`: what has not been checked on the ground. |
+
+Also on the card: `terms[]`, glossary entries (`{term, text}`) for the hard words that
+appear in this card's own text (for a weir, "weir"), to show behind a "What's a weir?"
+link; and `meta`, counts for a Sources view that are not shown on the card face:
+`species_shown`, `species_withheld_protected` (a number, never names),
+`species_withheld_imprecise`, `species_status_unchecked`, `cache_key`.
+
+`GET /map/spots/labels` also carries a `glossary` map of the same entries.
+
+**Protected species.** If any species recorded within 2 km has a listing signal (Special
+Concern, Threatened, Endangered or Extirpated from any source we hold, verified or not),
+the hook becomes the care message and that species is not named anywhere on the card:
+not in "You might find", not in a count, not in the facts. The gate reads
+`status_known_listed`, never `sar_alert`, which is true for every fish in the local
+species file. A species the file does not know at all is still shown, and counted in
+`meta.species_status_unchecked`. Records whose location is deliberately fuzzed (about
+22 km) are not "within 2 km", so they are left out and counted in
+`meta.species_withheld_imprecise`.
+
+**What a card is built from.** The spot, and `describe(map_tap)` within 2 km: no model
+call, no live lookup, no web search. The response has `Cache-Control: private,
+max-age=300`.
+
+The card payload for a spot whose structure gives nothing specific to say and where nothing is
+recorded (an honest-empty card):
+
+```json
+{
+  "spot_id": "creek_junction:n7742945_4424383",
+  "hook": {
+    "title": "Why it's interesting",
+    "kind": "honest_empty",
+    "text": "No fish records within 2 km, so this is a place to find out."
+  },
+  "might_find": {
+    "title": "You might find",
+    "species": [],
+    "more_text": null,
+    "caveat": "Recorded nearby, not a catch guarantee.",
+    "empty_text": "We hold no fish records for this area yet.",
+    "note": null,
+    "radius_km": 2.0,
+    "default_open": true
+  },
+  "why_gather": {
+    "title": "Why fish gather here",
+    "what_it_is": "Two streams meeting. Different temperature, speed and food mix at the join.",
+    "general": {
+      "text": "Two flows mixing makes a seam between fast and slow water, which fish use for shelter with food drifting past. A creek that runs cooler than the river can also give fish a place to ease out of warm water.",
+      "label": "General reasoning, not a record about this spot",
+      "provenance": "inference"
+    },
+    "facts_title": "What our records say about this spot",
+    "facts": [],
+    "default_open": false
+  },
+  "getting_there": {
+    "title": "Getting there",
+    "items": [],
+    "empty_text": "No parking, trailhead or boat launch found within 1.5 km in our map data.",
+    "crown_land": {
+      "state": "not_checked",
+      "text": "We have no Crown land data for this area.",
+      "source": null
+    },
+    "unverified_title": "Not checked on the ground",
+    "unverified": [
+      "Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.",
+      "Fishing rules and permission to cross private land are not checked here."
+    ],
+    "default_open": false
+  },
+  "terms": [],
+  "meta": {
+    "records_radius_km": 2.0,
+    "species_shown": 0,
+    "species_withheld_protected": 0,
+    "species_withheld_imprecise": 0,
+    "species_status_unchecked": 0,
+    "cache_key": "creek_junction:n7742945_4424383@2026-10-12T21:43:44+00:00"
+  }
+}
+```
+
+A protected-species card. The listed fish is named nowhere in the response, and the other
+fish recorded nearby are still listed:
+
+```json
+{
+  "spot_id": "creek_junction:n7966741_4355566",
+  "hook": {
+    "title": "Why it's interesting",
+    "kind": "protected_species",
+    "text": "Protected fish have been recorded near here. Handle any fish with care and release it."
+  },
+  "might_find": {
+    "title": "You might find",
+    "species": [
+      {
+        "name": "Rainbow Darter",
+        "scientific_name": "Etheostoma caeruleum",
+        "source": "GBIF/Example fish survey",
+        "date": "2019-07-10",
+        "evidence": "survey",
+        "cite": "GBIF/Example fish survey, 2019-07-10",
+        "note": null
+      },
+      {
+        "name": "Creek Chub",
+        "scientific_name": "Semotilus atromaculatus",
+        "source": "iNaturalist",
+        "date": "2024-06-03",
+        "evidence": "sighting",
+        "cite": "iNaturalist, 2024-06-03",
+        "note": null
+      },
+      {
+        "name": "Blacknose Dace",
+        "scientific_name": "Rhinichthys atratulus",
+        "source": "iNaturalist",
+        "date": "2023-08-19",
+        "evidence": "sighting",
+        "cite": "iNaturalist, 2023-08-19",
+        "note": null
+      },
+      {
+        "name": "White Sucker",
+        "scientific_name": "Catostomus commersonii",
+        "source": "iNaturalist",
+        "date": "2022-05-02",
+        "evidence": "sighting",
+        "cite": "iNaturalist, 2022-05-02",
+        "note": null
+      }
+    ],
+    "more_text": null,
+    "caveat": "Recorded nearby, not a catch guarantee.",
+    "empty_text": null,
+    "note": "Protected species recorded nearby are not listed.",
+    "radius_km": 2.0,
+    "default_open": true
+  },
+  "why_gather": {
+    "title": "Why fish gather here",
+    "what_it_is": "Two streams meeting. Different temperature, speed and food mix at the join.",
+    "general": {
+      "text": "Two flows mixing makes a seam between fast and slow water, which fish use for shelter with food drifting past. A creek that runs cooler than the river can also give fish a place to ease out of warm water.",
+      "label": "General reasoning, not a record about this spot",
+      "provenance": "inference"
+    },
+    "facts_title": "What our records say about this spot",
+    "facts": [
+      {
+        "text": "The smaller stream has about 46 km of channel upstream of this point; the larger has about 1238 km.",
+        "provenance": "record",
+        "source": "Ontario Hydro Network"
+      },
+      {
+        "text": "4 fish records within 2 km, covering 4 species.",
+        "provenance": "record",
+        "source": "GBIF, iNaturalist"
+      }
+    ],
+    "default_open": false
+  },
+  "getting_there": {
+    "title": "Getting there",
+    "items": [],
+    "empty_text": "No parking, trailhead or boat launch found within 1.5 km in our map data.",
+    "crown_land": {
+      "state": "not_checked",
+      "text": "We have no Crown land data for this area.",
+      "source": null
+    },
+    "unverified_title": "Not checked on the ground",
+    "unverified": [
+      "Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.",
+      "Fishing rules and permission to cross private land are not checked here."
+    ],
+    "default_open": false
+  },
+  "terms": [],
+  "meta": {
+    "records_radius_km": 2.0,
+    "species_shown": 4,
+    "species_withheld_protected": 1,
+    "species_withheld_imprecise": 0,
+    "species_status_unchecked": 4,
+    "cache_key": "creek_junction:n7966741_4355566@2026-10-12T21:43:44+00:00"
+  }
+}
+```
+
 ## What is not here yet
 
-- **Species and "what you might find"**, the hook line, "new to you" and the card text
-  itself are later phases. This API serves the spot, its structure and its access; the
-  card renderer will produce the text.
+- **"New to you"** and **"recorded more often here than along the rest of the river"**
+  hooks. Both are slots in the hook chain with no text yet; "new to you" needs the
+  logged-in user (phase 5) and the other needs frequency along the river (phase 6).
+- **Seasons and gear.** The card makes no claim about when or how to fish.
 - **Water body outlines.** A river's line exists; a lake has none (`geometry: null`) because no
   lake outline is on file in this repo. Sourcing outlines is a data task, not an API change: the
   field already allows a polygon.
@@ -887,10 +1109,19 @@ Unknown id is a `404`:
 
 ## About the example data
 
-The fixture was captured from a build that read only the caches (Overpass was not
-reachable), so OpenStreetMap data covered 7 of the 61 stretches: most spots show an
-empty `getting_there`. A full build fills it in. River mouths take their lake from the
-curation file, so their lakes are named. Shapes do not change.
+The fixture was captured from a build that read the caches and fetched only what
+Overpass would serve in time, so OpenStreetMap data covers part of the 61 stretches: most
+spots show an empty `getting_there` (so their cards say nothing was found nearby) and the
+build has no public fishing spots. River mouths take their lake from the curation file, so
+their lakes are named. A full build fills the rest in. Shapes do not change.
+
+No fish records have been ingested into the database the fixture was taken from, so the
+spot cards in it are honest-empty or show the structure hook. Two entries are the
+exception, and their `note` says so: the card with fish records and the protected-species
+card were captured from a throwaway copy of the database with **example** records added
+(four common fish, one of them a survey record, and one Redside Dace marked Endangered).
+They exist to show the shape and are not observations. A real record near a real spot
+produces the same payload.
 
 ## Building and refreshing
 
@@ -901,4 +1132,6 @@ curation file, so their lakes are named. Shapes do not change.
 - Water bodies are rebuilt with the spots, in the same transaction, from the curated river
   sections and the lake names on river mouths; nothing else feeds them yet. The build prints how
   many spots were linked to a water body and how many were not.
-- User-facing words live in `src/services/spot_labels.py` and nowhere else.
+- User-facing words for the map live in `src/services/spot_labels.py`. The card's words
+  are written by `render_spot()` in `src/services/context/render.py`, and the "why fish
+  gather here" text is in `src/services/context/translate.py`. Nothing else writes any.

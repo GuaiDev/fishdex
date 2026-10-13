@@ -783,7 +783,14 @@ def spots_geojson(
 
 
 def get_spot_detail(db: Database, spot_id: str) -> dict | None:
-    """One spot in full, with its sibling spots on the same river for 'more spots on this river'."""
+    """One spot in full: its facts, the other spots on the same river, and its card.
+
+    The card is the four resolved blocks (why it's interesting, you might find,
+    why fish gather here, getting there) with every string written, so the
+    front end joins nothing. It is the same for every user.
+    """
+    from src.services.spot_card import build_spot_card
+
     spot = get_spot(db, spot_id)
     if spot is None:
         return None
@@ -800,6 +807,7 @@ def get_spot_detail(db: Database, spot_id: str) -> dict | None:
             ref for i in spot.also_on_water_body_ids if (ref := _water_body_ref(db, i))
         ],
         "more_on_this_water": others,
+        "card": build_spot_card(db, spot).model_dump(),
     }
 
 

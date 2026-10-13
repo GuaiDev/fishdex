@@ -11,6 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from src.models.spot import AccessRef, Spot, SpotBuildReport
+from src.models.spot_card import SpotCard
 from src.models.stretch import FishingStretch, StretchSegment
 from src.models.stretch_anchor import StretchAnchor
 from src.services import spot_labels
@@ -896,10 +897,11 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
             detail = {
                 k: v
                 for k, v in e["response"].items()
-                if k not in ("more_on_this_water", "water_body", "also_on_water_bodies")
+                if k not in ("more_on_this_water", "water_body", "also_on_water_bodies", "card")
             }
             assert Spot.model_validate(detail).spot_id == route.removeprefix("/map/spots/")
             assert e["response"]["water_body"]["water_body_id"] == detail["water_body_id"]
+            assert SpotCard.model_validate(e["response"]["card"]).spot_id == detail["spot_id"]
         else:
             assert e["response"]["type"] == "FeatureCollection"
             for f in e["response"]["features"]:
