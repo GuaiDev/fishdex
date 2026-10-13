@@ -1545,10 +1545,17 @@ def _parse_bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
 
 
 def _parse_spot_filters(
-    bbox: str | None, kind: str | None, tier: int,
+    bbox: str | None,
+    kind: str | None,
+    tier: int,
     species: str | None = None,
     near: str | None = None,
-) -> tuple[tuple[float, float, float, float] | None, list[str] | None, str | None, tuple[float, float, float | None] | None]:
+) -> tuple[
+    tuple[float, float, float, float] | None,
+    list[str] | None,
+    str | None,
+    tuple[float, float, float | None] | None,
+]:
     from src.models.spot import SpotKind
 
     box = _parse_bbox(bbox)
@@ -1566,7 +1573,7 @@ def _parse_spot_filters(
     near_t = None
     if near:
         try:
-            parts = tuple(float(p.strip()) for p in near.split(','))
+            parts = tuple(float(p.strip()) for p in near.split(","))
             if len(parts) != 2 and len(parts) != 3:
                 raise ValueError
             nlat, nlon = parts[0], parts[1]
@@ -1674,7 +1681,6 @@ def get_map_water_body(water_body_id: str, user: dict = Depends(get_current_user
     return detail
 
 
-
 @app.get("/map/layers/getting-there")
 def get_map_layers_getting_there(
     bbox: str | None = None,
@@ -1699,6 +1705,7 @@ def get_map_layers_bridges(
 
     box = _parse_bbox(bbox)
     return bridges_geojson(get_db(), box, jurisdiction)
+
 
 @app.get("/map/my-stops")
 def get_my_stops(user: dict = Depends(get_current_user)):

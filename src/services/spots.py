@@ -740,7 +740,10 @@ def build_spots(db: Database, curation_path: Path = DEFAULT_CURATION_PATH) -> Sp
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return 6371.0 * c
 
@@ -837,7 +840,6 @@ def get_spot_detail(db: Database, spot_id: str) -> dict | None:
     }
 
 
-
 def _species_within_2km(db: Database, species_l: str) -> list[str]:
     """Return spot_ids where the given species has records within 2 km."""
     from src.services.context import slices
@@ -850,9 +852,17 @@ def _species_within_2km(db: Database, species_l: str) -> list[str]:
         found = False
         matched = set()
         try:
-            obs, _ = query_observations(db, lat=spot.lat, lng=spot.lng, radius_km=2.0, days_back=3650, species_filter=species_l, limit=50)
+            obs, _ = query_observations(
+                db,
+                lat=spot.lat,
+                lng=spot.lng,
+                radius_km=2.0,
+                days_back=3650,
+                species_filter=species_l,
+                limit=50,
+            )
             for o in obs:
-                spn = getattr(o, 'species', '') or ''
+                spn = getattr(o, "species", "") or ""
                 if species_l in spn.lower():
                     found = True
                     matched.add(spn)
@@ -860,9 +870,11 @@ def _species_within_2km(db: Database, species_l: str) -> list[str]:
             pass
         if not found:
             try:
-                gb = query_gbif_observations(db, lat=spot.lat, lng=spot.lng, radius_km=2.0, species_filter=species_l)
+                gb = query_gbif_observations(
+                    db, lat=spot.lat, lng=spot.lng, radius_km=2.0, species_filter=species_l
+                )
                 for o in gb:
-                    spn = getattr(o, 'species', '') or ''
+                    spn = getattr(o, "species", "") or ""
                     if species_l in spn.lower():
                         found = True
                         matched.add(spn)
@@ -871,11 +883,13 @@ def _species_within_2km(db: Database, species_l: str) -> list[str]:
         if not found:
             try:
                 deg = 2.0 / 111.0
-                rows = list(db.execute(
-                    "SELECT st.species_caught FROM stops st JOIN sessions s ON st.session_id = s.id "
-                    "WHERE st.lat BETWEEN ? AND ? AND st.lng BETWEEN ? AND ?",
-                    [spot.lat - deg, spot.lat + deg, spot.lng - deg, spot.lng + deg],
-                ).fetchall())
+                rows = list(
+                    db.execute(
+                        "SELECT st.species_caught FROM stops st JOIN sessions s ON st.session_id = s.id "
+                        "WHERE st.lat BETWEEN ? AND ? AND st.lng BETWEEN ? AND ?",
+                        [spot.lat - deg, spot.lat + deg, spot.lng - deg, spot.lng + deg],
+                    ).fetchall()
+                )
                 for r in rows:
                     for sp in slices._load_species_list(r[0]):
                         if species_l in sp.lower():
@@ -888,7 +902,7 @@ def _species_within_2km(db: Database, species_l: str) -> list[str]:
             for m in matched:
                 try:
                     sc = describe_species(db, m)
-                    if getattr(sc, 'status_known_listed', False):
+                    if getattr(sc, "status_known_listed", False):
                         listed = True
                         break
                 except Exception:
@@ -911,6 +925,7 @@ def _water_body_ref(db: Database, water_body_id: str | None) -> dict | None:
         "type": wb.type,
     }
 
+
 def species_within_2km_of_spot(db: Database, lat: float, lng: float, species: str) -> bool:
     """Small helper: does the species have records within 2 km of (lat,lng)?"""
     from src.services.context.species import describe_species
@@ -920,7 +935,9 @@ def species_within_2km_of_spot(db: Database, lat: float, lng: float, species: st
     if describe_species(db, species).status_known_listed:
         return False
     try:
-        obs, _ = query_observations(db, lat=lat, lng=lng, radius_km=2.0, days_back=3650, species_filter=species, limit=1)
+        obs, _ = query_observations(
+            db, lat=lat, lng=lng, radius_km=2.0, days_back=3650, species_filter=species, limit=1
+        )
         if obs:
             return True
     except Exception:
@@ -933,20 +950,26 @@ def species_within_2km_of_spot(db: Database, lat: float, lng: float, species: st
         pass
     try:
         from src.services.context import slices
+
         deg = 2.0 / 111.0
-        rows = list(db.execute(
-            "SELECT st.species_caught FROM stops st JOIN sessions s ON st.session_id = s.id "
-            "WHERE st.lat BETWEEN ? AND ? AND st.lng BETWEEN ? AND ?",
-            [lat - deg, lat + deg, lng - deg, lng + deg],
-        ).fetchall())
+        rows = list(
+            db.execute(
+                "SELECT st.species_caught FROM stops st JOIN sessions s ON st.session_id = s.id "
+                "WHERE st.lat BETWEEN ? AND ? AND st.lng BETWEEN ? AND ?",
+                [lat - deg, lat + deg, lng - deg, lng + deg],
+            ).fetchall()
+        )
         sl = species.strip().lower()
         for r in rows:
-            for sp in slices._load_species_list(r[0]) if hasattr(slices, '_load_species_list') else []:
+            for sp in (
+                slices._load_species_list(r[0]) if hasattr(slices, "_load_species_list") else []
+            ):
                 if sp.strip().lower() == sl:
                     return True
     except Exception:
         pass
     return False
+
 
 def getting_there_geojson(
     db: Database,

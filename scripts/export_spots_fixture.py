@@ -268,7 +268,9 @@ def main() -> None:
         capture(path, note)
     # include examples with filters if they don't error
     try:
-        capture("/map/spots?near=43.20,-80.35&bbox=-80.40,43.17,-80.30,43.25", "near filter example")
+        capture(
+            "/map/spots?near=43.20,-80.35&bbox=-80.40,43.17,-80.30,43.25", "near filter example"
+        )
     except Exception:
         pass
     for water_body_id, note in WATER_BODY_DETAILS:
