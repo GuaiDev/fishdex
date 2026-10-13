@@ -139,13 +139,12 @@ Respects fishing gatekeep culture.
 - **Frontend dist rebuild** — web/dist/ predates the LogTrip.jsx multi-catch rebuild.
   Run `npm run build` in web/, then commit web/dist/ — until then, real users get the
   old single-photo/single-textarea Log Trip screen regardless of what's in web/src/.
-- **Dev-only login bypass still in code** — App.jsx auto-logs in via POST
-  /admin/bootstrap when import.meta.env.DEV is true (also falls back to it on a
-  stale/invalid token), and /admin/bootstrap itself is permissive whenever
-  FISHBOT_API_KEY is unset. Both are marked "TEMPORARY DEV-ONLY — REMOVE BEFORE
-  MERGING/DEPLOYING" in comments but were never removed. Must be stripped before
-  onboarding real (non-admin) users — anyone running the app without
-  FISHBOT_API_KEY set skips the invite-code Login screen entirely.
+- ~~**Dev-only login bypass still in code**~~ — resolved. The web auto-login and
+  POST /admin/bootstrap were removed in 5e9fe9b (2026-07-18). The remaining hole was
+  `verify_api_key` allowing every request when FISHBOT_API_KEY was unset (including
+  POST /admin/token, which mints a 90-day admin token); it now fails closed with 503
+  when the key is unset/empty, 401 on a wrong key, and compares with
+  `secrets.compare_digest`. FISHBOT_API_KEY must be set locally (see README).
 
 ## Core Intelligence (completed) ✅
 

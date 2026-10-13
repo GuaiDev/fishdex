@@ -7,6 +7,7 @@ Start with: uv run fishbot serve
 import json
 import logging
 import os
+import secrets
 import sys
 from contextlib import asynccontextmanager
 
@@ -55,11 +56,19 @@ from src.models.weed_report import WeedReportCreate, WeedReportUpdate  # noqa: E
 
 
 def verify_api_key(x_api_key: str = Header(None)) -> None:
-    """Verify admin API key for protected endpoints."""
+    """Verify admin API key for protected endpoints.
+
+    Fails closed: if FISHBOT_API_KEY is unset or empty the endpoint refuses with
+    503 (server not configured) rather than letting everyone in. A wrong or
+    missing X-Api-Key header is 401.
+    """
     expected = os.environ.get("FISHBOT_API_KEY")
     if not expected:
-        return
-    if x_api_key != expected:
+        raise HTTPException(
+            status_code=503,
+            detail="FISHBOT_API_KEY is not set on the server; admin endpoints are disabled.",
+        )
+    if not x_api_key or not secrets.compare_digest(x_api_key.encode(), expected.encode()):
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
@@ -93,7 +102,7 @@ def get_current_user_or_apikey(
         if user:
             return user
     expected = os.environ.get("FISHBOT_API_KEY")
-    if expected and x_api_key == expected:
+    if expected and x_api_key and secrets.compare_digest(x_api_key.encode(), expected.encode()):
         return {"id": 1, "username": "jason", "role": "admin", "daily_message_limit": 9999}
     raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -940,7 +949,6 @@ if not os.environ.get("RAILWAY_ENVIRONMENT"):
 @app.post("/admin/token")
 def get_admin_token(_: None = Depends(verify_api_key)):
     """Generate a fresh admin token. Protected by API key only."""
-    import secrets
     from datetime import datetime, timedelta
 
     from src.storage.database import get_db

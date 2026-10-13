@@ -61,7 +61,7 @@
       if (!silent) setStatus('Logging in…');
       try {
         const res = await fetch('/admin/token', { method: 'POST', headers: { 'X-Api-Key': apiKey } });
-        if (!res.ok) throw new Error(res.status === 401 ? 'Invalid API key' : `Failed (${res.status})`);
+        if (!res.ok) throw new Error(res.status === 401 ? 'Invalid API key' : res.status === 503 ? 'FISHBOT_API_KEY is not set on the server' : `Failed (${res.status})`);
         const data = await res.json();
         localStorage.setItem('fishbot_token', data.token);
         localStorage.setItem('fishbot_user', JSON.stringify({

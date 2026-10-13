@@ -97,8 +97,9 @@ def test_log_trip_endpoint():
     assert "session_id" in data
 
 
-def test_ingest_data_requires_lat_lng():
+def test_ingest_data_requires_lat_lng(monkeypatch):
     """Missing lat/lng returns 400."""
+    monkeypatch.setenv("FISHBOT_API_KEY", "test-key")
     response = client.post(
         "/ingest/data",
         json={"label": "test"},
@@ -108,15 +109,52 @@ def test_ingest_data_requires_lat_lng():
     assert response.status_code in (400, 401, 422)
 
 
-def test_ingest_data_no_key_development_mode():
-    """Without FISHBOT_API_KEY env var set, endpoint allows requests (returns non-401)."""
-    if os.environ.get("FISHBOT_API_KEY"):
-        return
+def test_api_key_unset_refuses(monkeypatch):
+    """With FISHBOT_API_KEY unset, protected endpoints refuse (503), even with a header."""
+    monkeypatch.delenv("FISHBOT_API_KEY", raising=False)
     response = client.post(
         "/ingest/data",
         json={"lat": 43.45, "lng": -79.72, "radius_km": 1},
+        headers={"X-Api-Key": "anything"},
     )
-    assert response.status_code != 401
+    assert response.status_code == 503
+
+
+def test_api_key_empty_refuses(monkeypatch):
+    monkeypatch.setenv("FISHBOT_API_KEY", "")
+    response = client.post("/ingest/data", json={"lat": 43.45, "lng": -79.72, "radius_km": 1})
+    assert response.status_code == 503
+
+
+def test_api_key_wrong_refuses(monkeypatch):
+    monkeypatch.setenv("FISHBOT_API_KEY", "right-key")
+    response = client.post(
+        "/ingest/data",
+        json={"lat": 43.45, "lng": -79.72, "radius_km": 1},
+        headers={"X-Api-Key": "wrong-key"},
+    )
+    assert response.status_code == 401
+    response = client.post("/ingest/data", json={"lat": 43.45, "lng": -79.72, "radius_km": 1})
+    assert response.status_code == 401
+
+
+def test_api_key_right_passes(monkeypatch):
+    monkeypatch.setenv("FISHBOT_API_KEY", "right-key")
+    response = client.post(
+        "/ingest/data",
+        json={"label": "test"},
+        headers={"X-Api-Key": "right-key"},
+    )
+    # Past the key check: the body is rejected by validation, not by auth.
+    assert response.status_code in (400, 422)
+
+
+def test_admin_token_refuses_without_key(monkeypatch):
+    monkeypatch.delenv("FISHBOT_API_KEY", raising=False)
+    assert client.post("/admin/token").status_code == 503
+    monkeypatch.setenv("FISHBOT_API_KEY", "right-key")
+    assert client.post("/admin/token").status_code == 401
+    assert client.post("/admin/token", headers={"X-Api-Key": "bad"}).status_code == 401
 
 
 def _apikey_headers(monkeypatch):
