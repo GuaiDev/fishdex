@@ -605,7 +605,6 @@ river quietly behind them, and let someone browse by water.
 | `type` | One or more of `river`, `creek`, `lake`, `pond`, `great_lake`, comma-separated. Omit for all. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
 
-
 `meta.type_counts` counts every type in view, ignoring the `type` filter, so a filter row can
 show what each would add. Features come in type order (rivers, creeks, lakes, ponds, Great
 Lakes), then by id.
@@ -1648,8 +1647,8 @@ produces the same payload.
 
 ## `GET /map/layers/getting-there`
 
-Returns GeoJSON point features (FeatureCollection) for parking, trailheads and boat launches attached to spots in view. Parameters: `bbox` (optional, `min_lon,min_lat,max_lon,max_lat`) and `jurisdiction` (optional, ISO 3166-2). Labels come from the labels endpoint's `layers.getting_there` and `access_labels`. Properties: `kind`, `name`, `distance_m`, `spot_id`, `spot_title`, `attributes`.
+Returns GeoJSON point features (FeatureCollection) for parking, trailheads and boat launches. Parameters: `bbox` (optional, `min_lon,min_lat,max_lon,max_lat`) and `jurisdiction` (optional, ISO 3166-2). The bbox is applied to the access points themselves, and a point shared by several spots appears once. Labels come from the labels endpoint's `layers.getting_there` and `access_labels`. Properties: `kind`, `name`, `attributes`.
 
 ## `GET /map/layers/bridges`
 
-Returns GeoJSON point features (FeatureCollection) for road crossings attached to spots in view. Bridges are off by default in the UI. Parameters: `bbox` (optional) and `jurisdiction` (optional). Labels come from `layers.bridges` and `access_labels`. Properties: `kind`, `name`, `distance_m`, `spot_id`, `spot_title`, `attributes`.
+Returns GeoJSON point features (FeatureCollection) for road crossings. Bridges are off by default in the UI. Parameters: `bbox` (optional) and `jurisdiction` (optional), filtered and de-duplicated as for getting-there. Labels come from `layers.bridges` and `access_labels`. Properties: `kind`, `name`, `attributes`.
