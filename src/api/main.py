@@ -51,6 +51,7 @@ from src.models.pin import (  # noqa: E402
     SessionUpdate,
     TripPinRating,
 )
+from src.models.weed_report import WeedReportCreate, WeedReportUpdate  # noqa: E402
 
 
 def verify_api_key(x_api_key: str = Header(None)) -> None:
@@ -1670,6 +1671,115 @@ def get_map_water_body_features(water_body_id: str, user: dict = Depends(get_cur
     if out is None:
         raise HTTPException(status_code=404, detail=f"No water body with id {water_body_id!r}")
     return out
+
+
+# --- Weed reports ---
+#
+# A weed edge the user saw and wrote down. Private: every route reads the user from
+# the bearer token and nowhere else, and another user's report answers 404, exactly
+# like one that does not exist. Nothing here returns a count, and nothing derives an
+# edge from other data.
+
+
+def _weed_db():
+    from src.storage.database import get_db
+
+    return get_db()
+
+
+def _weed_error(exc) -> HTTPException:
+    return HTTPException(status_code=exc.status, detail=exc.detail)
+
+
+@app.get("/map/weed-reports/labels")
+def get_weed_report_labels(user: dict = Depends(get_current_user)):
+    """Every user-facing word and tolerance for weed reports, from
+    src/services/weed_reports/labels.py. The web app hardcodes none of it."""
+    from src.services.weed_reports.labels import labels_payload
+
+    return labels_payload()
+
+
+@app.get("/map/weed-reports/layer")
+def get_weed_report_layer(
+    water_body_id: str | None = None,
+    bbox: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """The map layer: only the caller's own weed reports, as GeoJSON.
+
+    Each feature is labelled "reported, not verified" and dated. `water_body_id` and
+    `bbox` (min_lon,min_lat,max_lon,max_lat) narrow it. `meta` has no counts.
+    """
+    from src.services.weed_reports import weed_reports_geojson
+
+    return weed_reports_geojson(_weed_db(), user["id"], water_body_id, _parse_bbox(bbox))
+
+
+@app.get("/map/weed-reports")
+def list_weed_report_routes(
+    water_body_id: str | None = None,
+    bbox: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """The caller's own weed reports, newest sighting first, optionally for one water
+    body and/or a box."""
+    from src.services.weed_reports import list_weed_reports
+
+    return list_weed_reports(_weed_db(), user["id"], water_body_id, _parse_bbox(bbox))
+
+
+@app.post("/map/weed-reports", status_code=201)
+def post_weed_report(body: WeedReportCreate, user: dict = Depends(get_current_user)):
+    """Report a weed edge: a point or a line on a water body, and the date you saw it.
+
+    404 for an unknown water body; 422 when the position is not on or near the water
+    body's drawn shape, or the water body has no shape on file to check against."""
+    from src.services.weed_reports import WeedReportError, create_weed_report
+
+    try:
+        return create_weed_report(_weed_db(), user["id"], body)
+    except WeedReportError as exc:
+        raise _weed_error(exc) from exc
+
+
+@app.get("/map/weed-reports/{report_id}")
+def get_weed_report_detail(report_id: int, user: dict = Depends(get_current_user)):
+    """One of the caller's weed reports. 404 if it is not theirs."""
+    from src.services.weed_reports import weed_report_payload
+
+    payload = weed_report_payload(_weed_db(), user["id"], report_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="No such weed report")
+    return payload
+
+
+@app.patch("/map/weed-reports/{report_id}")
+def patch_weed_report(
+    report_id: int, body: WeedReportUpdate, user: dict = Depends(get_current_user)
+):
+    """Change the position, date or note of one of the caller's reports. A new position is
+    checked against the report's water body again. 404 if it is not theirs."""
+    from src.services.weed_reports import WeedReportError, update_weed_report
+
+    fields = {name: getattr(body, name) for name in body.model_fields_set}
+    try:
+        payload = update_weed_report(_weed_db(), user["id"], report_id, fields)
+    except WeedReportError as exc:
+        raise _weed_error(exc) from exc
+    if payload is None:
+        raise HTTPException(status_code=404, detail="No such weed report")
+    return payload
+
+
+@app.delete("/map/weed-reports/{report_id}")
+def delete_weed_report_endpoint(report_id: int, user: dict = Depends(get_current_user)):
+    """Delete one of the caller's weed reports. 404 if it is not theirs."""
+    from src.storage.weed_reports import delete_weed_report
+
+    if not delete_weed_report(_weed_db(), user["id"], report_id):
+        raise HTTPException(status_code=404, detail="No such weed report")
+    return {"deleted": report_id}
 
 
 @app.get("/map/my-stops")

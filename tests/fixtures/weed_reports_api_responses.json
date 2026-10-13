@@ -1,0 +1,713 @@
+{
+  "requests": [
+    {
+      "request": "GET /map/weed-reports/labels",
+      "note": "every user-facing word and tolerance",
+      "status": 200,
+      "response": {
+        "kind_label": "Weed edge",
+        "status_label": "reported, not verified",
+        "provenance_label": "Reported by you",
+        "layer": {
+          "label": "Your weed edges",
+          "note": "Weed edges you reported. Only you can see them. They are your sightings, not checked against anything else.",
+          "default_on": true
+        },
+        "shape_labels": {
+          "Point": "A spot on the edge",
+          "LineString": "A line along the edge"
+        },
+        "near_line_m": 150,
+        "near_outline_m": 100,
+        "max_line_length_m": 10000
+      }
+    },
+    {
+      "request": "GET /map/weed-reports",
+      "note": "no reports yet: an empty list, not an error",
+      "status": 200,
+      "response": {
+        "weed_reports": []
+      }
+    },
+    {
+      "request": "POST /map/weed-reports",
+      "body": {
+        "water_body_id": "river:credit-river",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.96423,
+            43.8139
+          ]
+        },
+        "observed_on": "2026-10-04",
+        "note": "Example: weeds thin out below the riffle."
+      },
+      "note": "report a weed edge as a point (EXAMPLE report, not a sighting)",
+      "status": 201,
+      "response": {
+        "weed_report_id": 1,
+        "water_body_id": "river:credit-river",
+        "water_body_name": "Credit River",
+        "jurisdiction": "CA-ON",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.96423,
+            43.8139
+          ]
+        },
+        "shape_label": "A spot on the edge",
+        "observed_on": "2026-10-04",
+        "note": "Example: weeds thin out below the riffle.",
+        "provenance": "user_reported",
+        "provenance_label": "Reported by you",
+        "kind_label": "Weed edge",
+        "status_label": "reported, not verified",
+        "date_label": "seen 2026-10-04",
+        "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-10-04",
+        "created_at": "2026-10-13 16:05:09",
+        "updated_at": null
+      }
+    },
+    {
+      "request": "POST /map/weed-reports",
+      "body": {
+        "water_body_id": "river:credit-river",
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              -79.96423,
+              43.8139
+            ],
+            [
+              -79.96307,
+              43.81495
+            ]
+          ]
+        },
+        "observed_on": "2026-09-21"
+      },
+      "note": "report a weed edge as a line along the water (EXAMPLE report, not a sighting)",
+      "status": 201,
+      "response": {
+        "weed_report_id": 2,
+        "water_body_id": "river:credit-river",
+        "water_body_name": "Credit River",
+        "jurisdiction": "CA-ON",
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              -79.96423,
+              43.8139
+            ],
+            [
+              -79.96307,
+              43.81495
+            ]
+          ]
+        },
+        "shape_label": "A line along the edge",
+        "observed_on": "2026-09-21",
+        "note": null,
+        "provenance": "user_reported",
+        "provenance_label": "Reported by you",
+        "kind_label": "Weed edge",
+        "status_label": "reported, not verified",
+        "date_label": "seen 2026-09-21",
+        "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-09-21",
+        "created_at": "2026-10-13 16:05:09",
+        "updated_at": null
+      }
+    },
+    {
+      "request": "POST /map/weed-reports",
+      "body": {
+        "water_body_id": "creek:bronte-creek",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.84537,
+            43.42573
+          ]
+        },
+        "observed_on": "2026-08-15",
+        "note": "Example: lilies along the near bank."
+      },
+      "note": "a point on a different water body (EXAMPLE report, not a sighting)",
+      "status": 201,
+      "response": {
+        "weed_report_id": 3,
+        "water_body_id": "creek:bronte-creek",
+        "water_body_name": "Bronte Creek",
+        "jurisdiction": "CA-ON",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.84537,
+            43.42573
+          ]
+        },
+        "shape_label": "A spot on the edge",
+        "observed_on": "2026-08-15",
+        "note": "Example: lilies along the near bank.",
+        "provenance": "user_reported",
+        "provenance_label": "Reported by you",
+        "kind_label": "Weed edge",
+        "status_label": "reported, not verified",
+        "date_label": "seen 2026-08-15",
+        "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-08-15",
+        "created_at": "2026-10-13 16:05:09",
+        "updated_at": null
+      }
+    },
+    {
+      "request": "POST /map/weed-reports",
+      "body": {
+        "water_body_id": "river:credit-river",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.91423,
+            43.863899999999994
+          ]
+        },
+        "observed_on": "2026-10-04"
+      },
+      "note": "422: the position is not on or near the water body's drawn line",
+      "status": 422,
+      "response": {
+        "detail": "That is 6,180 m from Credit River. A weed edge has to be on the water, within 150 m of its drawn line."
+      }
+    },
+    {
+      "request": "POST /map/weed-reports",
+      "body": {
+        "water_body_id": "great_lake:lake-ontario",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.4,
+            43.55
+          ]
+        },
+        "observed_on": "2026-10-04"
+      },
+      "note": "422: a water body with no outline on file cannot take a report",
+      "status": 422,
+      "response": {
+        "detail": "Lake Ontario has no outline on file, so a weed edge cannot be checked against it. Weed edges can only be reported on water that is drawn."
+      }
+    },
+    {
+      "request": "POST /map/weed-reports",
+      "body": {
+        "water_body_id": "river:no-such-river",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.96423,
+            43.8139
+          ]
+        },
+        "observed_on": "2026-10-04"
+      },
+      "note": "404: unknown water body",
+      "status": 404,
+      "response": {
+        "detail": "No water body with id 'river:no-such-river'"
+      }
+    },
+    {
+      "request": "POST /map/weed-reports",
+      "body": {
+        "water_body_id": "river:credit-river",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.96423,
+            43.8139
+          ]
+        },
+        "observed_on": "2999-01-01"
+      },
+      "note": "422: the date is in the future",
+      "status": 422,
+      "response": {
+        "detail": [
+          {
+            "type": "value_error",
+            "loc": [
+              "body",
+              "observed_on"
+            ],
+            "msg": "Value error, observed_on cannot be in the future",
+            "input": "2999-01-01",
+            "ctx": {
+              "error": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/weed-reports",
+      "note": "the caller's reports, newest sighting first",
+      "status": 200,
+      "response": {
+        "weed_reports": [
+          {
+            "weed_report_id": 1,
+            "water_body_id": "river:credit-river",
+            "water_body_name": "Credit River",
+            "jurisdiction": "CA-ON",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.96423,
+                43.8139
+              ]
+            },
+            "shape_label": "A spot on the edge",
+            "observed_on": "2026-10-04",
+            "note": "Example: weeds thin out below the riffle.",
+            "provenance": "user_reported",
+            "provenance_label": "Reported by you",
+            "kind_label": "Weed edge",
+            "status_label": "reported, not verified",
+            "date_label": "seen 2026-10-04",
+            "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-10-04",
+            "created_at": "2026-10-13 16:05:09",
+            "updated_at": null
+          },
+          {
+            "weed_report_id": 2,
+            "water_body_id": "river:credit-river",
+            "water_body_name": "Credit River",
+            "jurisdiction": "CA-ON",
+            "geometry": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  -79.96423,
+                  43.8139
+                ],
+                [
+                  -79.96307,
+                  43.81495
+                ]
+              ]
+            },
+            "shape_label": "A line along the edge",
+            "observed_on": "2026-09-21",
+            "note": null,
+            "provenance": "user_reported",
+            "provenance_label": "Reported by you",
+            "kind_label": "Weed edge",
+            "status_label": "reported, not verified",
+            "date_label": "seen 2026-09-21",
+            "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-09-21",
+            "created_at": "2026-10-13 16:05:09",
+            "updated_at": null
+          },
+          {
+            "weed_report_id": 3,
+            "water_body_id": "creek:bronte-creek",
+            "water_body_name": "Bronte Creek",
+            "jurisdiction": "CA-ON",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.84537,
+                43.42573
+              ]
+            },
+            "shape_label": "A spot on the edge",
+            "observed_on": "2026-08-15",
+            "note": "Example: lilies along the near bank.",
+            "provenance": "user_reported",
+            "provenance_label": "Reported by you",
+            "kind_label": "Weed edge",
+            "status_label": "reported, not verified",
+            "date_label": "seen 2026-08-15",
+            "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-08-15",
+            "created_at": "2026-10-13 16:05:09",
+            "updated_at": null
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/weed-reports?water_body_id=river:credit-river",
+      "note": "narrowed to one water body",
+      "status": 200,
+      "response": {
+        "weed_reports": [
+          {
+            "weed_report_id": 1,
+            "water_body_id": "river:credit-river",
+            "water_body_name": "Credit River",
+            "jurisdiction": "CA-ON",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.96423,
+                43.8139
+              ]
+            },
+            "shape_label": "A spot on the edge",
+            "observed_on": "2026-10-04",
+            "note": "Example: weeds thin out below the riffle.",
+            "provenance": "user_reported",
+            "provenance_label": "Reported by you",
+            "kind_label": "Weed edge",
+            "status_label": "reported, not verified",
+            "date_label": "seen 2026-10-04",
+            "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-10-04",
+            "created_at": "2026-10-13 16:05:09",
+            "updated_at": null
+          },
+          {
+            "weed_report_id": 2,
+            "water_body_id": "river:credit-river",
+            "water_body_name": "Credit River",
+            "jurisdiction": "CA-ON",
+            "geometry": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  -79.96423,
+                  43.8139
+                ],
+                [
+                  -79.96307,
+                  43.81495
+                ]
+              ]
+            },
+            "shape_label": "A line along the edge",
+            "observed_on": "2026-09-21",
+            "note": null,
+            "provenance": "user_reported",
+            "provenance_label": "Reported by you",
+            "kind_label": "Weed edge",
+            "status_label": "reported, not verified",
+            "date_label": "seen 2026-09-21",
+            "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-09-21",
+            "created_at": "2026-10-13 16:05:09",
+            "updated_at": null
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/weed-reports/layer",
+      "note": "the map layer: GeoJSON, each labelled and dated",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "layer": "Your weed edges",
+          "note": "Weed edges you reported. Only you can see them. They are your sightings, not checked against anything else.",
+          "visible_to": "you"
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": 1,
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.96423,
+                43.8139
+              ]
+            },
+            "properties": {
+              "weed_report_id": 1,
+              "water_body_id": "river:credit-river",
+              "water_body_name": "Credit River",
+              "jurisdiction": "CA-ON",
+              "shape_label": "A spot on the edge",
+              "observed_on": "2026-10-04",
+              "note": "Example: weeds thin out below the riffle.",
+              "provenance": "user_reported",
+              "provenance_label": "Reported by you",
+              "kind_label": "Weed edge",
+              "status_label": "reported, not verified",
+              "date_label": "seen 2026-10-04",
+              "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-10-04"
+            }
+          },
+          {
+            "type": "Feature",
+            "id": 2,
+            "geometry": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  -79.96423,
+                  43.8139
+                ],
+                [
+                  -79.96307,
+                  43.81495
+                ]
+              ]
+            },
+            "properties": {
+              "weed_report_id": 2,
+              "water_body_id": "river:credit-river",
+              "water_body_name": "Credit River",
+              "jurisdiction": "CA-ON",
+              "shape_label": "A line along the edge",
+              "observed_on": "2026-09-21",
+              "note": null,
+              "provenance": "user_reported",
+              "provenance_label": "Reported by you",
+              "kind_label": "Weed edge",
+              "status_label": "reported, not verified",
+              "date_label": "seen 2026-09-21",
+              "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-09-21"
+            }
+          },
+          {
+            "type": "Feature",
+            "id": 3,
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.84537,
+                43.42573
+              ]
+            },
+            "properties": {
+              "weed_report_id": 3,
+              "water_body_id": "creek:bronte-creek",
+              "water_body_name": "Bronte Creek",
+              "jurisdiction": "CA-ON",
+              "shape_label": "A spot on the edge",
+              "observed_on": "2026-08-15",
+              "note": "Example: lilies along the near bank.",
+              "provenance": "user_reported",
+              "provenance_label": "Reported by you",
+              "kind_label": "Weed edge",
+              "status_label": "reported, not verified",
+              "date_label": "seen 2026-08-15",
+              "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-08-15"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/weed-reports/layer?bbox=-80.1,43.4,-79.5,43.9",
+      "note": "the map layer in a box",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "layer": "Your weed edges",
+          "note": "Weed edges you reported. Only you can see them. They are your sightings, not checked against anything else.",
+          "visible_to": "you"
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": 1,
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.96423,
+                43.8139
+              ]
+            },
+            "properties": {
+              "weed_report_id": 1,
+              "water_body_id": "river:credit-river",
+              "water_body_name": "Credit River",
+              "jurisdiction": "CA-ON",
+              "shape_label": "A spot on the edge",
+              "observed_on": "2026-10-04",
+              "note": "Example: weeds thin out below the riffle.",
+              "provenance": "user_reported",
+              "provenance_label": "Reported by you",
+              "kind_label": "Weed edge",
+              "status_label": "reported, not verified",
+              "date_label": "seen 2026-10-04",
+              "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-10-04"
+            }
+          },
+          {
+            "type": "Feature",
+            "id": 2,
+            "geometry": {
+              "type": "LineString",
+              "coordinates": [
+                [
+                  -79.96423,
+                  43.8139
+                ],
+                [
+                  -79.96307,
+                  43.81495
+                ]
+              ]
+            },
+            "properties": {
+              "weed_report_id": 2,
+              "water_body_id": "river:credit-river",
+              "water_body_name": "Credit River",
+              "jurisdiction": "CA-ON",
+              "shape_label": "A line along the edge",
+              "observed_on": "2026-09-21",
+              "note": null,
+              "provenance": "user_reported",
+              "provenance_label": "Reported by you",
+              "kind_label": "Weed edge",
+              "status_label": "reported, not verified",
+              "date_label": "seen 2026-09-21",
+              "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-09-21"
+            }
+          },
+          {
+            "type": "Feature",
+            "id": 3,
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.84537,
+                43.42573
+              ]
+            },
+            "properties": {
+              "weed_report_id": 3,
+              "water_body_id": "creek:bronte-creek",
+              "water_body_name": "Bronte Creek",
+              "jurisdiction": "CA-ON",
+              "shape_label": "A spot on the edge",
+              "observed_on": "2026-08-15",
+              "note": "Example: lilies along the near bank.",
+              "provenance": "user_reported",
+              "provenance_label": "Reported by you",
+              "kind_label": "Weed edge",
+              "status_label": "reported, not verified",
+              "date_label": "seen 2026-08-15",
+              "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-08-15"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/weed-reports/1",
+      "note": "one report",
+      "status": 200,
+      "response": {
+        "weed_report_id": 1,
+        "water_body_id": "river:credit-river",
+        "water_body_name": "Credit River",
+        "jurisdiction": "CA-ON",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.96423,
+            43.8139
+          ]
+        },
+        "shape_label": "A spot on the edge",
+        "observed_on": "2026-10-04",
+        "note": "Example: weeds thin out below the riffle.",
+        "provenance": "user_reported",
+        "provenance_label": "Reported by you",
+        "kind_label": "Weed edge",
+        "status_label": "reported, not verified",
+        "date_label": "seen 2026-10-04",
+        "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-10-04",
+        "created_at": "2026-10-13 16:05:09",
+        "updated_at": null
+      }
+    },
+    {
+      "request": "PATCH /map/weed-reports/1",
+      "body": {
+        "observed_on": "2026-10-05",
+        "note": null
+      },
+      "note": "change the date and clear the note; only what is sent changes",
+      "status": 200,
+      "response": {
+        "weed_report_id": 1,
+        "water_body_id": "river:credit-river",
+        "water_body_name": "Credit River",
+        "jurisdiction": "CA-ON",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.96423,
+            43.8139
+          ]
+        },
+        "shape_label": "A spot on the edge",
+        "observed_on": "2026-10-05",
+        "note": null,
+        "provenance": "user_reported",
+        "provenance_label": "Reported by you",
+        "kind_label": "Weed edge",
+        "status_label": "reported, not verified",
+        "date_label": "seen 2026-10-05",
+        "caption": "Weed edge \u00b7 reported, not verified \u00b7 seen 2026-10-05",
+        "created_at": "2026-10-13 16:05:09",
+        "updated_at": "2026-10-13T16:05:09"
+      }
+    },
+    {
+      "request": "GET /map/weed-reports/2",
+      "note": "another user asks for this id: 404, same as an id nobody has used",
+      "status": 404,
+      "response": {
+        "detail": "No such weed report"
+      }
+    },
+    {
+      "request": "GET /map/weed-reports/layer",
+      "note": "another user's layer: empty, whatever the first user has reported",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "layer": "Your weed edges",
+          "note": "Weed edges you reported. Only you can see them. They are your sightings, not checked against anything else.",
+          "visible_to": "you"
+        },
+        "features": []
+      }
+    },
+    {
+      "request": "DELETE /map/weed-reports/2",
+      "note": "another user deletes it: 404, and it is untouched",
+      "status": 404,
+      "response": {
+        "detail": "No such weed report"
+      }
+    },
+    {
+      "request": "DELETE /map/weed-reports/2",
+      "note": "delete your own report",
+      "status": 200,
+      "response": {
+        "deleted": 2
+      }
+    },
+    {
+      "request": "GET /map/weed-reports/2",
+      "note": "gone: 404",
+      "status": 404,
+      "response": {
+        "detail": "No such weed report"
+      }
+    }
+  ]
+}
