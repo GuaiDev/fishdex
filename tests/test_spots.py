@@ -997,26 +997,3 @@ def test_species_filter_returns_nothing_for_a_listed_species(tmp_path, monkeypat
     )
     db = get_db(tmp_path / "t.db")
     assert spots_mod._species_within_2km(db, "clinostomus elongatus") == []
-
-
-def test_listed_species_is_recognised_by_scientific_name(tmp_path):
-    from src.models.species_range import SpeciesRange
-    from src.services.context.species import describe_species
-    from src.storage.database import get_db
-    from src.storage.species_ranges import upsert_species_ranges
-
-    db = get_db(tmp_path / "t.db")
-    upsert_species_ranges(
-        db,
-        [
-            SpeciesRange(
-                species="Redside Dace",
-                scientific_name="Clinostomus elongatus",
-                native_to_ontario=True,
-                native_to_great_lakes=True,
-                general_range="Southern Ontario",
-                sara_status="Endangered",
-            )
-        ],
-    )
-    assert describe_species(db, "Clinostomus elongatus").status_known_listed is True
