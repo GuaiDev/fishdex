@@ -885,8 +885,9 @@ def _species_within_2km(db: Database, species_l: str) -> list[str]:
                 deg = 2.0 / 111.0
                 rows = list(
                     db.execute(
-                        "SELECT st.species_caught FROM stops st JOIN sessions s ON st.session_id = s.id "
-                        "WHERE st.lat BETWEEN ? AND ? AND st.lng BETWEEN ? AND ?",
+                        "SELECT st.species_caught FROM stops st JOIN sessions s "
+                        "ON st.session_id = s.id WHERE st.lat BETWEEN ? AND ? "
+                        "AND st.lng BETWEEN ? AND ?",
                         [spot.lat - deg, spot.lat + deg, spot.lng - deg, spot.lng + deg],
                     ).fetchall()
                 )
