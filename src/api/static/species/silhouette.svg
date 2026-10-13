@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 660" role="img" aria-label="Fish silhouette (no illustration for this species yet)">
+  <title>Fish silhouette (placeholder)</title>
+  <g fill="#7f8f94">
+    <path d="M130 335C200 240 360 205 520 215C610 220 690 270 730 320L830 235C815 285 810 300 810 335C810 370 815 385 830 435L730 350C690 400 610 450 520 455C360 465 200 430 130 335Z"/>
+    <path d="M340 218C390 150 450 140 505 217Z"/>
+    <path d="M400 450C410 500 440 520 475 522C472 495 482 470 492 452Z"/>
+    <path d="M585 440C605 482 645 492 690 480C665 462 655 440 652 410Z"/>
+    <path d="M300 345C250 385 245 420 275 428C300 410 330 385 345 355Z"/>
+  </g>
+  <circle cx="205" cy="305" r="13" fill="#dfe6e8"/>
+</svg>

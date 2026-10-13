@@ -126,7 +126,9 @@ def _fetch_batch(titles: list[str], templates: tuple[str, ...]) -> dict[str, Com
             merged = pages.setdefault(page["title"], {"templates": [], "categories": []})
             merged["templates"] += [t["title"] for t in page.get("templates", [])]
             merged["categories"] += [c["title"] for c in page.get("categories", [])]
-            if "imageinfo" in page:
+            # Commons pages through a file's older revisions with `continue`; the
+            # first imageinfo is the current version and must not be overwritten.
+            if "imageinfo" in page and "imageinfo" not in merged:
                 merged["imageinfo"] = page["imageinfo"][0]
         if "continue" not in data:
             break

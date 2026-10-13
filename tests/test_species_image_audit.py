@@ -136,3 +136,30 @@ def test_commons_adapter_parses_recorded_imageinfo(monkeypatch):
     assert f.fws_source_url == (
         "https://digitalmedia.fws.gov/cdm/singleitem/collection/natdiglib/id/2287/rec/1"
     )
+
+
+def test_commons_adapter_keeps_the_current_revision_when_paging_through_history(monkeypatch):
+    """Commons pages a re-uploaded file's older revisions; they must not replace the current one."""
+    import importlib
+
+    commons = importlib.import_module("src.ingest.global.commons_images")
+
+    def page(url, width, more):
+        info = {"url": url, "width": width, "height": 400, "mime": "image/jpeg"}
+        data = {"query": {"pages": [{"title": "File:A.jpg", "imageinfo": [info]}]}}
+        if more:
+            data["continue"] = {"iistart": "2005-10-30T17:02:16Z", "continue": "||"}
+        return data
+
+    responses = iter(
+        [
+            page("https://x/current.jpg?utm=1", 1098, True),
+            page("https://x/archive/old.jpg", 1246, False),
+        ]
+    )
+    monkeypatch.setattr(commons, "_cached_get", lambda params: next(responses))
+
+    f = commons.file_records(["File:A.jpg"])["File:A.jpg"]
+
+    assert f.original_url == "https://x/current.jpg"
+    assert f.width == 1098

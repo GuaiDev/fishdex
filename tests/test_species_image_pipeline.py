@@ -142,6 +142,7 @@ def test_fetch_records_the_hash_of_the_untouched_original(tmp_path, monkeypatch)
         mime="image/jpeg",
     )
     monkeypatch.setattr(pipe._commons, "file_records", lambda titles: {titles[0]: record})
+    monkeypatch.setattr(pipe._commons, "licence_statement", lambda title: "Stated on the page.")
     monkeypatch.setattr(
         pipe._commons,
         "download_original",
@@ -161,6 +162,8 @@ def test_fetch_records_the_hash_of_the_untouched_original(tmp_path, monkeypatch)
     manifest = pipe.fetch_originals([row], tmp_path / "orig", tmp_path / "m.csv")
 
     assert manifest[0]["sha256"] == hashlib.sha256(payload).hexdigest()
+    assert manifest[0]["licence_evidence_url"] == record.page_url
+    assert "Stated on the page." in manifest[0]["licence"]
     assert (tmp_path / "orig" / "a-b.jpg").read_bytes() == payload
     with (tmp_path / "m.csv").open() as fh:
         assert list(csv.DictReader(fh))[0]["file"] == "a-b.jpg"
@@ -181,3 +184,21 @@ def test_contact_sheet_embeds_every_species(tmp_path):
     )
     html = sheet.read_text()
     assert "Fish A" in html and "data:image/webp;base64," in html
+
+
+def test_creator_says_so_when_the_source_page_states_none():
+    def record(artist, categories):
+        return CommonsFile(
+            title="File:A.jpg",
+            page_url="u",
+            original_url="u",
+            width=1,
+            height=1,
+            mime="image/jpeg",
+            artist=artist,
+            categories=categories,
+        )
+
+    assert pipe._creator(record("Duane Raver", [])) == "Duane Raver"
+    assert "no author stated" in pipe._creator(record("", ["Duane Raver"]))
+    assert pipe._creator(record("", [])).startswith("U.S. Fish and Wildlife Service")

@@ -1,25 +1,25 @@
-species_id,common_name,source_page,decision,reason,facing
-Micropterus dolomieu,Smallmouth Bass,https://commons.wikimedia.org/wiki/File:Smallmouth_bass.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Micropterus salmoides,Largemouth Bass,https://commons.wikimedia.org/wiki/File:Micropterus_salmoides.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Esox masquinongy,Muskellunge,https://commons.wikimedia.org/wiki/File:Muskellunge_(Duane_Raver).png,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",
-Sander vitreus,Walleye,https://commons.wikimedia.org/wiki/File:Walleye_fish_stizostedion_canadense.jpg,excluded,"only candidate is titled with the Sauger name (Stizostedion canadense); name-mismatch, low confidence, weaker PD-author tag",
-Sander canadensis,Sauger,https://commons.wikimedia.org/wiki/File:Saugernctc.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Salvelinus fontinalis,Brook Trout,https://commons.wikimedia.org/wiki/File:Brook_trout.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Salmo trutta,Brown Trout,https://commons.wikimedia.org/wiki/File:Bachforelle_Zeichnung.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Oncorhynchus mykiss,Rainbow Trout,https://commons.wikimedia.org/wiki/File:Oncorhynchus_mykiss_mid_res_150dpi.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Perca flavescens,Yellow Perch,https://commons.wikimedia.org/wiki/File:Yellow_perch_fish_perca_flavescens.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",
-Morone americana,White Perch,https://commons.wikimedia.org/wiki/File:Whiteperchnctc.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Ictalurus punctatus,Channel Catfish,https://commons.wikimedia.org/wiki/File:Ictalurus_punctatus.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Ameiurus nebulosus,Brown Bullhead,https://commons.wikimedia.org/wiki/File:Brown_bullhead_fish_ameiurus_nebulosus.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",
-Ameiurus melas,Black Bullhead,https://commons.wikimedia.org/wiki/File:Ameiurus_melas_by_Duane_Raver.png,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Lepomis gibbosus,Pumpkinseed,https://commons.wikimedia.org/wiki/File:Lepomis_gibbosus2.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Pomoxis annularis,White Crappie,https://commons.wikimedia.org/wiki/File:White_crappie_pomoxis_annularis.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",
-Amia calva,Bowfin,https://commons.wikimedia.org/wiki/File:Amia_calva1.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Anguilla rostrata,American Eel,https://commons.wikimedia.org/wiki/File:Amerikanischer_Aal.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Polyodon spathula,Paddlefish,https://commons.wikimedia.org/wiki/File:Paddlefish_underwater_polyodon_spathula.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",
-Semotilus atromaculatus,Creek Chub,https://commons.wikimedia.org/wiki/File:Creekchub_fish_illustration.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",
-Pimephales promelas,Fathead Minnow,https://commons.wikimedia.org/wiki/File:Pimephales_promelas2.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left
-Cyprinus carpio,Common Carp,https://commons.wikimedia.org/wiki/File:Common_carp.jpg,download,"captain approved: US-government public-domain tag (PD-USGov-FWS); replaces Common_carp_tagged.png, which carried diagram callout numbers",left
-Alosa pseudoharengus,Alewife,https://commons.wikimedia.org/wiki/File:Alewife_fish.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",
-Carassius auratus,Goldfish,https://commons.wikimedia.org/wiki/File:Goldfish_carassius_auratus.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",
-Micropterus nigricans,Northern Largemouth Bass,https://commons.wikimedia.org/wiki/File:Micropterus_salmoides.jpg,excluded,alias of Largemouth Bass (Micropterus nigricans folds into M. salmoides); would duplicate the Largemouth image,
+species_id,common_name,source_page,decision,reason,facing,review
+Micropterus dolomieu,Smallmouth Bass,https://commons.wikimedia.org/wiki/File:Smallmouth_bass.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Micropterus salmoides,Largemouth Bass,https://commons.wikimedia.org/wiki/File:Micropterus_salmoides.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Esox masquinongy,Muskellunge,https://commons.wikimedia.org/wiki/File:Muskellunge_(Duane_Raver).png,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",,
+Sander vitreus,Walleye,https://commons.wikimedia.org/wiki/File:Walleye_fish_stizostedion_canadense.jpg,excluded,"only candidate is titled with the Sauger name (Stizostedion canadense); name-mismatch, low confidence, weaker PD-author tag",,
+Sander canadensis,Sauger,https://commons.wikimedia.org/wiki/File:Saugernctc.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Salvelinus fontinalis,Brook Trout,https://commons.wikimedia.org/wiki/File:Brook_trout.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Salmo trutta,Brown Trout,https://commons.wikimedia.org/wiki/File:Bachforelle_Zeichnung.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Oncorhynchus mykiss,Rainbow Trout,https://commons.wikimedia.org/wiki/File:Oncorhynchus_mykiss_mid_res_150dpi.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Perca flavescens,Yellow Perch,https://commons.wikimedia.org/wiki/File:Yellow_perch_fish_perca_flavescens.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",,
+Morone americana,White Perch,https://commons.wikimedia.org/wiki/File:Whiteperchnctc.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Ictalurus punctatus,Channel Catfish,https://commons.wikimedia.org/wiki/File:Ictalurus_punctatus.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Ameiurus nebulosus,Brown Bullhead,https://commons.wikimedia.org/wiki/File:Brown_bullhead_fish_ameiurus_nebulosus.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",,
+Ameiurus melas,Black Bullhead,https://commons.wikimedia.org/wiki/File:Ameiurus_melas_by_Duane_Raver.png,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Lepomis gibbosus,Pumpkinseed,https://commons.wikimedia.org/wiki/File:Lepomis_gibbosus2.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Pomoxis annularis,White Crappie,https://commons.wikimedia.org/wiki/File:White_crappie_pomoxis_annularis.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",,
+Amia calva,Bowfin,https://commons.wikimedia.org/wiki/File:Amia_calva1.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Anguilla rostrata,American Eel,https://commons.wikimedia.org/wiki/File:Amerikanischer_Aal.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Polyodon spathula,Paddlefish,https://commons.wikimedia.org/wiki/File:Paddlefish_underwater_polyodon_spathula.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",,
+Semotilus atromaculatus,Creek Chub,https://commons.wikimedia.org/wiki/File:Creekchub_fish_illustration.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",,
+Pimephales promelas,Fathead Minnow,https://commons.wikimedia.org/wiki/File:Pimephales_promelas2.jpg,download,captain approved: US-government public-domain tag (PD-USGov-FWS),left,approved
+Cyprinus carpio,Common Carp,https://commons.wikimedia.org/wiki/File:Common_carp.jpg,download,"captain approved: US-government public-domain tag (PD-USGov-FWS); replaces Common_carp_tagged.png, which carried diagram callout numbers",left,approved
+Alosa pseudoharengus,Alewife,https://commons.wikimedia.org/wiki/File:Alewife_fish.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",,
+Carassius auratus,Goldfish,https://commons.wikimedia.org/wiki/File:Goldfish_carassius_auratus.jpg,excluded,"PD-author tag only (Commons uploader claim, no US-government tag); excluded for now by captain decision",,
+Micropterus nigricans,Northern Largemouth Bass,https://commons.wikimedia.org/wiki/File:Micropterus_salmoides.jpg,excluded,alias of Largemouth Bass (Micropterus nigricans folds into M. salmoides); would duplicate the Largemouth image,,

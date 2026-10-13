@@ -29,6 +29,7 @@ from PIL import Image
 from scipy import ndimage
 
 _commons = importlib.import_module("src.ingest.global.commons_images")
+_audit = importlib.import_module("src.services.species_image_audit")
 
 PROCESSING_VERSION = "1"
 
@@ -43,6 +44,8 @@ SIZES = {"carousel": (960, 660), "tile": (500, 344)}
 # image edges with a radial mask, so a fish must stay clear of them.
 FISH_BOX = (0.80, 0.60)
 
+SOURCE_NAME = "US Fish and Wildlife Service National Digital Library, via Wikimedia Commons"
+
 MANIFEST_COLUMNS = [
     "species_id",
     "file",
@@ -51,6 +54,11 @@ MANIFEST_COLUMNS = [
     "source_url",
     "original_url",
     "retrieved",
+    "creator",
+    "licence",
+    "licence_evidence_url",
+    "match_confidence",
+    "name_as_published",
 ]
 
 
@@ -62,6 +70,8 @@ class Selection:
     decision: str
     reason: str
     facing: str
+    review: str = ""
+    """'approved' once the captain has passed the image on the contact sheet. Never set by code."""
 
     @property
     def slug(self) -> str:
@@ -74,6 +84,7 @@ def load_selection(path: Path = SELECTION_CSV) -> list[Selection]:
 
 
 def approved(rows: list[Selection]) -> list[Selection]:
+    """Rows cleared for download (not the same as reviewed: see `Selection.review`)."""
     return [r for r in rows if r.decision == "download"]
 
 
@@ -98,6 +109,7 @@ def fetch_originals(
         ext = Path(record.original_url).suffix.lower()
         dest = originals_dir / f"{row.slug}{ext}"
         _commons.download_original(record.original_url, dest)
+        verdict = _audit._classify(record, row.species_id, row.common_name)
         manifest.append(
             {
                 "species_id": row.species_id,
@@ -107,6 +119,15 @@ def fetch_originals(
                 "source_url": row.source_page,
                 "original_url": record.original_url,
                 "retrieved": _retrieved_date(dest),
+                "creator": _creator(record),
+                # The sentence the source page itself shows, with the tag that backs it.
+                "licence": (
+                    f"{record.licence_short}: {_commons.licence_statement(title)} "
+                    f"[Commons tag {record.licence_tag}]"
+                ),
+                "licence_evidence_url": record.page_url,
+                "match_confidence": verdict[1] if verdict else "unmatched",
+                "name_as_published": _audit._published_name(record),
             }
         )
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -115,6 +136,15 @@ def fetch_originals(
         writer.writeheader()
         writer.writerows(manifest)
     return manifest
+
+
+def _creator(record) -> str:
+    """The creator as the source page states it; says so when the page states none."""
+    if record.artist:
+        return record.artist
+    if "Duane Raver" in record.categories:
+        return "Duane Raver (Commons category; no author stated on the file page)"
+    return "U.S. Fish and Wildlife Service (no individual author stated on the file page)"
 
 
 def _retrieved_date(path: Path) -> str:
