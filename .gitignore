@@ -42,3 +42,4 @@ __pycache__/
 # moment and regenerated for free by `make harvest-ca`.
 data/processed/ca_harvest_report.json
 fishing.db
+data/species_images/originals/

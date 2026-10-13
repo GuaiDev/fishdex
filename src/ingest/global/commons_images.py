@@ -27,7 +27,7 @@ _API_URL = "https://commons.wikimedia.org/w/api.php"
 _PAGE_URL = "https://commons.wikimedia.org/wiki/"
 _CACHE_DIR = Path("data/cache/commons")
 _CACHE_TTL_SECONDS = 7 * 24 * 3600
-_USER_AGENT = "fishdex-image-audit/0.1 (personal project; contact via GitHub kunchenguid)"
+_USER_AGENT = "fishdex-image-audit/0.1 (personal project; https://github.com/kunchenguid)"
 _BATCH = 15
 _FWS_RECORD_RE = re.compile(r'href="(https?://digitalmedia\.fws\.gov/[^"]+)"')
 
@@ -176,3 +176,34 @@ def licence_statement(title: str) -> str:
     # The template body ends where the "For more information" pointer begins.
     sentence = re.search(r"(This (?:image|file|work).*?)(?: For more information|$)", text)
     return sentence.group(1).strip() if sentence else ""
+
+
+def download_original(url: str, dest: Path) -> bytes:
+    """Download one original image to `dest` untouched, unless it is already there.
+
+    The originals folder is this call's cache: an existing file is returned as
+    is, so a rerun never refetches and never rewrites a byte.
+    """
+    if dest.exists():
+        return dest.read_bytes()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    last_error = "no attempt made"
+    for attempt in range(8):
+        # The image host throttles bursts harder than the API does; pace downloads.
+        time.sleep(15)
+        try:
+            response = httpx.get(
+                url, headers={"User-Agent": _USER_AGENT}, timeout=120, follow_redirects=True
+            )
+        except httpx.TransportError as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+            time.sleep(5 * (attempt + 1))
+            continue
+        if response.status_code == 429:
+            last_error = "HTTP 429"
+            time.sleep(float(response.headers.get("Retry-After", 60 * (attempt + 1))))
+            continue
+        response.raise_for_status()
+        dest.write_bytes(response.content)
+        return response.content
+    raise RuntimeError(f"Could not download {url} after 8 attempts (last: {last_error})")
