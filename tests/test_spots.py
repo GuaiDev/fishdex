@@ -983,7 +983,7 @@ def test_layers_getting_there_and_bridges():
 
 
 def test_species_filter_returns_nothing_for_a_listed_species(tmp_path, monkeypatch):
-    from sqlite_utils import Database
+    from src.storage.database import get_db
 
     from src.services import spots as spots_mod
     from src.services.context.species import SpeciesContext
@@ -992,4 +992,5 @@ def test_species_filter_returns_nothing_for_a_listed_species(tmp_path, monkeypat
         "src.services.context.species.describe_species",
         lambda db, name: SpeciesContext.model_construct(status_known_listed=True),
     )
-    assert spots_mod._species_within_2km(Database(tmp_path / "t.db"), "clinostomus elongatus") == []
+    db = get_db(tmp_path / "t.db")
+    assert spots_mod._species_within_2km(db, "clinostomus elongatus") == []

@@ -845,27 +845,27 @@ def _species_within_2km(db: Database, species_l: str) -> list[str]:
     from src.services.context.species import describe_species
     from src.services.context import slices
 
-    # check if species is listed (status_known_listed) - if so, return empty
-    if describe_species(db, species_l).status_known_listed:
-        return []
-
     spot_ids = []
-    # get all spots and test - but could be many; for now scan in_view of current call is expensive
-    # easier: get all spots, check in batches? or just search near each spot
-    # but keep small: get all spots
     for spot in list_spots(db, max_tier=3):
         found = False
+        matched = set()
         try:
-            obs, _ = query_observations(db, lat=spot.lat, lng=spot.lng, radius_km=2.0, days_back=3650, species_filter=species_l, limit=5)
-            if obs:
-                found = True
+            obs, _ = query_observations(db, lat=spot.lat, lng=spot.lng, radius_km=2.0, days_back=3650, species_filter=species_l, limit=50)
+            for o in obs:
+                spn = getattr(o, 'species', '') or ''
+                if species_l in spn.lower():
+                    found = True
+                    matched.add(spn)
         except Exception:
             pass
         if not found:
             try:
                 gb = query_gbif_observations(db, lat=spot.lat, lng=spot.lng, radius_km=2.0, species_filter=species_l)
-                if gb:
-                    found = True
+                for o in gb:
+                    spn = getattr(o, 'species', '') or ''
+                    if species_l in spn.lower():
+                        found = True
+                        matched.add(spn)
             except Exception:
                 pass
         if not found:
@@ -877,16 +877,24 @@ def _species_within_2km(db: Database, species_l: str) -> list[str]:
                     [spot.lat - deg, spot.lat + deg, spot.lng - deg, spot.lng + deg],
                 ).fetchall())
                 for r in rows:
-                    for sp in slices._load_species_list(r[0]) if hasattr(slices, '_load_species_list') else []:
-                        if sp.strip().lower() == species_l:
+                    for sp in slices._load_species_list(r[0]):
+                        if species_l in sp.lower():
                             found = True
-                            break
-                    if found:
-                        break
+                            matched.add(sp)
             except Exception:
                 pass
         if found:
-            spot_ids.append(spot.spot_id)
+            listed = False
+            for m in matched:
+                try:
+                    sc = describe_species(db, m)
+                    if getattr(sc, 'status_known_listed', False):
+                        listed = True
+                        break
+                except Exception:
+                    listed = True  # fail closed
+            if not listed:
+                spot_ids.append(spot.spot_id)
     return spot_ids
 
 
