@@ -1008,10 +1008,10 @@ def _species_within_2km(db: Database, species_l: str) -> list[str]:
                 limit=50,
             )
             for o in obs:
-                spn = getattr(o, "species", "") or ""
-                if species_l in spn.lower():
+                names = [getattr(o, "species", "") or "", getattr(o, "common_name", "") or ""]
+                if any(species_l in n.lower() for n in names):
                     found = True
-                    matched.add(spn)
+                    matched.update(n for n in names if n)
         except Exception:
             pass
         if not found:
@@ -1020,10 +1020,10 @@ def _species_within_2km(db: Database, species_l: str) -> list[str]:
                     db, lat=spot.lat, lng=spot.lng, radius_km=2.0, species_filter=species_l
                 )
                 for o in gb:
-                    spn = getattr(o, "species", "") or ""
-                    if species_l in spn.lower():
+                    names = [getattr(o, "species", "") or "", getattr(o, "common_name", "") or ""]
+                    if any(species_l in n.lower() for n in names):
                         found = True
-                        matched.add(spn)
+                        matched.update(n for n in names if n)
             except Exception:
                 pass
         if not found:

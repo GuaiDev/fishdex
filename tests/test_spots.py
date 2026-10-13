@@ -999,3 +999,19 @@ def test_species_filter_returns_nothing_for_a_listed_species(tmp_path, monkeypat
     )
     db = get_db(tmp_path / "t.db")
     assert spots_mod._species_within_2km(db, "clinostomus elongatus") == []
+
+
+def test_species_filter_matches_an_observation_by_common_name(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from src.services import spots as spots_mod
+    from src.storage.database import get_db
+
+    spot = SimpleNamespace(spot_id="river_mouth:1", lat=43.5, lng=-79.5)
+    obs = SimpleNamespace(species="Etheostoma caeruleum", common_name="Rainbow Darter")
+    monkeypatch.setattr(spots_mod, "list_spots", lambda db, max_tier=3: [spot])
+    monkeypatch.setattr(
+        "src.storage.observations.query_observations", lambda db, **kw: ([obs], 1)
+    )
+    db = get_db(tmp_path / "t.db")
+    assert spots_mod._species_within_2km(db, "rainbow darter") == ["river_mouth:1"]
