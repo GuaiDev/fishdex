@@ -93,7 +93,7 @@ def test_empty_field_is_empty_and_valued_field_is_not():
 
 def test_translation_gives_meaning_to_useful_values():
     assert "clearer" in translate.substrate("bedrock")
-    assert "stack under the dam" in translate.barriers(2, 0)
+    assert "barrier lies upstream" in translate.barriers(2, 0)
     assert "year-round" in translate.ept_proportion(0.42)
 
 
@@ -116,7 +116,7 @@ def test_barrier_translation_distinguishes_direction():
     up_only = translate.barriers(2, 0)
     down_only = translate.barriers(0, 2)
     assert len({both, up_only, down_only}) == 3
-    assert "resident" in down_only
+    assert "downstream" in down_only
 
 
 # ── escalation blocklist ──────────────────────────────────────────────────────

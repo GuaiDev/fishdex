@@ -6,7 +6,14 @@ drop the value entirely in that case.
 
 This is a lookup, not an LLM call, and it lives in one place so that seven
 callers do not each reinvent what "EPT 0.42" means.
+
+It also holds the one thing here that is not about a measured value: the
+"why fish gather here" paragraph for each kind of spot. That text is general
+reasoning about a kind of water, so it is served as INFERENCE with a fixed
+label and never rides inside a RECORD field about a particular place.
 """
+
+from src.models.context import ContextField
 
 
 def substrate(category: str | None) -> str | None:
@@ -34,12 +41,12 @@ def barriers(upstream: int | None, downstream: int | None) -> str | None:
     up = upstream or 0
     down = downstream or 0
     if up == 0 and down == 0:
-        return "no mapped barriers either way — fish can move through freely"
+        return "no mapped barriers either way"
     if up > 0 and down == 0:
-        return "fish move up from the river below, then stack under the dam"
+        return "a mapped barrier lies upstream of here and none lies downstream"
     if down > 0 and up == 0:
-        return "cut off from downstream water — whatever is here is resident"
-    return "barriers both ways — this reach is largely its own population"
+        return "a mapped barrier lies downstream and none upstream"
+    return "mapped barriers lie both upstream and downstream"
 
 
 def ept_proportion(value: float | None) -> str | None:
@@ -153,3 +160,65 @@ def conductivity(_value: float | None) -> None:
 def turbidity_fnu(_value: float | None) -> None:
     """Always None — the clarity proxy anglers use is visual, not FNU."""
     return None
+
+
+# ── why fish gather here ──────────────────────────────────────────────────────
+
+GENERAL_REASONING_LABEL = "General reasoning, not a record about this spot"
+GENERAL_REASONING_SOURCE = "General reasoning about this kind of water"
+
+# One entry per kind of spot, exactly two sentences each, no seasonal claims and
+# no gear advice (the project removed its last unsourced tactics module). Words
+# a beginner would not know are kept out; a test enforces it. Quiet water is a
+# ranking of reaches, not a located structure, so its entry says what the
+# ranking is NOT: a claim about fish.
+WHY_FISH_GATHER: dict[str, str] = {
+    "river_mouth": (
+        "Fish that live in the lake pass through here to feed or to run upstream. "
+        "The river also carries food out into open water."
+    ),
+    "creek_junction": (
+        "Two flows mixing makes a seam between fast and slow water, which fish use "
+        "for shelter with food drifting past. A creek that runs cooler than the river can "
+        "also give fish a place to ease out of warm water."
+    ),
+    "below_dam": (
+        "A dam or weir blocks fish from moving further upstream, so they gather in the "
+        "water just below it. That water is churned up and rich in oxygen."
+    ),
+    "public_fishing": (
+        "Someone has mapped this as a place to fish, usually because the water is easy "
+        "and allowed to reach. That is about access, so it says nothing by itself about "
+        "what is swimming there."
+    ),
+    "quiet_water": (
+        "These reaches have few public observation records. That can mean fewer anglers, "
+        "few observers or hard access, and it never tells you whether fish are there."
+    ),
+}
+
+
+def why_fish_gather(kind: str) -> ContextField:
+    """The kind's two-sentence explanation, as inferred, general-reasoning text.
+
+    Returned as an `inferred` field so it can never render like a record: the
+    provenance names it as reasoning about the kind of water, and the label
+    says it is not a fact about this spot.
+    """
+    text = WHY_FISH_GATHER.get(kind)
+    if text is None:
+        return ContextField.inferred(None)
+    return ContextField.inferred(text, meaning=GENERAL_REASONING_LABEL)
+
+
+# Words a beginner may meet in the cards' explanations, and what they mean. The
+# cards avoid them; the glossary is for the one place they cannot be avoided
+# (a map label, a question to the bot) and is the only text allowed to use them.
+GLOSSARY: dict[str, str] = {
+    "weir": (
+        "A weir is a low wall built across a river that water flows over. "
+        "It holds the water back a little."
+    ),
+    "confluence": "A confluence is the place where two streams meet and become one.",
+    "tailwater": "A tailwater is the stretch of river just downstream of a dam.",
+}

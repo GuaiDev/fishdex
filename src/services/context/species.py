@@ -31,6 +31,35 @@ _UNVERIFIED = (
 _LISTED = frozenset({"Special Concern", "Threatened", "Endangered", "Extirpated"})
 
 
+def status_known_listed(sr) -> bool:
+    """An affirmative listing signal from any authority, verified or not.
+
+    The one definition of the gate. `describe_species` reports it and the spot
+    card enforces it, so the two cannot disagree about which fish are protected.
+    """
+    return bool({sr.sara_status, sr.ontario_status, sr.cosewic_status} & _LISTED)
+
+
+def listing_check(
+    db: Database, scientific_name: str | None, common_name: str | None
+) -> bool | None:
+    """Is this recorded species affirmatively listed? None when we cannot tell.
+
+    None means the species is not in the local species file, so nothing is
+    known either way. It is reported rather than rounded to False so a caller
+    can count how many species it could not check; `sar_alert` is deliberately
+    not consulted, because it is true for every species in the file.
+    """
+    from src.storage.species_ranges import query_species_range_exact
+
+    try:
+        sr = query_species_range_exact(db, common_name=common_name, scientific_name=scientific_name)
+    except Exception:  # noqa: BLE001 - never break the caller over this slice
+        logger.warning("species listing check failed", exc_info=True)
+        return None
+    return None if sr is None else status_known_listed(sr)
+
+
 def describe_species(db: Database, name: str) -> SpeciesContext:
     """Everything the corpus holds about a species, with provenance on each claim.
 
@@ -69,9 +98,7 @@ def describe_species(db: Database, name: str) -> SpeciesContext:
     # not evidence of a listing. Callers that need a hard refusal gate on this
     # rather than on `sar_alert`, which is true for everything until the
     # registry import runs.
-    known_listed = bool(
-        {sr.sara_status, sr.ontario_status, sr.cosewic_status} & _LISTED
-    )
+    known_listed = status_known_listed(sr)
 
     if verified:
         listed = {sr.sara_status, sr.ontario_status, sr.cosewic_status} & _LISTED

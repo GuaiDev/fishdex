@@ -90,6 +90,38 @@ def query_species_range(db: Database, species: str) -> SpeciesRange | None:
     return _row_to_range(rows[0])
 
 
+def query_species_range_exact(
+    db: Database, common_name: str | None = None, scientific_name: str | None = None
+) -> SpeciesRange | None:
+    """One species by its exact common name, else by its scientific name.
+
+    `query_species_range` is a substring search meant for typed questions, so
+    "dace" finds whichever dace row comes first. A caller deciding whether a
+    recorded species is protected needs the row for *that* species or none:
+    a near-miss would clear or flag the wrong fish. A subspecies name falls
+    back to its genus and species.
+    """
+    if "species_ranges" not in db.table_names():
+        return None
+    if common_name and common_name.strip():
+        rows = list(
+            db["species_ranges"].rows_where(
+                "LOWER(species) = ?", [common_name.strip().lower()], limit=1
+            )
+        )
+        if rows:
+            return _row_to_range(rows[0])
+    if scientific_name and scientific_name.strip():
+        words = scientific_name.strip().lower().split()
+        for candidate in dict.fromkeys([" ".join(words), " ".join(words[:2])]):
+            rows = list(
+                db["species_ranges"].rows_where("LOWER(scientific_name) = ?", [candidate], limit=1)
+            )
+            if rows:
+                return _row_to_range(rows[0])
+    return None
+
+
 def query_species_ranges_for_jurisdiction(db: Database, jurisdiction: str) -> list[SpeciesRange]:
     """Return every species present in the given jurisdiction (e.g. "CA-ON")."""
     rows = list(

@@ -34,6 +34,7 @@ from fastapi import (  # noqa: E402
     Form,
     Header,
     HTTPException,
+    Response,
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
@@ -1596,15 +1597,21 @@ def get_map_spots(
 
 
 @app.get("/map/spots/{spot_id}")
-def get_map_spot(spot_id: str, user: dict = Depends(get_current_user)):
+def get_map_spot(spot_id: str, response: Response, user: dict = Depends(get_current_user)):
     """One spot in full: title, structure facts, separate signals, nearby parking and
-    bridges, sources, and the other spots on the same river. 404 for an unknown id."""
+    bridges, sources, the other spots on the same river, and `card`: the four resolved
+    blocks a tap reveals (why it's interesting, you might find, why fish gather here,
+    getting there) with every string written. The card is the same for every user.
+    404 for an unknown id."""
     from src.services.spots import get_spot_detail
     from src.storage.database import get_db
 
     detail = get_spot_detail(get_db(), spot_id)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"No spot with id {spot_id!r}")
+    # The card is user-independent and keyed by (spot_id, built_at): safe to
+    # keep briefly, but not shared (records can arrive without a spot rebuild).
+    response.headers["Cache-Control"] = "private, max-age=300"
     return detail
 
 

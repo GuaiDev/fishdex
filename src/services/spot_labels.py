@@ -5,25 +5,24 @@ The web app never hardcodes these. It reads them from `GET /map/spots/labels`
 can be built against the API, without touching the client.
 
 What is here: the chip for each kind of spot, the one line that says what the
-kind is, the title templates the classifier fills in, the names of the
-getting-there layers, and the one paragraph of "why fish gather here" per kind.
+kind is, the title templates the classifier fills in, and the names of the
+getting-there layers.
 
-That paragraph is general reasoning about a kind of water, not a record about
-the spot, and it is served labelled as such. Exactly two sentences per kind, no
-seasonal claims and no gear advice (the project removed its last unsourced
-tactics module). Words a beginner would not know — confluence, tailwater,
-anchor, stretch, OHN — are kept out of every string; a test enforces it.
-
-Phase 3 of the spots plan moves the paragraphs behind `render.py` and
-`translate.py`; until then this module is the only source, and nothing else in
-the codebase writes spot text.
+The "why fish gather here" paragraph per kind is not written here. It is
+general reasoning about a kind of water, so it lives in
+`services/context/translate.py` as inferred text with a fixed label, and this
+module only passes it through to the labels payload. The text of a spot card
+itself is produced by `render_spot()` in `services/context/render.py` and
+nowhere else. Words a beginner would not know — confluence, tailwater, anchor,
+stretch, OHN — are kept out of every string; a test enforces it.
 """
 
 from typing import TypedDict
 
 from src.models.spot import SpotKind
+from src.services.context import translate
 
-GENERAL_REASONING_LABEL = "General reasoning, not a record about this spot"
+GENERAL_REASONING_LABEL = translate.GENERAL_REASONING_LABEL
 # Provenance vocabulary of src/models/context.py, for the paragraph.
 GENERAL_REASONING_PROVENANCE = "inference"
 
@@ -31,7 +30,6 @@ GENERAL_REASONING_PROVENANCE = "inference"
 class KindLabels(TypedDict):
     chip: str
     one_liner: str
-    why_fish_gather: str
     # Quiet water is a ranking of reaches, not a located structure: the UI
     # draws it apart from the others and lists it last.
     distinct: bool
@@ -49,39 +47,21 @@ KINDS: dict[SpotKind, KindLabels] = {
     "river_mouth": {
         "chip": "River mouths",
         "one_liner": "Where a river runs out into a lake.",
-        "why_fish_gather": (
-            "Fish that live in the lake pass through here to feed or to run upstream. "
-            "The river also carries food out into open water."
-        ),
         "distinct": False,
     },
     "creek_junction": {
         "chip": "Where creeks join",
         "one_liner": "Two streams meeting. Different temperature, speed and food mix at the join.",
-        "why_fish_gather": (
-            "Two flows mixing makes a seam between fast and slow water, which fish use "
-            "for shelter with food drifting past. A creek that runs cooler than the river can "
-            "also give fish a place to ease out of warm water."
-        ),
         "distinct": False,
     },
     "below_dam": {
         "chip": "Below dams",
         "one_liner": "The water just downstream of a dam or weir.",
-        "why_fish_gather": (
-            "A dam or weir blocks fish from moving further upstream, so they gather in the "
-            "water just below it. That water is churned up and rich in oxygen."
-        ),
         "distinct": False,
     },
     "public_fishing": {
         "chip": "Public fishing spots",
         "one_liner": "Places that volunteer mappers have marked as set aside for fishing.",
-        "why_fish_gather": (
-            "Someone has mapped this as a place to fish, usually because the water is easy "
-            "and allowed to reach. That is about access, so it says nothing by itself about "
-            "what is swimming there."
-        ),
         "distinct": False,
     },
     "quiet_water": {
@@ -89,10 +69,6 @@ KINDS: dict[SpotKind, KindLabels] = {
         "one_liner": (
             "Reaches with few public observation records, which may mean few anglers "
             "or just few observers."
-        ),
-        "why_fish_gather": (
-            "These reaches have few public observation records. That can mean fewer anglers, "
-            "few observers or hard access, and it never tells you whether fish are there."
         ),
         "distinct": True,
     },
@@ -236,7 +212,7 @@ def labels_payload() -> dict:
                 "one_liner": KINDS[kind]["one_liner"],
                 "distinct": KINDS[kind]["distinct"],
                 "why_fish_gather": {
-                    "text": KINDS[kind]["why_fish_gather"],
+                    "text": translate.WHY_FISH_GATHER[kind],
                     "label": GENERAL_REASONING_LABEL,
                     "provenance": GENERAL_REASONING_PROVENANCE,
                 },
@@ -253,6 +229,7 @@ def labels_payload() -> dict:
         "shoreline_derivations": FEATURE_DERIVATION_LABELS,
         "layers": LAYERS,
         "access_labels": ACCESS_LABELS,
+        "glossary": translate.GLOSSARY,
     }
 
 
@@ -260,7 +237,8 @@ def all_strings() -> list[str]:
     """Every user-facing string above, flat — for the jargon lint test."""
     out: list[str] = [GENERAL_REASONING_LABEL, RIVER_MOUTH_SUBLINE]
     for entry in KINDS.values():
-        out += [entry["chip"], entry["one_liner"], entry["why_fish_gather"]]
+        out += [entry["chip"], entry["one_liner"]]
+    out += list(translate.WHY_FISH_GATHER.values())
     out += list(ACCESS_LABELS.values())
     for entry in WATER_BODY_TYPES.values():
         out += list(entry.values())
