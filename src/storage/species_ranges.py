@@ -80,8 +80,8 @@ def query_species_range(db: Database, species: str) -> SpeciesRange | None:
     term = species.strip().lower()
     rows = list(
         db["species_ranges"].rows_where(
-            "LOWER(species) LIKE ? OR LOWER(scientific_name) LIKE ?",
-            [f"%{term}%", f"%{term}%"],
+            "LOWER(species) LIKE ?",
+            [f"%{term}%"],
             limit=1,
         )
     )
