@@ -298,6 +298,7 @@ def _apply_migrations(db: Database) -> None:
     migrate_dismissed_segments_user(db)
     migrate_user_patterns(db)
     migrate_pins(db)
+    migrate_weed_reports(db)
 
 
 def migrate_pins(db: Database) -> None:
@@ -307,6 +308,14 @@ def migrate_pins(db: Database) -> None:
     logged before this have no rating and no start or end time.
     """
     from src.storage.pins import ensure_tables
+
+    ensure_tables(db)
+
+
+def migrate_weed_reports(db: Database) -> None:
+    """Create the weed_reports table. Idempotent. Nothing is backfilled: weed edges
+    are only ever reported by a person, never derived from other data."""
+    from src.storage.weed_reports import ensure_tables
 
     ensure_tables(db)
 
