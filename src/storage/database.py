@@ -239,9 +239,11 @@ def _ensure_shoreline_features(db: Database) -> None:
     """Create the shoreline_features table. Idempotent.
 
     The inlets, outlets, islands, points and peninsulas derived from a lake's
-    outline (services/shoreline_features.py). Rebuilt wholesale with the water
-    bodies, in the same transaction, so a water body never points at a feature
-    the rebuild removed. No foreign key, for the same reason as water_bodies.
+    outline (services/shoreline_features.py), plus the drop-offs and humps
+    derived from a lake's bathymetry (services/bathymetry.py). Rebuilt wholesale
+    with the water bodies, in the same transaction, so a water body never points
+    at a feature the rebuild removed. No foreign key, for the same reason as
+    water_bodies.
     """
     db.execute("""
         CREATE TABLE IF NOT EXISTS shoreline_features (
@@ -256,14 +258,54 @@ def _ensure_shoreline_features(db: Database) -> None:
             provenance       TEXT NOT NULL,
             derivation       TEXT NOT NULL,
             note             TEXT,
+            attributes_json  TEXT NOT NULL DEFAULT '{}',
             area_m2          REAL,
             length_m         REAL,
             built_at         TEXT NOT NULL
         )
     """)
+    # A database written before bathymetry has no attributes column.
+    try:
+        db.execute(
+            "ALTER TABLE shoreline_features ADD COLUMN attributes_json TEXT NOT NULL DEFAULT '{}'"
+        )
+    except Exception:
+        pass  # column already exists
     db.execute(
         "CREATE INDEX IF NOT EXISTS idx_shoreline_features_water "
         "ON shoreline_features(water_body_id, kind)"
+    )
+    _ensure_bathymetry_contours(db)
+
+
+def _ensure_bathymetry_contours(db: Database) -> None:
+    """Create the bathymetry_contours table. Idempotent.
+
+    The raw LIO Bathymetry depth lines a lake's drop-offs and humps are derived
+    from — stored so those features can name the contours behind them and the
+    survey facts stay with the shape. Rebuilt wholesale with the shoreline
+    features, in the same transaction, so a feature never cites a contour the
+    rebuild removed. No foreign key, for the same reason as water_bodies.
+    """
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS bathymetry_contours (
+            ogf_id               INTEGER PRIMARY KEY,
+            water_body_id        TEXT,
+            jurisdiction         TEXT NOT NULL,
+            depth_m              REAL NOT NULL,
+            survey_method        TEXT,
+            survey_date          TEXT,
+            creation_methodology TEXT,
+            location_accuracy    TEXT,
+            geometry_geojson     TEXT NOT NULL,
+            source               TEXT,
+            licence              TEXT,
+            built_at             TEXT
+        )
+    """)
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bathymetry_contours_water "
+        "ON bathymetry_contours(water_body_id)"
     )
 
 

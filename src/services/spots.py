@@ -40,6 +40,7 @@ from pathlib import Path
 
 from sqlite_utils.db import Database
 
+from src.models.bathymetry import BathymetryContour
 from src.models.hydrology import StreamSegment
 from src.models.jurisdiction import JurisdictionCode
 from src.models.lake_outline import LakeOutline
@@ -56,6 +57,11 @@ from src.models.spot import (
 from src.models.stretch import FishingStretch
 from src.models.stretch_anchor import StretchAnchor
 from src.services import spot_labels as words
+from src.services.bathymetry import (
+    BathymetryFeatureSet,
+    LakeBathymetry,
+    derive_bathymetry_features,
+)
 from src.services.shoreline_features import derive_shoreline_features
 from src.services.stretch_anchors import DAM_MERGE_M, _coord_key
 from src.services.stretches import DEFAULT_CURATION_PATH, load_curation
@@ -141,6 +147,7 @@ def classify(
     built_at: str | None = None,
     outlines: dict[str, LakeOutline] | None = None,
     watercourses: list[StreamSegment] | None = None,
+    bathymetry: dict[str, LakeBathymetry] | None = None,
 ) -> SpotClassification:
     """Spots from anchors: merged, deduped, titled, gated and tiered. Pure.
 
@@ -150,11 +157,14 @@ def classify(
     `outlines` maps a curated lake name to its resolved OHN outline and
     `watercourses` is the OHN watercourse layer, both supplied by the caller
     (build_spots does the network) so this function stays pure. With them, the
-    lakes get their shore geometry and their shoreline features.
+    lakes get their shore geometry and their shoreline features. `bathymetry`
+    maps a lake name to its surveyed contours, likewise fetched by the caller,
+    for the drop-offs and humps read off the bottom.
     """
     built_at = built_at or datetime.now(UTC).isoformat(timespec="seconds")
     hints = hints or {}
     outlines = outlines or {}
+    bathymetry = bathymetry or {}
     report = SpotBuildReport(jurisdiction=jurisdiction, anchors_in=len(anchors))
     ctx = _Context(
         stretches={s.stretch_id: s for s in stretches},
@@ -183,7 +193,9 @@ def classify(
     final = sorted(by_id.values(), key=lambda s: (_KIND_ORDER[s.kind], s.tier, s.spot_id))
 
     _attach_access(ctx, final, anchors)
-    water_bodies, features = _link_water_bodies(ctx, final, outlines, watercourses or [])
+    water_bodies, features, contours = _link_water_bodies(
+        ctx, final, outlines, watercourses or [], bathymetry
+    )
 
     for spot in final:
         report.by_kind[spot.kind] = report.by_kind.get(spot.kind, 0) + 1
@@ -193,6 +205,7 @@ def classify(
         spots=final,
         water_bodies=water_bodies.bodies,
         shoreline_features=features,
+        bathymetry_contours=contours,
         report=report,
     )
 
@@ -675,7 +688,8 @@ def _link_water_bodies(
     spots: list[Spot],
     outlines: dict[str, LakeOutline],
     watercourses: list[StreamSegment],
-) -> tuple[WaterBodySet, list[ShorelineFeature]]:
+    bathymetry: dict[str, LakeBathymetry] | None = None,
+) -> tuple[WaterBodySet, list[ShorelineFeature], list[BathymetryContour]]:
     """Derive the water bodies and hang each spot off its river, creek or lake.
 
     A spot is a child of the river its stretch belongs to. A river mouth is also
@@ -684,7 +698,9 @@ def _link_water_bodies(
 
     The lakes' outlines (`outlines`) give the lake bodies their geometry, and the
     shoreline features are derived from those outlines next (`watercourses` names
-    the inlets and outlets).
+    the inlets and outlets). `bathymetry` holds each lake's surveyed contours, and
+    the drop-offs and humps are read off them; the raw contours are returned so
+    the build stores the evidence with the features.
     """
     lakes = [
         LakeRef(
@@ -722,28 +738,50 @@ def _link_water_bodies(
             report.water_bodies_without_geometry += 1
 
     features: list[ShorelineFeature] = []
+    contours: list[BathymetryContour] = []
     if outlines:
         lake_to_wb_id = {slug: bodies.lake_id(slug) for slug in outlines}
-        feature_set = derive_shoreline_features(
+        shoreline_set = derive_shoreline_features(
             outlines,
             {slug: wb_id for slug, wb_id in lake_to_wb_id.items() if wb_id},
             ctx.jurisdiction,
             ctx.built_at,
             watercourses,
         )
-        features = feature_set.features
-        report.lakes_with_outline = feature_set.lakes_with_outline
-        report.lakes_without_outline = feature_set.lakes_without_outline
-        report.shoreline_features_total = len(features)
-        for feature in features:
-            report.shoreline_features_by_kind[feature.kind] = (
-                report.shoreline_features_by_kind.get(feature.kind, 0) + 1
-            )
-        for reason, n in feature_set.dropped.items():
+        features = shoreline_set.features
+        report.lakes_with_outline = shoreline_set.lakes_with_outline
+        report.lakes_without_outline = shoreline_set.lakes_without_outline
+        for reason, n in shoreline_set.dropped.items():
             report.shoreline_features_dropped[reason] = (
                 report.shoreline_features_dropped.get(reason, 0) + n
             )
-    return bodies, features
+
+        bathymetry = {
+            slugify(name): lake for name, lake in (bathymetry or {}).items() if slugify(name)
+        }
+        bathymetry_set: BathymetryFeatureSet = derive_bathymetry_features(
+            outlines,
+            {slug: wb_id for slug, wb_id in lake_to_wb_id.items() if wb_id},
+            ctx.jurisdiction,
+            ctx.built_at,
+            bathymetry,
+        )
+        features = features + bathymetry_set.features
+        contours = bathymetry_set.contours
+        report.lakes_with_survey_contours = bathymetry_set.lakes_with_contours
+        report.lakes_without_survey_contours = bathymetry_set.lakes_without_contours
+        report.bathymetry_contours_stored = len(contours)
+        for reason, n in bathymetry_set.dropped.items():
+            report.shoreline_features_dropped[reason] = (
+                report.shoreline_features_dropped.get(reason, 0) + n
+            )
+
+    report.shoreline_features_total = len(features)
+    for feature in features:
+        report.shoreline_features_by_kind[feature.kind] = (
+            report.shoreline_features_by_kind.get(feature.kind, 0) + 1
+        )
+    return bodies, features, contours
 
 
 # ── build ─────────────────────────────────────────────────────────────────────
@@ -756,6 +794,7 @@ def build_spots(
     outline_resolver: Callable[[dict[str, list[tuple[float, float]]]], dict[str, LakeOutline]]
     | None = None,
     watercourse_fetcher: Callable[[float, float, float, float], list[StreamSegment]] | None = None,
+    bathymetry_fetcher: Callable[[LakeOutline], LakeBathymetry] | None = None,
 ) -> SpotBuildReport:
     """Rebuild every spot for the curation file's jurisdiction from the stored anchors.
 
@@ -764,16 +803,18 @@ def build_spots(
     being derived leaves the map, and the map never reads a half-written one.
     Ids come from coordinates, so rebuilding twice gives the same spots.
 
-    The network work — matching each lake's outline from OHN Waterbody and
-    reading the watercourses that name its inlets and outlets — happens here,
-    through the cached adapters, so a second build is offline. Tests inject
-    `outline_resolver` and `watercourse_fetcher` so they never touch the network.
+    The network work — matching each lake's outline from OHN Waterbody, reading
+    the watercourses that name its inlets and outlets, and fetching the
+    bathymetry that names its drop-offs and humps — happens here, through the
+    cached adapters, so a second build is offline. Tests inject `outline_resolver`,
+    `watercourse_fetcher` and `bathymetry_fetcher` so they never touch the network.
     """
     curation = load_curation(curation_path)
     jurisdiction = curation.jurisdiction
     anchors = list_anchors(db, jurisdiction=jurisdiction)
     stretches = list_stretches(db, jurisdiction)
     outlines, watercourses = _lake_outline_inputs(anchors, outline_resolver, watercourse_fetcher)
+    bathymetry = _bathymetry_inputs(outlines, bathymetry_fetcher)
     result = classify(
         anchors,
         stretches,
@@ -781,8 +822,16 @@ def build_spots(
         load_stretch_hints(curation_path),
         outlines=outlines,
         watercourses=watercourses,
+        bathymetry=bathymetry,
     )
-    replace_spots(db, jurisdiction, result.spots, result.water_bodies, result.shoreline_features)
+    replace_spots(
+        db,
+        jurisdiction,
+        result.spots,
+        result.water_bodies,
+        result.shoreline_features,
+        result.bathymetry_contours,
+    )
 
     report = result.report
     if not anchors:
@@ -854,6 +903,32 @@ def _lake_outline_inputs(
                     seen_ogf.add(seg.ogf_id)
                     watercourses.append(seg)
     return outlines, watercourses
+
+
+def _bathymetry_inputs(
+    outlines: dict[str, LakeOutline],
+    bathymetry_fetcher: Callable[[LakeOutline], LakeBathymetry] | None = None,
+) -> dict[str, LakeBathymetry]:
+    """Each matched lake's surveyed contours, keyed by curated name.
+
+    Every call goes through a cache, so this stays cheap offline after the first
+    build. The fetcher is injected in tests; the default is the cached LIO
+    Bathymetry adapter. A lake with no overlapping survey is left out, so the
+    derivation counts it as one with no contours.
+    """
+    matched = {name: o for name, o in outlines.items() if o.matched and o.geometry}
+    if not matched:
+        return {}
+    if bathymetry_fetcher is None:
+        from src.services.bathymetry import fetch_lake_bathymetry
+
+        bathymetry_fetcher = fetch_lake_bathymetry
+    out: dict[str, LakeBathymetry] = {}
+    for name, outline in matched.items():
+        lake = bathymetry_fetcher(outline)
+        if lake.index is not None or lake.contours:
+            out[name] = lake
+    return out
 
 
 def _shore_cells(boundary, cell_deg: float = 0.5) -> list[tuple[float, float, float, float]]:

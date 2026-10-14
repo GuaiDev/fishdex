@@ -10,6 +10,7 @@ import sqlite3
 
 from sqlite_utils.db import Database
 
+from src.models.bathymetry import BathymetryContour
 from src.models.shoreline_feature import ShorelineFeature
 from src.models.water_body import WaterBody
 
@@ -39,6 +40,25 @@ def write_shoreline_features(
         cols = list(rows[0])
         conn.executemany(
             f"INSERT INTO shoreline_features ({', '.join(cols)}) "
+            f"VALUES ({', '.join(':' + c for c in cols)})",
+            rows,
+        )
+
+
+def write_bathymetry_contours(
+    conn: sqlite3.Connection, jurisdiction: str, contours: list[BathymetryContour]
+) -> None:
+    """Swap in a jurisdiction's raw bathymetry contours. The caller commits.
+
+    The depth lines behind the drop-off and hump features, so a rebuild replaces
+    them together in one transaction (storage/spots.py::replace_spots).
+    """
+    conn.execute("DELETE FROM bathymetry_contours WHERE jurisdiction = ?", [jurisdiction])
+    rows = [_contour_row(c) for c in contours]
+    if rows:
+        cols = list(rows[0])
+        conn.executemany(
+            f"INSERT INTO bathymetry_contours ({', '.join(cols)}) "
             f"VALUES ({', '.join(':' + c for c in cols)})",
             rows,
         )
@@ -111,6 +131,30 @@ def list_shoreline_features(
     return [_feature_from_row(r) for r in rows]
 
 
+def count_bathymetry_contours(db: Database, jurisdiction: str | None = None) -> int:
+    if jurisdiction is None:
+        return db.execute("SELECT COUNT(*) FROM bathymetry_contours").fetchone()[0]
+    return db.execute(
+        "SELECT COUNT(*) FROM bathymetry_contours WHERE jurisdiction = ?", [jurisdiction]
+    ).fetchone()[0]
+
+
+def list_bathymetry_contours(
+    db: Database, water_body_id: str | None = None
+) -> list[BathymetryContour]:
+    """Raw depth contours, all of them or one water body's, in depth then id order."""
+    if water_body_id is None:
+        rows = db.execute_returning_dicts(
+            "SELECT * FROM bathymetry_contours ORDER BY depth_m, ogf_id"
+        )
+    else:
+        rows = db.execute_returning_dicts(
+            "SELECT * FROM bathymetry_contours WHERE water_body_id = ? ORDER BY depth_m, ogf_id",
+            [water_body_id],
+        )
+    return [_contour_from_row(r) for r in rows]
+
+
 def _dumps(value) -> str:
     return json.dumps(value, separators=(",", ":"), sort_keys=True)
 
@@ -165,6 +209,7 @@ def _feature_row(f: ShorelineFeature) -> dict:
         "provenance": f.provenance,
         "derivation": f.derivation,
         "note": f.note,
+        "attributes_json": _dumps(f.attributes),
         "area_m2": f.area_m2,
         "length_m": f.length_m,
         "built_at": f.built_at,
@@ -184,7 +229,42 @@ def _feature_from_row(r: dict) -> ShorelineFeature:
         provenance=r["provenance"],
         derivation=r["derivation"],
         note=r["note"],
+        attributes=json.loads(r["attributes_json"]),
         area_m2=r["area_m2"],
         length_m=r["length_m"],
+        built_at=r["built_at"],
+    )
+
+
+def _contour_row(c: BathymetryContour) -> dict:
+    return {
+        "ogf_id": c.ogf_id,
+        "water_body_id": c.water_body_id,
+        "jurisdiction": c.jurisdiction,
+        "depth_m": c.depth_m,
+        "survey_method": c.survey_method,
+        "survey_date": c.survey_date,
+        "creation_methodology": c.creation_methodology,
+        "location_accuracy": c.location_accuracy,
+        "geometry_geojson": _dumps(c.geometry),
+        "source": c.source,
+        "licence": c.licence,
+        "built_at": c.built_at,
+    }
+
+
+def _contour_from_row(r: dict) -> BathymetryContour:
+    return BathymetryContour(
+        ogf_id=r["ogf_id"],
+        water_body_id=r["water_body_id"],
+        jurisdiction=r["jurisdiction"],
+        depth_m=r["depth_m"],
+        survey_method=r["survey_method"],
+        survey_date=r["survey_date"],
+        creation_methodology=r["creation_methodology"],
+        location_accuracy=r["location_accuracy"],
+        geometry=json.loads(r["geometry_geojson"]),
+        source=r["source"],
+        licence=r["licence"],
         built_at=r["built_at"],
     )

@@ -14,8 +14,8 @@ it is a good place to fish; a test enforces it.
 
 `mapped_from` names where features of this type come from on the map, so a
 label can carry its source. A term with `mapped_from=None` has no map layer
-yet (drop-offs need lake depth, which is not ingested): it is in the registry
-so literacy can be tracked against it the day a layer arrives.
+yet: it is in the registry so literacy can be tracked against it the day a
+layer arrives.
 
 This replaced `translate.GLOSSARY`, which held three of these definitions as
 bare strings with no id. The definition text for weir, confluence and
@@ -35,6 +35,7 @@ class Term(TypedDict):
 
 _OHN = "Ontario government water map (stream lines)"
 _OHN_OUTLINE = "Ontario government water map (lake outlines)"
+_LIO_BATHYMETRY = "Ontario government lake depth surveys (depth contours)"
 _OSM_DAMS = "OpenStreetMap volunteers (dams and weirs)"
 
 TERMS: dict[str, Term] = {
@@ -136,7 +137,17 @@ TERMS: dict[str, Term] = {
                 "A drop-off is a place where the bottom of a lake or river slopes "
                 "steeply from shallow to deep water."
             ),
-            mapped_from=None,
+            mapped_from=_LIO_BATHYMETRY,
+        ),
+        Term(
+            term_id="hump",
+            plain="A shallow rise in the lake bottom",
+            technical="Hump",
+            definition=(
+                "A hump is a place where the bottom of a lake rises to shallower "
+                "water than the water around it."
+            ),
+            mapped_from=_LIO_BATHYMETRY,
         ),
         Term(
             term_id="weed_edge",
@@ -164,7 +175,7 @@ SPOT_KIND_TERMS: dict[str, tuple[str, ...]] = {
     "quiet_water": (),
 }
 SHORELINE_KIND_TERMS: dict[str, tuple[str, ...]] = {
-    k: (k,) for k in ("inlet", "outlet", "island", "point", "peninsula")
+    k: (k,) for k in ("inlet", "outlet", "island", "point", "peninsula", "drop_off", "hump")
 }
 
 

@@ -1,0 +1,55 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OGF_ID": 118430028,
+        "PROJECT_NAME": "Rice Lake",
+        "WBY_LID": "17-7257-48946",
+        "SURVEY_YEAR": 1970,
+        "SCALE_TEXT": null,
+        "SURVEY_METHOD": "Transect",
+        "BATHYMETRY_LINE_IND": "Yes",
+        "BATHYMETRY_POINT_IND": "Yes",
+        "HISTORIC_MAP_IND": "No",
+        "EFFECTIVE_DATETIME": 1602028800000
+      },
+      "geometry": {
+        "rings": [
+          [
+            [-78.3, 44.1],
+            [-78.3, 44.25],
+            [-78.15, 44.25],
+            [-78.15, 44.1],
+            [-78.3, 44.1]
+          ]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OGF_ID": 103384764,
+        "PROJECT_NAME": "Rice Lake",
+        "WBY_LID": "17-5405-51855",
+        "SURVEY_YEAR": 1979,
+        "SCALE_TEXT": "25.3cm = 1 km",
+        "SURVEY_METHOD": "Transect",
+        "BATHYMETRY_LINE_IND": "No",
+        "BATHYMETRY_POINT_IND": "No",
+        "HISTORIC_MAP_IND": "No",
+        "EFFECTIVE_DATETIME": 1602028800000
+      },
+      "geometry": {
+        "rings": [
+          [
+            [-78.28, 44.2],
+            [-78.28, 44.22],
+            [-78.26, 44.22],
+            [-78.26, 44.2],
+            [-78.28, 44.2]
+          ]
+        ]
+      }
+    }
+  ],
+  "exceededTransferLimit": false
+}

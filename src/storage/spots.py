@@ -10,10 +10,15 @@ import json
 
 from sqlite_utils.db import Database
 
+from src.models.bathymetry import BathymetryContour
 from src.models.shoreline_feature import ShorelineFeature
 from src.models.spot import Spot
 from src.models.water_body import WaterBody
-from src.storage.water_bodies import write_shoreline_features, write_water_bodies
+from src.storage.water_bodies import (
+    write_bathymetry_contours,
+    write_shoreline_features,
+    write_water_bodies,
+)
 
 
 def replace_spots(
@@ -22,13 +27,15 @@ def replace_spots(
     spots: list[Spot],
     water_bodies: list[WaterBody] | None = None,
     shoreline_features: list[ShorelineFeature] | None = None,
+    bathymetry_contours: list[BathymetryContour] | None = None,
 ) -> int:
-    """Swap in a jurisdiction's spots, water bodies and shoreline features.
+    """Swap in a jurisdiction's spots, water bodies and derived features.
 
-    All three go in one transaction: spots point at water bodies, which point at
-    shoreline features, so a half-written rebuild must never leave one without
-    the others. `water_bodies=None` leaves the stored ones alone; likewise
-    `shoreline_features`.
+    All of them go in one transaction: spots point at water bodies, which point
+    at shoreline features, and the bathymetry contours are the evidence the
+    drop-off and hump features cite, so a half-written rebuild must never leave
+    one without the others. `water_bodies=None` (and likewise
+    `shoreline_features`/`bathymetry_contours`) leaves the stored ones alone.
     """
     rows = [_spot_row(s) for s in spots]
     conn = db.conn
@@ -37,6 +44,8 @@ def replace_spots(
             write_water_bodies(conn, jurisdiction, water_bodies)
         if shoreline_features is not None:
             write_shoreline_features(conn, jurisdiction, shoreline_features)
+        if bathymetry_contours is not None:
+            write_bathymetry_contours(conn, jurisdiction, bathymetry_contours)
         conn.execute("DELETE FROM spots WHERE jurisdiction = ?", [jurisdiction])
         if rows:
             cols = list(rows[0])

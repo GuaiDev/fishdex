@@ -90,11 +90,15 @@ All user-facing strings, in display order (Quiet water last).
 - `name_sources` — a plain-words line for each `name_source`, for a "source" caption under a name.
 - `no_outline_note` — what to say when a lake has no shape on the map.
 - `shoreline_features[]` — for each shoreline feature `kind` (`inlet`, `outlet`, `island`,
-  `point`, `peninsula`): `label` (singular, for a card), `chip` (plural, for a legend) and
-  `one_liner` (what it is, in beginner words).
+  `point`, `peninsula`, `drop_off`, `hump`): `label` (singular, for a card), `chip` (plural,
+  for a legend) and `one_liner` (what it is, in beginner words).
 - `shoreline_derivations` — a plain-words phrase for each `derivation`, for the caption under a
-  shoreline feature: `shoreline_outline` (a shape read off the outline itself) or
-  `watercourse_endpoint` (a mapped stream that ends at the shore).
+  shoreline feature: `shoreline_outline` (a shape read off the outline itself),
+  `watercourse_endpoint` (a mapped stream that ends at the shore) or `bathymetry_contours`
+  (a shape read off a lake's surveyed depth contours).
+- `bathymetry_data_note` — a data note for contour-derived features (a drop-off or a hump):
+  depth is at the survey's own water level, not today's, and the source states no unit. For a
+  data-notes panel, never a card line.
 
 ```json
 {
@@ -956,11 +960,13 @@ Unknown id is a `404`:
 ## `GET /map/water-bodies/{water_body_id}/features`
 
 The shoreline features of one lake, as a GeoJSON `FeatureCollection`: where a mapped stream
-enters (`inlet`) or leaves (`outlet`), an island (`island`), and a point or peninsula of land
-reaching out (`point`, `peninsula`). These are read off the lake's OHN Waterbody outline and the
-OHN streams that end at its shore — a located thing to show, never a claim about fish. A river
-has no shoreline, so the honest answer is an **empty collection**, not an error; an unknown id
-is `404`.
+enters (`inlet`) or leaves (`outlet`), an island (`island`), a point or peninsula of land
+reaching out (`point`, `peninsula`), and — where the lake has a digital survey — where the
+bottom falls away quickly (`drop_off`) or rises into a shallower shoal (`hump`). The first five
+are read off the lake's OHN Waterbody outline and the OHN streams that end at its shore; the
+last two are read off the LIO Bathymetry depth contours. A located thing to show, never a claim
+about fish. A river has no shoreline, and a lake with no contours gets no drop-off or hump, so
+the honest answer is an **empty collection**, not an error; an unknown id is `404`.
 
 Each feature's `properties`:
 
@@ -968,87 +974,135 @@ Each feature's `properties`:
 |---|---|
 | `feature_id` | Stable id: `{water_body_id}:{kind}:{key}`, where the key comes from the feature's location (or the stream's OGF_ID for an inlet or outlet). |
 | `water_body_id` | The lake the feature belongs to. |
-| `kind` | `inlet`, `outlet`, `island`, `point` or `peninsula`. Words in `labels.shoreline_features`. |
+| `kind` | `inlet`, `outlet`, `island`, `point`, `peninsula`, `drop_off` or `hump`. Words in `labels.shoreline_features`. |
 | `name` | The mapped stream's name for an inlet or outlet, else `null`. |
-| `derivation` | How it was obtained: `watercourse_endpoint` (a mapped OHN stream that ends at the shore) or `shoreline_outline` (a shape read off the outline's own edge). Phrase in `labels.shoreline_derivations`. |
-| `provenance` | `record` for an island (a ring inside the source polygon) or a stream junction; `inference` for a point or peninsula (a shape computed from the outline). |
-| `note` | A full sentence for the card, already assembled from the vocabulary. Safe to show as-is. |
-| `source`, `source_date` | The named source (`OHN Waterbody` or `OHN Watercourse`) and that record's effective date (`YYYY-MM-DD`, or `null` if the source gave none). Credit these. |
-| `area_m2` | An island's area, else `null`. |
-| `length_m` | How far a point or peninsula sticks out from the shore, in metres; else `null`. |
-| `geometry` | A `Point` for inlets, outlets, points and peninsulas; a `Polygon` for an island. |
+| `derivation` | How it was obtained: `watercourse_endpoint` (a mapped OHN stream that ends at the shore), `shoreline_outline` (a shape read off the outline's own edge), or `bathymetry_contours` (a shape read off a lake survey's depth contours). Phrase in `labels.shoreline_derivations`. |
+| `provenance` | `record` for an island (a ring inside the source polygon) or a stream junction; `inference` for a point, peninsula, drop-off or hump (a shape computed from the outline or the contours). |
+| `note` | A full sentence for the card, already assembled from the vocabulary. Safe to show as-is. A drop-off or hump names its survey ("from a 1970 survey, transect") or says `survey date unknown`. |
+| `attributes` | Survey facts behind a contour-derived feature: `contour_ogf_ids`, `survey_year`, `survey_method`, `depth_basis`, `depth_m`, and (for a drop-off) `depth_change_m` and `gap_m` or (for a hump) `area_m2`. Also the `attribution`, `licence` and `licence_url` to credit. `{}` for an outline-derived feature. |
+| `source`, `source_date` | The named source (`OHN Waterbody`, `OHN Watercourse` or `LIO Bathymetry`) and that record's effective date (`YYYY-MM-DD`, or `null` if the source gave none). Credit these. |
+| `area_m2` | An island's area or a hump's area, else `null`. |
+| `length_m` | How far a point or peninsula sticks out from the shore, or the depth change across a drop-off, in metres; else `null`. |
+| `geometry` | A `Point` for inlets, outlets, points, peninsulas and drop-offs; a `Polygon` for an island or hump. |
 
 ```json
 {
   "type": "FeatureCollection",
+  "water_body_id": "lake:rice-lake",
+  "water_body_name": "Rice Lake",
   "meta": {
-    "count": 2,
+    "count": 3,
     "by_kind": {
       "inlet": 1,
-      "island": 1
+      "island": 1,
+      "drop_off": 1
     }
   },
   "features": [
     {
       "type": "Feature",
-      "id": "great_lake:lake-ontario#inlet:1",
+      "id": "lake:rice-lake:inlet:1",
       "geometry": {
         "type": "Point",
         "coordinates": [
-          -79.57731,
-          43.54567
+          -78.32,
+          44.2
         ]
       },
       "properties": {
-        "feature_id": "great_lake:lake-ontario#inlet:1",
-        "water_body_id": "great_lake:lake-ontario",
+        "feature_id": "lake:rice-lake:inlet:1",
+        "water_body_id": "lake:rice-lake",
         "kind": "inlet",
-        "name": "Credit River",
+        "name": "Otonabee River",
         "derivation": "watercourse_endpoint",
         "provenance": "record",
-        "note": "A mapped stream flows in here. Credit River is mapped here. Read from the Ontario government water map.",
-        "area_m2": null
+        "source": "OHN Watercourse",
+        "source_date": "2024-01-01",
+        "note": "A mapped stream flows in here. Otonabee River is mapped here. Read from the Ontario government water map.",
+        "attributes": {},
+        "area_m2": null,
+        "length_m": null
       }
     },
     {
       "type": "Feature",
-      "id": "great_lake:lake-ontario:island:-79.195_43.605",
+      "id": "lake:rice-lake:island:-78.195_44.205",
       "geometry": {
         "type": "Polygon",
         "coordinates": [
           [
             [
-              -79.2,
-              43.6
+              -78.2,
+              44.2
             ],
             [
-              -79.19,
-              43.6
+              -78.19,
+              44.2
             ],
             [
-              -79.19,
-              43.61
+              -78.19,
+              44.21
             ],
             [
-              -79.2,
-              43.61
+              -78.2,
+              44.21
             ],
             [
-              -79.2,
-              43.6
+              -78.2,
+              44.2
             ]
           ]
         ]
       },
       "properties": {
-        "feature_id": "great_lake:lake-ontario:island:-79.195_43.605",
-        "water_body_id": "great_lake:lake-ontario",
+        "feature_id": "lake:rice-lake:island:-78.195_44.205",
+        "water_body_id": "lake:rice-lake",
         "kind": "island",
         "name": null,
         "derivation": "shoreline_outline",
         "provenance": "record",
+        "source": "OHN Waterbody",
+        "source_date": "2021-04-08",
         "note": "Land inside the water. Read from the shoreline outline.",
-        "area_m2": 590000.0
+        "attributes": {},
+        "area_m2": 590000.0,
+        "length_m": null
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "lake:rice-lake:drop_off:-78.145_44.19",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -78.145,
+          44.19
+        ]
+      },
+      "properties": {
+        "feature_id": "lake:rice-lake:drop_off:-78.145_44.19",
+        "water_body_id": "lake:rice-lake",
+        "kind": "drop_off",
+        "name": null,
+        "derivation": "bathymetry_contours",
+        "provenance": "inference",
+        "source": "LIO Bathymetry",
+        "source_date": "1970-07-10",
+        "note": "The bottom falls away quickly here. From a 1970 survey, Transect.",
+        "attributes": {
+          "contour_ogf_ids": [118431234, 118431235],
+          "survey_year": 1970,
+          "survey_method": "Transect",
+          "depth_basis": "at the survey's own water level; metres inferred from the source",
+          "depth_m": -4.0,
+          "depth_change_m": 4.0,
+          "gap_m": 35.2,
+          "attribution": "Contains information licensed under the Open Government Licence – Ontario. Bathymetry, Ontario Ministry of Natural Resources (Land Information Ontario).",
+          "licence": "Open Government Licence – Ontario",
+          "licence_url": "https://www.ontario.ca/page/open-government-licence-ontario"
+        },
+        "area_m2": null,
+        "length_m": 4.0
       }
     }
   ]
@@ -1616,10 +1670,11 @@ id nobody has used. Their layer and list are simply empty of it.
   effective date and licence on `attributes` (see `GET /map/water-bodies/{id}/features`). A lake
   with no match stays `geometry: null`.
 - **Lake features** — inlets, outlets, islands, points and peninsulas — are built from a lake's
-  outline and served at `GET /map/water-bodies/{id}/features`. Deeper structure (drop-offs,
-  humps, weed lines) is not built: it needs bathymetry, not an outline. The only weed edges
-  anywhere are the private ones a user reports themselves (see [Weed reports](#weed-reports));
-  none is derived, and none appears on a spot, a card or a water body.
+  outline, and drop-offs and humps from the LIO Bathymetry depth contours of the ~3,500 surveyed
+  Ontario lakes, all served at `GET /map/water-bodies/{id}/features`. A lake with no survey gets
+  no drop-off or hump. The only weed edges anywhere are the private ones a user reports themselves
+  (see [Weed reports](#weed-reports)); none is derived, and none appears on a spot, a card or a
+  water body.
 - **Quiet water** spots (a ranking of reaches, not a located structure). The kind and its
   chip exist in `labels` so the filter row can be designed now; no spot has that kind.
 

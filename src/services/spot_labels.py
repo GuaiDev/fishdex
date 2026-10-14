@@ -154,7 +154,7 @@ NO_OUTLINE_NOTE = "No outline is on file for this water, so it has no shape on t
 # edge says so ("from the shoreline outline"); a stream junction is its own line
 # ending at the shore.
 
-FEATURE_KIND_ORDER = ("inlet", "outlet", "island", "point", "peninsula")
+FEATURE_KIND_ORDER = ("inlet", "outlet", "island", "point", "peninsula", "drop_off", "hump")
 FEATURE_KINDS: dict[str, dict[str, str]] = {
     "inlet": {
         "label": "Inlet",
@@ -173,25 +173,64 @@ FEATURE_KINDS: dict[str, dict[str, str]] = {
         "chip": "Peninsulas",
         "one_liner": "A long point of land reaches out.",
     },
+    # Read off a lake's surveyed depth contours, not its outline. A beginner does
+    # not know either word; the one line says what each is in plain terms.
+    "drop_off": {
+        "label": "Drop-off",
+        "chip": "Drop-offs",
+        "one_liner": "The bottom falls away quickly here.",
+    },
+    "hump": {
+        "label": "Hump",
+        "chip": "Humps",
+        "one_liner": "A shallower rise in the bottom.",
+    },
 }
-# What a derivation is, in words. Both come from the same Ontario government
-# water map; the outline is the water's own edge, a stream its own line.
+# What a derivation is, in words. The outline is the water's own edge, a stream
+# its own line, and the contours come from a government lake survey.
 FEATURE_DERIVATION_LABELS: dict[str, str] = {
     "shoreline_outline": "from the shoreline outline",
     "watercourse_endpoint": "where a mapped stream meets the shore",
+    "bathymetry_contours": "from a lake survey",
 }
 FEATURE_READ_FROM_OUTLINE = "Read from the shoreline outline"
 FEATURE_READ_FROM_MAP = "Read from the Ontario government water map"
+# Shown when a survey's own date is missing on the contour and its index.
+SURVEY_DATE_UNKNOWN = "survey date unknown"
+# Depth is recorded relative to the level the lake was at on survey day, not
+# today, and the source states no unit. This is a data note, never a card line.
+BATHYMETRY_DATA_NOTE = (
+    "Depth is measured at the survey's own water level, not today's. "
+    "The source does not state the unit; metres is taken from the values."
+)
 
 
-def shoreline_feature_note(kind: str, derivation: str, name: str | None = None) -> str:
-    """The sentence shown under a shoreline feature, assembled from the vocabulary."""
+def shoreline_feature_note(
+    kind: str, derivation: str, name: str | None = None, attributes: dict | None = None
+) -> str:
+    """The sentence shown under a shoreline feature, assembled from the vocabulary.
+
+    A contour-derived feature names its survey ("from a 1970 survey, transect"),
+    or says the date is unknown, using the facts carried in `attributes`.
+    """
     base = FEATURE_KINDS[kind]["one_liner"]
+    if derivation == "bathymetry_contours":
+        return f"{base} {_survey_phrase(attributes or {})}."
     if derivation == "watercourse_endpoint":
         if name:
             return f"{base} {name} is mapped here. {FEATURE_READ_FROM_MAP}."
         return f"{base} {FEATURE_READ_FROM_MAP}."
     return f"{base} {FEATURE_READ_FROM_OUTLINE}."
+
+
+def _survey_phrase(attributes: dict) -> str:
+    """'From a 1970 survey, transect' or 'From a survey, survey date unknown'."""
+    year = attributes.get("survey_year")
+    method = attributes.get("survey_method")
+    if year:
+        tail = f", {method}" if method else ""
+        return f"From a {year} survey{tail}"
+    return f"From a survey, {SURVEY_DATE_UNKNOWN}"
 
 
 # ── titles ────────────────────────────────────────────────────────────────────
@@ -259,6 +298,7 @@ def labels_payload() -> dict:
             "note": NEW_TO_YOU_NOTE,
         },
         "filters": {"new_to_me": NEW_TO_ME_FILTER},
+        "bathymetry_data_note": BATHYMETRY_DATA_NOTE,
         "layers": LAYERS,
         "access_labels": ACCESS_LABELS,
         # Every map/habitat concept, with plain and technical wording and a
@@ -281,7 +321,7 @@ def all_strings() -> list[str]:
     for entry in FEATURE_KINDS.values():
         out += list(entry.values())
     out += list(FEATURE_DERIVATION_LABELS.values())
-    out += [FEATURE_READ_FROM_OUTLINE, FEATURE_READ_FROM_MAP]
+    out += [FEATURE_READ_FROM_OUTLINE, FEATURE_READ_FROM_MAP, BATHYMETRY_DATA_NOTE]
     for layer in LAYERS.values():
         out += [layer["label"], layer["note"]]
     out += [

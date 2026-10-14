@@ -1,28 +1,31 @@
-"""One feature read off a lake's shoreline: an inlet, an island, a point of land.
+"""One feature read off a lake's shoreline or its surveyed bottom.
 
 A shoreline feature is a located thing a person can see on the water — where a
 creek enters, an island, a point — derived from a named, dated source and stored
 against the water body it belongs to. It is not a fish claim: no field says what
 lives near it. The words the map shows for a kind live in services/spot_labels.py.
 
-`provenance` follows src/models/context.py: an island is a ring inside the OHN
-polygon (a RECORD), while a point or peninsula is a shape *computed* from the
-outline (INFERENCE). `derivation` says which came from the outline geometry
-alone, so the map can label those "from the shoreline outline".
+Two kinds come from the outline (inlet, outlet, island, point, peninsula) and two
+from a lake's surveyed depth contours (drop_off, hump). `provenance` follows
+src/models/context.py: an island is a ring inside the OHN polygon and an inlet is
+a mapped stream (both RECORD), while a point, peninsula, drop-off or hump is a
+shape *computed* from the geometry (INFERENCE). `derivation` says where the shape
+came from, so the map can say "from the shoreline outline" or "from a 1970
+survey, transect".
 """
 
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from src.models.context import ProvenanceKind
 from src.models.jurisdiction import JurisdictionCode
 
-FeatureKind = Literal["inlet", "outlet", "point", "peninsula", "island"]
+FeatureKind = Literal["inlet", "outlet", "point", "peninsula", "island", "drop_off", "hump"]
 
-# How the feature was obtained: read straight out of a source record, or worked
-# out from the outline's shape.
-Derivation = Literal["watercourse_endpoint", "shoreline_outline"]
+# How the feature was obtained: read straight out of a source record, worked out
+# from the outline's shape, or computed from a lake's surveyed depth contours.
+Derivation = Literal["watercourse_endpoint", "shoreline_outline", "bathymetry_contours"]
 
 
 class ShorelineFeature(BaseModel):
@@ -34,15 +37,19 @@ class ShorelineFeature(BaseModel):
     kind: FeatureKind
     name: str | None = None
     geometry: dict
-    """GeoJSON Point (inlet, outlet, point, peninsula) or Polygon (island)."""
+    """GeoJSON Point (inlet, outlet, point, peninsula, drop_off) or Polygon (island, hump)."""
     source: str
-    """'OHN Waterbody' or 'OHN Watercourse'."""
+    """'OHN Waterbody', 'OHN Watercourse' or 'LIO Bathymetry'."""
     source_date: str | None = None
     provenance: ProvenanceKind = ProvenanceKind.RECORD
     derivation: Derivation
     # The sentence a person reads under the feature. Built at render time from
     # the labels vocabulary (services/spot_labels.py), never stored free text.
     note: str | None = None
+    # Source facts a derivation used, kept so a feature can say what it was read
+    # from: the contour OGF_IDs, the survey year and method, the depth. Empty for
+    # features read off an outline.
+    attributes: dict = Field(default_factory=dict)
     area_m2: float | None = None
     length_m: float | None = None
     built_at: str

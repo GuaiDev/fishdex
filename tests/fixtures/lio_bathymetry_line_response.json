@@ -1,0 +1,83 @@
+{
+  "features": [
+    {
+      "attributes": {
+        "OGF_ID": 118431234,
+        "DEPTH": -4.0,
+        "SURVEY_METHOD": "Transect",
+        "SURVEY_DATE": 16416000000,
+        "CREATION_METHODOLOGY": "Hand Digitized",
+        "LOCATION_ACCURACY": "not to be relied on"
+      },
+      "geometry": {
+        "paths": [
+          [
+            [-78.24, 44.19],
+            [-78.23, 44.195],
+            [-78.22, 44.19]
+          ]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OGF_ID": 118431235,
+        "DEPTH": -6.0,
+        "SURVEY_METHOD": "Transect",
+        "SURVEY_DATE": 16416000000,
+        "CREATION_METHODOLOGY": "Hand Digitized",
+        "LOCATION_ACCURACY": null
+      },
+      "geometry": {
+        "paths": [
+          [
+            [-78.24, 44.191],
+            [-78.23, 44.196],
+            [-78.22, 44.191]
+          ],
+          [
+            [-78.25, 44.2],
+            [-78.24, 44.205]
+          ]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OGF_ID": 118431236,
+        "DEPTH": 0.0,
+        "SURVEY_METHOD": "Transect",
+        "SURVEY_DATE": null,
+        "CREATION_METHODOLOGY": "Hand Digitized",
+        "LOCATION_ACCURACY": null
+      },
+      "geometry": {
+        "paths": [
+          [
+            [-78.3, 44.1],
+            [-78.29, 44.11]
+          ]
+        ]
+      }
+    },
+    {
+      "attributes": {
+        "OGF_ID": 118431237,
+        "DEPTH": null,
+        "SURVEY_METHOD": "Transect",
+        "SURVEY_DATE": null,
+        "CREATION_METHODOLOGY": null,
+        "LOCATION_ACCURACY": null
+      },
+      "geometry": {
+        "paths": [
+          [
+            [-78.3, 44.12],
+            [-78.29, 44.13]
+          ]
+        ]
+      }
+    }
+  ],
+  "exceededTransferLimit": false
+}
