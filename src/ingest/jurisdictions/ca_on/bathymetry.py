@@ -26,6 +26,7 @@ Attribution travels with every contour that reaches the map:
 """
 
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from src.ingest.jurisdictions.ca_on.hydro_network import (
@@ -108,6 +109,7 @@ def fetch_bathymetry_contours(
         "returnGeometry": "true",
         "outSR": "4326",
         "resultRecordCount": str(_PAGE_SIZE),
+        "orderByFields": "OGF_ID",
         "f": "json",
     }
     features = _fetch_all_pages(url, params)
@@ -197,7 +199,7 @@ def _parse_contour(feat: dict) -> BathymetryContour | None:
             ogf_id=int(ogf_id),
             depth_m=float(depth),
             survey_method=attrs.get("SURVEY_METHOD") or None,
-            survey_date=parse_effective_date(attrs.get("SURVEY_DATE")),
+            survey_date=_parse_survey_date(attrs.get("SURVEY_DATE")),
             creation_methodology=attrs.get("CREATION_METHODOLOGY") or None,
             location_accuracy=attrs.get("LOCATION_ACCURACY") or None,
             geometry=geometry,
@@ -205,6 +207,16 @@ def _parse_contour(feat: dict) -> BathymetryContour | None:
         )
     except (ValueError, TypeError) as exc:
         logger.debug("Skipping bathymetry contour OGF_ID=%s: %s", ogf_id, exc)
+        return None
+
+
+def _parse_survey_date(ms: object) -> str | None:
+    """SURVEY_DATE (epoch ms, negative before 1970) -> ISO date; None when absent."""
+    if isinstance(ms, bool) or not isinstance(ms, (int, float)):
+        return None
+    try:
+        return (datetime(1970, 1, 1, tzinfo=UTC) + timedelta(milliseconds=ms)).date().isoformat()
+    except (OverflowError, ValueError):
         return None
 
 

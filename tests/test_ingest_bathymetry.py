@@ -213,3 +213,13 @@ def test_fetch_warns_when_a_query_is_still_truncated_at_the_page_cap(cache_dir, 
         bathymetry.fetch_bathymetry_contours(0, 0, 1, 1)
 
     assert any("still truncated" in r.message for r in caplog.records)
+
+
+def test_a_pre_1970_survey_date_is_kept():
+    from src.ingest.jurisdictions.ca_on.bathymetry import _parse_contour
+
+    feat = {
+        "attributes": {"OGF_ID": 1, "DEPTH": -3.0, "SURVEY_DATE": -142000000000},
+        "geometry": {"paths": [[[0.0, 0.0], [1.0, 1.0]]]},
+    }
+    assert _parse_contour(feat).survey_date == "1965-07-02"

@@ -265,12 +265,10 @@ def _ensure_shoreline_features(db: Database) -> None:
         )
     """)
     # A database written before bathymetry has no attributes column.
-    try:
+    if "attributes_json" not in {c.name for c in db["shoreline_features"].columns}:
         db.execute(
             "ALTER TABLE shoreline_features ADD COLUMN attributes_json TEXT NOT NULL DEFAULT '{}'"
         )
-    except Exception:
-        pass  # column already exists
     db.execute(
         "CREATE INDEX IF NOT EXISTS idx_shoreline_features_water "
         "ON shoreline_features(water_body_id, kind)"

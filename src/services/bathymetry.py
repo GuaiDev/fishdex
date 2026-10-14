@@ -181,6 +181,7 @@ def derive_bathymetry_features(
     nothing and is counted; its name is never guessed at.
     """
     result = BathymetryFeatureSet()
+    seen_contours: set[int] = set()
     for name, outline in outlines.items():
         if not outline.matched or not outline.geometry:
             continue
@@ -195,10 +196,13 @@ def derive_bathymetry_features(
             continue
         result.lakes_with_contours += 1
         for contour in contours:
+            if contour.ogf_id in seen_contours:
+                continue
+            seen_contours.add(contour.ogf_id)
             contour.water_body_id = wb_id
             if contour.built_at is None:
                 contour.built_at = built_at
-        result.contours.extend(contours)
+            result.contours.append(contour)
         result.features += _humps(wb_id, contours, index, jurisdiction, built_at, result)
         result.features += _drop_offs(wb_id, contours, index, jurisdiction, built_at, result)
     return result
@@ -415,15 +419,13 @@ def _survey_attributes(
 ) -> tuple[dict, str | None]:
     """The contour OGF_IDs, survey year and method, attribution, plus `extra`.
 
-    The year and method fall back to the survey index when the contour lines
-    carry none, so a contour is never labelled "unknown" when the survey that
-    produced it is dated. The returned date is the contour's own, for source_date.
+    The year and method come only from the contour lines' own SURVEY_DATE and
+    SURVEY_METHOD; a contour with no date is "survey date unknown", never the
+    survey index's year. The returned date is the contour's own, for source_date.
     """
     date = next((c.survey_date for c in contours if c.survey_date), None)
-    year = int(date[:4]) if date else (index.survey_year if index else None)
+    year = int(date[:4]) if date else None
     method = next((c.survey_method for c in contours if c.survey_method), None)
-    if method is None and index is not None:
-        method = index.survey_method
     attrs = {
         "contour_ogf_ids": [c.ogf_id for c in contours],
         "survey_year": year,

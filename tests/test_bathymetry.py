@@ -15,6 +15,7 @@ from src.services.bathymetry import (
     MAX_DROP_OFFS,
     MAX_HUMPS,
     MIN_HUMP_AREA_M2,
+    LakeBathymetry,
     derive_bathymetry_features,
     fetch_lake_bathymetry,
     match_index,
@@ -125,8 +126,31 @@ def test_a_shallow_ring_inside_a_deep_one_is_a_hump():
     assert hump.area_m2 > MIN_HUMP_AREA_M2
     assert hump.attributes["depth_m"] == -3.0
     assert hump.attributes["depth_change_m"] == 3.0
-    assert hump.attributes["survey_year"] == 1970
+    assert hump.attributes["survey_year"] is None
     assert hump.water_body_id == "lake:test-lake"
+
+
+def test_survey_year_comes_only_from_the_contours_own_date():
+    deep = _contour(1, -6.0, _ring(-0.015, -0.015, 0.015, 0.015), date="1965-06-01")
+    shallow = _contour(2, -3.0, _ring(-0.005, -0.005, 0.005, 0.005), date="1965-06-01")
+    hump = next(f for f in _derive([deep, shallow]).features if f.kind == "hump")
+    assert hump.attributes["survey_year"] == 1965
+    assert hump.attributes["survey_method"] is None
+
+
+def test_a_contour_shared_by_two_lakes_is_stored_once():
+    deep = _contour(1, -6.0, _ring(-0.015, -0.015, 0.015, 0.015))
+    shallow = _contour(2, -3.0, _ring(-0.005, -0.005, 0.005, 0.005))
+    bathy = LakeBathymetry(SURVEY, [deep, shallow])
+    result = derive_bathymetry_features(
+        {"A": LAKE, "B": LAKE},
+        {"A": "lake:a", "B": "lake:b"},
+        JURISDICTION,
+        BUILT,
+        {"A": bathy, "B": bathy},
+    )
+    assert sorted(c.ogf_id for c in result.contours) == [1, 2]
+    assert {c.water_body_id for c in result.contours} == {"lake:a"}
 
 
 def test_a_shallow_ring_too_small_to_draw_is_dropped_and_counted():
