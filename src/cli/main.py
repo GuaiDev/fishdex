@@ -206,7 +206,6 @@ def profile() -> None:
         default=", ".join(p.target_species),
     )
     fishing_style = typer.prompt("Fishing style", default=p.fishing_style)
-    skill_level = typer.prompt("Skill level", default=p.skill_level)
     preferences = typer.prompt("Preferences (free text)", default=p.preferences)
 
     home_location = None
@@ -224,7 +223,6 @@ def profile() -> None:
         target_species=[s.strip() for s in target_species_raw.split(",") if s.strip()],
         gear=p.gear,
         budget=p.budget,
-        skill_level=skill_level,
         fishing_style=fishing_style,
         preferences=preferences,
     )
@@ -1393,7 +1391,6 @@ def _print_profile(p: UserProfile) -> None:
         f"Home location: {home_str}",
         f"Target species: {species}",
         f"Fishing style: {p.fishing_style or '(not set)'}",
-        f"Skill level: {p.skill_level}",
         f"Preferences: {p.preferences or '(none)'}",
     ]
     if p.frequented_jurisdictions:
