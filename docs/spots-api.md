@@ -273,7 +273,7 @@ GeoJSON `FeatureCollection` of points, light enough to load for a whole viewport
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
 | `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
 | `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, nearest first. Radius defaults to 50 km and is capped at 200 km. |
-| `new_to_me` | `true` keeps only spots with at least one species recorded within 2 km that **the caller** has not caught (see [New to you](#new-to-you)). Per-user, computed for this request, never cached; the response is `Cache-Control: private, no-store`. Combines with every other filter. It reads the records around each spot, so send a `bbox` with it. Default `false`. |
+| `new_to_me` | `true` keeps only spots with at least one species recorded within 2 km that **the caller** has not caught (see [New to you](#new-to-you)). Per-user, computed for this request, never cached; the response is `Cache-Control: private, no-store`. Combines with every other filter. It reads the records around each spot, so a `bbox` is required: without one the request is rejected with 422 (`new_to_me needs a bbox`). Default `false`. |
 
 `meta.kind_counts` counts the spots in view for **every** kind, ignoring the `kind`
 filter, so the chips can show how many each would add. `meta.count` is how many

@@ -226,6 +226,9 @@ def test_the_card_model_validates_with_and_without_the_block(db):
         assert SpotCard.model_validate(card.model_dump()).spot_id == junction().spot_id
 
 
+WORLD = "-180,-90,180,90"
+
+
 # ── the new_to_me filter ─────────────────────────────────────────────────────
 
 
@@ -354,14 +357,14 @@ def test_over_http_one_user_cannot_see_another_users_progress(client):
     bob = client.get(path).json()["card"]
     assert alice["new_to_you"] is None and alice["hook"]["kind"] == "structure"
     assert bob["new_to_you"]["count"] == 2
-    listing = client.get("/map/spots?tier=3&new_to_me=true")
+    listing = client.get(f"/map/spots?bbox={WORLD}&tier=3&new_to_me=true")
     assert ids(listing.json()) == [junction().spot_id]
     client.who["id"] = ALICE
-    assert client.get("/map/spots?tier=3&new_to_me=true").json()["features"] == []
+    assert client.get(f"/map/spots?bbox={WORLD}&tier=3&new_to_me=true").json()["features"] == []
 
 
 def test_new_to_me_over_http_is_private_and_the_plain_list_is_unchanged(client):
-    listing = client.get("/map/spots?tier=3&new_to_me=true")
+    listing = client.get(f"/map/spots?bbox={WORLD}&tier=3&new_to_me=true")
     assert listing.status_code == 200
     assert listing.headers["cache-control"] == "private, no-store"
     assert listing.json()["meta"]["new_to_me"] is True
@@ -371,4 +374,11 @@ def test_new_to_me_over_http_is_private_and_the_plain_list_is_unchanged(client):
 
 
 def test_new_to_me_must_be_a_boolean(client):
-    assert client.get("/map/spots?new_to_me=maybe").status_code == 422
+    assert client.get(f"/map/spots?bbox={WORLD}&new_to_me=maybe").status_code == 422
+
+
+def test_new_to_me_without_a_bbox_is_rejected(client):
+    response = client.get("/map/spots?tier=3&new_to_me=true")
+    assert response.status_code == 422
+    assert response.json()["detail"] == "new_to_me needs a bbox"
+    assert client.get("/map/spots?tier=3&new_to_me=false").status_code == 200

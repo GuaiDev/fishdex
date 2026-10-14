@@ -1722,13 +1722,15 @@ def get_map_spots(
     the normal ones (default), 3 everything. Built by `make build-spots` (and at the
     end of `make build-anchors`); an empty collection means it has not been run.
     `new_to_me=true` keeps only spots with a recorded species the caller has not caught
-    (confirmed catches only), and is computed for the caller alone.
+    (confirmed catches only), and is computed for the caller alone. It needs a `bbox`.
     """
     from src.services.spots import spots_geojson
     from src.storage.database import get_db
 
     box, kinds, species_f, near_f = _parse_spot_filters(bbox, kind, tier, species, near)
     if new_to_me:
+        if box is None:
+            raise HTTPException(status_code=422, detail="new_to_me needs a bbox")
         # Per-user answer: never let a browser or proxy keep it for the next person.
         response.headers["Cache-Control"] = "private, no-store"
     return spots_geojson(
