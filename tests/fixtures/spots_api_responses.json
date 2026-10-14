@@ -166,6 +166,19 @@
           "shoreline_outline": "from the shoreline outline",
           "watercourse_endpoint": "where a mapped stream meets the shore"
         },
+        "new_to_you": {
+          "title": "New to you",
+          "hook_one": "1 species recorded here you haven't caught yet",
+          "hook_many": "{n} species recorded here you haven't caught yet",
+          "tap_prompt": "Tap to see which",
+          "note": "Based on the catches you have confirmed. Only you see this."
+        },
+        "filters": {
+          "new_to_me": {
+            "chip": "New to me",
+            "one_liner": "Spots with fish recorded nearby that you haven't caught yet."
+          }
+        },
         "layers": {
           "getting_there": {
             "label": "Getting there",
@@ -933,6 +946,7 @@
             ],
             "default_open": false
           },
+          "new_to_you": null,
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -1160,6 +1174,7 @@
             ],
             "default_open": false
           },
+          "new_to_you": null,
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -1309,6 +1324,7 @@
             ],
             "default_open": false
           },
+          "new_to_you": null,
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -1438,6 +1454,7 @@
             ],
             "default_open": false
           },
+          "new_to_you": null,
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -1452,7 +1469,7 @@
     },
     {
       "request": "GET /map/spots/below_dam:n8038314_4319587",
-      "note": "card with fish records. EXAMPLE records added to a throwaway copy of the database to show the shape; they are not observations",
+      "note": "card with fish records, for a logged-in angler who has caught nothing yet, so the hook is `new_to_you` and `card.new_to_you` names every recorded species. EXAMPLE records added to a throwaway copy of the database to show the shape; they are not observations",
       "status": 200,
       "response": {
         "spot_id": "below_dam:n8038314_4319587",
@@ -1566,8 +1583,8 @@
           "spot_id": "below_dam:n8038314_4319587",
           "hook": {
             "title": "Why it's interesting",
-            "kind": "structure",
-            "text": "The water just downstream of a dam."
+            "kind": "new_to_you",
+            "text": "4 species recorded here you haven't caught yet"
           },
           "might_find": {
             "title": "You might find",
@@ -1673,6 +1690,51 @@
             ],
             "default_open": false
           },
+          "new_to_you": {
+            "title": "New to you",
+            "count": 4,
+            "tap_prompt": "Tap to see which",
+            "species": [
+              {
+                "name": "Rainbow Darter",
+                "scientific_name": "Etheostoma caeruleum",
+                "source": "GBIF/Example fish survey",
+                "date": "2019-07-10",
+                "evidence": "survey",
+                "cite": "GBIF/Example fish survey, 2019-07-10",
+                "note": null
+              },
+              {
+                "name": "Creek Chub",
+                "scientific_name": "Semotilus atromaculatus",
+                "source": "iNaturalist",
+                "date": "2024-06-03",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2024-06-03",
+                "note": null
+              },
+              {
+                "name": "Blacknose Dace",
+                "scientific_name": "Rhinichthys atratulus",
+                "source": "iNaturalist",
+                "date": "2023-08-19",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2023-08-19",
+                "note": null
+              },
+              {
+                "name": "White Sucker",
+                "scientific_name": "Catostomus commersonii",
+                "source": "iNaturalist",
+                "date": "2022-05-02",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2022-05-02",
+                "note": null
+              }
+            ],
+            "note": "Based on the catches you have confirmed. Only you see this.",
+            "default_open": false
+          },
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -1686,8 +1748,355 @@
       }
     },
     {
+      "request": "GET /map/spots/below_dam:n8038314_4319587",
+      "note": "the same card after the angler confirmed catching Creek Chub and Rainbow Darter: the hook counts what is left and `card.new_to_you` lists only those. A different user asking gets the previous entry, not this one. EXAMPLE records and catches in a throwaway copy of the database",
+      "status": 200,
+      "response": {
+        "spot_id": "below_dam:n8038314_4319587",
+        "kind": "below_dam",
+        "jurisdiction": "CA-ON",
+        "lat": 43.195868,
+        "lng": -80.38314,
+        "water_id": "grand-cambridge-paris",
+        "water_name": "Cambridge to Paris",
+        "water_body_id": "river:grand-river",
+        "also_on_water_body_ids": [],
+        "title": "Below the Paris Dam",
+        "subtitle": "Grand River · Cambridge to Paris",
+        "tier": 1,
+        "structure_type": "dam",
+        "structure_attrs": {
+          "dam_kind": "dam",
+          "reach_m": 410,
+          "tailwater_verified": true
+        },
+        "signals": {
+          "named": true,
+          "nearest_bridge_m": 171,
+          "nearest_parking_m": 150
+        },
+        "getting_there": [
+          {
+            "kind": "parking",
+            "name": null,
+            "lat": 43.196501,
+            "lng": -80.3815019,
+            "distance_m": 150,
+            "source_ref": "way/533807418",
+            "attributes": {}
+          },
+          {
+            "kind": "parking",
+            "name": null,
+            "lat": 43.1936867,
+            "lng": -80.3843379,
+            "distance_m": 262,
+            "source_ref": "way/475398031",
+            "attributes": {
+              "access": "yes",
+              "fee": "no",
+              "surface": "asphalt"
+            }
+          }
+        ],
+        "bridges": [
+          {
+            "kind": "road_crossing",
+            "name": "William Street",
+            "lat": 43.194342,
+            "lng": -80.383334,
+            "distance_m": 171,
+            "source_ref": "way/40790441",
+            "attributes": {
+              "ref": "CR 50"
+            }
+          }
+        ],
+        "sources": [
+          {
+            "kind": "osm",
+            "ref": "way/248706708",
+            "anchor_ids": [
+              "grand-cambridge-paris:tailwater:osm-way-248706708"
+            ],
+            "built_at": "2026-10-12T21:43:44+00:00"
+          },
+          {
+            "kind": "osm",
+            "ref": "way/248706708",
+            "anchor_ids": [
+              "grand-cambridge-paris:dam:osm-way-248706708"
+            ],
+            "built_at": "2026-10-12T21:43:44+00:00"
+          }
+        ],
+        "built_at": "2026-10-12T21:43:44+00:00",
+        "water_body": {
+          "water_body_id": "river:grand-river",
+          "name": "Grand River",
+          "display_name": "Grand River",
+          "name_source": "curated",
+          "type": "river"
+        },
+        "also_on_water_bodies": [],
+        "more_on_this_water": [
+          {
+            "spot_id": "creek_junction:n8038226_4319286",
+            "kind": "creek_junction",
+            "title": "Where the Nith River joins the Grand River",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n8031055_4330884",
+            "kind": "creek_junction",
+            "title": "Where Alder Creek joins the Grand River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n8031731_4334263",
+            "kind": "creek_junction",
+            "title": "Where Moffatt's Creek joins the Grand River",
+            "tier": 2
+          }
+        ],
+        "card": {
+          "spot_id": "below_dam:n8038314_4319587",
+          "hook": {
+            "title": "Why it's interesting",
+            "kind": "new_to_you",
+            "text": "2 species recorded here you haven't caught yet"
+          },
+          "might_find": {
+            "title": "You might find",
+            "species": [
+              {
+                "name": "Rainbow Darter",
+                "scientific_name": "Etheostoma caeruleum",
+                "source": "GBIF/Example fish survey",
+                "date": "2019-07-10",
+                "evidence": "survey",
+                "cite": "GBIF/Example fish survey, 2019-07-10",
+                "note": null
+              },
+              {
+                "name": "Creek Chub",
+                "scientific_name": "Semotilus atromaculatus",
+                "source": "iNaturalist",
+                "date": "2024-06-03",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2024-06-03",
+                "note": null
+              },
+              {
+                "name": "Blacknose Dace",
+                "scientific_name": "Rhinichthys atratulus",
+                "source": "iNaturalist",
+                "date": "2023-08-19",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2023-08-19",
+                "note": null
+              },
+              {
+                "name": "White Sucker",
+                "scientific_name": "Catostomus commersonii",
+                "source": "iNaturalist",
+                "date": "2022-05-02",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2022-05-02",
+                "note": null
+              }
+            ],
+            "more_text": null,
+            "caveat": "Recorded nearby, not a catch guarantee.",
+            "empty_text": null,
+            "note": null,
+            "radius_km": 2.0,
+            "default_open": true
+          },
+          "why_gather": {
+            "title": "Why fish gather here",
+            "what_it_is": "The water just downstream of a dam or weir.",
+            "general": {
+              "text": "A dam or weir blocks fish from moving further upstream, so they gather in the water just below it. That water is churned up and rich in oxygen.",
+              "label": "General reasoning, not a record about this spot",
+              "provenance": "inference"
+            },
+            "facts_title": "What our records say about this spot",
+            "facts": [
+              {
+                "text": "Mapped as a dam.",
+                "provenance": "record",
+                "source": "OpenStreetMap"
+              },
+              {
+                "text": "4 fish records within 2 km, covering 4 species.",
+                "provenance": "record",
+                "source": "GBIF, iNaturalist"
+              }
+            ],
+            "default_open": false
+          },
+          "getting_there": {
+            "title": "Getting there",
+            "items": [
+              {
+                "kind": "parking",
+                "label": "Parking",
+                "text": "Parking about 150 m away",
+                "distance_m": 150,
+                "details": [],
+                "source": "OpenStreetMap"
+              },
+              {
+                "kind": "road_crossing",
+                "label": "Road crossing",
+                "text": "Public road crossing (William Street) about 170 m away",
+                "distance_m": 171,
+                "details": [],
+                "source": "OpenStreetMap"
+              }
+            ],
+            "empty_text": null,
+            "crown_land": {
+              "state": "not_checked",
+              "text": "We have no Crown land data for this area.",
+              "source": null
+            },
+            "unverified_title": "Not checked on the ground",
+            "unverified": [
+              "Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.",
+              "Distances are in a straight line, not by road or trail.",
+              "Fishing rules and permission to cross private land are not checked here."
+            ],
+            "default_open": false
+          },
+          "new_to_you": {
+            "title": "New to you",
+            "count": 2,
+            "tap_prompt": "Tap to see which",
+            "species": [
+              {
+                "name": "Blacknose Dace",
+                "scientific_name": "Rhinichthys atratulus",
+                "source": "iNaturalist",
+                "date": "2023-08-19",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2023-08-19",
+                "note": null
+              },
+              {
+                "name": "White Sucker",
+                "scientific_name": "Catostomus commersonii",
+                "source": "iNaturalist",
+                "date": "2022-05-02",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2022-05-02",
+                "note": null
+              }
+            ],
+            "note": "Based on the catches you have confirmed. Only you see this.",
+            "default_open": false
+          },
+          "terms": [],
+          "meta": {
+            "records_radius_km": 2.0,
+            "species_shown": 4,
+            "species_withheld_protected": 0,
+            "species_withheld_imprecise": 0,
+            "species_status_unchecked": 4,
+            "cache_key": "below_dam:n8038314_4319587@2026-10-12T21:43:44+00:00"
+          }
+        }
+      }
+    },
+    {
+      "request": "GET /map/spots?bbox=-80.4331,43.1459,-80.3331,43.2459&tier=3&new_to_me=true",
+      "note": "the New to me filter for that angler: only spots with a recorded species they have not caught, each with `properties.new_to_you`. The care-message spot is absent unless a non-listed fish is recorded there. EXAMPLE records and catches in a throwaway copy of the database",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "count": 2,
+          "kind_counts": {
+            "river_mouth": 0,
+            "creek_junction": 1,
+            "below_dam": 1,
+            "public_fishing": 0,
+            "quiet_water": 0
+          },
+          "max_tier": 3,
+          "new_to_me": true
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "creek_junction:n8038226_4319286",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.38226,
+                43.19286
+              ]
+            },
+            "properties": {
+              "spot_id": "creek_junction:n8038226_4319286",
+              "kind": "creek_junction",
+              "title": "Where the Nith River joins the Grand River",
+              "subtitle": "Grand River · Cambridge to Paris",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "grand-cambridge-paris",
+              "water_name": "Cambridge to Paris",
+              "water_body_id": "river:grand-river",
+              "signals": {
+                "named": true,
+                "nearest_bridge_m": 187,
+                "nearest_parking_m": 138,
+                "size_class": "large"
+              },
+              "new_to_you": {
+                "count": 2,
+                "text": "2 species recorded here you haven't caught yet"
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "below_dam:n8038314_4319587",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.38314,
+                43.195868
+              ]
+            },
+            "properties": {
+              "spot_id": "below_dam:n8038314_4319587",
+              "kind": "below_dam",
+              "title": "Below the Paris Dam",
+              "subtitle": "Grand River · Cambridge to Paris",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "grand-cambridge-paris",
+              "water_name": "Cambridge to Paris",
+              "water_body_id": "river:grand-river",
+              "signals": {
+                "named": true,
+                "nearest_bridge_m": 171,
+                "nearest_parking_m": 150
+              },
+              "new_to_you": {
+                "count": 2,
+                "text": "2 species recorded here you haven't caught yet"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "request": "GET /map/spots/creek_junction:n7966741_4355566",
-      "note": "protected-species card: the hook is a care message and the listed fish is named nowhere. An EXAMPLE listed record was added to a throwaway copy of the database; it is not an observation",
+      "note": "protected-species card: the hook is a care message and the listed fish is named nowhere, not even in `card.new_to_you`, which lists only the other fish this angler has not caught. An EXAMPLE listed record was added to a throwaway copy of the database; it is not an observation",
       "status": 200,
       "response": {
         "spot_id": "creek_junction:n7966741_4355566",
@@ -1854,6 +2263,33 @@
               "Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.",
               "Fishing rules and permission to cross private land are not checked here."
             ],
+            "default_open": false
+          },
+          "new_to_you": {
+            "title": "New to you",
+            "count": 2,
+            "tap_prompt": "Tap to see which",
+            "species": [
+              {
+                "name": "Blacknose Dace",
+                "scientific_name": "Rhinichthys atratulus",
+                "source": "iNaturalist",
+                "date": "2023-08-19",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2023-08-19",
+                "note": null
+              },
+              {
+                "name": "White Sucker",
+                "scientific_name": "Catostomus commersonii",
+                "source": "iNaturalist",
+                "date": "2022-05-02",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2022-05-02",
+                "note": null
+              }
+            ],
+            "note": "Based on the catches you have confirmed. Only you see this.",
             "default_open": false
           },
           "terms": [],

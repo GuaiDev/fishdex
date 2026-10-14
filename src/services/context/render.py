@@ -54,11 +54,13 @@ from src.models.spot_card import (
     GettingThereBlock,
     GlossaryTerm,
     MightFindBlock,
+    NewToYouBlock,
     SpotCard,
     WhyGatherBlock,
 )
 from src.services import spot_labels, terms
 from src.services.context import translate
+from src.services.new_to_you import is_caught
 
 # A record older than this is called out in the rendering. Not a cutoff and not
 # a confidence penalty — the angler weighs it. We only make sure the date is
@@ -600,6 +602,8 @@ class _Species:
 
     line: CardSpecies
     count: int
+    scientific: str  # what the record filed it under, for matching against a user's catches
+    common: str | None
 
 
 @dataclass
@@ -611,6 +615,9 @@ class _CardInputs:
     shown_records: int  # records behind `shown`
     n_protected: int
     n_imprecise: int
+    # Species in `shown` the logged-in user has not caught, ranked like `shown`.
+    # None for a caller with no user; [] for a user with nothing new.
+    new_species: list[CardSpecies] | None = None
 
     @property
     def radius(self) -> str:
@@ -626,6 +633,11 @@ class HookRule(NamedTuple):
 
 def _hook_protected(c: _CardInputs) -> str | None:
     return CARE_MESSAGE if c.n_protected else None
+
+
+def _hook_new_to_you(c: _CardInputs) -> str | None:
+    """"3 species recorded here you haven't caught yet": only for a user with something new."""
+    return spot_labels.new_to_you_hook(len(c.new_species)) if c.new_species else None
 
 
 def _hook_structure(c: _CardInputs) -> str | None:
@@ -653,13 +665,14 @@ def _hook_honest_empty(c: _CardInputs) -> str | None:
     return HONEST_EMPTY.format(radius=c.radius)
 
 
-# First rule that has data wins. "new_to_you" needs the logged-in user (phase 5)
-# and "distinctive" needs frequency along the river (phase 6); the card is the
-# same for everyone, so both are empty slots. They show nothing, not even a
-# placeholder, until their phase fills `build`.
+# First rule that has data wins. "new_to_you" is per-user: it speaks only when
+# the caller is a logged-in user with a recorded species they have not caught,
+# and otherwise the chain falls through to "structure". "distinctive" needs
+# frequency along the river (phase 6) and is an empty slot: it shows nothing,
+# not even a placeholder, until its phase fills `build`.
 HOOK_CHAIN: tuple[HookRule, ...] = (
     HookRule("protected_species", _hook_protected),
-    HookRule("new_to_you", None),
+    HookRule("new_to_you", _hook_new_to_you),
     HookRule("distinctive", None),
     HookRule("structure", _hook_structure),
     HookRule("honest_empty", _hook_honest_empty),
@@ -719,6 +732,8 @@ def _species_line(rec) -> _Species | None:
             note=note,
         ),
         count=rec.count,
+        scientific=rec.species,
+        common=rec.common_name,
     )
 
 
@@ -924,11 +939,52 @@ def _terms_used(*texts: str) -> list[GlossaryTerm]:
     return out
 
 
+def _rank_recorded(
+    ctx: PlaceContext | None, protected: frozenset[str]
+) -> tuple[list[_Species], int, int]:
+    """(ranked nameable species, n_protected, n_imprecise) for a describe() result.
+
+    The one place that decides which recorded species a card may name, so the
+    species list, the "new to you" hook and the `new_to_me` filter cannot disagree.
+    """
+    rows: list[_Species] = []
+    n_protected = n_imprecise = 0
+    for rec in ctx.records.species if ctx and ctx.records else []:
+        if rec.species.strip().lower() in protected:
+            n_protected += 1
+        elif rec.is_obscured and not rec.survey_record:
+            n_imprecise += 1  # ~22 km of fuzz is not "within 2 km"
+        elif (row := _species_line(rec)) is not None:
+            rows.append(row)
+    return _rank(rows), n_protected, n_imprecise
+
+
+def new_species_for_user(
+    ctx: PlaceContext | None, protected: frozenset[str], caught: frozenset[str]
+) -> list[CardSpecies]:
+    """Nameable recorded species the user has not caught, ranked. Never a protected one."""
+    ranked, _, _ = _rank_recorded(ctx, protected)
+    return [r.line for r in ranked if not is_caught(caught, r.scientific, r.common)]
+
+
+def _new_to_you_block(new_species: list[CardSpecies] | None) -> NewToYouBlock | None:
+    if not new_species:
+        return None
+    return NewToYouBlock(
+        title=spot_labels.NEW_TO_YOU_TITLE,
+        count=len(new_species),
+        tap_prompt=spot_labels.NEW_TO_YOU_TAP_PROMPT,
+        species=new_species,
+        note=spot_labels.NEW_TO_YOU_NOTE,
+    )
+
+
 def render_spot(
     spot: Spot,
     ctx: PlaceContext | None,
     protected: frozenset[str] = frozenset(),
     unchecked: int = 0,
+    caught: frozenset[str] | None = None,
 ) -> SpotCard:
     """The whole tap card for one spot: four blocks, every string already written.
 
@@ -940,19 +996,19 @@ def render_spot(
     anywhere in the card, are not counted, and turn the hook into a care message.
     `unchecked` is how many recorded species were not in the species file.
 
-    The card is the same for every user. Nothing here reads a person's history.
+    The card is the same for every user, with one exception. `caught` is the
+    match keys of the logged-in user's confirmed catches (`new_to_you.caught_keys`)
+    and is None for a caller with no user. Only then are the "new to you" hook and
+    block filled; `ctx` is never built from a person's history, so nothing else
+    on the card changes with who asks.
     """
     radius = ctx.place.radius_km if ctx else 2.0
-    rows: list[_Species] = []
-    n_protected = n_imprecise = 0
-    for rec in ctx.records.species if ctx and ctx.records else []:
-        if rec.species.strip().lower() in protected:
-            n_protected += 1
-        elif rec.is_obscured and not rec.survey_record:
-            n_imprecise += 1  # ~22 km of fuzz is not "within 2 km"
-        elif (row := _species_line(rec)) is not None:
-            rows.append(row)
-    ranked = _rank(rows)
+    ranked, n_protected, n_imprecise = _rank_recorded(ctx, protected)
+    new_species = (
+        [r.line for r in ranked if not is_caught(caught, r.scientific, r.common)]
+        if caught is not None
+        else None
+    )
     inputs = _CardInputs(
         spot=spot,
         ctx=ctx,
@@ -961,6 +1017,7 @@ def render_spot(
         shown_records=sum(r.count for r in ranked),
         n_protected=n_protected,
         n_imprecise=n_imprecise,
+        new_species=new_species,
     )
     hook = _choose_hook(inputs)
     getting_there = _getting_there(inputs)
@@ -971,6 +1028,7 @@ def render_spot(
         might_find=_might_find(inputs),
         why_gather=why_gather,
         getting_there=getting_there,
+        new_to_you=_new_to_you_block(new_species),
         terms=_terms_used(spot.title, hook.text, *(f.text for f in why_gather.facts)),
         meta=CardMeta(
             records_radius_km=radius,

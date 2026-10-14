@@ -61,9 +61,13 @@ pressure from anglers, and a map must not blur them.
 - Records and reasoning never share a line. `provenance: "record"` things carry a
   `source`; the one `provenance: "inference"` thing is the general explanation, shown
   with its `label`.
-- The card is the same for every user and can be cached by `meta.cache_key`
-  (`{spot_id}@{built_at}`). Nothing on it is per-user. "New to you" is a later phase and
-  has no field yet.
+- The card is the same for every user and the shared part can be cached by `meta.cache_key`
+  (`{spot_id}@{built_at}`), with one exception: **"new to you" is per-user**. `card.hook`
+  (when its `kind` is `new_to_you`) and `card.new_to_you` are computed for the caller from
+  their own confirmed catches on every request. Never cache the response across users, and
+  never show the count, the names or the filter to anyone but the person they belong to: it
+  is not a leaderboard, a public count or something to share. The endpoints send
+  `Cache-Control: private, no-store` for this reason.
 
 ## `GET /map/spots/labels`
 
@@ -74,6 +78,11 @@ All user-facing strings, in display order (Quiet water last).
   `why_fish_gather` = `{text, label, provenance}`: exactly two sentences, `label` is the
   caption to show with it, `provenance` is `"inference"`.
 - `river_mouth_subline` — the line under the River mouths chip.
+- `new_to_you` — the words for the per-user hook: `title` (the block title), `hook_one` and
+  `hook_many` (the hook text; `hook_many` has an `{n}` to fill, but `card.hook.text` and
+  `properties.new_to_you.text` already arrive filled in), `tap_prompt` ("Tap to see which")
+  and `note` (whose catches it is based on).
+- `filters.new_to_me` — `chip` and `one_liner` for the "New to me" toggle.
 - `layers` — the Getting there and Bridges layers: `label`, `kinds`, `default_on`, `note`.
 - `access_labels` — display names for `getting_there[].kind` and `bridges[].kind`.
 - `water_body_types[]` — for each water body `type`: `chip` (plural, for a filter), `label`
@@ -264,6 +273,7 @@ GeoJSON `FeatureCollection` of points, light enough to load for a whole viewport
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
 | `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
 | `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, nearest first. Radius defaults to 50 km and is capped at 200 km. |
+| `new_to_me` | `true` keeps only spots with at least one species recorded within 2 km that **the caller** has not caught (see [New to you](#new-to-you)). Per-user, computed for this request, never cached; the response is `Cache-Control: private, no-store`. Combines with every other filter. It reads the records around each spot, so send a `bbox` with it. Default `false`. |
 
 `meta.kind_counts` counts the spots in view for **every** kind, ignoring the `kind`
 filter, so the chips can show how many each would add. `meta.count` is how many
@@ -273,6 +283,8 @@ never by any measure of how popular a place is.
 Each feature's `properties`: `spot_id`, `kind`, `title`, `subtitle`, `tier`,
 `jurisdiction`, `water_body_id` (the river, creek or lake it is a child of, see
 `/map/water-bodies`), `water_id`, `water_name` (the river section it sits on) and `signals`.
+With `new_to_me=true` each feature also has `new_to_you` = `{count, text}` (`text` is the
+ready-made "2 species recorded here you haven't caught yet"), and `meta.new_to_me` is `true`.
 
 ```json
 {
@@ -1051,12 +1063,12 @@ Every user-facing string is in it, including block titles.
 
 | Block | Field | What it holds |
 |---|---|---|
-| 1. Why it's interesting | `card.hook` | `title`, `kind`, `text`: at most two lines. The first rule with data wins: `protected_species` (a care message that replaces everything else), then `structure` (one plain sentence about the water, only where a record supports it), then `honest_empty` ("No fish records within 2 km, so this is a place to find out."). `kind_description` is used when fish are recorded but nothing above has anything specific to say; it is the kind's one-liner. `new_to_you` and `distinctive` are reserved for later phases and never appear yet. |
+| 1. Why it's interesting | `card.hook` | `title`, `kind`, `text`: at most two lines. The first rule with data wins: `protected_species` (a care message that replaces everything else), then `structure` (one plain sentence about the water, only where a record supports it), then `honest_empty` ("No fish records within 2 km, so this is a place to find out."). `kind_description` is used when fish are recorded but nothing above has anything specific to say; it is the kind's one-liner. `new_to_you` is the first hook for a logged-in user who has something new (see [New to you](#new-to-you)); it sits after `protected_species`, so a care message still replaces it, and when it has nothing the chain falls through to `structure` as before. `distinctive` is reserved for a later phase and never appears yet. |
 | 2. You might find | `card.might_find` | `species[]` (top 5), `more_text`, `caveat` ("Recorded nearby, not a catch guarantee."), `empty_text` (why there is no list), `note` (why some recorded species are left out), `radius_km`. Each species has `name`, `scientific_name`, `source`, `date`, `evidence`, `cite` (`"iNaturalist, 2024-06-03"`, ready to show in brackets) and `note` (`"Older record"` for a record a decade old or more). Standardised surveys (`evidence: "survey"`) come first, then photos and sightings, each most recent first. |
 | 3. Why fish gather here | `card.why_gather` | `what_it_is` (the kind in plain words), `general` = `{text, label, provenance: "inference"}`: the kind's two sentences, shown with the label "General reasoning, not a record about this spot". Then `facts_title` and `facts[]`: facts about this spot, each `{text, provenance: "record", source}`. They are listed apart from the reasoning on purpose. |
 | 4. Getting there | `card.getting_there` | `items[]`: the nearest parking, trailhead, boat launch and public road crossing, each `{kind, label, text, distance_m, details[], source}` (`text` is "Parking about 150 m away"; `details` are mapped tags such as "mapped as free"). `empty_text` when there are none. `crown_land` = `{state, text, source}` where `state` is `mapped`, `none_found` or `not_checked`. `unverified_title` and `unverified[]`: what has not been checked on the ground. |
 
-Also on the card: `terms[]`, entries from the term registry (`{term, term_id, text}`,
+Also on the card: `new_to_you` (see below; `null` when there is nothing new), and `terms[]`, entries from the term registry (`{term, term_id, text}`,
 `src/services/terms.py`) for the hard words that appear in this card's own text (for a
 weir, "weir"), to show behind a "What's a weir?" link; and `meta`, counts for a Sources view that are not shown on the card face:
 `species_shown`, `species_withheld_protected` (a number, never names),
@@ -1078,7 +1090,7 @@ species file. A species the file does not know at all is still shown, and counte
 
 **What a card is built from.** The spot, and `describe(map_tap)` within 2 km: no model
 call, no live lookup, no web search. The response has `Cache-Control: private,
-max-age=300`.
+no-store`, because the "new to you" hook depends on who asks.
 
 The card payload for a spot whose structure gives nothing specific to say and where nothing is
 recorded (an honest-empty card):
@@ -1596,9 +1608,8 @@ id nobody has used. Their layer and list are simply empty of it.
 
 ## What is not here yet
 
-- **"New to you"** and **"recorded more often here than along the rest of the river"**
-  hooks. Both are slots in the hook chain with no text yet; "new to you" needs the
-  logged-in user (phase 5) and the other needs frequency along the river (phase 6).
+- **"Recorded more often here than along the rest of the river"** hook. A slot in the
+  hook chain with no text yet; it needs frequency along the river (phase 6).
 - **Seasons and gear.** The card makes no claim about when or how to fish.
 - **Water body outlines** are built for the curated lakes: a lake's OHN Waterbody polygon is
   matched by position at build time and served as `geometry`, with the source OGF_IDs, name,
@@ -1611,6 +1622,97 @@ id nobody has used. Their layer and list are simply empty of it.
   none is derived, and none appears on a spot, a card or a water body.
 - **Quiet water** spots (a ranking of reaches, not a located structure). The kind and its
   chip exist in `labels` so the filter row can be designed now; no spot has that kind.
+
+### New to you
+
+A per-user hook and block, filled only for the logged-in caller:
+
+    new_species = species recorded within 2 km − the caller's confirmed catches
+                  (and never a species with a listing signal)
+
+- **Confirmed catches only.** A species the angler has logged but not confirmed (a text or
+  photo-ID guess) is not caught, so it still counts as new. This is the same rule the
+  FishDex screen uses.
+- **Never a listed species.** The same screen that keeps a protected fish out of "You might
+  find" keeps it out of the count and the names. A spot whose only recorded fish are listed
+  has nothing new, and its hook stays the care message.
+- **Computed per request, for the caller alone.** One angler's catches never change another
+  angler's card, and nothing about it is stored on a spot or in a cache. Do not cache the
+  response across users.
+- **No user, or nothing new:** `card.new_to_you` is `null` and the hook is whatever the
+  chain gives next (`structure`, `honest_empty`, `kind_description`).
+- **Shown as a prompt, not a score:** "3 species recorded here you haven't caught yet" in the
+  hook; the names behind a tap on `card.new_to_you.species[]`. No ranking, no total across
+  spots, nothing to share.
+
+`card.new_to_you` = `title`, `count`, `tap_prompt`, `species[]` (every new species, each
+shaped like a `might_find` species with its own `cite`, surveys first), `note` and
+`default_open` (`false`: collapsed behind the tap).
+
+A card for an angler who has confirmed catching Creek Chub and Rainbow Darter, at a spot with
+four recorded species (example records; see the fixture):
+
+```json
+{
+  "hook": {
+    "title": "Why it's interesting",
+    "kind": "new_to_you",
+    "text": "2 species recorded here you haven't caught yet"
+  },
+  "new_to_you": {
+    "title": "New to you",
+    "count": 2,
+    "tap_prompt": "Tap to see which",
+    "species": [
+      {
+        "name": "Blacknose Dace",
+        "scientific_name": "Rhinichthys atratulus",
+        "source": "iNaturalist",
+        "date": "2023-08-19",
+        "evidence": "sighting",
+        "cite": "iNaturalist, 2023-08-19",
+        "note": null
+      },
+      {
+        "name": "White Sucker",
+        "scientific_name": "Catostomus commersonii",
+        "source": "iNaturalist",
+        "date": "2022-05-02",
+        "evidence": "sighting",
+        "cite": "iNaturalist, 2022-05-02",
+        "note": null
+      }
+    ],
+    "note": "Based on the catches you have confirmed. Only you see this.",
+    "default_open": false
+  }
+}
+```
+
+`GET /map/spots?bbox=…&new_to_me=true` for the same angler returns the spots that still have
+something new, each with its count (`meta.new_to_me` is `true`):
+
+```json
+{
+  "type": "Feature",
+  "id": "creek_junction:n8038226_4319286",
+  "geometry": { "type": "Point", "coordinates": [-80.38226, 43.19286] },
+  "properties": {
+    "spot_id": "creek_junction:n8038226_4319286",
+    "kind": "creek_junction",
+    "title": "Where the Nith River joins the Grand River",
+    "tier": 1,
+    "jurisdiction": "CA-ON",
+    "water_body_id": "river:grand-river",
+    "new_to_you": {
+      "count": 2,
+      "text": "2 species recorded here you haven't caught yet"
+    }
+  }
+}
+```
+
+(Trimmed here; the fixture has the full feature and the full response.)
 
 ## About the example data
 
@@ -1625,7 +1727,9 @@ spot cards in it are honest-empty or show the structure hook. Two entries are th
 exception, and their `note` says so: the card with fish records and the protected-species
 card were captured from a throwaway copy of the database with **example** records added
 (four common fish, one of them a survey record, and one Redside Dace marked Endangered).
-They exist to show the shape and are not observations. A real record near a real spot
+Those two example cards, the "after two catches" card and the `new_to_me` list were
+captured as a logged-in angler (user 1) with example catches added to the same throwaway
+copy. They exist to show the shape and are not observations. A real record near a real spot
 produces the same payload.
 
 ## Building and refreshing

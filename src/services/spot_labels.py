@@ -78,6 +78,23 @@ KINDS: dict[SpotKind, KindLabels] = {
 # Under the River mouths chip, per the report's wording question.
 RIVER_MOUTH_SUBLINE = "Where a river meets a lake"
 
+# "New to you": per-user, so the words live here and the client shows them as given.
+# A count and a prompt, never a score: no rank, no total across spots, nothing shared.
+NEW_TO_YOU_TITLE = "New to you"
+NEW_TO_YOU_HOOK_ONE = "1 species recorded here you haven't caught yet"
+NEW_TO_YOU_HOOK_MANY = "{n} species recorded here you haven't caught yet"
+NEW_TO_YOU_TAP_PROMPT = "Tap to see which"
+NEW_TO_YOU_NOTE = "Based on the catches you have confirmed. Only you see this."
+NEW_TO_ME_FILTER = {
+    "chip": "New to me",
+    "one_liner": "Spots with fish recorded nearby that you haven't caught yet.",
+}
+
+
+def new_to_you_hook(n: int) -> str:
+    return NEW_TO_YOU_HOOK_ONE if n == 1 else NEW_TO_YOU_HOOK_MANY.format(n=n)
+
+
 # Getting-there layer: what each kind of access is called on a card and a legend.
 ACCESS_LABELS: dict[str, str] = {
     "parking": "Parking",
@@ -234,6 +251,14 @@ def labels_payload() -> dict:
             for kind in FEATURE_KIND_ORDER
         ],
         "shoreline_derivations": FEATURE_DERIVATION_LABELS,
+        "new_to_you": {
+            "title": NEW_TO_YOU_TITLE,
+            "hook_one": NEW_TO_YOU_HOOK_ONE,
+            "hook_many": NEW_TO_YOU_HOOK_MANY,
+            "tap_prompt": NEW_TO_YOU_TAP_PROMPT,
+            "note": NEW_TO_YOU_NOTE,
+        },
+        "filters": {"new_to_me": NEW_TO_ME_FILTER},
         "layers": LAYERS,
         "access_labels": ACCESS_LABELS,
         # Every map/habitat concept, with plain and technical wording and a
@@ -259,5 +284,13 @@ def all_strings() -> list[str]:
     out += [FEATURE_READ_FROM_OUTLINE, FEATURE_READ_FROM_MAP]
     for layer in LAYERS.values():
         out += [layer["label"], layer["note"]]
+    out += [
+        NEW_TO_YOU_TITLE,
+        NEW_TO_YOU_HOOK_ONE,
+        NEW_TO_YOU_HOOK_MANY,
+        NEW_TO_YOU_TAP_PROMPT,
+        NEW_TO_YOU_NOTE,
+        *NEW_TO_ME_FILTER.values(),
+    ]
     out += list(TITLES.values()) + list(UNNAMED_TRIBUTARY.values()) + [UNNAMED_LARGER_RIVER]
     return out

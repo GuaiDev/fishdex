@@ -177,7 +177,7 @@ def walk(value, skip=()):
 # ── the hook chain ────────────────────────────────────────────────────────────
 
 
-def test_hook_chain_order_and_the_slots_that_are_not_built_yet():
+def test_hook_chain_order_and_the_slot_that_is_not_built_yet():
     assert [r.kind for r in render.HOOK_CHAIN] == [
         "protected_species",
         "new_to_you",
@@ -186,10 +186,10 @@ def test_hook_chain_order_and_the_slots_that_are_not_built_yet():
         "honest_empty",
     ]
     unbuilt = {r.kind for r in render.HOOK_CHAIN if r.build is None}
-    assert unbuilt == {"new_to_you", "distinctive"}
+    assert unbuilt == {"distinctive"}  # "new_to_you" is built, see tests/test_new_to_you.py
 
 
-def test_unbuilt_hook_slots_show_nothing_to_anyone(db):
+def test_unbuilt_and_per_user_hook_slots_show_nothing_to_an_anonymous_card(db):
     """No placeholder text: with records and nothing else to say, the hook is the kind."""
     inat(db, "Semotilus atromaculatus", "Creek Chub")
     card = build_spot_card(
@@ -759,7 +759,8 @@ def test_the_spot_endpoint_returns_all_four_resolved_blocks(client):
     assert card["why_gather"]["general"]["provenance"] == "inference"
     assert card["getting_there"]["crown_land"]["state"] == "not_checked"
     assert card["meta"]["cache_key"] == f"{spot_id}@{BUILT}"
-    assert response.headers["cache-control"] == "private, max-age=300"
+    # The hook depends on who asks, so the response is never kept.
+    assert response.headers["cache-control"] == "private, no-store"
 
 
 def test_the_spot_endpoint_withholds_the_protected_species_over_http(client):

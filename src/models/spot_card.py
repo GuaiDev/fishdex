@@ -9,8 +9,11 @@ card and joins nothing: not the records, not the labels, not the access data.
     3. why_gather    the kind's general reasoning, then facts about this spot
     4. getting_there parking, trail, launch, crossing, Crown land, and what is unverified
 
-The card is the same for everyone. Nothing here is per-user: the "new to you"
-and "special here" hooks are later phases and have no field yet.
+The card is the same for everyone except two per-user things, both empty unless
+the caller is a logged-in user: the "new to you" hook and the `new_to_you` block
+that names those species. They are computed per request from that user's own
+confirmed catches and are never stored or cached. The "special here" hook is a
+later phase and has no field yet.
 
 Records and reasoning never share a field. Anything that came from a record
 carries `provenance="record"` and its source; the general explanation carries
@@ -84,6 +87,17 @@ class GeneralReasoning(BaseModel):
     provenance: Literal["inference"] = "inference"
 
 
+class NewToYouBlock(BaseModel):
+    """Species recorded within the radius that this user has not caught. Per-user."""
+
+    title: str
+    count: int
+    tap_prompt: str  # "Tap to see which"
+    species: list[CardSpecies] = Field(default_factory=list)  # every one, not capped
+    note: str  # whose catches this is based on
+    default_open: bool = False
+
+
 class WhyGatherBlock(BaseModel):
     title: str
     what_it_is: str  # the kind in the plain word
@@ -135,7 +149,7 @@ class CardMeta(BaseModel):
     species_withheld_protected: int = 0  # a count only; never names
     species_withheld_imprecise: int = 0  # records whose location is fuzzed ~22 km
     species_status_unchecked: int = 0  # not in the local species file
-    cache_key: str  # "{spot_id}@{built_at}"; the same for every user
+    cache_key: str  # "{spot_id}@{built_at}"; keys the shared part of the card only
 
 
 class SpotCard(BaseModel):
@@ -144,5 +158,6 @@ class SpotCard(BaseModel):
     might_find: MightFindBlock
     why_gather: WhyGatherBlock
     getting_there: GettingThereBlock
+    new_to_you: NewToYouBlock | None = None  # only for a logged-in user with something new
     terms: list[GlossaryTerm] = Field(default_factory=list)
     meta: CardMeta
