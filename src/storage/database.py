@@ -300,6 +300,7 @@ def _apply_migrations(db: Database) -> None:
     migrate_pins(db)
     migrate_weed_reports(db)
     migrate_session_conditions_gauge(db)
+    migrate_species_images(db)
 
 
 def migrate_session_conditions_gauge(db: Database) -> None:
@@ -338,6 +339,13 @@ def migrate_session_conditions_gauge(db: Database) -> None:
             "AND s.user_id IS NOT session_conditions.user_id)"
         )
     db.conn.commit()
+
+
+def migrate_species_images(db: Database) -> None:
+    """Create the species reference-image table. Idempotent; filled by `sync-species-images`."""
+    from src.storage.species_images import ensure_table
+
+    ensure_table(db)
 
 
 def migrate_pins(db: Database) -> None:
