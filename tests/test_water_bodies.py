@@ -906,7 +906,8 @@ def test_classify_reads_drop_offs_and_humps_from_a_supplied_survey():
     assert "hump" in kinds and "drop_off" in kinds
     humps = [f for f in result.shoreline_features if f.kind == "hump"]
     assert humps[0].derivation == "bathymetry_contours"
-    assert humps[0].attributes["survey_year"] == 1970  # falls back to the index
+    # The contours carry no SURVEY_DATE, and the index year is not borrowed.
+    assert humps[0].attributes["survey_year"] is None
     assert result.report.lakes_with_survey_contours == 1
     assert result.report.lakes_without_survey_contours == 0
     assert result.report.bathymetry_contours_stored == 4
