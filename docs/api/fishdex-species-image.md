@@ -111,6 +111,7 @@ two species per list.
 
 The `species_image` table (keyed by scientific name, the same `id` the payload uses) holds the
 provenance. It is rebuilt from `data/species_images/selection.csv`,
-`data/species_images/originals_manifest.csv` and the species list, and is filled automatically
-the first time `/fishdex` finds it empty. After adding or approving an image, run
-`uv run python -m src.cli.main sync-species-images` to refresh the table and the credits page.
+`data/species_images/originals_manifest.csv` and the species list, and `/fishdex` resyncs it
+automatically whenever it differs from those files (empty or stale). The credits page is not
+regenerated that way: after adding or approving an image, run
+`uv run python -m src.cli.main sync-species-images` to refresh it.
