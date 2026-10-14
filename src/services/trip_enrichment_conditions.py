@@ -2,19 +2,28 @@
 Auto-enrichment service: fetches environmental conditions at time of a
 fishing session and stores them in session_conditions.
 
-Two data layers:
-1. Open-Meteo archive API (weather at exact timestamp + coords)
+Three data layers:
+1. Open-Meteo archive API (weather at exact timestamp + coords), through the cache
 2. Local PWQMN database (water quality at nearest station/date)
+3. The nearest WSC gauge's current flow and level, snapshotted as it was at log time
 
 Plus anomaly detection vs PWQMN historical baseline.
 """
 
-import json
+import importlib
 import math
-import urllib.request
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlite_utils import Database
+
+from src.models.freshness import SNAPSHOT_MAX_GAP_S, parse_observed_at
+
+_weather = importlib.import_module("src.ingest.global.weather")
+
+# Naive trip times are the angler's wall clock, which is what the archive
+# request has always been made in.
+_LOCAL_TZ = ZoneInfo("America/Toronto")
 
 
 def enrich_session_conditions(
@@ -24,11 +33,17 @@ def enrich_session_conditions(
     lng: float,
     session_datetime: datetime,
     timeout_seconds: float = 3.0,
+    *,
+    user_id: int,
 ) -> dict:
     """
     Fetch and store environmental conditions for a session.
     Returns dict of what was fetched (or errors).
     Non-fatal: always returns, never raises.
+
+    `user_id` is the owner of the session and is written to the row. It is
+    required, not defaulted: the column's own default is user 1, and a caller
+    that forgot it used to stamp every other user's conditions as user 1's.
     """
     result = {
         "session_id": session_id,
@@ -59,6 +74,16 @@ def enrich_session_conditions(
     except Exception as e:
         result["pwqmn_error"] = str(e)
 
+    # Layer 3: nearest WSC gauge, as it reads now
+    gauge = None
+    try:
+        gauge = _snapshot_gauge(lat, lng, session_datetime, timeout_seconds)
+        if gauge:
+            sources.append("wsc")
+            result["gauge"] = gauge
+    except Exception as e:
+        result["gauge_error"] = str(e)
+
     # Anomaly detection
     anomalies = {}
     try:
@@ -79,6 +104,7 @@ def enrich_session_conditions(
     try:
         row = {
             "session_id": session_id,
+            "user_id": user_id,
             "enrichment_source": "+".join(sources) if sources else "none",
             "season": season,
             "time_of_day": time_of_day,
@@ -114,6 +140,19 @@ def enrich_session_conditions(
                 }
             )
 
+        if gauge:
+            row.update(
+                {
+                    "flow_cms": gauge["flow_cms"],
+                    "flow_trend": gauge["flow_trend"],
+                    "level_m": gauge["level_m"],
+                    "gauge_station_id": gauge["station_id"],
+                    "gauge_station_name": gauge["station_name"],
+                    "gauge_dist_km": gauge["dist_km"],
+                    "gauge_observed_at": gauge["observed_at"],
+                }
+            )
+
         if anomalies:
             row.update(
                 {
@@ -140,31 +179,27 @@ def _fetch_open_meteo(lat: float, lng: float, dt: datetime, timeout: float) -> d
     date_str = dt.strftime("%Y-%m-%d")
     start_date = (dt - timedelta(days=7)).strftime("%Y-%m-%d")
 
-    variables = ",".join(
-        [
-            "temperature_2m",
-            "apparent_temperature",
-            "surface_pressure",
-            "precipitation",
-            "cloud_cover",
-            "wind_speed_10m",
-            "wind_direction_10m",
-            "weather_code",
-        ]
-    )
-
-    url = (
-        f"https://archive-api.open-meteo.com/v1/archive"
-        f"?latitude={lat}&longitude={lng}"
-        f"&start_date={start_date}&end_date={date_str}"
-        f"&hourly={variables}"
-        f"&timezone=America%2FToronto"
-        f"&wind_speed_unit=kmh"
-    )
+    variables = [
+        "temperature_2m",
+        "apparent_temperature",
+        "surface_pressure",
+        "precipitation",
+        "cloud_cover",
+        "wind_speed_10m",
+        "wind_direction_10m",
+        "weather_code",
+    ]
 
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode())
+        data = _weather.get_archive_hourly(
+            lat,
+            lng,
+            start_date,
+            date_str,
+            variables,
+            timeout=timeout,
+            wind_speed_unit="kmh",
+        )
     except Exception as e:
         raise RuntimeError(f"Open-Meteo fetch failed: {e}")
 
@@ -199,6 +234,38 @@ def _fetch_open_meteo(lat: float, lng: float, dt: datetime, timeout: float) -> d
         "wind_direction_deg": val("wind_direction_10m"),
         "weather_code": val("weather_code"),
         "precip_history": precip_arr,
+    }
+
+
+def _snapshot_gauge(lat: float, lng: float, dt: datetime, timeout: float) -> dict | None:
+    """The nearest gauge's current reading, if it describes this trip's time.
+
+    The WSC feed only gives "now". It is the trip's flow only when the trip is
+    now-ish, so a reading further than SNAPSHOT_MAX_GAP_S from the trip is
+    dropped rather than recorded as something it is not. Returns None when no
+    gauge in range reports, or when the reading does not fit the trip.
+    """
+    from src.services.stream_gauge import nearest_gauge
+
+    found = nearest_gauge(lat, lng, timeout=timeout)
+    if found is None:
+        return None
+    r = found.reading
+    trip = dt if dt.tzinfo else dt.replace(tzinfo=_LOCAL_TZ)
+    observed = parse_observed_at(r.reading_datetime.isoformat())
+    if observed is None or abs((observed - trip.astimezone(UTC)).total_seconds()) > (
+        SNAPSHOT_MAX_GAP_S
+    ):
+        return None
+    trend = r.discharge_trend or r.level_trend
+    return {
+        "flow_cms": r.discharge_cms,
+        "flow_trend": {"stable": "steady"}.get(trend, trend),
+        "level_m": r.water_level_m,
+        "station_id": r.station_id,
+        "station_name": r.station_name,
+        "dist_km": found.distance_km,
+        "observed_at": observed.isoformat(),
     }
 
 
@@ -362,15 +429,9 @@ def _fetch_historical_air_temp_baseline(
             prior = dt.replace(year=dt.year - years_back)
             start = (prior - timedelta(days=3)).strftime("%Y-%m-%d")
             end = (prior + timedelta(days=3)).strftime("%Y-%m-%d")
-            url = (
-                f"https://archive-api.open-meteo.com/v1/archive"
-                f"?latitude={lat}&longitude={lng}"
-                f"&start_date={start}&end_date={end}"
-                f"&hourly=temperature_2m"
-                f"&timezone=America%2FToronto"
+            data = _weather.get_archive_hourly(
+                lat, lng, start, end, ["temperature_2m"], timeout=timeout
             )
-            with urllib.request.urlopen(url, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode())
             arr = data.get("hourly", {}).get("temperature_2m", [])
             valid = [t for t in arr if t is not None]
             if valid:

@@ -32,7 +32,9 @@ from src.services.context import slices, translate
 
 logger = logging.getLogger(__name__)
 
-CallerType = Literal["map_tap", "chat_place", "post_log", "coach", "trip_parse", "full"]
+CallerType = Literal[
+    "map_tap", "chat_place", "post_log", "coach", "trip_parse", "pin_panel", "full"
+]
 
 # Which slices each caller gets. A map tap does not need live conditions —
 # that saves both tokens and a live API call, and a tap should feel free.
@@ -46,6 +48,11 @@ _BUNDLES: dict[str, tuple[str, ...]] = {
     "post_log": ("records", "conditions", "history"),
     "coach": ("records", "history", "water", "conditions"),
     "trip_parse": ("records", "history"),
+    # The conditions panel on a pin: what the weather, the nearest gauge and
+    # the nearest dated water sample say right now, each with source and age.
+    # Nothing static about the water and no species records — the panel is a
+    # set of facts about the moment, and the pin's own history is the pin's.
+    "pin_panel": ("conditions",),
     "full": ("records", "water", "structure", "access", "conditions", "history"),
 }
 

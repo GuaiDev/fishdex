@@ -18,13 +18,16 @@ _TTL_STATIONS = 86_400  # 24 hours — stations don't move
 _TTL_REALTIME = 3_600  # 1 hour — data refreshes every 5 minutes at source
 _KM_PER_DEGREE = 111.0
 _USER_AGENT = "fishbot/1.0 (personal fishing assistant)"
+_HTTP_TIMEOUT_S = 30
 
 # Trend thresholds
 _LEVEL_TREND_THRESHOLD_M = 0.05  # 0.05m change over 3hr
 _DISCHARGE_TREND_THRESHOLD_PCT = 2.0  # 2% change over 3hr
 
 
-def fetch_nearby_stations(lat: float, lng: float, radius_km: float = 50) -> list[dict]:
+def fetch_nearby_stations(
+    lat: float, lng: float, radius_km: float = 50, timeout: float = _HTTP_TIMEOUT_S
+) -> list[dict]:
     """Return active WSC stations within radius_km of lat/lng. Cached 24hr.
 
     Returns a list of normalised dicts with keys:
@@ -36,7 +39,7 @@ def fetch_nearby_stations(lat: float, lng: float, radius_km: float = 50) -> list
         "bbox": f"{lng - deg},{lat - deg},{lng + deg},{lat + deg}",
         "limit": 500,
     }
-    data = _cached_get(_STATIONS_URL, params, _TTL_STATIONS)
+    data = _cached_get(_STATIONS_URL, params, _TTL_STATIONS, timeout)
 
     stations = []
     for feature in data.get("features", []):
@@ -61,7 +64,9 @@ def fetch_nearby_stations(lat: float, lng: float, radius_km: float = 50) -> list
     return stations
 
 
-def fetch_station_reading(station_id: str, lat: float, lng: float) -> StreamGaugeReading | None:
+def fetch_station_reading(
+    station_id: str, lat: float, lng: float, timeout: float = _HTTP_TIMEOUT_S
+) -> StreamGaugeReading | None:
     """Fetch current reading + trend for a single WSC station. Cached 1hr.
 
     Returns None if the station has no recent data or is offline.
@@ -72,7 +77,7 @@ def fetch_station_reading(station_id: str, lat: float, lng: float) -> StreamGaug
         "sortby": "-DATETIME",
         "limit": 500,
     }
-    data = _cached_get(_REALTIME_URL, params, _TTL_REALTIME)
+    data = _cached_get(_REALTIME_URL, params, _TTL_REALTIME, timeout)
     features = data.get("features", [])
     if not features:
         return None
@@ -193,7 +198,7 @@ def _extract_river_name(station_name: str) -> str | None:
     return None
 
 
-def _cached_get(url: str, params: dict, ttl_seconds: int) -> dict:
+def _cached_get(url: str, params: dict, ttl_seconds: int, timeout: float = _HTTP_TIMEOUT_S) -> dict:
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     key_data = url + json.dumps(params, sort_keys=True)
     key = hashlib.sha256(key_data.encode()).hexdigest()[:16]
@@ -208,7 +213,7 @@ def _cached_get(url: str, params: dict, ttl_seconds: int) -> dict:
         url,
         params=params,
         headers={"User-Agent": _USER_AGENT},
-        timeout=30,
+        timeout=timeout,
     )
     response.raise_for_status()
     data = response.json()

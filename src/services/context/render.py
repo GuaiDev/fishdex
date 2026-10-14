@@ -200,10 +200,12 @@ def render_conditions(conditions: ConditionsSlice) -> str:
     return _block(
         "Conditions now",
         [
-            _line("flow vs median", conditions.flow_vs_median),
-            _line("water temp", conditions.water_temp_c),
             _line("air temp", conditions.air_temp_c),
             _line("pressure", conditions.pressure_trend),
+            _line("river flow", conditions.flow_cms),
+            _line("flow trend", conditions.flow_trend),
+            _line("water level", conditions.level_m),
+            _line("water temp", conditions.water_temp_c),
         ],
     )
 

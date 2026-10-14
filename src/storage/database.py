@@ -299,6 +299,45 @@ def _apply_migrations(db: Database) -> None:
     migrate_user_patterns(db)
     migrate_pins(db)
     migrate_weed_reports(db)
+    migrate_session_conditions_gauge(db)
+
+
+def migrate_session_conditions_gauge(db: Database) -> None:
+    """Add the gauge snapshot columns to session_conditions, and repair user_id.
+
+    Idempotent. The snapshot columns hold the nearest WSC gauge's reading as it
+    was when the trip was logged: flow and level with the station, its distance
+    and the time the gauge reported. Trips logged earlier have none and are not
+    backfilled here.
+
+    The repair: enrich_session_conditions never wrote user_id, so every row got
+    the column default of 1. A row's owner is its session's owner, so any row
+    that disagrees is set from the session. A row whose session is gone keeps
+    what it has.
+    """
+    if "session_conditions" not in db.table_names():
+        return
+    have = {c.name for c in db["session_conditions"].columns}
+    for name, decl in (
+        ("flow_cms", "REAL"),
+        ("flow_trend", "TEXT"),
+        ("level_m", "REAL"),
+        ("gauge_station_id", "TEXT"),
+        ("gauge_station_name", "TEXT"),
+        ("gauge_dist_km", "REAL"),
+        ("gauge_observed_at", "TEXT"),
+    ):
+        if name not in have:
+            db.execute(f"ALTER TABLE session_conditions ADD COLUMN {name} {decl}")
+    if "user_id" in have and "sessions" in db.table_names():
+        db.execute(
+            "UPDATE session_conditions SET user_id = "
+            "(SELECT s.user_id FROM sessions s WHERE s.id = session_conditions.session_id) "
+            "WHERE EXISTS (SELECT 1 FROM sessions s WHERE s.id = session_conditions.session_id "
+            "AND s.user_id IS NOT NULL "
+            "AND s.user_id IS NOT session_conditions.user_id)"
+        )
+    db.conn.commit()
 
 
 def migrate_pins(db: Database) -> None:

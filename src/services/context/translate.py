@@ -97,19 +97,24 @@ def ph(value: float | None) -> str | None:
     return None  # 5.5-9.0 is unremarkable; saying so wastes the reader's time
 
 
-def flow_vs_median(ratio: float | None) -> str | None:
-    """Current flow as a multiple of seasonal median."""
-    if ratio is None:
+def flow_trend(trend: str | None) -> tuple[str, str] | None:
+    """A gauge's trend as (word, plain statement), or None when it has none.
+
+    The gauge reports "stable"; the panel says "steady", the word already used
+    for pressure. There is deliberately no "normal" here: a normal needs a
+    seasonal baseline for this gauge, and we do not hold one. The statement
+    says only what was measured — a change over the last three hours.
+    """
+    if not trend:
         return None
-    if ratio >= 2.0:
-        return "well above normal — likely blown out and unfishable"
-    if ratio >= 1.3:
-        return "up on normal, so fish will hold tighter to the edges"
-    if ratio <= 0.5:
-        return "very low and clear — fish will be spooky, go lighter"
-    if ratio <= 0.8:
-        return "below normal, concentrating fish into the deeper holds"
-    return "around seasonal normal"
+    match trend.strip().lower():
+        case "rising":
+            return "rising", "rising over the last 3 hours"
+        case "falling":
+            return "falling", "falling over the last 3 hours"
+        case "stable" | "steady":
+            return "steady", "little change over the last 3 hours"
+    return None
 
 
 def pressure_trend(trend: str | None) -> str | None:

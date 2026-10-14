@@ -8,6 +8,7 @@ the way through.
 
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlite_utils import Database
@@ -26,6 +27,7 @@ from src.models.context import (
     StructureSlice,
     WaterSlice,
 )
+from src.models.freshness import GAUGE_STALE_S, WATER_QUALITY_STALE_S, WEATHER_STALE_S
 from src.services.context import translate
 
 logger = logging.getLogger(__name__)
@@ -454,47 +456,85 @@ def _chemistry_source(rows: list) -> str:
     return " + ".join(names) if names else "water quality"
 
 
+# What each chemistry field is read from, on the sample row.
+_SAMPLE_FIELDS = ("do_mgl", "ph", "temp_c")
+
+
+def _nearest_water_samples(db: Database, place: Place) -> dict[str, tuple]:
+    """For each chemistry field, the nearest *dated* sample: (reading, distance_km).
+
+    Nearest by distance, then newest — rows from one station share a distance,
+    so that is the station's latest sample of the field. Fields are chosen
+    independently: the nearest station that measured pH is not necessarily the
+    one that measured dissolved oxygen. The sample's own date travels with it;
+    an undated median across stations and years would hide that this is one
+    afternoon's reading.
+    """
+    from src.storage.pins import distance_m
+    from src.storage.water_quality import query_water_quality
+
+    radius_km = max(place.radius_km, 25.0)
+    try:
+        rows = query_water_quality(db, lat=place.lat, lng=place.lng, radius_km=radius_km)
+    except Exception:  # noqa: BLE001
+        logger.warning("water sample lookup failed", exc_info=True)
+        return {}
+
+    best: dict[str, tuple] = {}
+    for r in rows:
+        if r.lat is None or r.lng is None:
+            continue
+        dist_km = distance_m(place.lat, place.lng, r.lat, r.lng) / 1000.0
+        if dist_km > radius_km:
+            continue
+        for fld in _SAMPLE_FIELDS:
+            if getattr(r, fld, None) is None:
+                continue
+            key = (dist_km, -r.sampled_at.toordinal())
+            if fld not in best or key < best[fld][2]:
+                best[fld] = (r, round(dist_km, 1), key)
+    return {fld: (r, d) for fld, (r, d, _) in best.items()}
+
+
+def _sample_field(
+    sample: tuple, value: float, meaning: str | None, now: datetime | None
+) -> ContextField:
+    """A dated sample value as a field, sourced to its station and stale by age."""
+    reading, dist_km = sample
+    return ContextField.recorded(
+        round(float(value), 1),
+        source=_chemistry_source([reading]),
+        station=reading.station_name or reading.station_id,
+        distance_km=dist_km,
+        observed_at=reading.sampled_at,
+        stale_after_s=WATER_QUALITY_STALE_S,
+        meaning=meaning,
+        now=now,
+    )
+
+
 def _fill_chemistry(db: Database, place: Place, out: WaterSlice) -> None:
     if "water_quality_readings" not in db.table_names():
         out.dissolved_oxygen = ContextField.empty(EmptyReason.SOURCE_DOES_NOT_COVER_AREA)
         out.ph = ContextField.empty(EmptyReason.SOURCE_DOES_NOT_COVER_AREA)
         return
-    try:
-        from src.storage.water_quality import query_water_quality
+    samples = _nearest_water_samples(db, place)
 
-        rows = query_water_quality(
-            db, lat=place.lat, lng=place.lng, radius_km=max(place.radius_km, 25.0)
-        )
-    except Exception:  # noqa: BLE001
-        logger.warning("chemistry slice failed", exc_info=True)
-        rows = []
-
-    do_vals = [r.do_mgl for r in rows if getattr(r, "do_mgl", None) is not None]
-    ph_vals = [r.ph for r in rows if getattr(r, "ph", None) is not None]
-    do_source = _chemistry_source(
-        [r for r in rows if getattr(r, "do_mgl", None) is not None]
-    )
-    ph_source = _chemistry_source([r for r in rows if getattr(r, "ph", None) is not None])
-
-    if do_vals:
-        median = sorted(do_vals)[len(do_vals) // 2]
-        out.dissolved_oxygen = ContextField.recorded(
-            round(float(median), 1),
-            source=f"{do_source} ({len(do_vals)} readings)",
-            meaning=translate.dissolved_oxygen(float(median)),
+    if "do_mgl" in samples:
+        value = samples["do_mgl"][0].do_mgl
+        out.dissolved_oxygen = _sample_field(
+            samples["do_mgl"], value, translate.dissolved_oxygen(float(value)), None
         )
     else:
         out.dissolved_oxygen = ContextField.empty(EmptyReason.NO_RECORDS_IN_RADIUS)
 
-    if ph_vals:
-        median = sorted(ph_vals)[len(ph_vals) // 2]
-        meaning = translate.ph(float(median))
+    if "ph" in samples:
+        value = samples["ph"][0].ph
+        meaning = translate.ph(float(value))
         # A mid-range pH was measured; it just tells an angler nothing. Saying
         # "nothing recorded" would be false — the reading exists.
         out.ph = (
-            ContextField.recorded(
-                round(float(median), 1), source=ph_source, meaning=meaning
-            )
+            _sample_field(samples["ph"], value, meaning, None)
             if meaning
             else ContextField.empty(EmptyReason.RECORDED_BUT_NOT_DECISION_RELEVANT)
         )
@@ -794,62 +834,154 @@ def _crown_land(db: Database, place: Place) -> ContextField:
 # ── conditions (live — never cached beyond an hour) ───────────────────────────
 
 
-def build_conditions(db: Database, place: Place, fetch_live: bool = True) -> ConditionsSlice:
-    """Live conditions. Every field is assigned on every path.
+def build_conditions(db: Database, place: Place, now: datetime | None = None) -> ConditionsSlice:
+    """Conditions at a place. Every field is assigned on every path.
 
     Leaving a field default-constructed means no value AND no reason, which
-    renders the internal "this is a bug" fallback to the reader. Weather and
-    flow are the two fields most likely to be absent, so they are also the
-    two most important to explain.
+    renders the internal "this is a bug" fallback to the reader. Each source is
+    filled by its own function, so one failing never blanks another.
     """
+    now = now or datetime.now(UTC)
     out = ConditionsSlice()
+    _fill_weather(place, out, now)
+    _fill_gauge(place, out, now)
+    _fill_water_samples(db, place, out, now)
+    return out
 
-    # Neither flow nor water temperature is wired into this slice yet — the
-    # WSC gauge and thermal lookups live elsewhere. Say so rather than
-    # implying the reading was attempted and missing.
-    not_wired = ContextField.empty(EmptyReason.SOURCE_DOES_NOT_COVER_AREA)
-    out.flow_vs_median = not_wired
-    out.water_temp_c = not_wired
 
-    if not fetch_live:
-        # A caller bundle that deliberately skips the live call (a map tap
-        # should be free) — not a failure, but still not a value.
-        skipped = ContextField.empty(EmptyReason.SOURCE_DOES_NOT_COVER_AREA)
-        out.air_temp_c = skipped
-        out.pressure_trend = skipped
-        return out
+def _live_field(
+    raw: dict,
+    key: str,
+    source: str,
+    observed_at: str | None,
+    limit_s: int,
+    now: datetime,
+    unavailable: EmptyReason,
+    meaning: str | None = None,
+) -> ContextField:
+    value = raw.get(key)
+    if value is None:
+        return ContextField.empty(unavailable)
+    return ContextField.recorded(
+        value,
+        source=source,
+        observed_at=observed_at,
+        stale_after_s=limit_s,
+        meaning=meaning,
+        now=now,
+    )
 
+
+def _fill_weather(place: Place, out: ConditionsSlice, now: datetime) -> None:
     try:
         from src.services.weather import get_conditions_for_agent
 
         raw = json.loads(get_conditions_for_agent(lat=place.lat, lng=place.lng))
-        reachable = True
+        unavailable = EmptyReason.FIELD_NOT_POPULATED_BY_SOURCE
     except Exception:  # noqa: BLE001 - live fetch must never break describe()
-        logger.warning("conditions slice failed", exc_info=True)
+        logger.warning("weather conditions failed", exc_info=True)
         raw = {}
-        reachable = False
+        unavailable = EmptyReason.LIVE_LOOKUP_FAILED
 
-    unavailable = EmptyReason.LIVE_LOOKUP_FAILED if not reachable else (
-        EmptyReason.FIELD_NOT_POPULATED_BY_SOURCE
-    )
-
-    temp = raw.get("temperature_c") or raw.get("air_temp_c")
-    out.air_temp_c = (
-        ContextField.recorded(temp, source="Open-Meteo")
-        if temp is not None
-        else ContextField.empty(unavailable)
-    )
-
+    seen = raw.get("time")
     trend = raw.get("pressure_trend")
-    out.pressure_trend = (
-        ContextField.recorded(
-            trend, source="Open-Meteo", meaning=translate.pressure_trend(trend)
-        )
-        if trend
-        else ContextField.empty(unavailable)
-    )
 
-    return out
+    def field(key: str, meaning: str | None = None) -> ContextField:
+        return _live_field(
+            raw, key, "Open-Meteo", seen, WEATHER_STALE_S, now, unavailable, meaning
+        )
+
+    out.air_temp_c = field("temperature_c")
+    out.wind_speed_kmh = field("wind_speed_kmh")
+    out.precipitation_mm = field("precipitation_mm")
+    out.pressure_hpa = field("pressure_hpa")
+    out.pressure_trend = field("pressure_trend", translate.pressure_trend(trend))
+
+
+def _fill_gauge(place: Place, out: ConditionsSlice, now: datetime) -> None:
+    from src.services.stream_gauge import nearest_gauge
+
+    fields = ("flow_cms", "flow_trend", "level_m", "level_trend")
+    try:
+        gauge = nearest_gauge(place.lat, place.lng)
+    except Exception:  # noqa: BLE001 - live fetch must never break describe()
+        logger.warning("gauge lookup failed", exc_info=True)
+        for name in fields:
+            setattr(out, name, ContextField.empty(EmptyReason.LIVE_LOOKUP_FAILED))
+        return
+    if gauge is None:
+        for name in fields:
+            setattr(out, name, ContextField.empty(EmptyReason.NO_RECORDS_IN_RADIUS))
+        return
+
+    r = gauge.reading
+    where = {
+        "source": f"WSC station {r.station_id}",
+        "station": r.station_name or r.station_id,
+        "distance_km": gauge.distance_km,
+        "observed_at": r.reading_datetime,
+        "stale_after_s": GAUGE_STALE_S,
+        "now": now,
+    }
+    missing = EmptyReason.FIELD_NOT_POPULATED_BY_SOURCE
+
+    def reading(value, unit_round: int) -> ContextField:
+        if value is None:
+            return ContextField.empty(missing)
+        return ContextField.recorded(round(float(value), unit_round), **where)
+
+    def trend(raw_trend: str | None) -> ContextField:
+        said = translate.flow_trend(raw_trend)
+        if said is None:
+            return ContextField.empty(missing)
+        word, meaning = said
+        return ContextField.recorded(word, meaning=meaning, **where)
+
+    out.flow_cms = reading(r.discharge_cms, 3)
+    out.flow_trend = trend(r.discharge_trend)
+    out.level_m = reading(r.water_level_m, 3)
+    out.level_trend = trend(r.level_trend)
+
+
+def _fill_water_samples(db: Database, place: Place, out: ConditionsSlice, now: datetime) -> None:
+    """Water temperature and chemistry: the nearest dated PWQMN sample, or why none.
+
+    There is no live water-temperature feed. A grab sample is the best there
+    is, and it is shown as what it is — dated, at a named station, stale once
+    past WATER_QUALITY_STALE_S. Without one the field says there is no live
+    source, not that the source "does not cover" the place.
+    """
+    if "water_quality_readings" not in db.table_names():
+        samples: dict[str, tuple] = {}
+        no_table = True
+    else:
+        samples = _nearest_water_samples(db, place)
+        no_table = False
+
+    one_sample = "a single dated sample at the nearest monitoring station, not a live reading"
+    if "temp_c" in samples:
+        temp = samples["temp_c"]
+        out.water_temp_c = _sample_field(temp, temp[0].temp_c, one_sample, now)
+    else:
+        out.water_temp_c = ContextField.empty(EmptyReason.NO_LIVE_SOURCE)
+
+    if "do_mgl" in samples:
+        value = samples["do_mgl"][0].do_mgl
+        out.dissolved_oxygen_mgl = _sample_field(
+            samples["do_mgl"], value, translate.dissolved_oxygen(float(value)), now
+        )
+    else:
+        out.dissolved_oxygen_mgl = ContextField.empty(
+            EmptyReason.SOURCE_DOES_NOT_COVER_AREA if no_table else EmptyReason.NO_RECORDS_IN_RADIUS
+        )
+
+    if "ph" in samples:
+        value = samples["ph"][0].ph
+        out.ph = _sample_field(samples["ph"], value, translate.ph(float(value)), now)
+    else:
+        out.ph = ContextField.empty(
+            EmptyReason.SOURCE_DOES_NOT_COVER_AREA if no_table else EmptyReason.NO_RECORDS_IN_RADIUS
+        )
 
 
 # ── history ───────────────────────────────────────────────────────────────────
