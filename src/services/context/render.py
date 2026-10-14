@@ -636,7 +636,7 @@ def _hook_protected(c: _CardInputs) -> str | None:
 
 
 def _hook_new_to_you(c: _CardInputs) -> str | None:
-    """"3 species recorded here you haven't caught yet": only for a user with something new."""
+    """ "3 species recorded here you haven't caught yet": only for a user with something new."""
     return spot_labels.new_to_you_hook(len(c.new_species)) if c.new_species else None
 
 
