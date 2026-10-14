@@ -638,3 +638,54 @@ class LocalRichness(BaseModel):
     confidence: float = 0.0
     """1.0 on local data; lower on the regional fallback; 0.0 with nothing."""
     by_source: dict[str, int] = Field(default_factory=dict)
+
+
+# ── special-here ──────────────────────────────────────────────────────────────
+
+SpecialHereStatus = Literal[
+    "found",  # at least one species is recorded clearly more often here
+    "none_stands_out",  # enough records on both sides, but no species stands out
+    "too_few_records_here",  # fewer than the minimum within the card radius
+    "too_few_records_along_river",  # fewer than the minimum on the rest of the river section
+    "no_river_section",  # the spot is not on a curated river section, or its line is missing
+]
+
+
+class SpecialHereSpecies(BaseModel):
+    """One species recorded clearly more often at a spot than along the rest of its river.
+
+    Counts and shares, never a verdict: the numbers are about records, and
+    records follow observers as much as fish.
+    """
+
+    species: str
+    common_name: str | None = None
+    here_records: int
+    here_total: int
+    elsewhere_records: int
+    elsewhere_total: int
+
+    @property
+    def here_share(self) -> float:
+        return self.here_records / self.here_total
+
+    @property
+    def elsewhere_share(self) -> float:
+        return self.elsewhere_records / self.elsewhere_total
+
+
+class SpecialHere(BaseModel):
+    """What the spot's records say about frequency, compared with the rest of its river section.
+
+    `evidence` is the one kind of record the counts were made from. Surveys and
+    sightings are never mixed in one share: a standardised haul and a photo
+    are different kinds of effort.
+    """
+
+    status: SpecialHereStatus
+    river: str | None = None
+    evidence: Literal["survey", "sighting"] | None = None
+    radius_km: float
+    here_total: int = 0
+    elsewhere_total: int = 0
+    species: list[SpecialHereSpecies] = Field(default_factory=list)

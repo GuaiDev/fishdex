@@ -4,10 +4,15 @@ The file is what another tool builds the spots UI against (see docs/spots-api.md
 real responses from the real endpoints over a real build, not hand-written JSON.
 Rerun after a build whenever the response shapes change:
 
-    uv run python scripts/export_spots_fixture.py [path/to/fishing.db]
+    uv run python scripts/export_spots_fixture.py [path/to/fishing.db [path/to/records.db]]
 
 Read-only: it serves the database through the API with a stubbed login and
 changes nothing in it. Defaults to the database the app uses.
+
+The "recorded more often here" card needs real fish records along a river. When a
+second database is given, its iNaturalist and GBIF records are copied into a
+throwaway copy of the first and the spot with the strongest comparison is
+captured from that; without one the entry is skipped, never invented.
 
 Spot cards need fish records to show a species list or a protected-species care
 message, and a fresh build has none. So the card examples that need records are
@@ -44,8 +49,17 @@ LISTS = [
         "/map/spots?kind=below_dam,public_fishing&tier=3",
         "every dam and OSM fishing spot in the build, including unnamed ones",
     ),
+    (
+        "/map/spots?kind=quiet_water",
+        "quiet water: reaches with few public records, each with its caveats. "
+        "Needs the explore score cache; without it the list is empty and meta.notes says so",
+    ),
+    (
+        "/map/spots?kind=quiet_water&tier=3&near=43.47,-79.69,15",
+        "quiet water at every tier within 15 km of home, nearest first",
+    ),
 ]
-DETAIL_KINDS = ("below_dam", "creek_junction", "river_mouth", "public_fishing")
+DETAIL_KINDS = ("below_dam", "creek_junction", "river_mouth", "public_fishing", "quiet_water")
 # Water bodies: the rivers, creeks and lakes the spots hang off.
 WATER_BODY_LISTS = [
     (
@@ -257,9 +271,58 @@ def seed_examples_and_capture(client, capture, seen: dict[str, str]) -> None:
         shutil.rmtree(scratch, ignore_errors=True)
 
 
+def capture_special_here(client, capture, records_db: Path) -> None:
+    """The card with a "recorded more often here" line, from a copy holding real records.
+
+    Copies the iNaturalist and GBIF tables of `records_db` into a throwaway copy
+    of the database being served, then captures the spot whose comparison rests
+    on the most records. Nothing is added by hand: the counts are the records'.
+    """
+    import sqlite3
+
+    from src.services.context.special import special_here
+    from src.storage.spots import list_spots
+
+    real_path = database.DB_PATH
+    scratch = Path(tempfile.mkdtemp())
+    copy = scratch / "records.db"
+    shutil.copy(real_path, copy)
+    try:
+        conn = sqlite3.connect(copy)
+        conn.execute("ATTACH DATABASE ? AS src", [str(records_db)])
+        for table in ("observations", "gbif_observations"):
+            conn.execute(f"INSERT OR IGNORE INTO {table} SELECT * FROM src.{table}")
+        conn.commit()
+        conn.close()
+        db = database.get_db(copy)
+        best = None
+        for spot in list_spots(db, max_tier=3):
+            if spot.kind == "quiet_water":
+                continue
+            result = special_here(db, spot)
+            if result.status == "found" and (
+                best is None or result.here_total + result.elsewhere_total > best[0]
+            ):
+                best = (result.here_total + result.elsewhere_total, spot.spot_id)
+        if best is None:
+            print("no spot has a recorded-more-often-here comparison; entry skipped")
+            return
+        database.DB_PATH = copy
+        capture(
+            f"/map/spots/{best[1]}",
+            "card with a recorded-more-often-here line. Captured from a throwaway copy of the "
+            "database that also holds the real iNaturalist and GBIF records ingested in the main "
+            "project database; the counts in the line are those records'",
+        )
+    finally:
+        database.DB_PATH = real_path
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
 def main() -> None:
     if len(sys.argv) > 1:
         database.DB_PATH = Path(sys.argv[1])
+    records_db = Path(sys.argv[2]) if len(sys.argv) > 2 else None
     from fastapi.testclient import TestClient
 
     from src.api.main import app, get_current_user
@@ -304,6 +367,8 @@ def main() -> None:
             break
 
     seed_examples_and_capture(client, capture, seen)
+    if records_db is not None:
+        capture_special_here(client, capture, records_db)
 
     for path, note in WATER_BODY_LISTS:
         capture(path, note)

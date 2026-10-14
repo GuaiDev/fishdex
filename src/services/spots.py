@@ -42,6 +42,7 @@ from sqlite_utils.db import Database
 
 from src.models.bathymetry import BathymetryContour
 from src.models.hydrology import StreamSegment
+from src.models.ingest_area import IngestArea
 from src.models.jurisdiction import JurisdictionCode
 from src.models.lake_outline import LakeOutline
 from src.models.shoreline_feature import ShorelineFeature
@@ -62,11 +63,12 @@ from src.services.bathymetry import (
     LakeBathymetry,
     derive_bathymetry_features,
 )
+from src.services.quiet_water import QuietWaterBuild, build_quiet_water
 from src.services.shoreline_features import derive_shoreline_features
 from src.services.stretch_anchors import DAM_MERGE_M, _coord_key
 from src.services.stretches import DEFAULT_CURATION_PATH, load_curation
 from src.services.water_bodies import LakeRef, WaterBodySet, derive_water_bodies, slugify
-from src.storage.spots import get_spot, list_spots, replace_spots
+from src.storage.spots import count_spots_of_kind, get_spot, list_spots, replace_spots
 from src.storage.stretch_anchors import list_anchors
 from src.storage.stretches import list_stretches
 from src.storage.water_bodies import get_water_body
@@ -795,6 +797,7 @@ def build_spots(
     | None = None,
     watercourse_fetcher: Callable[[float, float, float, float], list[StreamSegment]] | None = None,
     bathymetry_fetcher: Callable[[LakeOutline], LakeBathymetry] | None = None,
+    quiet_water_areas: list[IngestArea] | None = None,
 ) -> SpotBuildReport:
     """Rebuild every spot for the curation file's jurisdiction from the stored anchors.
 
@@ -808,6 +811,12 @@ def build_spots(
     bathymetry that names its drop-offs and humps — happens here, through the
     cached adapters, so a second build is offline. Tests inject `outline_resolver`,
     `watercourse_fetcher` and `bathymetry_fetcher` so they never touch the network.
+
+    Quiet water is the one kind not derived from the anchors: it wraps the
+    `explore()` ranking for each ingest area of the jurisdiction
+    (`quiet_water_areas` overrides which) and needs the untapped-potential parquet.
+    Without it the build still succeeds, with no quiet-water spots and a
+    warning, so the rest of the map never waits on a score cache.
     """
     curation = load_curation(curation_path)
     jurisdiction = curation.jurisdiction
@@ -815,19 +824,22 @@ def build_spots(
     stretches = list_stretches(db, jurisdiction)
     outlines, watercourses = _lake_outline_inputs(anchors, outline_resolver, watercourse_fetcher)
     bathymetry = _bathymetry_inputs(outlines, bathymetry_fetcher)
+    built_at = datetime.now(UTC).isoformat(timespec="seconds")
     result = classify(
         anchors,
         stretches,
         jurisdiction,
         load_stretch_hints(curation_path),
+        built_at=built_at,
         outlines=outlines,
         watercourses=watercourses,
         bathymetry=bathymetry,
     )
+    quiet = build_quiet_water(db, jurisdiction, built_at, quiet_water_areas)
     replace_spots(
         db,
         jurisdiction,
-        result.spots,
+        result.spots + quiet.spots,
         result.water_bodies,
         result.shoreline_features,
         result.bathymetry_contours,
@@ -856,6 +868,9 @@ def build_spots(
             "%d curated lakes have no OHN outline; they stay placed by their mouths",
             report.lakes_without_outline,
         )
+    # After the warnings above: they talk about anchor-derived spots, and the
+    # quiet-water ones have no water body by design.
+    _count_quiet_water(report, quiet)
     return report
 
 
@@ -958,6 +973,19 @@ def _shore_cells(boundary, cell_deg: float = 0.5) -> list[tuple[float, float, fl
 # ── read side ─────────────────────────────────────────────────────────────────
 
 
+def _count_quiet_water(report: SpotBuildReport, quiet: QuietWaterBuild) -> None:
+    """Fold the quiet-water build into the report: counts, drops, and a missing cache."""
+    report.quiet_water_areas = quiet.areas_checked
+    report.quiet_water_candidates = quiet.candidates
+    report.quiet_water_cache_missing = quiet.cache_missing
+    for spot in quiet.spots:
+        report.by_kind[spot.kind] = report.by_kind.get(spot.kind, 0) + 1
+        report.by_tier[str(spot.tier)] = report.by_tier.get(str(spot.tier), 0) + 1
+    report.spots_total += len(quiet.spots)
+    for reason, n in quiet.dropped.items():
+        report.drop(f"quiet_water_{reason}", n)
+
+
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
@@ -990,7 +1018,9 @@ def spots_geojson(
 
     `max_tier` is cumulative: 1 is the headline spots only, 3 is everything.
     `kinds` counts in the `meta` are taken before the kind filter, so the
-    filter chips can show how many each would add.
+    filter chips can show how many each would add. `meta.notes` says, in words,
+    why a kind that was asked for has nothing to show when that is a matter of
+    the build rather than of the viewport (quiet water needs the explore scores).
     """
     in_view = list_spots(db, bbox=bbox, max_tier=max_tier, jurisdiction=jurisdiction)
     counts = {kind: 0 for kind in words.KIND_ORDER}
@@ -1032,37 +1062,44 @@ def spots_geojson(
                 new_counts[s.spot_id] = n
                 kept.append(s)
         shown = kept
-    meta = {"count": len(shown), "kind_counts": counts, "max_tier": max_tier}
+    meta: dict = {"count": len(shown), "kind_counts": counts, "max_tier": max_tier}
+    notes = []
+    if (not kinds or "quiet_water" in kinds) and count_spots_of_kind(db, "quiet_water") == 0:
+        notes.append(words.QUIET_WATER_NOT_BUILT)
+    if notes:
+        meta["notes"] = notes
     if new_to_me_applied:
         meta["new_to_me"] = True
     return {
         "type": "FeatureCollection",
         "meta": meta,
-        "features": [
-            {
-                "type": "Feature",
-                "id": s.spot_id,
-                "geometry": {"type": "Point", "coordinates": [s.lng, s.lat]},
-                "properties": {
-                    "spot_id": s.spot_id,
-                    "kind": s.kind,
-                    "title": s.title,
-                    "subtitle": s.subtitle,
-                    "tier": s.tier,
-                    "jurisdiction": s.jurisdiction,
-                    "water_id": s.water_id,
-                    "water_name": s.water_name,
-                    "water_body_id": s.water_body_id,
-                    "signals": s.signals,
-                    **(
-                        {"new_to_you": _new_to_you_property(new_counts[s.spot_id])}
-                        if s.spot_id in new_counts
-                        else {}
-                    ),
-                },
-            }
-            for s in shown
-        ],
+        "features": [_feature(s, new_counts.get(s.spot_id)) for s in shown],
+    }
+
+
+def _feature(s: Spot, new_to_you_count: int | None = None) -> dict:
+    properties = {
+        "spot_id": s.spot_id,
+        "kind": s.kind,
+        "title": s.title,
+        "subtitle": s.subtitle,
+        "tier": s.tier,
+        "jurisdiction": s.jurisdiction,
+        "water_id": s.water_id,
+        "water_name": s.water_name,
+        "water_body_id": s.water_body_id,
+        "signals": s.signals,
+    }
+    # Only quiet water carries caveats today; the key is absent when there are none.
+    if caveats := words.caveats_for(s.kind, s.signals):
+        properties["caveats"] = caveats
+    if new_to_you_count is not None:
+        properties["new_to_you"] = _new_to_you_property(new_to_you_count)
+    return {
+        "type": "Feature",
+        "id": s.spot_id,
+        "geometry": {"type": "Point", "coordinates": [s.lng, s.lat]},
+        "properties": properties,
     }
 
 

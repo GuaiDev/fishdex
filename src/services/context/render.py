@@ -36,6 +36,7 @@ from src.models.context import (
     PlaceContext,
     RecordedInsight,
     RecordsSlice,
+    SpecialHere,
     SpeciesContext,
     SpeciesHistory,
     StructureSlice,
@@ -45,6 +46,7 @@ from src.models.context import (
 from src.models.spot import AccessRef, Spot
 from src.models.spot_card import (
     AccessItem,
+    CardCaveat,
     CardFact,
     CardHook,
     CardMeta,
@@ -55,6 +57,8 @@ from src.models.spot_card import (
     GlossaryTerm,
     MightFindBlock,
     NewToYouBlock,
+    SpecialHereBlock,
+    SpecialHereSpeciesLine,
     SpotCard,
     WhyGatherBlock,
 )
@@ -138,9 +142,7 @@ def render_records(records: RecordsSlice, today_year: int | None = None) -> str:
         lines.append(f"- {detail}: {', '.join(suffix)} [{rec.provenance.describe()}]")
 
     if records.escalated_to_web:
-        lines.append(
-            "- _Some of the above came from a live web search and is unverified._"
-        )
+        lines.append("- _Some of the above came from a live web search and is unverified._")
     proxy = _line("fish-eating birds", records.piscivore_activity)
     if proxy:
         lines.append(proxy)
@@ -221,9 +223,7 @@ def render_history(history: HistorySlice) -> str:
     treat them as a failure state to be tidied away.
     """
     if history.visits == 0:
-        reason = (
-            history.empty_reason.value if history.empty_reason else "no visits logged"
-        )
+        reason = history.empty_reason.value if history.empty_reason else "no visits logged"
         return f"### Your history here\nNone ({reason})."
 
     lines = [
@@ -276,9 +276,7 @@ def render_species_context(ctx: SpeciesContext) -> str:
         # an exemption and the reader has to see this before the habitat note.
         lines.append(f"- **Conservation flag: {ctx.sar_reason}**")
         if ctx.status_known_listed:
-            lines.append(
-                "- Do not suggest how to target this species. Handling guidance only."
-            )
+            lines.append("- Do not suggest how to target this species. Handling guidance only.")
         else:
             # No affirmative listing signal, only an unverified status. The
             # corpus's own angling text stays withheld — it was generated, not
@@ -302,9 +300,7 @@ def render_species_context(ctx: SpeciesContext) -> str:
 
 def render_explore(response: ExploreResponse) -> str:
     if not response.results:
-        reason = (
-            response.empty_reason.value if response.empty_reason else "no candidates"
-        )
+        reason = response.empty_reason.value if response.empty_reason else "no candidates"
         return f"### Exploration candidates\nNone ({reason})."
 
     lines = ["### Exploration candidates", f"_{response.scoring_note}_", ""]
@@ -378,8 +374,7 @@ def render_user_layer(layer: UserLayer) -> str:
     lines += _profile_lines(layer.profile)
     if layer.target_species:
         lines.append(
-            f"- appears to target (from logs, not configured): "
-            f"{', '.join(layer.target_species)}"
+            f"- appears to target (from logs, not configured): {', '.join(layer.target_species)}"
         )
     if layer.species_logged:
         lines.append(f"- species logged: {', '.join(layer.species_logged)}")
@@ -436,11 +431,7 @@ def render_species_history(history: SpeciesHistory) -> str:
     attached rather than as a bare number the reader will over-interpret.
     """
     if history.caught_stops == 0 and history.blank_stops == 0 and not history.insights:
-        reason = (
-            history.empty_reason.value
-            if history.empty_reason
-            else "nothing logged"
-        )
+        reason = history.empty_reason.value if history.empty_reason else "nothing logged"
         return f"### Your record with {history.species}\nNothing logged ({reason})."
 
     lines = [f"### Your record with {history.species}"]
@@ -589,6 +580,30 @@ CROWN_MAPPED = (
 )
 CROWN_NONE = "No Crown land found within {radius} km in our data."
 CROWN_UNCHECKED = "We have no Crown land data for this area."
+SPECIAL_TITLE = "Recorded more often here"
+# Never "lives here": records are presence-only and follow observers as much as fish.
+SPECIAL_LABEL = "Recorded more often here than along the rest of the {river}"
+SPECIAL_HOOK = "{name} is recorded more often here than along the rest of the {river}."
+SPECIAL_HOOK_MORE = (
+    "{name} and {n} more are recorded more often here than along the rest of the {river}."
+)
+SPECIAL_LINE = (
+    "{here} of {here_total} records here ({here_pct}%), against {else_pct}% "
+    "along the rest of the {river}"
+)
+SPECIAL_LINE_NONE_ELSEWHERE = (
+    "{here} of {here_total} records here ({here_pct}%), and none along the rest of the {river}"
+)
+SPECIAL_BASIS = {
+    "survey": "Counted from fish surveys only, not photos, with each fish counted once per survey.",
+    "sighting": (
+        "Counted from photo and sighting records only, one for each fish per person per day."
+    ),
+}
+SPECIAL_CAVEAT = (
+    "This compares how often each fish was recorded. Records follow where people look "
+    "as well as where fish are, so it does not mean the fish are found only here."
+)
 TOP_SPECIES = 5
 _SOURCE_OHN = "Ontario Hydro Network"
 _SOURCE_OSM = "OpenStreetMap"
@@ -618,6 +633,7 @@ class _CardInputs:
     # Species in `shown` the logged-in user has not caught, ranked like `shown`.
     # None for a caller with no user; [] for a user with nothing new.
     new_species: list[CardSpecies] | None = None
+    special: SpecialHere | None = None
 
     @property
     def radius(self) -> str:
@@ -657,6 +673,66 @@ def _hook_structure(c: _CardInputs) -> str | None:
     return None
 
 
+def _display_name(common_name: str | None, species: str) -> str:
+    name = common_name or species
+    return name.title() if name == name.lower() else name
+
+
+def _hook_distinctive(c: _CardInputs) -> str | None:
+    """A species recorded clearly more often here than along the rest of the river."""
+    sp = c.special
+    if sp is None or sp.status != "found" or not sp.species:
+        return None
+    first = _display_name(sp.species[0].common_name, sp.species[0].species)
+    river = sp.river or "river"
+    if len(sp.species) == 1:
+        return SPECIAL_HOOK.format(name=first, river=river)
+    return SPECIAL_HOOK_MORE.format(name=first, n=len(sp.species) - 1, river=river)
+
+
+def _special_block(c: _CardInputs) -> SpecialHereBlock | None:
+    sp = c.special
+    if sp is None or sp.status != "found" or not sp.species or sp.evidence is None:
+        return None
+    river = sp.river or "river"
+    lines = []
+    for s in sp.species:
+        here_pct = round(100 * s.here_share)
+        if s.elsewhere_records:
+            text = SPECIAL_LINE.format(
+                here=s.here_records,
+                here_total=s.here_total,
+                here_pct=here_pct,
+                else_pct=round(100 * s.elsewhere_share),
+                river=river,
+            )
+        else:
+            text = SPECIAL_LINE_NONE_ELSEWHERE.format(
+                here=s.here_records, here_total=s.here_total, here_pct=here_pct, river=river
+            )
+        common = _display_name(s.common_name, s.species)
+        lines.append(
+            SpecialHereSpeciesLine(
+                name=common,
+                scientific_name=s.species if s.species.lower() != common.lower() else None,
+                text=text,
+                here_records=s.here_records,
+                here_total=s.here_total,
+                elsewhere_records=s.elsewhere_records,
+                elsewhere_total=s.elsewhere_total,
+            )
+        )
+    return SpecialHereBlock(
+        title=SPECIAL_TITLE,
+        label=SPECIAL_LABEL.format(river=river),
+        species=lines,
+        evidence=sp.evidence,
+        basis_text=SPECIAL_BASIS[sp.evidence],
+        caveat=SPECIAL_CAVEAT,
+        radius_km=sp.radius_km,
+    )
+
+
 def _hook_honest_empty(c: _CardInputs) -> str | None:
     if c.shown or c.n_protected:
         return None
@@ -668,12 +744,11 @@ def _hook_honest_empty(c: _CardInputs) -> str | None:
 # First rule that has data wins. "new_to_you" is per-user: it speaks only when
 # the caller is a logged-in user with a recorded species they have not caught,
 # and otherwise the chain falls through to "structure". "distinctive" needs
-# frequency along the river (phase 6) and is an empty slot: it shows nothing,
-# not even a placeholder, until its phase fills `build`.
+# the special-here line: frequency here against the rest of the river section.
 HOOK_CHAIN: tuple[HookRule, ...] = (
     HookRule("protected_species", _hook_protected),
     HookRule("new_to_you", _hook_new_to_you),
-    HookRule("distinctive", None),
+    HookRule("distinctive", _hook_distinctive),
     HookRule("structure", _hook_structure),
     HookRule("honest_empty", _hook_honest_empty),
 )
@@ -775,6 +850,9 @@ def _might_find(c: _CardInputs) -> MightFindBlock:
         empty_text=empty,
         note=" ".join(notes) or None,
         radius_km=c.radius_km,
+        # Not shown when the care message is: a protected species nearby replaces
+        # everything else on the card, and the share of the rest would only hint at it.
+        special_here=None if c.n_protected else _special_block(c),
     )
 
 
@@ -985,6 +1063,7 @@ def render_spot(
     protected: frozenset[str] = frozenset(),
     unchecked: int = 0,
     caught: frozenset[str] | None = None,
+    special: SpecialHere | None = None,
 ) -> SpotCard:
     """The whole tap card for one spot: four blocks, every string already written.
 
@@ -995,6 +1074,9 @@ def render_spot(
     with `status_known_listed`, never `sar_alert`. Those species are not named
     anywhere in the card, are not counted, and turn the hook into a care message.
     `unchecked` is how many recorded species were not in the species file.
+    `special` is the frequency comparison for the spot's river section
+    (context/special.py); it fills the "distinctive" hook and `might_find.special_here`
+    only when it found something, and the protected-species care message still comes first.
 
     The card is the same for every user, with one exception. `caught` is the
     match keys of the logged-in user's confirmed catches (`new_to_you.caught_keys`)
@@ -1018,6 +1100,7 @@ def render_spot(
         n_protected=n_protected,
         n_imprecise=n_imprecise,
         new_species=new_species,
+        special=special,
     )
     hook = _choose_hook(inputs)
     getting_there = _getting_there(inputs)
@@ -1029,6 +1112,7 @@ def render_spot(
         why_gather=why_gather,
         getting_there=getting_there,
         new_to_you=_new_to_you_block(new_species),
+        caveats=[CardCaveat(**c) for c in spot_labels.caveats_for(spot.kind, spot.signals)],
         terms=_terms_used(spot.title, hook.text, *(f.text for f in why_gather.facts)),
         meta=CardMeta(
             records_radius_km=radius,
@@ -1036,6 +1120,7 @@ def render_spot(
             species_withheld_protected=n_protected,
             species_withheld_imprecise=n_imprecise,
             species_status_unchecked=unchecked,
+            special_here=special.status if special else "not_applicable",
             cache_key=f"{spot.spot_id}@{spot.built_at}",
         ),
     )

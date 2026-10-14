@@ -65,6 +65,10 @@ def count_spots(db: Database, jurisdiction: str | None = None) -> int:
     ).fetchone()[0]
 
 
+def count_spots_of_kind(db: Database, kind: str) -> int:
+    return db.execute("SELECT COUNT(*) FROM spots WHERE kind = ?", [kind]).fetchone()[0]
+
+
 def list_spots(
     db: Database,
     bbox: tuple[float, float, float, float] | None = None,

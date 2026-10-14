@@ -8,6 +8,8 @@ records, the labels and the access data itself. The pieces are:
     escalation, so building a card costs nothing and cannot spend money.
   * the species-at-risk screen below, which decides which recorded species may
     not be named.
+  * `special_here()`, the frequency of each species here against the rest of the
+    spot's river section, which feeds the "recorded more often here" line.
   * `render_spot()`, the only place card text is produced.
 
 The shared part of the card is the same for every user and is keyed by
@@ -28,6 +30,7 @@ from src.models.spot import Spot
 from src.models.spot_card import SpotCard
 from src.services.context import describe
 from src.services.context.render import new_species_for_user, render_spot
+from src.services.context.special import special_here
 from src.services.context.species import listing_check
 from src.services.new_to_you import caught_keys
 
@@ -68,7 +71,12 @@ def build_spot_card(db: Database, spot: Spot, user_id: int | None = None) -> Spo
         user_id=NO_USER,
     )
     protected, unchecked = screen_species(db, ctx)
-    return render_spot(spot, ctx, protected=protected, unchecked=unchecked, caught=caught)
+    # Quiet water is a reach, not a located structure on a curated river
+    # section, so there is nothing to compare it with.
+    special = None if spot.kind == "quiet_water" else special_here(db, spot, protected)
+    return render_spot(
+        spot, ctx, protected=protected, unchecked=unchecked, special=special, caught=caught
+    )
 
 
 def new_species_at_spot(db: Database, spot: Spot, caught: frozenset[str]) -> list:

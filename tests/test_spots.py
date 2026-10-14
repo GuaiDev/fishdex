@@ -877,6 +877,8 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
             assert set(e["response"]) == {"detail"}
         elif route == "/map/spots/labels":
             assert e["response"] == spot_labels.labels_payload()
+        elif route.endswith("/features"):
+            assert e["response"]["type"] == "FeatureCollection"
         elif route.startswith("/map/water-bodies/"):
             detail = {
                 k: v
@@ -900,14 +902,23 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
                 if k not in ("more_on_this_water", "water_body", "also_on_water_bodies", "card")
             }
             assert Spot.model_validate(detail).spot_id == route.removeprefix("/map/spots/")
-            assert e["response"]["water_body"]["water_body_id"] == detail["water_body_id"]
+            if detail["kind"] == "quiet_water":
+                # A reach found by the explore ranking belongs to no curated river.
+                assert e["response"]["water_body"] is None and detail["water_body_id"] is None
+            else:
+                assert e["response"]["water_body"]["water_body_id"] == detail["water_body_id"]
             assert SpotCard.model_validate(e["response"]["card"]).spot_id == detail["spot_id"]
+        elif route.startswith("/map/layers/"):
+            assert e["response"]["type"] == "FeatureCollection"
+            for f in e["response"]["features"]:
+                assert f["properties"]["kind"] in spot_labels.ACCESS_LABELS
         else:
             assert e["response"]["type"] == "FeatureCollection"
             for f in e["response"]["features"]:
                 assert f["id"] == f["properties"]["spot_id"]
                 assert f["properties"]["jurisdiction"]
-                assert f["properties"]["water_body_id"]
+                if f["properties"]["kind"] != "quiet_water":
+                    assert f["properties"]["water_body_id"]
                 assert not JARGON.search(f["properties"]["title"])
 
 

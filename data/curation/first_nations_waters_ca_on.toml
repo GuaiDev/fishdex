@@ -1,0 +1,35 @@
+# Waters the app does not suggest — Ontario.
+#
+# First Nations territory: there is no boundary layer in this repository, so the
+# stretch curation (stretches_ca_on.toml) leaves these reaches out of the map by
+# not listing them. Quiet water ranks reaches on its own, so it reads this file
+# and drops any reach inside a box below. The boxes are drawn around the omitted
+# reaches with generous padding (about 8 km): they leave out some good water
+# on purpose rather than suggest water that should not be suggested.
+#
+# Replace a box with the official boundary when a layer is ingested. The Grand
+# and Thames boxes are built from the boundary points in stretches_ca_on.toml;
+# the St. Clair box is a rougher estimate of the delta around Walpole Island.
+
+version = 1
+jurisdiction = "CA-ON"
+
+[[zone]]
+id = "grand_brantford_caledonia"
+name = "Grand River between Brantford and Caledonia"
+# Brantford (Lorne Bridge) 43.12834, -80.2644 to Caledonia dam 43.06597, -79.938, padded 0.08 degrees.
+bbox = [-80.344, 42.986, -79.858, 43.208]
+note = "Six Nations of the Grand River and Mississaugas of the Credit territory."
+
+[[zone]]
+id = "thames_delaware_thamesville"
+name = "Thames River between Delaware and Thamesville"
+# Delaware 42.89881, -81.42067 to Thamesville 42.54517, -81.98671, padded 0.08 degrees.
+bbox = [-82.067, 42.465, -81.341, 42.979]
+note = "Chippewas of the Thames, Munsee-Delaware, Oneida Nation of the Thames and Delaware Nation at Moraviantown."
+
+[[zone]]
+id = "st_clair_delta"
+name = "St. Clair delta"
+bbox = [-82.70, 42.45, -82.30, 42.75]
+note = "Walpole Island First Nation. A rough box; no curated boundary point exists for the delta."

@@ -50,3 +50,16 @@ def _no_live_ohn(monkeypatch):
     monkeypatch.setattr(
         bathymetry, "fetch_lake_bathymetry", lambda *_a, **_k: bathymetry.LakeBathymetry(None, [])
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_untapped_cache(monkeypatch, tmp_path):
+    """`build_spots` wraps explore() as quiet-water spots, which reads the repo's score cache.
+
+    Point it at a file that does not exist, so a build in a test finds no cache
+    (the honest-empty path) and never depends on, or waits for, the real parquet.
+    A test that wants quiet water writes its own parquet and points this at it.
+    """
+    from src.services import untapped_potential
+
+    monkeypatch.setattr(untapped_potential, "_PARQUET_PATH", tmp_path / "no_untapped.parquet")
