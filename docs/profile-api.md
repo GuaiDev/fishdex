@@ -27,8 +27,9 @@ rebuilds the derived user layer):
   trips barely move it. It is not a species count. Catches are compared against what was
   recorded at that place (`local_richness`), and intent counts over outcome: a new species
   recorded at the water you travelled to counts fully, one nothing recorded there counts
-  little, and returning to the same water for the same species, or the same species in
-  another season, counts toward specialist. Only confirmed catches are read.
+  little, and returning to the same water for the same species (on a later session, not
+  another stop in the same one), or the same species in another season, counts toward
+  specialist. Only confirmed catches are read.
 - **Size focus** and **micro focus**: two separate soft values (the decayed share of catches
   with a size recorded, and of small-bodied species). They are not part of the spectrum.
 - **Literacy per concept**: one state per `term_id` (`unseen`, `introduced`, `familiar`) with
@@ -83,9 +84,10 @@ term or kind gets `400`.
 
 ### `PUT /profile/declared/{key}` and `DELETE /profile/declared/{key}`
 
-`{"value": 0..1, "weight": ≥0 (default 3), "override": false}`. Keys: `orientation`,
+`{"value": 0..1, "weight": 0..50 (default 3), "override": false}`. Keys: `orientation`,
 `size_focus`, `micro_focus` and `concept:<term_id>` (value `0` unseen, `0.5` introduced,
-`1` familiar). Any other key, including any skill or expertise field, gets `400`.
+`1` familiar). Any other key, including any skill or expertise field, gets `400`. So does a
+non-finite weight or one above `MAX_DECLARED_WEIGHT` (`src/storage/angler_profile.py`).
 
 - A future questionnaire writes `override: false` starting values that fade.
 - A settings override writes `override: true`. It holds exactly and applies on the next read.

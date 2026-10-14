@@ -106,13 +106,13 @@ def test_two_stops_on_one_water_in_one_session_are_not_a_return_trip(db):
     record(db, 43.01, -80.01)
     one = trip(db, 1, "2025-06-01", 43.01, -80.01, ["common carp"])
     prof_one = prof.derive_profile(db, 1).orientation.inferred.value
-    db["stops"].insert({
+    second_stop = db["stops"].insert({
         "session_id": one, "user_id": 1, "location_text": "water", "location_name": "water",
         "lat": 43.01, "lng": -80.01, "species_caught": json.dumps(["common carp"]),
         "was_productive": 1,
-    })  # fmt: skip
+    }).last_pk  # fmt: skip
     db["catches"].insert({
-        "stop_id": db["stops"].last_pk, "session_id": one, "user_id": 1,
+        "stop_id": second_stop, "session_id": one, "user_id": 1,
         "species": "common carp", "count": 1, "biggest_size_cm": None, "species_confirmed": 1,
     })  # fmt: skip
     assert prof.derive_profile(db, 1).orientation.inferred.value == prof_one

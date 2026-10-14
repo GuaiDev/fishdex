@@ -1663,7 +1663,7 @@ def post_concept_event(body: dict, user: dict = Depends(get_current_user)):
 
 @app.put("/profile/declared/{key}")
 def put_declared_value(key: str, body: dict, user: dict = Depends(get_current_user)):
-    """Write a declared value: {"value": 0..1, "weight": >=0 (default 3), "override": bool}.
+    """Write a declared value: {"value": 0..1, "weight": 0..MAX (default 3), "override": bool}.
     A questionnaire writes a starting value that fades as trips are logged; settings
     writes an override that holds until cleared. Keys: orientation, size_focus,
     micro_focus, concept:<term_id>."""

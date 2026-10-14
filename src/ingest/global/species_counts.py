@@ -98,6 +98,7 @@ def cells_for_bbox(
     Snapping means two overlapping areas fetched on different days share
     cells instead of producing near-duplicates.
     """
+
     def idx(x: float) -> float:
         # 43.65 / 0.05 is 873.0000000001 in floating point; without rounding
         # ceil() would add a whole row of cells beyond the box.
