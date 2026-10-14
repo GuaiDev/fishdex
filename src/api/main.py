@@ -1615,6 +1615,93 @@ def get_terms(user: dict = Depends(get_current_user)):
     return {"terms": terms_payload()}
 
 
+# ── angler profile ──────────────────────────────────────────────────────────
+# Every route reads the user from the token, never from the body or the path.
+
+
+@app.get("/profile")
+def get_profile(user: dict = Depends(get_current_user)):
+    """The angler profile: orientation, size and small-species focus, and literacy per
+    concept, each with its inferred and declared parts (value + source + weight) and the
+    evidence behind it. For settings and for checking what the app has inferred."""
+    from src.services.context import angler_profile
+    from src.storage.database import get_db
+
+    return angler_profile(get_db(), user_id=user["id"]).model_dump()
+
+
+@app.get("/profile/presentation")
+def get_profile_presentation(user: dict = Depends(get_current_user)):
+    """Per-element prominence (0..1) and label wording mode for the map, dex, log form
+    and pins. Facts are never filtered; components decide how loudly to render."""
+    from src.services.context import angler_profile
+    from src.services.presentation import presentation
+    from src.storage.database import get_db
+
+    return presentation(angler_profile(get_db(), user_id=user["id"]))
+
+
+@app.post("/profile/concept-events", status_code=201)
+def post_concept_event(body: dict, user: dict = Depends(get_current_user)):
+    """Record literacy evidence: {"term_id": "confluence", "kind": "definition_opened" |
+    "seen_on_map", "ref": optional id}. Folded in at the next logged session."""
+    from src.storage import angler_profile as store
+    from src.storage.database import get_db
+
+    try:
+        event_id = store.record_event(
+            get_db(),
+            user["id"],
+            str(body.get("term_id", "")),
+            str(body.get("kind", "")),
+            body.get("ref"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"id": event_id}
+
+
+@app.put("/profile/declared/{key}")
+def put_declared_value(key: str, body: dict, user: dict = Depends(get_current_user)):
+    """Write a declared value: {"value": 0..1, "weight": >=0 (default 3), "override": bool}.
+    A questionnaire writes a starting value that fades as trips are logged; settings
+    writes an override that holds until cleared. Keys: orientation, size_focus,
+    micro_focus, concept:<term_id>."""
+    from src.storage import angler_profile as store
+    from src.storage.database import get_db
+
+    try:
+        value = float(body["value"])
+        weight = float(body.get("weight", DECLARED_DEFAULT_WEIGHT))
+        if not 0.0 <= value <= 1.0 or weight < 0:
+            raise ValueError("value must be 0..1 and weight >= 0")
+        row = store.set_declared(
+            get_db(), user["id"], key, value, weight, is_override=bool(body.get("override"))
+        )
+    except (KeyError, TypeError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"key": key, **row.model_dump()}
+
+
+@app.delete("/profile/declared/{key}")
+def delete_declared_value(key: str, user: dict = Depends(get_current_user)):
+    """Clear a declared value or override; the value goes back to behaviour alone."""
+    from src.storage import angler_profile as store
+    from src.storage.database import get_db
+
+    try:
+        removed = store.clear_declared(get_db(), user["id"], key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not removed:
+        raise HTTPException(status_code=404, detail="no declared value for that key")
+    return {"key": key, "removed": True}
+
+
+# A declared starting value counts as this many sessions of evidence.
+DECLARED_DEFAULT_WEIGHT = 3.0
+
+
 @app.get("/map/spots")
 def get_map_spots(
     bbox: str | None = None,

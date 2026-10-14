@@ -1,0 +1,577 @@
+{
+  "note": "Real responses for user 1 after replaying their 12 historical trips (scripts/batch_log_historical_trips_v2.py) into a stripped dev copy with per-cell GBIF + iNaturalist species counts. richness_basis is emptied so no pulled data is committed. Groundwork: values will change.",
+  "requests": [
+    {
+      "request": "GET /profile",
+      "status": 200,
+      "response": {
+        "user_id": 1,
+        "orientation": {
+          "value": 0.5633,
+          "confidence": 0.5401,
+          "inferred": {
+            "value": 0.6447,
+            "source": "inferred",
+            "weight": 6.2146,
+            "is_override": false,
+            "updated_at": null
+          },
+          "declared": null
+        },
+        "size_focus": {
+          "value": 0.2502,
+          "confidence": 0.8261,
+          "inferred": {
+            "value": 0.3039,
+            "source": "inferred",
+            "weight": 13.9921,
+            "is_override": false,
+            "updated_at": null
+          },
+          "declared": null
+        },
+        "micro_focus": {
+          "value": 0.0923,
+          "confidence": 0.8261,
+          "inferred": {
+            "value": 0.1121,
+            "source": "inferred",
+            "weight": 13.9921,
+            "is_override": false,
+            "updated_at": null
+          },
+          "declared": null
+        },
+        "concepts": {
+          "confluence": {
+            "term_id": "confluence",
+            "state": "familiar",
+            "source": "inferred",
+            "evidence": [
+              {
+                "kind": "logged_near",
+                "count": 5,
+                "sessions": 5,
+                "refs": [
+                  "stop:13~creek_junction:n8125738_4298133",
+                  "stop:12~creek_junction:n8125738_4298133",
+                  "stop:10~creek_junction:n8125738_4298133",
+                  "stop:8~creek_junction:n8125738_4298133",
+                  "stop:4~creek_junction:n7963464_4290332"
+                ]
+              }
+            ]
+          },
+          "river_mouth": {
+            "term_id": "river_mouth",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "dam": {
+            "term_id": "dam",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "weir": {
+            "term_id": "weir",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "tailwater": {
+            "term_id": "tailwater",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "culvert": {
+            "term_id": "culvert",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "inlet": {
+            "term_id": "inlet",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "outlet": {
+            "term_id": "outlet",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "island": {
+            "term_id": "island",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "point": {
+            "term_id": "point",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "peninsula": {
+            "term_id": "peninsula",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "drop_off": {
+            "term_id": "drop_off",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "weed_edge": {
+            "term_id": "weed_edge",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          }
+        },
+        "sessions_used": 12,
+        "session_evidence": [
+          {
+            "session_id": 12,
+            "date": "December 2024 or February 2025",
+            "places": [
+              "Downtown Oakville pier",
+              "Burloak Boat Club harbour, Oakville"
+            ],
+            "lifelist": 0.0,
+            "specialist": 0.0,
+            "signal": null,
+            "weight": 0.0,
+            "reasons": [],
+            "richness_basis": []
+          },
+          {
+            "session_id": 11,
+            "date": "March 2025",
+            "places": [
+              "Several sessions, London"
+            ],
+            "lifelist": 0.0,
+            "specialist": 0.0,
+            "signal": null,
+            "weight": 0.0,
+            "reasons": [],
+            "richness_basis": []
+          },
+          {
+            "session_id": 10,
+            "date": "2025-04-13",
+            "places": [
+              "Greenway Dog Park, Thames River, London"
+            ],
+            "lifelist": 2.0,
+            "specialist": 0.0,
+            "signal": 1.0,
+            "weight": 1.0,
+            "reasons": [
+              "new water with 62 recorded species new to the angler",
+              "new species moxostoma erythrurum (recorded there)"
+            ],
+            "richness_basis": []
+          },
+          {
+            "session_id": 9,
+            "date": "2025-04-17",
+            "places": [
+              "The Forks, Thames River, London"
+            ],
+            "lifelist": 2.0,
+            "specialist": 0.0,
+            "signal": 1.0,
+            "weight": 1.0,
+            "reasons": [
+              "new species moxostoma anisurum (recorded there)",
+              "new species moxostoma macrolepidotum (recorded there)"
+            ],
+            "richness_basis": []
+          },
+          {
+            "session_id": 8,
+            "date": "2025-04-19",
+            "places": [
+              "Snake Creek, London (city-level location)"
+            ],
+            "lifelist": 4.024,
+            "specialist": 0.0,
+            "signal": 1.0,
+            "weight": 1.0,
+            "reasons": [
+              "new water with 1 recorded species new to the angler",
+              "new species lepomis macrochirus (recorded there)",
+              "new species semotilus atromaculatus (recorded there)",
+              "new species lepomis cyanellus (recorded there)",
+              "new species luxilus cornutus (recorded there)"
+            ],
+            "richness_basis": []
+          },
+          {
+            "session_id": 7,
+            "date": "2025-04-23",
+            "places": [
+              "The Forks, Thames River, London"
+            ],
+            "lifelist": 1.0,
+            "specialist": 1.4,
+            "signal": 0.417,
+            "weight": 1.0,
+            "reasons": [
+              "returned to The Forks, Thames River, London",
+              "caught moxostoma anisurum, moxostoma macrolepidotum there again",
+              "new species cyprinus carpio (recorded there)"
+            ],
+            "richness_basis": []
+          },
+          {
+            "session_id": 6,
+            "date": "2025-04-26",
+            "places": [
+              "North London Athletic Fields, Thames River"
+            ],
+            "lifelist": 0.14,
+            "specialist": 0.0,
+            "signal": 1.0,
+            "weight": 0.14,
+            "reasons": [
+              "new water with 8 recorded species new to the angler"
+            ],
+            "richness_basis": []
+          },
+          {
+            "session_id": 5,
+            "date": "2025-04-27",
+            "places": [
+              "Greenway Dog Park, Thames River, London"
+            ],
+            "lifelist": 0.0,
+            "specialist": 0.4,
+            "signal": 0.0,
+            "weight": 0.4,
+            "reasons": [
+              "returned to Greenway Dog Park, Thames River, London"
+            ],
+            "richness_basis": []
+          },
+          {
+            "session_id": 4,
+            "date": "2025-05-10",
+            "places": [
+              "Stormwater pond, Milton",
+              "Osprey Marsh, Mississauga",
+              "Lake Aquitaine, Mississauga"
+            ],
+            "lifelist": 0.38,
+            "specialist": 0.0,
+            "signal": 1.0,
+            "weight": 0.38,
+            "reasons": [
+              "new water with 4 recorded species new to the angler",
+              "new water with 3 recorded species new to the angler"
+            ],
+            "richness_basis": []
+          },
+          {
+            "session_id": 3,
+            "date": "2025-05-15",
+            "places": [
+              "Byng Island, Grand River, Dunnville"
+            ],
+            "lifelist": 1.283,
+            "specialist": 0.0,
+            "signal": 1.0,
+            "weight": 1.0,
+            "reasons": [
+              "new water with 15 recorded species new to the angler",
+              "new species ictalurus punctatus (recorded there)"
+            ],
+            "richness_basis": []
+          },
+          {
+            "session_id": 2,
+            "date": "late May 2025",
+            "places": [
+              "Stormwater pond, Milton",
+              "Second stormwater pond, Milton"
+            ],
+            "lifelist": 0.0,
+            "specialist": 0.4,
+            "signal": 0.0,
+            "weight": 0.4,
+            "reasons": [
+              "returned to Stormwater pond, Milton"
+            ],
+            "richness_basis": []
+          },
+          {
+            "session_id": 1,
+            "date": "2025-06-08",
+            "places": [
+              "Osprey Marsh, Mississauga"
+            ],
+            "lifelist": 0.0,
+            "specialist": 1.2,
+            "signal": 0.0,
+            "weight": 1.0,
+            "reasons": [
+              "returned to Osprey Marsh, Mississauga",
+              "cyprinus carpio again in a different season"
+            ],
+            "richness_basis": []
+          }
+        ],
+        "computed_at": "2026-10-14T16:14:03.533933+00:00"
+      }
+    },
+    {
+      "request": "GET /profile/presentation",
+      "status": 200,
+      "response": {
+        "user_id": 1,
+        "basis": {
+          "orientation": 0.5633,
+          "orientation_confidence": 0.5401,
+          "effective_lean": 0.5342,
+          "size_focus": 0.2502,
+          "micro_focus": 0.0923,
+          "sessions_used": 12
+        },
+        "map": {
+          "labels": {
+            "confluence": {
+              "state": "familiar",
+              "label_mode": "term",
+              "prominence": 0.85
+            },
+            "river_mouth": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "dam": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "weir": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "tailwater": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "culvert": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "inlet": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "outlet": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "island": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "point": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "peninsula": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "drop_off": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "weed_edge": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            }
+          },
+          "default_layer_density": 0.4462,
+          "more_detail_toggle": true,
+          "water_body_mix": {
+            "lake": 0.3333333333333333,
+            "pond": 0.3333333333333333,
+            "river": 0.3333333333333333
+          }
+        },
+        "dex": {
+          "family_completion": 0.6041,
+          "recorded_near_not_caught": 0.6041,
+          "lifer_markers": 0.6041,
+          "journal_timeline": 0.9651,
+          "seasonal_timeline": 0.5459,
+          "catches_by_conditions": 0.5459,
+          "species_depth": 0.5459,
+          "size_records": 0.3627,
+          "small_species": 0.2285
+        },
+        "log_form": {
+          "defaults": {
+            "species": {
+              "prominence": 1.0,
+              "available": true
+            },
+            "place": {
+              "prominence": 1.0,
+              "available": true
+            },
+            "photo": {
+              "prominence": 1.0,
+              "available": true
+            },
+            "trip_rating": {
+              "prominence": 1.0,
+              "available": true
+            }
+          },
+          "details": {
+            "size": {
+              "prominence": 0.3627,
+              "start_expanded": false,
+              "available": true
+            },
+            "count": {
+              "prominence": 0.6041,
+              "start_expanded": true,
+              "available": true
+            },
+            "target_species": {
+              "prominence": 0.5459,
+              "start_expanded": false,
+              "available": true
+            },
+            "technique": {
+              "prominence": 0.5459,
+              "start_expanded": false,
+              "available": true
+            },
+            "bait": {
+              "prominence": 0.5459,
+              "start_expanded": false,
+              "available": true
+            },
+            "water_clarity": {
+              "prominence": 0.5459,
+              "start_expanded": false,
+              "available": true
+            },
+            "water_level": {
+              "prominence": 0.5459,
+              "start_expanded": false,
+              "available": true
+            },
+            "water_temp": {
+              "prominence": 0.5459,
+              "start_expanded": false,
+              "available": true
+            },
+            "time_of_day": {
+              "prominence": 0.5459,
+              "start_expanded": false,
+              "available": true
+            },
+            "small_species_id_help": {
+              "prominence": 0.2285,
+              "start_expanded": false,
+              "available": true
+            },
+            "notes": {
+              "prominence": 0.9651,
+              "start_expanded": true,
+              "available": true
+            }
+          },
+          "species_order_weights": {
+            "your_targets": 0.5459,
+            "recorded_here_not_caught": 0.6041,
+            "recently_logged": 0.9651
+          }
+        },
+        "pins": {
+          "target_species_context": 0.5459,
+          "conditions_context": 0.5459,
+          "uncaught_recorded_cue": 0.6041
+        }
+      }
+    },
+    {
+      "request": "POST /profile/concept-events",
+      "status": 201,
+      "response": {
+        "id": 2
+      },
+      "body": {
+        "term_id": "weir",
+        "kind": "definition_opened"
+      }
+    },
+    {
+      "request": "PUT /profile/declared/micro_focus",
+      "status": 200,
+      "response": {
+        "key": "micro_focus",
+        "value": 0.8,
+        "source": "declared",
+        "weight": 3.0,
+        "is_override": false,
+        "updated_at": "2026-10-14T16:15:41.790142+00:00"
+      },
+      "body": {
+        "value": 0.8,
+        "weight": 3
+      }
+    },
+    {
+      "request": "PUT /profile/declared/skill_level",
+      "status": 400,
+      "response": {
+        "detail": "not a profile key: 'skill_level'"
+      },
+      "body": {
+        "value": 0.5
+      }
+    },
+    {
+      "request": "DELETE /profile/declared/micro_focus",
+      "status": 200,
+      "response": {
+        "key": "micro_focus",
+        "removed": true
+      }
+    },
+    {
+      "request": "DELETE /profile/declared/micro_focus",
+      "status": 404,
+      "response": {
+        "detail": "no declared value for that key"
+      }
+    }
+  ]
+}
