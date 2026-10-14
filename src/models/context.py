@@ -114,8 +114,7 @@ _EMPTY_PHRASING: dict[EmptyReason, str] = {
         "measured, but unremarkable enough that the number would not change your plan"
     ),
     EmptyReason.SUPPRESSED_ON_CONSERVATION_GROUNDS: (
-        "withheld while this species may be listed — not missing, deliberately "
-        "not shown"
+        "withheld while this species may be listed — not missing, deliberately not shown"
     ),
 }
 
