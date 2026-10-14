@@ -86,6 +86,17 @@ def test_replace_drops_species_no_longer_listed(tmp_path):
     assert list(store.get_species_images(db)) == ["Micropterus dolomieu"]
 
 
+def test_images_by_id_resyncs_a_stale_table(tmp_path):
+    db = get_db(tmp_path / "t.db")
+    store.replace_species_images(db, [_approved(species_id="Esox lucius")])
+
+    served = service.images_by_id(db)
+
+    expected = {i.species_id: i for i in service.current_images()}
+    assert served == expected
+    assert store.get_species_images(db) == expected
+
+
 # ── building rows ──────────────────────────────────────────────────────────
 
 _ORIGINAL = {

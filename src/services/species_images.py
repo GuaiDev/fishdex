@@ -118,15 +118,15 @@ STATIC_URL_PREFIX = "/static/"
 
 
 def images_by_id(db: Database) -> dict[str, SpeciesImage]:
-    """The species_image rows, filling the table from the committed files if it is empty.
+    """The species_image rows, resynced from the committed files if they differ.
 
-    The table is derived, so an empty one (a fresh database) is rebuilt rather
-    than served as "no images". After adding or approving an image, rerun
-    `sync-species-images` to refresh it.
+    The table is derived, so an empty or stale one (a fresh database, or an
+    image approved since the last sync) is rebuilt rather than served.
     """
+    expected = {i.species_id: i for i in current_images()}
     images = store.get_species_images(db)
-    if not images:
-        sync_species_images(db)
+    if images != expected:
+        store.replace_species_images(db, list(expected.values()))
         images = store.get_species_images(db)
     return images
 
