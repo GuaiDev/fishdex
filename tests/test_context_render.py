@@ -299,7 +299,6 @@ def test_unclaimable_pattern_is_shown_and_marked():
         user_id=1,
         total_sessions=2,
         total_stops=2,
-        expertise="novice",
         patterns=[
             DerivedPattern(
                 statement="more productive in stained water",
@@ -317,7 +316,6 @@ def test_claimable_pattern_is_marked_claimable():
         user_id=1,
         total_sessions=8,
         total_stops=12,
-        expertise="intermediate",
         patterns=[
             DerivedPattern(
                 statement="more productive in stained water",
@@ -338,10 +336,38 @@ def test_targets_are_labelled_as_derived_not_configured():
         total_sessions=4,
         total_stops=9,
         target_species=["greater redhorse"],
-        expertise="advanced",
     )
     out = render.render_user_layer(layer)
     assert "from logs, not configured" in out
+
+
+def test_the_user_layer_never_prints_a_skill_level():
+    from src.models.angler_profile import AnglerProfile, BlendedValue, ConceptState
+
+    def bv(v):
+        return BlendedValue(value=v, confidence=0.3)
+
+    layer = UserLayer(
+        user_id=1,
+        total_sessions=4,
+        total_stops=9,
+        profile=AnglerProfile(
+            user_id=1,
+            orientation=bv(0.4),
+            size_focus=bv(0.5),
+            micro_focus=bv(0.1),
+            concepts={
+                "confluence": ConceptState(term_id="confluence", state="familiar"),
+                "dam": ConceptState(term_id="dam", state="introduced"),
+            },
+        ),
+    )
+    out = render.render_user_layer(layer)
+    assert "0.40" in out and "confidence 0.30" in out
+    assert "say plainly): confluence" in out
+    assert "define briefly): dam" in out
+    for word in ("expertise", "novice", "beginner", "advanced", "expert"):
+        assert word not in out.lower()
 
 
 # -- whole context -------------------------------------------------------------

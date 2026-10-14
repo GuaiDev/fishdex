@@ -32,9 +32,9 @@ Three entry points in `src/services/context/__init__.py`:
 
 - `describe(place, caller=...)` — one stretch of water, sliced. Callers do not pick slices; `_BUNDLES` maps caller type to slices, and `_ESCALATING_CALLERS` decides who may spend a live web search when the corpus is empty.
 - `explore(area)` — ranks unvisited segments. No habitat term, no species prediction.
-- `user_layer(user)` / `species_history(db, species)` — derived, never raw rows.
+- `user_layer(user)` / `species_history(db, species)` / `angler_profile(user)` — derived, never raw rows.
 
-**The derived layer is computed on write.** `log_session` calls `recompute_user_layer`; `user_layer()` serves the stored result whenever the inputs are unchanged. Freshness is a **fingerprint** of the inputs (row counts + max ids for stops, sessions and current insights), not an age — a stale row is caught by the data having moved, so a direct DB edit cannot serve a wrong answer forever. A miss recomputes: the cache is an optimisation and never a source of truth, and dropping `user_patterns` costs time, not answers.
+**The derived layer is computed on write.** `log_session` calls `recompute_user_layer`; `user_layer()` serves the stored result whenever the inputs are unchanged. Freshness is a **fingerprint** of the inputs (row counts + max ids for stops, sessions and current insights, plus the confirmed-catch total), not an age — a stale row is caught by the data having moved, so a direct DB edit cannot serve a wrong answer forever. A miss recomputes: the cache is an optimisation and never a source of truth, and dropping `user_patterns` costs time, not answers.
 
 The freshness check is deliberately one query. The first version issued six and was *slower* than deriving for any log under ~300 stops — a cache whose freshness check costs more than a miss is not a cache. Measured after the fix: 1.2× at zero stops, 3.7× at 100, 19× at 1,200.
 

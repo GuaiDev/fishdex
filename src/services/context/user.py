@@ -1,8 +1,8 @@
 """Derived user layer.
 
-Precomputed from logged activity. Never raw rows, and never a configured
-profile: what someone cares about and how experienced they are is derived
-from what they log, not from what they told a form once.
+Precomputed from logged activity. Never raw rows. What someone cares about
+and which map concepts they know is derived from what they log
+(`profile.py`); a declared value can seed it but never replaces behaviour.
 
 The core epistemic rule lives here in code rather than in prompt prose:
 
@@ -30,28 +30,13 @@ from src.models.context import (
     SpeciesHistory,
     UserLayer,
 )
+from src.services.context.profile import derive_profile
 
 logger = logging.getLogger(__name__)
 
 # A species has to show up this often before we treat it as something the
 # angler targets rather than something they happened to catch.
 _TARGET_MIN_CATCHES = 3
-
-# Microfishing and specialist taxa. Logging these is a strong signal of
-# demonstrated expertise: nobody catches a madtom by accident on a nightcrawler.
-_SPECIALIST_MARKERS = (
-    "darter",
-    "dace",
-    "madtom",
-    "shiner",
-    "chub",
-    "sculpin",
-    "lamprey",
-    "stickleback",
-    "redhorse",
-    "sucker",
-    "logperch",
-)
 
 
 def build_user_layer(db: Database, user_id: int = 1) -> UserLayer:
@@ -62,9 +47,12 @@ def build_user_layer(db: Database, user_id: int = 1) -> UserLayer:
     every single request.
     """
     now = datetime.now(UTC).isoformat()
+    profile = derive_profile(db, user_id)
 
     if "stops" not in db.table_names():
-        return UserLayer(user_id=user_id, computed_at=now, known_gaps=["no trips logged yet"])
+        return UserLayer(
+            user_id=user_id, computed_at=now, known_gaps=["no trips logged yet"], profile=profile
+        )
 
     rows = list(
         db.execute(
@@ -76,7 +64,9 @@ def build_user_layer(db: Database, user_id: int = 1) -> UserLayer:
         ).fetchall()
     )
     if not rows:
-        return UserLayer(user_id=user_id, computed_at=now, known_gaps=["no trips logged yet"])
+        return UserLayer(
+            user_id=user_id, computed_at=now, known_gaps=["no trips logged yet"], profile=profile
+        )
 
     session_count = db.execute(
         "SELECT COUNT(*) FROM sessions WHERE user_id = ?", [user_id]
@@ -101,7 +91,7 @@ def build_user_layer(db: Database, user_id: int = 1) -> UserLayer:
         blank_rate=round(blanks / len(rows), 3) if rows else None,
         species_logged=sorted(species_counter),
         target_species=_infer_targets(species_counter),
-        expertise=_infer_expertise(species_counter, len(rows)),
+        profile=profile,
         patterns=_derive_patterns(clarity_outcomes),
         known_gaps=_known_gaps(rows),
         computed_at=now,
@@ -125,29 +115,6 @@ def _infer_targets(counter: Counter[str]) -> list[str]:
     to know someone targets redhorse, it learns it from their logs.
     """
     return sorted(sp for sp, n in counter.items() if n >= _TARGET_MIN_CATCHES)
-
-
-def _infer_expertise(counter: Counter[str], stop_count: int) -> str:
-    """Demonstrated, not declared.
-
-    Register calibrates to this: telling an angler who logs madtoms on a
-    tanago hook something obvious, confidently, destroys credibility.
-    """
-    if stop_count == 0:
-        return "unknown"
-
-    distinct = len(counter)
-    specialist_hits = sum(
-        n for sp, n in counter.items() if any(m in sp for m in _SPECIALIST_MARKERS)
-    )
-
-    if specialist_hits >= 3 or distinct >= 12:
-        return "advanced"
-    if stop_count >= 10 or distinct >= 5:
-        return "intermediate"
-    if stop_count >= 3:
-        return "novice"
-    return "unknown"
 
 
 def _derive_patterns(clarity_outcomes: list[tuple[str, bool]]) -> list[DerivedPattern]:

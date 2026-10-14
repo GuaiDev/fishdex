@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from src.models.angler_profile import AnglerProfile
 from src.models.freshness import is_stale, normalise_observed_at
 
 
@@ -556,9 +557,11 @@ class UserLayer(BaseModel):
     target_species: list[str] = Field(default_factory=list)
     """Inferred from logging behaviour, never configured."""
 
-    expertise: Literal["unknown", "novice", "intermediate", "advanced"] = "unknown"
-    """Demonstrated, not declared. Drives register — telling an experienced
-    angler something obvious destroys credibility."""
+    profile: AnglerProfile | None = None
+    """Orientation spectrum, size and small-species focus, and literacy per
+    concept — inferred only; declared values are blended at read time by
+    `context.angler_profile()`. There is deliberately no global
+    beginner/expert level: register follows the per-concept states."""
 
     patterns: list[DerivedPattern] = Field(default_factory=list)
     known_gaps: list[str] = Field(default_factory=list)

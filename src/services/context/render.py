@@ -25,6 +25,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import NamedTuple
 
+from src.models.angler_profile import AnglerProfile
 from src.models.context import (
     AccessSlice,
     ConditionsSlice,
@@ -372,7 +373,7 @@ def render_user_layer(layer: UserLayer) -> str:
     ]
     if layer.blank_rate is not None:
         lines.append(f"- blank rate: {layer.blank_rate:.0%}")
-    lines.append(f"- demonstrated expertise: {layer.expertise}")
+    lines += _profile_lines(layer.profile)
     if layer.target_species:
         lines.append(
             f"- appears to target (from logs, not configured): "
@@ -394,6 +395,36 @@ def render_user_layer(layer: UserLayer) -> str:
         for g in layer.known_gaps:
             lines.append(f"  - {g}")
     return "\n".join(lines)
+
+
+def _profile_lines(profile: AnglerProfile | None) -> list[str]:
+    """The angler profile as register guidance, never as a level.
+
+    Orientation decides emphasis, not content; the concept states decide
+    wording. Familiar concepts can be named outright, unseen ones need
+    explaining. There is no overall beginner/expert label to print.
+    """
+    if profile is None:
+        return []
+    o = profile.orientation
+    lines = [
+        f"- leaning (0 = specialist, 1 = lifelister, from logs): {o.value:.2f}, "
+        f"confidence {o.confidence:.2f}",
+        f"- records sizes on {profile.size_focus.value:.0%} of catches (soft); "
+        f"small-species share {profile.micro_focus.value:.0%} (soft)",
+    ]
+    by_state: dict[str, list[str]] = {"familiar": [], "introduced": []}
+    for c in profile.concepts.values():
+        if c.state in by_state:
+            by_state[c.state].append(terms.TERMS[c.term_id]["technical"].lower())
+    if by_state["familiar"]:
+        lines.append(f"- map words they know (say plainly): {', '.join(by_state['familiar'])}")
+    if by_state["introduced"]:
+        lines.append(
+            f"- map words they have met (define briefly): {', '.join(by_state['introduced'])}"
+        )
+    lines.append("- any other map word: explain it in plain words first")
+    return lines
 
 
 def render_species_history(history: SpeciesHistory) -> str:

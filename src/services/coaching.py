@@ -50,8 +50,10 @@ _RULES = """Rules you must follow:
 - Where the data is empty, the reason is given. Say which gap it is; "no data"
   on its own is not an acceptable answer.
 - Blanks are not failures. They are half the signal and worth analysing.
-- Match the register to the demonstrated expertise shown. Telling an
-  experienced angler something obvious destroys credibility."""
+- Match the register per concept, from the profile lines: say the map words
+  they know plainly, define the ones they have met in a few words, and explain
+  any other in plain words first. There is no overall skill level; never
+  describe the angler as a beginner or an expert."""
 
 _SAR_RULES = """
 CONSERVATION OVERRIDE — this species carries a conservation flag.

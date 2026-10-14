@@ -7,7 +7,8 @@ Three entry points:
 
     describe(place)        everything known about one stretch of water
     explore(area, filters) ranks places the user hasn't been
-    user_layer(user)       derived patterns, expertise, known gaps
+    user_layer(user)       derived patterns, angler profile, known gaps
+    angler_profile(user)   the profile with declared values blended in
 
 Callers do not choose slices. Bundles are determined by caller type here, in
 Python — letting surfaces request slices individually would recreate the
@@ -288,7 +289,7 @@ def describe_species(db: Database, name: str):
 
 
 def user_layer(db: Database, user_id: int = 1, force: bool = False):
-    """Derived patterns, demonstrated expertise, and known gaps.
+    """Derived patterns, the inferred angler profile, and known gaps.
 
     Served from the stored layer when the inputs have not changed. Recomputed
     when a session is logged, not when a question is asked — this used to
@@ -310,7 +311,43 @@ def user_layer(db: Database, user_id: int = 1, force: bool = False):
 
     layer = build_user_layer(db, user_id=user_id)
     user_patterns.store(db, layer, fingerprint)
+    if layer.profile is not None:
+        _store_inferred_profile(db, layer.profile)
     return layer
+
+
+def _store_inferred_profile(db: Database, profile) -> None:
+    """Write the inferred values as rows (value + source + weight).
+
+    Never raises into the caller, for the same reason the layer cache does
+    not: a logged trip must not fail over this. It is logged, because a write
+    that always fails looks exactly like a profile nobody has built yet.
+    """
+    from src.services.context.profile import inferred_rows
+    from src.storage import angler_profile as profile_store
+
+    try:
+        profile_store.write_inferred(db, profile.user_id, inferred_rows(profile))
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "Could not store inferred profile values for user %s", profile.user_id, exc_info=True
+        )
+
+
+def angler_profile(db: Database, user_id: int = 1):
+    """The angler profile for one user, declared values blended in.
+
+    The inferred part comes from the stored layer (recomputed once per logged
+    session); declared values — a questionnaire's starting point or a settings
+    override — are blended on every read, so an override applies at once.
+    """
+    from src.services.context.profile import blend, derive_profile
+
+    layer = user_layer(db, user_id=user_id)
+    profile = layer.profile
+    if profile is None:
+        profile = derive_profile(db, user_id)
+    return blend(db, profile)
 
 
 def recompute_user_layer(db: Database, user_id: int = 1):
@@ -337,6 +374,7 @@ __all__ = [
     "ExploreResult",
     "Place",
     "PlaceContext",
+    "angler_profile",
     "describe",
     "describe_species",
     "explore",
