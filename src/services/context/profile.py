@@ -362,6 +362,8 @@ def _orientation(db: Database, sessions: list[_Session]):
         ev = SessionEvidence(session_id=sess.id, date=sess.date)
         lifelist = specialist = 0.0
         new_this_session: set[str] = set()
+        visited_before = set(visited)
+        caught_before = {w: set(c) for w, c in caught_at_water.items()}
         rich_conf: list[float] = []
         for stop in sess.stops:
             ev.places.append(stop.label)
@@ -379,10 +381,10 @@ def _orientation(db: Database, sessions: list[_Session]):
             names = rich.common_names if rich else {}
             caught = {_canonical(c["species"], names) for c in stop.catches}
 
-            if stop.water in visited:
+            if stop.water in visited_before:
                 specialist += REPEAT_WATER_WEIGHT
                 ev.reasons.append(f"returned to {stop.label or stop.water}")
-                repeat = caught & caught_at_water[stop.water]
+                repeat = caught & caught_before.get(stop.water, set())
                 if repeat:
                     specialist += REPEAT_WATER_SPECIES_WEIGHT
                     ev.reasons.append(f"caught {', '.join(sorted(repeat))} there again")

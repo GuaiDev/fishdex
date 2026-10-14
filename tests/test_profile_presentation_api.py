@@ -115,6 +115,9 @@ def test_the_api_refuses_a_skill_field_and_bad_values(api):
     c, h = api.client, api.ann["h"]
     assert c.put("/profile/declared/skill_level", json={"value": 0.5}, headers=h).status_code == 400
     assert c.put("/profile/declared/orientation", json={"value": 2}, headers=h).status_code == 400
+    for bad in (1e9, -1):
+        r = c.put("/profile/declared/orientation", json={"value": 0.5, "weight": bad}, headers=h)
+        assert r.status_code == 400
     r = c.post("/profile/concept-events", json={"term_id": "dam", "kind": "x"}, headers=h)
     assert r.status_code == 400
 

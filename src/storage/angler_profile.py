@@ -18,6 +18,7 @@ Writable keys are fixed (`models/angler_profile.SCALAR_KEYS` and
 skill or expertise field can come back through a questionnaire.
 """
 
+import math
 from datetime import UTC, datetime
 
 from sqlite_utils import Database
@@ -27,6 +28,8 @@ from src.services import terms
 
 VALUES = "angler_profile_values"
 EVENTS = "angler_concept_events"
+
+MAX_DECLARED_WEIGHT = 50.0
 
 EVENT_KINDS: tuple[str, ...] = ("definition_opened", "seen_on_map")
 
@@ -79,6 +82,8 @@ def set_declared(
     is_override: bool = False,
 ) -> ProfileValue:
     validate_key(key)
+    if not math.isfinite(weight) or not 0.0 <= weight <= MAX_DECLARED_WEIGHT:
+        raise ValueError(f"weight must be between 0 and {MAX_DECLARED_WEIGHT:g}")
     row = ProfileValue(
         value=value, source="declared", weight=weight, is_override=is_override, updated_at=_now()
     )

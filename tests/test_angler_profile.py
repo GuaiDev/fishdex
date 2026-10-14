@@ -51,6 +51,17 @@ def test_a_skill_field_cannot_be_written(db):
             store.set_declared(db, 1, key, 0.5, 1.0)
 
 
+_BAD_WEIGHTS = [float("inf"), float("nan"), -1.0, store.MAX_DECLARED_WEIGHT + 1]
+
+
+@pytest.mark.parametrize("weight", _BAD_WEIGHTS)
+def test_declared_weight_must_be_finite_and_capped(db, weight):
+    with pytest.raises(ValueError):
+        store.set_declared(db, 1, "orientation", 0.5, weight)
+    assert store.get_values(db, 1) == {}
+    store.set_declared(db, 1, "orientation", 0.5, store.MAX_DECLARED_WEIGHT)
+
+
 def test_declared_values_are_scoped_to_their_user(db):
     store.set_declared(db, 1, "orientation", 0.9, 3.0)
     store.set_declared(db, 2, "orientation", 0.1, 3.0)
@@ -89,6 +100,24 @@ def test_returning_to_one_water_for_one_species_reads_as_specialist(db):
     p = prof.derive_profile(db, 1)
     assert p.orientation.inferred.value < 0.3
     assert p.orientation.value < 0.5
+
+
+def test_two_stops_on_one_water_in_one_session_are_not_a_return_trip(db):
+    record(db, 43.01, -80.01)
+    one = trip(db, 1, "2025-06-01", 43.01, -80.01, ["common carp"])
+    prof_one = prof.derive_profile(db, 1).orientation.inferred.value
+    db["stops"].insert({
+        "session_id": one, "user_id": 1, "location_text": "water", "location_name": "water",
+        "lat": 43.01, "lng": -80.01, "species_caught": json.dumps(["common carp"]),
+        "was_productive": 1,
+    })  # fmt: skip
+    db["catches"].insert({
+        "stop_id": db["stops"].last_pk, "session_id": one, "user_id": 1,
+        "species": "common carp", "count": 1, "biggest_size_cm": None, "species_confirmed": 1,
+    })  # fmt: skip
+    assert prof.derive_profile(db, 1).orientation.inferred.value == prof_one
+    trip(db, 1, "2025-06-08", 43.01, -80.01, ["common carp"])
+    assert prof.derive_profile(db, 1).orientation.inferred.value < prof_one
 
 
 def test_seeking_out_recorded_new_species_on_new_water_reads_as_lifelister(db):

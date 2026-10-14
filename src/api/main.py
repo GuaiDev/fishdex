@@ -1673,8 +1673,8 @@ def put_declared_value(key: str, body: dict, user: dict = Depends(get_current_us
     try:
         value = float(body["value"])
         weight = float(body.get("weight", DECLARED_DEFAULT_WEIGHT))
-        if not 0.0 <= value <= 1.0 or weight < 0:
-            raise ValueError("value must be 0..1 and weight >= 0")
+        if not 0.0 <= value <= 1.0:
+            raise ValueError("value must be 0..1")
         row = store.set_declared(
             get_db(), user["id"], key, value, weight, is_override=bool(body.get("override"))
         )
