@@ -153,9 +153,13 @@ Optional keys unlock individual adapters and features:
 | `MAPBOX_TOKEN` | Satellite imagery links and map rendering |
 | `YOUTUBE_API_KEY` | YouTube transcript ingestion |
 | `DATASTREAM_API_KEY` | DataStream water quality |
-| `FISHBOT_API_KEY` | Web API authentication |
+| `FISHBOT_API_KEY` | Web API authentication — **required** for admin endpoints (see below) |
 
 Note that `.env.example` currently documents only `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`, `LOG_LEVEL` and `DATASTREAM_API_KEY` — the rest are read by code but undocumented there.
+
+### Setting `FISHBOT_API_KEY` locally
+
+The API's admin endpoints (`POST /admin/token`, `/admin/dashboard`, `/ingest/data*`, and so on) are protected by `FISHBOT_API_KEY`. If it is unset or empty they refuse every request with HTTP 503 rather than letting anyone in; a wrong or missing `X-Api-Key` header gets 401. So set it before `make serve`: add a line such as `FISHBOT_API_KEY=pick-any-long-random-string` to `.env` (generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`), or export it in your shell. Then visit `/admin-login` and paste the same key to log in.
 
 ### Everything runs locally
 
