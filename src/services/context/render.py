@@ -56,7 +56,7 @@ from src.models.spot_card import (
     SpotCard,
     WhyGatherBlock,
 )
-from src.services import spot_labels
+from src.services import spot_labels, terms
 from src.services.context import translate
 
 # A record older than this is called out in the rendering. Not a cutoff and not
@@ -882,13 +882,15 @@ def _getting_there(c: _CardInputs) -> GettingThereBlock:
 
 
 def _terms_used(*texts: str) -> list[GlossaryTerm]:
-    """Glossary entries for the hard words that actually appear in this card's text."""
+    """Registry entries for the hard words that actually appear in this card's text."""
     body = " ".join(texts)
-    return [
-        GlossaryTerm(term=term, text=text)
-        for term, text in translate.GLOSSARY.items()
-        if re.search(rf"\b{term}\b", body, re.IGNORECASE)
-    ]
+    out = []
+    for term_id in terms.CARD_LINKED_TERMS:
+        if re.search(rf"\b{term_id}\b", body, re.IGNORECASE):
+            out.append(
+                GlossaryTerm(term=term_id, term_id=term_id, text=terms.TERMS[term_id]["definition"])
+            )
+    return out
 
 
 def render_spot(

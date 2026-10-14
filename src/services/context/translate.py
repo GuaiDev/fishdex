@@ -214,16 +214,3 @@ def why_fish_gather(kind: str) -> ContextField:
     if text is None:
         return ContextField.inferred(None)
     return ContextField.inferred(text, meaning=GENERAL_REASONING_LABEL)
-
-
-# Words a beginner may meet in the cards' explanations, and what they mean. The
-# cards avoid them; the glossary is for the one place they cannot be avoided
-# (a map label, a question to the bot) and is the only text allowed to use them.
-GLOSSARY: dict[str, str] = {
-    "weir": (
-        "A weir is a low wall built across a river that water flows over. "
-        "It holds the water back a little."
-    ),
-    "confluence": "A confluence is the place where two streams meet and become one.",
-    "tailwater": "A tailwater is the stretch of river just downstream of a dam.",
-}

@@ -119,7 +119,10 @@ class GettingThereBlock(BaseModel):
 
 
 class GlossaryTerm(BaseModel):
+    """A hard word on the card and its definition, from `services/terms.py`."""
+
     term: str
+    term_id: str
     text: str
 
 

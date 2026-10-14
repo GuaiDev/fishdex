@@ -1056,13 +1056,15 @@ Every user-facing string is in it, including block titles.
 | 3. Why fish gather here | `card.why_gather` | `what_it_is` (the kind in plain words), `general` = `{text, label, provenance: "inference"}`: the kind's two sentences, shown with the label "General reasoning, not a record about this spot". Then `facts_title` and `facts[]`: facts about this spot, each `{text, provenance: "record", source}`. They are listed apart from the reasoning on purpose. |
 | 4. Getting there | `card.getting_there` | `items[]`: the nearest parking, trailhead, boat launch and public road crossing, each `{kind, label, text, distance_m, details[], source}` (`text` is "Parking about 150 m away"; `details` are mapped tags such as "mapped as free"). `empty_text` when there are none. `crown_land` = `{state, text, source}` where `state` is `mapped`, `none_found` or `not_checked`. `unverified_title` and `unverified[]`: what has not been checked on the ground. |
 
-Also on the card: `terms[]`, glossary entries (`{term, text}`) for the hard words that
-appear in this card's own text (for a weir, "weir"), to show behind a "What's a weir?"
-link; and `meta`, counts for a Sources view that are not shown on the card face:
+Also on the card: `terms[]`, entries from the term registry (`{term, term_id, text}`,
+`src/services/terms.py`) for the hard words that appear in this card's own text (for a
+weir, "weir"), to show behind a "What's a weir?" link; and `meta`, counts for a Sources view that are not shown on the card face:
 `species_shown`, `species_withheld_protected` (a number, never names),
 `species_withheld_imprecise`, `species_status_unchecked`, `cache_key`.
 
-`GET /map/spots/labels` also carries a `glossary` map of the same entries.
+`GET /map/spots/labels` also carries `terms[]`, the whole term registry (`term_id`,
+`plain`, `technical`, `definition`, `mapped_from`); each kind and shoreline feature
+carries the `term_ids` it is an instance of. `GET /terms` serves the same registry.
 
 **Protected species.** If any species recorded within 2 km has a listing signal (Special
 Concern, Threatened, Endangered or Extirpated from any source we hold, verified or not),

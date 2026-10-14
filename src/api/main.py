@@ -1605,6 +1605,16 @@ def get_map_spot_labels(user: dict = Depends(get_current_user)):
     return labels_payload()
 
 
+@app.get("/terms")
+def get_terms(user: dict = Depends(get_current_user)):
+    """The term registry: every map/habitat concept with its term_id, plain wording,
+    technical wording, a factual definition and where the map gets that feature type.
+    Which wording a person sees comes from GET /profile/presentation, not from here."""
+    from src.services.terms import terms_payload
+
+    return {"terms": terms_payload()}
+
+
 @app.get("/map/spots")
 def get_map_spots(
     bbox: str | None = None,

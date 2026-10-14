@@ -21,6 +21,7 @@ from src.models.species_range import SpeciesRange
 from src.models.spot import AccessRef, Spot
 from src.models.spot_card import HOOK_MAX_CHARS, CardHook, SpotCard
 from src.services import spot_card as spot_card_service
+from src.services import terms
 from src.services.context import render, translate
 from src.services.spot_card import build_spot_card
 from src.storage.gbif_observations import upsert_gbif_observations
@@ -516,6 +517,7 @@ def test_a_weir_gets_its_glossary_entry_and_other_cards_get_none(db):
         ),
     )
     assert [t.term for t in weir.terms] == ["weir"]
+    assert [t.term_id for t in weir.terms] == ["weir"]
     assert build_spot_card(db, junction()).terms == []
 
 
@@ -689,7 +691,7 @@ def test_no_jargon_or_pressure_words_in_any_rendered_card_string(db):
         "protected_species",
         "kind_description",
     }
-    allowed = set(translate.GLOSSARY.values())
+    allowed = {terms.TERMS[t]["definition"] for t in terms.CARD_LINKED_TERMS}
     for card in cards:
         allowed |= {t.text for t in card.terms}
         for text in walk(card.model_dump(), skip=NOT_TEXT):
@@ -707,9 +709,10 @@ def test_no_jargon_in_any_fixed_string_the_renderer_owns():
         assert not BANNED.search(text), text
 
 
-def test_glossary_is_the_only_place_the_hard_words_are_allowed():
-    banned_in_glossary = {term for term, text in translate.GLOSSARY.items() if BANNED.search(text)}
-    assert banned_in_glossary == {"confluence", "tailwater"}
+def test_the_term_registry_is_the_only_place_the_hard_words_are_allowed():
+    linked = {t: terms.TERMS[t]["definition"] for t in terms.CARD_LINKED_TERMS}
+    banned_in_definitions = {t for t, text in linked.items() if BANNED.search(text)}
+    assert banned_in_definitions == {"confluence", "tailwater"}
 
 
 def test_every_hook_fits_two_lines(db):
@@ -801,7 +804,7 @@ def test_the_fixture_protected_card_names_the_listed_fish_nowhere():
 
 
 def test_the_fixture_cards_pass_the_same_lint():
-    allowed = set(translate.GLOSSARY.values())
+    allowed = {terms.TERMS[t]["definition"] for t in terms.CARD_LINKED_TERMS}
     for _, card in fixture_cards():
         allowed |= {t["text"] for t in card["terms"]}
         for text in walk(card, skip=NOT_TEXT):
