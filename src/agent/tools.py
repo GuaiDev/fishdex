@@ -308,7 +308,8 @@ def tool_schemas(profile: Any) -> list[dict]:
             "name": "get_my_fishing_summary",
             "description": (
                 "The user's derived profile: how many sessions and stops, blank rate, "
-                "species logged, what they appear to target, demonstrated expertise, "
+                "species logged, what they appear to target, their specialist-to-lifelister "
+                "leaning, which map words they already know, "
                 "personal patterns with their sample sizes, and which fields are too "
                 "sparsely recorded to support a claim. "
                 "Pass a species to also get their full record with it — every catch, "

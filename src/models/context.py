@@ -15,6 +15,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from src.models.angler_profile import AnglerProfile
 from src.models.freshness import is_stale, normalise_observed_at
 
 
@@ -556,9 +557,11 @@ class UserLayer(BaseModel):
     target_species: list[str] = Field(default_factory=list)
     """Inferred from logging behaviour, never configured."""
 
-    expertise: Literal["unknown", "novice", "intermediate", "advanced"] = "unknown"
-    """Demonstrated, not declared. Drives register — telling an experienced
-    angler something obvious destroys credibility."""
+    profile: AnglerProfile | None = None
+    """Orientation spectrum, size and small-species focus, and literacy per
+    concept — inferred only; declared values are blended at read time by
+    `context.angler_profile()`. There is deliberately no global
+    beginner/expert level: register follows the per-concept states."""
 
     patterns: list[DerivedPattern] = Field(default_factory=list)
     known_gaps: list[str] = Field(default_factory=list)
@@ -607,3 +610,31 @@ class SpeciesHistory(BaseModel):
     last_caught: str | None = None
     insights: list[RecordedInsight] = Field(default_factory=list)
     empty_reason: EmptyReason | None = None
+
+
+# -- what was realistically available at a place -------------------------------
+
+
+class LocalRichness(BaseModel):
+    """Which fish species are recorded around a place, and how firmly.
+
+    The angler profile normalises what someone caught against this, so that
+    living where many species occur does not by itself read as lifelisting.
+    """
+
+    lat: float
+    lng: float
+    radius_km: float
+    species: list[str] = Field(default_factory=list)
+    """Lowercased scientific names recorded within the radius."""
+    common_names: dict[str, str] = Field(default_factory=dict)
+    """Lowercased common name -> lowercased scientific name, where a source gave one."""
+    n_records: int = 0
+    richness: float = 0.0
+    """The species count used for normalising: the local count, or the
+    regional average when local data is thin."""
+    basis: Literal["local", "regional", "none"] = "none"
+    thin: bool = True
+    confidence: float = 0.0
+    """1.0 on local data; lower on the regional fallback; 0.0 with nothing."""
+    by_source: dict[str, int] = Field(default_factory=dict)

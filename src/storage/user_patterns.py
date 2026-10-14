@@ -51,11 +51,20 @@ _FINGERPRINT_SOURCES = (
         "SELECT COUNT(*), COALESCE(MAX(id), 0) FROM behavioral_insights "
         "WHERE user_id = ? AND is_current = 1",
     ),
+    (
+        "catches",
+        "SELECT COUNT(*), COALESCE(SUM(species_confirmed), 0) FROM catches WHERE user_id = ?",
+    ),
 )
 
 
 def input_fingerprint(db: Database, user_id: int) -> str:
     """A cheap summary of everything `build_user_layer` reads.
+
+    Literacy events (a definition opened, a feature seen) are deliberately not
+    in it: they are folded in at the next recompute, so the profile changes
+    once per logged session, not on every tap. Declared values are not in it
+    either; they are blended at read time and need no recompute.
 
     Counts plus the newest row id. Any insert, delete or session-date change
     moves at least one of them. It will not notice an in-place edit of an
@@ -76,19 +85,23 @@ def input_fingerprint(db: Database, user_id: int) -> str:
             "SELECT "
             + ", ".join(
                 f"(SELECT COUNT(*) FROM {t} WHERE {w}), "
-                f"(SELECT COALESCE(MAX(id), 0) FROM {t} WHERE {w})"
-                for t, w in (
-                    ("stops", "user_id = ?"),
-                    ("sessions", "user_id = ?"),
-                    ("behavioral_insights", "user_id = ? AND is_current = 1"),
+                f"(SELECT COALESCE({second}, 0) FROM {t} WHERE {w})"
+                for t, w, second in (
+                    ("stops", "user_id = ?", "MAX(id)"),
+                    ("sessions", "user_id = ?", "MAX(id)"),
+                    ("behavioral_insights", "user_id = ? AND is_current = 1", "MAX(id)"),
+                    # Confirming a catch's species changes no count or id, but
+                    # it is what the profile reads, so the confirmed total is
+                    # part of the fingerprint.
+                    ("catches", "user_id = ?", "SUM(species_confirmed)"),
                 )
             ),
-            [user_id] * 6,
+            [user_id] * 8,
         ).fetchone()
     except Exception:  # noqa: BLE001 - a table missing on a fresh DB is normal
         return _fingerprint_slow(db, user_id)
 
-    for i, name in enumerate(("stops", "sessions", "insights")):
+    for i, name in enumerate(("stops", "sessions", "insights", "catches")):
         parts.append(f"{name}:{row[i * 2]}:{row[i * 2 + 1]}")
     return "|".join(parts)
 
@@ -102,7 +115,11 @@ def _fingerprint_slow(db: Database, user_id: int) -> str:
         if table not in names:
             parts.append(f"{label}:absent")
             continue
-        row = db.execute(sql, [user_id]).fetchone()
+        try:
+            row = db.execute(sql, [user_id]).fetchone()
+        except Exception:  # noqa: BLE001 - an older catches table without the column
+            parts.append(f"{label}:unreadable")
+            continue
         parts.append(f"{label}:{row[0]}:{row[1]}")
     return "|".join(parts)
 
@@ -175,7 +192,10 @@ def json_summary(layer: UserLayer) -> str:
             "user_id": layer.user_id,
             "sessions": layer.total_sessions,
             "stops": layer.total_stops,
-            "expertise": layer.expertise,
+            "orientation": layer.profile.orientation.value if layer.profile else None,
+            "orientation_confidence": (
+                layer.profile.orientation.confidence if layer.profile else None
+            ),
             "patterns": len(layer.patterns),
             "computed_at": layer.computed_at,
         }

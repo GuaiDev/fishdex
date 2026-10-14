@@ -11,6 +11,9 @@
             "chip": "River mouths",
             "one_liner": "Where a river runs out into a lake.",
             "distinct": false,
+            "term_ids": [
+              "river_mouth"
+            ],
             "why_fish_gather": {
               "text": "Fish that live in the lake pass through here to feed or to run upstream. The river also carries food out into open water.",
               "label": "General reasoning, not a record about this spot",
@@ -22,6 +25,9 @@
             "chip": "Where creeks join",
             "one_liner": "Two streams meeting. Different temperature, speed and food mix at the join.",
             "distinct": false,
+            "term_ids": [
+              "confluence"
+            ],
             "why_fish_gather": {
               "text": "Two flows mixing makes a seam between fast and slow water, which fish use for shelter with food drifting past. A creek that runs cooler than the river can also give fish a place to ease out of warm water.",
               "label": "General reasoning, not a record about this spot",
@@ -33,6 +39,10 @@
             "chip": "Below dams",
             "one_liner": "The water just downstream of a dam or weir.",
             "distinct": false,
+            "term_ids": [
+              "dam",
+              "tailwater"
+            ],
             "why_fish_gather": {
               "text": "A dam or weir blocks fish from moving further upstream, so they gather in the water just below it. That water is churned up and rich in oxygen.",
               "label": "General reasoning, not a record about this spot",
@@ -44,6 +54,7 @@
             "chip": "Public fishing spots",
             "one_liner": "Places that volunteer mappers have marked as set aside for fishing.",
             "distinct": false,
+            "term_ids": [],
             "why_fish_gather": {
               "text": "Someone has mapped this as a place to fish, usually because the water is easy and allowed to reach. That is about access, so it says nothing by itself about what is swimming there.",
               "label": "General reasoning, not a record about this spot",
@@ -55,6 +66,7 @@
             "chip": "Quiet water",
             "one_liner": "Reaches with few public observation records, which may mean few anglers or just few observers.",
             "distinct": true,
+            "term_ids": [],
             "why_fish_gather": {
               "text": "These reaches have few public observation records. That can mean fewer anglers, few observers or hard access, and it never tells you whether fish are there.",
               "label": "General reasoning, not a record about this spot",
@@ -108,31 +120,46 @@
             "kind": "inlet",
             "label": "Inlet",
             "chip": "Inlets",
-            "one_liner": "A mapped stream flows in here."
+            "one_liner": "A mapped stream flows in here.",
+            "term_ids": [
+              "inlet"
+            ]
           },
           {
             "kind": "outlet",
             "label": "Outlet",
             "chip": "Outlets",
-            "one_liner": "The lake drains out here."
+            "one_liner": "The lake drains out here.",
+            "term_ids": [
+              "outlet"
+            ]
           },
           {
             "kind": "island",
             "label": "Island",
             "chip": "Islands",
-            "one_liner": "Land inside the water."
+            "one_liner": "Land inside the water.",
+            "term_ids": [
+              "island"
+            ]
           },
           {
             "kind": "point",
             "label": "Point",
             "chip": "Points",
-            "one_liner": "A point of land reaches out."
+            "one_liner": "A point of land reaches out.",
+            "term_ids": [
+              "point"
+            ]
           },
           {
             "kind": "peninsula",
             "label": "Peninsula",
             "chip": "Peninsulas",
-            "one_liner": "A long point of land reaches out."
+            "one_liner": "A long point of land reaches out.",
+            "term_ids": [
+              "peninsula"
+            ]
           }
         ],
         "shoreline_derivations": {
@@ -165,11 +192,99 @@
           "boat_launch": "Boat launch",
           "road_crossing": "Road crossing"
         },
-        "glossary": {
-          "weir": "A weir is a low wall built across a river that water flows over. It holds the water back a little.",
-          "confluence": "A confluence is the place where two streams meet and become one.",
-          "tailwater": "A tailwater is the stretch of river just downstream of a dam."
-        }
+        "terms": [
+          {
+            "term_id": "confluence",
+            "plain": "Where two streams join",
+            "technical": "Confluence",
+            "definition": "A confluence is the place where two streams meet and become one.",
+            "mapped_from": "Ontario government water map (stream lines)"
+          },
+          {
+            "term_id": "river_mouth",
+            "plain": "Where a river meets a lake",
+            "technical": "River mouth",
+            "definition": "A river mouth is where a river or creek flows out into a lake.",
+            "mapped_from": "Ontario government water map (stream lines)"
+          },
+          {
+            "term_id": "dam",
+            "plain": "A wall holding back a river",
+            "technical": "Dam",
+            "definition": "A dam is a wall built across a river to hold water back. It usually forms a pond or reservoir above it.",
+            "mapped_from": "OpenStreetMap volunteers (dams and weirs)"
+          },
+          {
+            "term_id": "weir",
+            "plain": "A low wall across a river",
+            "technical": "Weir",
+            "definition": "A weir is a low wall built across a river that water flows over. It holds the water back a little.",
+            "mapped_from": "OpenStreetMap volunteers (dams and weirs)"
+          },
+          {
+            "term_id": "tailwater",
+            "plain": "The water just below a dam",
+            "technical": "Tailwater",
+            "definition": "A tailwater is the stretch of river just downstream of a dam.",
+            "mapped_from": "OpenStreetMap volunteers (dams and weirs)"
+          },
+          {
+            "term_id": "culvert",
+            "plain": "A stream running through a pipe under a road",
+            "technical": "Culvert",
+            "definition": "A culvert is a pipe or box channel that carries a stream under a road, trail or railway.",
+            "mapped_from": "Ontario government water map and OpenStreetMap (barriers)"
+          },
+          {
+            "term_id": "inlet",
+            "plain": "Where a stream flows into a lake",
+            "technical": "Inlet",
+            "definition": "An inlet is a place where a stream flows into a lake.",
+            "mapped_from": "Ontario government water map (lake outlines)"
+          },
+          {
+            "term_id": "outlet",
+            "plain": "Where a lake drains out",
+            "technical": "Outlet",
+            "definition": "An outlet is the place where water leaves a lake as a stream.",
+            "mapped_from": "Ontario government water map (lake outlines)"
+          },
+          {
+            "term_id": "island",
+            "plain": "Land inside the water",
+            "technical": "Island",
+            "definition": "An island is land surrounded on all sides by water.",
+            "mapped_from": "Ontario government water map (lake outlines)"
+          },
+          {
+            "term_id": "point",
+            "plain": "Land reaching out into the water",
+            "technical": "Point",
+            "definition": "A point is a narrow piece of shore that sticks out into a lake.",
+            "mapped_from": "Ontario government water map (lake outlines)"
+          },
+          {
+            "term_id": "peninsula",
+            "plain": "A long arm of land reaching into the water",
+            "technical": "Peninsula",
+            "definition": "A peninsula is land with water on most sides, joined to the shore at one end.",
+            "mapped_from": "Ontario government water map (lake outlines)"
+          },
+          {
+            "term_id": "drop_off",
+            "plain": "Where the bottom gets deep quickly",
+            "technical": "Drop-off",
+            "definition": "A drop-off is a place where the bottom of a lake or river slopes steeply from shallow to deep water.",
+            "mapped_from": null
+          },
+          {
+            "term_id": "weed_edge",
+            "plain": "The edge of a weed bed",
+            "technical": "Weed edge",
+            "definition": "A weed edge is the boundary between a bed of underwater plants and open water.",
+            "mapped_from": "Your own weed reports"
+          }
+        ]
       }
     },
     {

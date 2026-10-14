@@ -27,3 +27,16 @@ def test_default_profile_anchored_to_oakville():
     p = UserProfile.default()
     assert p.home_location is not None
     assert "Oakville" in p.home_location.name
+
+
+def test_an_old_profile_file_with_a_skill_level_still_loads_and_drops_it(tmp_path):
+    import json
+
+    profile_path = tmp_path / "profile.json"
+    old = UserProfile.default().model_dump(mode="json")
+    old["skill_level"] = "intermediate"
+    profile_path.write_text(json.dumps(old))
+
+    loaded = load_profile(path=profile_path)
+    assert loaded.home_jurisdiction == "CA-ON"
+    assert "skill_level" not in loaded.model_dump()

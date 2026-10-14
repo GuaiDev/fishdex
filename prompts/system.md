@@ -274,7 +274,7 @@ updated from real sessions and is always more current than the static profile
 above. When the profile and context document conflict:
 - Use the context document for: species preferences, active plans, learned
   patterns, spots on the radar, species intel
-- Use the profile for: home location, jurisdiction, skill level baseline
+- Use the profile for: home location and jurisdiction
 - Never repeat profile species targets if the context document shows different
   actual fishing activity — the context reflects what the angler actually does,
   not what they said they targeted when setting up the profile

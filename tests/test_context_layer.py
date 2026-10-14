@@ -342,17 +342,13 @@ def test_target_species_inferred_from_repeated_logging(db):
     assert "bluegill" not in layer.target_species  # one catch is not a target
 
 
-def test_expertise_is_demonstrated_not_declared(db):
+def test_the_user_layer_carries_a_profile_and_no_skill_level(db):
     for sp in ("tadpole madtom", "rainbow darter", "northern redbelly dace"):
         _add_stop(db, species=(sp,))
     layer = build_user_layer(db, user_id=1)
-    assert layer.expertise == "advanced"
-
-
-def test_beginner_log_does_not_read_as_advanced(db):
-    for _ in range(3):
-        _add_stop(db, species=("bluegill",))
-    assert build_user_layer(db, user_id=1).expertise in {"novice", "intermediate"}
+    assert layer.profile is not None
+    assert not hasattr(layer, "expertise")
+    assert "expertise" not in layer.model_dump()
 
 
 def test_user_layer_is_isolated_between_users(db):

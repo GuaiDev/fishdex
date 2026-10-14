@@ -20,7 +20,6 @@ class UserProfile(BaseModel):
     target_species: list[str] = Field(default_factory=list)
     gear: list[dict] = Field(default_factory=list)
     budget: float | None = None
-    skill_level: str = "intermediate"
     fishing_style: str = ""
     preferences: str = ""
     updated_at: datetime | None = None

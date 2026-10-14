@@ -47,7 +47,6 @@ def _format_profile(profile: UserProfile) -> str:
         f"- Home: {home} ({profile.home_jurisdiction})",
         f"- Target species: {species}",
         f"- Fishing style: {profile.fishing_style or '(not set)'}",
-        f"- Skill level: {profile.skill_level}",
     ]
     if profile.frequented_jurisdictions:
         lines.append(f"- Also fishes: {', '.join(profile.frequented_jurisdictions)}")

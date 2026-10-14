@@ -20,6 +20,7 @@ stretch, OHN — are kept out of every string; a test enforces it.
 from typing import TypedDict
 
 from src.models.spot import SpotKind
+from src.services import terms
 from src.services.context import translate
 
 GENERAL_REASONING_LABEL = translate.GENERAL_REASONING_LABEL
@@ -211,6 +212,7 @@ def labels_payload() -> dict:
                 "chip": KINDS[kind]["chip"],
                 "one_liner": KINDS[kind]["one_liner"],
                 "distinct": KINDS[kind]["distinct"],
+                "term_ids": list(terms.SPOT_KIND_TERMS[kind]),
                 "why_fish_gather": {
                     "text": translate.WHY_FISH_GATHER[kind],
                     "label": GENERAL_REASONING_LABEL,
@@ -224,12 +226,20 @@ def labels_payload() -> dict:
         "name_sources": NAME_SOURCE_LABELS,
         "no_outline_note": NO_OUTLINE_NOTE,
         "shoreline_features": [
-            {"kind": kind, **FEATURE_KINDS[kind]} for kind in FEATURE_KIND_ORDER
+            {
+                "kind": kind,
+                **FEATURE_KINDS[kind],
+                "term_ids": list(terms.SHORELINE_KIND_TERMS[kind]),
+            }
+            for kind in FEATURE_KIND_ORDER
         ],
         "shoreline_derivations": FEATURE_DERIVATION_LABELS,
         "layers": LAYERS,
         "access_labels": ACCESS_LABELS,
-        "glossary": translate.GLOSSARY,
+        # Every map/habitat concept, with plain and technical wording and a
+        # factual definition. Which wording to show is the profile's call
+        # (GET /profile/presentation), never this payload's.
+        "terms": terms.terms_payload(),
     }
 
 
