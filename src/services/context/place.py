@@ -381,7 +381,7 @@ def segments_near(db: Database, lat: float, lng: float, radius_km: float) -> lis
 
 def water_names_at(
     db: Database, place: Place, among: Sequence[str], within_km: float = 1.0
-) -> list[str]:
+) -> list[str] | None:
     """Which of the `among` water names pass within `within_km` of the place.
 
     Nearest first, returned as the hydro network spells them. These are the
@@ -390,11 +390,13 @@ def water_names_at(
     the cost follows the candidate gauges, not the size of the network, and a
     dense area cannot hide the pin's own river. Works for any jurisdiction
     whose hydro network is in `stream_segments`. An empty list means none of
-    them passes that close, not that no water does.
+    them passes that close, not that no water does. None means the network holds
+    no water by any of those names (or no network at all), so the question
+    cannot be answered.
     """
     wanted = {n for n in map(normalize_water_name, among) if n}
     if not wanted or "stream_segments" not in db.table_names():
-        return []
+        return None
     names = [
         r[0]
         for r in db.execute(
@@ -402,6 +404,8 @@ def water_names_at(
         ).fetchall()
         if normalize_water_name(r[0]) in wanted
     ]
+    if not names:
+        return None
     best: dict[str, float] = {}
     for i in range(0, len(names), 400):
         chunk = names[i : i + 400]

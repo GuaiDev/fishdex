@@ -112,7 +112,7 @@ def nearest_gauge(
     timeout: float = 30,
     own_water: Sequence[str] = (),
     own_water_max_km: float = OWN_WATER_MAX_KM,
-    water_lookup: Callable[[list[str]], Sequence[str]] | None = None,
+    water_lookup: Callable[[list[str]], Sequence[str] | None] | None = None,
 ) -> NearestGauge | None:
     """The best active station that has a current reading, with its distance.
 
@@ -125,7 +125,8 @@ def nearest_gauge(
 
     `water_lookup` names the place's water lazily: it is handed the river names
     of the candidate stations within `own_water_max_km` and returns those that
-    pass the place, so the hydro network is only read for rivers a gauge is on.
+    pass the place (an empty list when none does), or None when the network
+    cannot say. The network is only read for rivers a gauge is on.
 
     Tries the closest `max_stations` candidates in order and takes the first
     that reports, because the closest gauge is sometimes offline. Returns None
@@ -153,7 +154,11 @@ def nearest_gauge(
                 if r[0] <= own_water_max_km and r[2].get("RIVER_NAME")
             }
         )
-        own_water = water_lookup(candidates) if candidates else ()
+        looked_up = water_lookup(candidates) if candidates else None
+        water_known = looked_up is not None
+        own_water = looked_up or ()
+    else:
+        water_known = bool(own_water)
     wanted = [n for n in own_water if n]
     if wanted:
         on_own = [
@@ -167,6 +172,8 @@ def nearest_gauge(
             return found.model_copy(update={"same_water": True})
 
     found = _first_reporting(ranked[:max_stations], timeout)
+    if found is not None and water_known and not wanted:
+        return found.model_copy(update={"same_water": False})
     if found is not None and wanted:
         # Still checked by name: the nearest reporting gauge can be on the
         # pin's river beyond the own-water cap.

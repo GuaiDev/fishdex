@@ -195,7 +195,7 @@ def test_the_pins_river_is_found_however_many_other_segments_surround_it(db):
 def test_no_hydro_table_means_no_names_not_an_error(tmp_path):
     empty = get_db(tmp_path / "empty.db")
     place = place_mod.resolve(empty, lat=MOUTH[0], lng=MOUTH[1])
-    assert place_mod.water_names_at(empty, place, ['Credit River']) == []
+    assert place_mod.water_names_at(empty, place, ['Credit River']) is None
 
 
 # -- the panel ---------------------------------------------------------------------
