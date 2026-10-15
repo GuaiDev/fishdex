@@ -7,7 +7,7 @@ without changing the agent tool signature.
 import importlib
 import json
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from src.models.stream_gauge import NearestGauge, StreamGaugeSummary
 from src.services.water_names import same_water
@@ -112,6 +112,7 @@ def nearest_gauge(
     timeout: float = 30,
     own_water: Sequence[str] = (),
     own_water_max_km: float = OWN_WATER_MAX_KM,
+    water_lookup: Callable[[list[str]], Sequence[str]] | None = None,
 ) -> NearestGauge | None:
     """The best active station that has a current reading, with its distance.
 
@@ -121,6 +122,10 @@ def nearest_gauge(
     result says `same_water=True`. When none reports, the nearest station that
     does is returned with `same_water=False`: the caller must say it is on
     another water. With no `own_water`, `same_water` is None.
+
+    `water_lookup` names the place's water lazily: it is handed the river names
+    of the candidate stations within `own_water_max_km` and returns those that
+    pass the place, so the hydro network is only read for rivers a gauge is on.
 
     Tries the closest `max_stations` candidates in order and takes the first
     that reports, because the closest gauge is sometimes offline. Returns None
@@ -140,6 +145,15 @@ def nearest_gauge(
         ranked.append((_haversine_km(lat, lng, float(s_lat), float(s_lng)), station_id, s))
     ranked.sort(key=lambda r: r[0])
 
+    if water_lookup is not None and not own_water:
+        candidates = sorted(
+            {
+                r[2]["RIVER_NAME"]
+                for r in ranked
+                if r[0] <= own_water_max_km and r[2].get("RIVER_NAME")
+            }
+        )
+        own_water = water_lookup(candidates) if candidates else ()
     wanted = [n for n in own_water if n]
     if wanted:
         on_own = [

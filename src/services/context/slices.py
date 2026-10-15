@@ -908,13 +908,15 @@ def _fill_gauge(db: Database, place: Place, out: ConditionsSlice, now: datetime)
     from src.services.stream_gauge import nearest_gauge
 
     fields = ("flow_cms", "flow_trend", "level_m", "level_trend")
+    def own_water(candidates: list[str]) -> list[str]:
+        try:
+            return water_names_at(db, place, candidates)
+        except Exception:  # noqa: BLE001 - no hydro names means nearest-gauge, labelled as such
+            logger.warning("could not name the water at this place", exc_info=True)
+            return []
+
     try:
-        own_water = water_names_at(db, place)
-    except Exception:  # noqa: BLE001 - no hydro names means nearest-gauge, labelled as such
-        logger.warning("could not name the water at this place", exc_info=True)
-        own_water = []
-    try:
-        gauge = nearest_gauge(place.lat, place.lng, own_water=own_water)
+        gauge = nearest_gauge(place.lat, place.lng, water_lookup=own_water)
     except Exception:  # noqa: BLE001 - live fetch must never break describe()
         logger.warning("gauge lookup failed", exc_info=True)
         for name in fields:

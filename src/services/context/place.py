@@ -13,11 +13,13 @@ returns an honest failure rather than a confident guess at the wrong river.
 import logging
 import math
 import re
+from collections.abc import Sequence
 from functools import lru_cache
 
 from sqlite_utils import Database
 
 from src.models.context import Place
+from src.services.water_names import normalize_water_name
 
 logger = logging.getLogger(__name__)
 
@@ -377,23 +379,38 @@ def segments_near(db: Database, lat: float, lng: float, radius_km: float) -> lis
     return out
 
 
-def water_names_at(db: Database, place: Place, within_km: float = 1.0) -> list[str]:
-    """Names of the named watercourses that pass within `within_km` of the place.
+def water_names_at(
+    db: Database, place: Place, among: Sequence[str], within_km: float = 1.0
+) -> list[str]:
+    """Which of the `among` water names pass within `within_km` of the place.
 
-    Nearest first. These are the place's own waters: what a gauge has to be on
-    to count as the same river. Searches every named segment rather than the
-    place's capped segment set, so dense areas cannot hide the pin's own river.
-    Works for any jurisdiction whose hydro network is in `stream_segments`. An
-    empty list means no named water passes that close, not that there is none.
+    Nearest first, returned as the hydro network spells them. These are the
+    place's own waters: what a gauge has to be on to count as the same river.
+    Only segments whose name is the same water as one of `among` are read, so
+    the cost follows the candidate gauges, not the size of the network, and a
+    dense area cannot hide the pin's own river. Works for any jurisdiction
+    whose hydro network is in `stream_segments`. An empty list means none of
+    them passes that close, not that no water does.
     """
-    if "stream_segments" not in db.table_names():
+    wanted = {n for n in map(normalize_water_name, among) if n}
+    if not wanted or "stream_segments" not in db.table_names():
         return []
+    names = [
+        r[0]
+        for r in db.execute(
+            "SELECT DISTINCT name FROM stream_segments WHERE name IS NOT NULL AND name != ''"
+        ).fetchall()
+        if normalize_water_name(r[0]) in wanted
+    ]
     best: dict[str, float] = {}
-    for row in db["stream_segments"].rows_where("name IS NOT NULL AND name != ''"):
-        dist = _segment_distance_km(row, place.lat, place.lng)
-        if dist is not None and dist <= within_km:
-            name = str(row["name"]).strip()
-            best[name] = min(dist, best.get(name, dist))
+    for i in range(0, len(names), 400):
+        chunk = names[i : i + 400]
+        marks = ",".join("?" * len(chunk))
+        for row in db["stream_segments"].rows_where(f"name IN ({marks})", chunk):
+            dist = _segment_distance_km(row, place.lat, place.lng)
+            if dist is not None and dist <= within_km:
+                name = str(row["name"]).strip()
+                best[name] = min(dist, best.get(name, dist))
     return sorted(best, key=best.__getitem__)
 
 
