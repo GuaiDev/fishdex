@@ -744,7 +744,236 @@ def test_labels_serve_the_shoreline_feature_vocabulary():
     assert kinds == list(spot_labels.FEATURE_KIND_ORDER)
     for entry in payload["shoreline_features"]:
         assert entry["label"] and entry["chip"] and entry["one_liner"]
-    assert set(payload["shoreline_derivations"]) == {"shoreline_outline", "watercourse_endpoint"}
+    assert set(payload["shoreline_derivations"]) == {
+        "shoreline_outline",
+        "watercourse_endpoint",
+        "bathymetry_contours",
+    }
+    assert payload["bathymetry_data_note"]
+
+
+# ── bathymetry: the survey note, storage and read side ───────────────────────
+
+
+def test_the_survey_note_names_the_year_and_method_or_says_unknown():
+    note = spot_labels.shoreline_feature_note(
+        "drop_off",
+        "bathymetry_contours",
+        attributes={"survey_year": 1970, "survey_method": "Transect"},
+    )
+    assert "From a 1970 survey, Transect" in note
+
+    unknown = spot_labels.shoreline_feature_note("hump", "bathymetry_contours", attributes={})
+    assert spot_labels.SURVEY_DATE_UNKNOWN in unknown
+
+
+def bathymetry_feature(**over):
+    base = dict(
+        feature_id="lake:rice-lake:drop_off:-78.145_44.19",
+        water_body_id="great_lake:lake-ontario",
+        jurisdiction=JURISDICTION,
+        kind="drop_off",
+        name=None,
+        geometry={"type": "Point", "coordinates": [-78.145, 44.19]},
+        source="LIO Bathymetry",
+        source_date="1970-07-10",
+        derivation="bathymetry_contours",
+        provenance="inference",
+        attributes={
+            "contour_ogf_ids": [1, 2],
+            "survey_year": 1970,
+            "survey_method": "Transect",
+            "depth_m": -4.0,
+            "depth_change_m": 4.0,
+            "gap_m": 35.2,
+        },
+        length_m=4.0,
+        built_at=BUILT,
+    )
+    return ShorelineFeature(**{**base, **over})
+
+
+def test_a_contour_feature_round_trips_through_storage(db):
+    from src.storage.spots import replace_spots
+
+    replace_spots(db, JURISDICTION, [], [lake_body()], [bathymetry_feature()])
+    (read,) = list_shoreline_features(db, "great_lake:lake-ontario")
+    assert read == bathymetry_feature()
+    assert read.attributes["survey_year"] == 1970
+
+
+def test_a_bathymetry_contour_round_trips_through_storage(db):
+    from src.models.bathymetry import BathymetryContour
+    from src.storage.spots import replace_spots
+    from src.storage.water_bodies import list_bathymetry_contours
+
+    contour = BathymetryContour(
+        ogf_id=118430028,
+        depth_m=-4.0,
+        survey_method="Transect",
+        survey_date="1970-07-09",
+        geometry={"type": "LineString", "coordinates": [[-78.14, 44.19], [-78.13, 44.2]]},
+        water_body_id="great_lake:lake-ontario",
+        jurisdiction=JURISDICTION,
+        licence="Open Government Licence – Ontario",
+        built_at=BUILT,
+    )
+    replace_spots(db, JURISDICTION, [], [lake_body()], [bathymetry_feature()], [contour])
+    (read,) = list_bathymetry_contours(db, "great_lake:lake-ontario")
+    assert read == contour
+
+
+def test_features_geojson_exposes_the_survey_attributes_and_note(db):
+    from src.storage.spots import replace_spots
+
+    replace_spots(db, JURISDICTION, [], [lake_body()], [bathymetry_feature()])
+    body = water_body_features_geojson(db, "great_lake:lake-ontario")
+    (f,) = body["features"]
+    props = f["properties"]
+    assert props["derivation"] == "bathymetry_contours"
+    assert props["attributes"]["survey_year"] == 1970
+    assert props["attributes"]["contour_ogf_ids"] == [1, 2]
+    assert "From a 1970 survey, Transect" in props["note"]
+
+
+def test_a_rebuild_with_no_contours_clears_the_stored_ones(db):
+    from src.models.bathymetry import BathymetryContour
+    from src.storage.spots import replace_spots
+    from src.storage.water_bodies import list_bathymetry_contours
+
+    contour = BathymetryContour(
+        ogf_id=1,
+        depth_m=-4.0,
+        geometry={"type": "LineString", "coordinates": [[-78.14, 44.19], [-78.13, 44.2]]},
+        jurisdiction=JURISDICTION,
+    )
+    replace_spots(db, JURISDICTION, [], [lake_body()], [], [contour])
+    replace_spots(db, JURISDICTION, [], [lake_body()], [], [])
+    assert list_bathymetry_contours(db) == []
+
+
+def test_classify_reads_drop_offs_and_humps_from_a_supplied_survey():
+    from src.models.bathymetry import LIO_BATHYMETRY_SOURCE, BathymetryContour, BathymetryIndex
+    from src.services.bathymetry import LakeBathymetry
+
+    def ring(minx, miny, maxx, maxy):
+        return [[minx, miny], [maxx, miny], [maxx, maxy], [minx, maxy], [minx, miny]]
+
+    contours = [
+        BathymetryContour(
+            ogf_id=1,
+            depth_m=-6.0,
+            geometry={"type": "LineString", "coordinates": ring(-78.29, 44.11, -78.11, 44.29)},
+            source=LIO_BATHYMETRY_SOURCE,
+        ),
+        BathymetryContour(
+            ogf_id=2,
+            depth_m=-3.0,
+            geometry={"type": "LineString", "coordinates": ring(-78.24, 44.16, -78.16, 44.24)},
+            source=LIO_BATHYMETRY_SOURCE,
+        ),
+        # A steep pair below the shoal: one drop-off.
+        BathymetryContour(
+            ogf_id=3,
+            depth_m=-3.0,
+            geometry={"type": "LineString", "coordinates": [[-78.25, 44.15], [-78.15, 44.15]]},
+            source=LIO_BATHYMETRY_SOURCE,
+        ),
+        BathymetryContour(
+            ogf_id=4,
+            depth_m=-5.0,
+            geometry={"type": "LineString", "coordinates": [[-78.25, 44.1505], [-78.15, 44.1505]]},
+            source=LIO_BATHYMETRY_SOURCE,
+        ),
+    ]
+    index = BathymetryIndex(
+        ogf_id=500,
+        geometry={"type": "Polygon", "coordinates": [ring(-78.3, 44.1, -78.1, 44.3)]},
+        survey_year=1970,
+        survey_method="Transect",
+    )
+    result = classify(
+        [mouth()],
+        [stretch()],
+        JURISDICTION,
+        {"credit-lower": StretchHints(lake="Rice Lake")},
+        BUILT,
+        outlines={"Rice Lake": outline()},
+        bathymetry={"Rice Lake": LakeBathymetry(index, contours)},
+    )
+
+    kinds = {f.kind for f in result.shoreline_features}
+    assert "hump" in kinds and "drop_off" in kinds
+    humps = [f for f in result.shoreline_features if f.kind == "hump"]
+    assert humps[0].derivation == "bathymetry_contours"
+    # The contours carry no SURVEY_DATE, and the index year is not borrowed.
+    assert humps[0].attributes["survey_year"] is None
+    assert result.report.lakes_with_survey_contours == 1
+    assert result.report.lakes_without_survey_contours == 0
+    assert result.report.bathymetry_contours_stored == 4
+    assert len(result.bathymetry_contours) == 4
+    assert all(c.water_body_id == "lake:rice-lake" for c in result.bathymetry_contours)
+
+
+def test_classify_counts_a_lake_with_no_survey_contours():
+    result = classify(
+        [mouth()],
+        [stretch()],
+        JURISDICTION,
+        {"credit-lower": StretchHints(lake="Rice Lake")},
+        BUILT,
+        outlines={"Rice Lake": outline()},
+    )
+    assert result.bathymetry_contours == []
+    assert not [f for f in result.shoreline_features if f.kind in ("hump", "drop_off")]
+    assert result.report.lakes_without_survey_contours == 1
+
+
+def test_build_stores_the_survey_contours_and_their_features(db, curation):
+    from src.models.bathymetry import LIO_BATHYMETRY_SOURCE, BathymetryContour, BathymetryIndex
+    from src.services.bathymetry import LakeBathymetry
+    from src.storage.water_bodies import count_bathymetry_contours, list_bathymetry_contours
+
+    def ring(minx, miny, maxx, maxy):
+        return [[minx, miny], [maxx, miny], [maxx, maxy], [minx, maxy], [minx, miny]]
+
+    contours = [
+        BathymetryContour(
+            ogf_id=1,
+            depth_m=-6.0,
+            geometry={"type": "LineString", "coordinates": ring(-78.29, 44.11, -78.11, 44.29)},
+            source=LIO_BATHYMETRY_SOURCE,
+        ),
+        BathymetryContour(
+            ogf_id=2,
+            depth_m=-3.0,
+            geometry={"type": "LineString", "coordinates": ring(-78.24, 44.16, -78.16, 44.24)},
+            source=LIO_BATHYMETRY_SOURCE,
+        ),
+    ]
+    index = BathymetryIndex(
+        ogf_id=500,
+        geometry={"type": "Polygon", "coordinates": [ring(-78.3, 44.1, -78.1, 44.3)]},
+        survey_year=1970,
+        survey_method="Transect",
+    )
+    store(db, [mouth(name="Rice Lake")], [stretch()])
+    report = build_spots(
+        db,
+        curation,
+        outline_resolver=lambda mouths: {"Rice Lake": outline()},
+        watercourse_fetcher=lambda *_: [],
+        bathymetry_fetcher=lambda _outline: LakeBathymetry(index, contours),
+    )
+    assert report.bathymetry_contours_stored == 2
+    assert report.lakes_with_survey_contours == 1
+    assert count_bathymetry_contours(db) == 2
+    stored = list_bathymetry_contours(db, "lake:rice-lake")
+    assert {c.ogf_id for c in stored} == {1, 2}
+    assert all(c.water_body_id == "lake:rice-lake" for c in stored)
+    humps = list_shoreline_features(db, "lake:rice-lake", kinds=["hump"])
+    assert len(humps) == 1
+    assert humps[0].derivation == "bathymetry_contours"
 
 
 # ── the words ─────────────────────────────────────────────────────────────────

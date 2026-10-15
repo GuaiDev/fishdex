@@ -1634,6 +1634,13 @@ def _print_spot_report(report) -> None:
             "[yellow]lakes with no outline[/yellow]",
             f"[yellow]{report.lakes_without_outline}[/yellow]",
         )
+    table.add_row("lakes with survey contours", str(report.lakes_with_survey_contours))
+    table.add_row("bathymetry contours stored", str(report.bathymetry_contours_stored))
+    if report.lakes_without_survey_contours:
+        table.add_row(
+            "  lakes with no survey contours",
+            str(report.lakes_without_survey_contours),
+        )
     table.add_row("shoreline features", str(report.shoreline_features_total))
     for kind, n in sorted(report.shoreline_features_by_kind.items()):
         table.add_row(f"  {kind}", str(n))

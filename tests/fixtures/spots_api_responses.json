@@ -160,11 +160,30 @@
             "term_ids": [
               "peninsula"
             ]
+          },
+          {
+            "kind": "drop_off",
+            "label": "Drop-off",
+            "chip": "Drop-offs",
+            "one_liner": "The bottom falls away quickly here.",
+            "term_ids": [
+              "drop_off"
+            ]
+          },
+          {
+            "kind": "hump",
+            "label": "Hump",
+            "chip": "Humps",
+            "one_liner": "A shallower rise in the bottom.",
+            "term_ids": [
+              "hump"
+            ]
           }
         ],
         "shoreline_derivations": {
           "shoreline_outline": "from the shoreline outline",
-          "watercourse_endpoint": "where a mapped stream meets the shore"
+          "watercourse_endpoint": "where a mapped stream meets the shore",
+          "bathymetry_contours": "from a lake survey"
         },
         "new_to_you": {
           "title": "New to you",
@@ -179,6 +198,7 @@
             "one_liner": "Spots with fish recorded nearby that you haven't caught yet."
           }
         },
+        "bathymetry_data_note": "Depth is measured at the survey's own water level, not today's. The source does not state the unit; metres is taken from the values.",
         "layers": {
           "getting_there": {
             "label": "Getting there",
@@ -288,7 +308,14 @@
             "plain": "Where the bottom gets deep quickly",
             "technical": "Drop-off",
             "definition": "A drop-off is a place where the bottom of a lake or river slopes steeply from shallow to deep water.",
-            "mapped_from": null
+            "mapped_from": "Ontario government lake depth surveys (depth contours)"
+          },
+          {
+            "term_id": "hump",
+            "plain": "A shallow rise in the lake bottom",
+            "technical": "Hump",
+            "definition": "A hump is a place where the bottom of a lake rises to shallower water than the water around it.",
+            "mapped_from": "Ontario government lake depth surveys (depth contours)"
           },
           {
             "term_id": "weed_edge",

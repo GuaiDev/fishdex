@@ -21,6 +21,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from src.models.bathymetry import BathymetryContour
 from src.models.jurisdiction import JurisdictionCode
 from src.models.shoreline_feature import ShorelineFeature
 from src.models.water_body import WaterBody
@@ -162,6 +163,9 @@ class SpotBuildReport(BaseModel):
     # reasons a feature was left out.
     lakes_with_outline: int = 0
     lakes_without_outline: int = 0
+    lakes_with_survey_contours: int = 0
+    lakes_without_survey_contours: int = 0
+    bathymetry_contours_stored: int = 0
     shoreline_features_total: int = 0
     shoreline_features_by_kind: dict[str, int] = Field(default_factory=dict)
     shoreline_features_dropped: dict[str, int] = Field(default_factory=dict)
@@ -185,4 +189,6 @@ class SpotClassification(BaseModel):
     spots: list[Spot]
     water_bodies: list[WaterBody] = Field(default_factory=list)
     shoreline_features: list[ShorelineFeature] = Field(default_factory=list)
+    # The raw LIO bathymetry contours the drop-off and hump features cite.
+    bathymetry_contours: list[BathymetryContour] = Field(default_factory=list)
     report: SpotBuildReport
