@@ -198,6 +198,84 @@
             "one_liner": "Spots with fish recorded nearby that you haven't caught yet."
           }
         },
+        "sections": {
+          "kinds": [
+            {
+              "kind": "river_section",
+              "label": "River section",
+              "one_liner": "One named run of a river or creek. Tap it to see what is along it."
+            },
+            {
+              "kind": "lake",
+              "label": "Lake",
+              "one_liner": "A lake drawn from its outline. Tap it to see what is on it."
+            }
+          ],
+          "pin_types": {
+            "spot": "Spot",
+            "feature": "Shoreline or depth feature",
+            "getting_there": "Getting there",
+            "weed_report": "Weed edge you reported"
+          },
+          "count_phrases": {
+            "river_mouth": {
+              "one": "river mouth",
+              "many": "river mouths"
+            },
+            "creek_junction": {
+              "one": "place where creeks join",
+              "many": "places where creeks join"
+            },
+            "below_dam": {
+              "one": "spot below a dam",
+              "many": "spots below dams"
+            },
+            "public_fishing": {
+              "one": "public fishing spot",
+              "many": "public fishing spots"
+            },
+            "quiet_water": {
+              "one": "quiet-water spot",
+              "many": "quiet-water spots"
+            },
+            "inlet": {
+              "one": "inlet",
+              "many": "inlets"
+            },
+            "outlet": {
+              "one": "outlet",
+              "many": "outlets"
+            },
+            "island": {
+              "one": "island",
+              "many": "islands"
+            },
+            "point": {
+              "one": "point",
+              "many": "points"
+            },
+            "peninsula": {
+              "one": "peninsula",
+              "many": "peninsulas"
+            },
+            "drop_off": {
+              "one": "drop-off",
+              "many": "drop-offs"
+            },
+            "hump": {
+              "one": "hump",
+              "many": "humps"
+            },
+            "weed_report": {
+              "one": "weed edge you reported",
+              "many": "weed edges you reported"
+            }
+          },
+          "empty_summary": "Nothing mapped here yet",
+          "label_only_note": "No outline is on file for this water, so it is a name on the map only.",
+          "weed_count_note": "Weed edges you reported. Only you see them.",
+          "not_built": "No river sections are built yet, so there are no sections to draw. The sections are made when the explore map's rivers are built."
+        },
         "bathymetry_data_note": "Depth is measured at the survey's own water level, not today's. The source does not state the unit; metres is taken from the values.",
         "quiet_water": {
           "titles": {

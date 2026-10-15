@@ -102,6 +102,38 @@ def list_spots(
     return [_row_to_spot(r) for r in rows]
 
 
+def list_spot_memberships(
+    db: Database, max_tier: int = 2, jurisdiction: str | None = None
+) -> list[dict]:
+    """Which water each spot is on, without loading the spots: for counting per section.
+
+    One light row per spot: `spot_id`, `kind`, `water_id` (its river section),
+    `water_body_id`, `also_on_water_ids` (the other river sections it is listed
+    under) and `also_on_water_body_ids` (the lakes and rivers it is also on).
+    """
+    clauses, params = ["tier <= ?"], [max_tier]
+    if jurisdiction is not None:
+        clauses.append("jurisdiction = ?")
+        params.append(jurisdiction)
+    rows = db.execute_returning_dicts(
+        "SELECT spot_id, kind, water_id, water_body_id, also_on_water_body_ids_json, "
+        "json_extract(structure_attrs_json, '$.also_on_water_ids') AS also_on_water_ids_json "
+        f"FROM spots WHERE {' AND '.join(clauses)} ORDER BY spot_id",
+        params,
+    )
+    return [
+        {
+            "spot_id": r["spot_id"],
+            "kind": r["kind"],
+            "water_id": r["water_id"],
+            "water_body_id": r["water_body_id"],
+            "also_on_water_ids": json.loads(r["also_on_water_ids_json"] or "[]"),
+            "also_on_water_body_ids": json.loads(r["also_on_water_body_ids_json"]),
+        }
+        for r in rows
+    ]
+
+
 def list_spots_also_on(db: Database, water_body_id: str) -> list[Spot]:
     """Spots that belong to another water body but are also on this one, in id order."""
     rows = db.execute_returning_dicts(
@@ -109,6 +141,18 @@ def list_spots_also_on(db: Database, water_body_id: str) -> list[Spot]:
         [f'%"{water_body_id}"%'],
     )
     return [s for s in map(_row_to_spot, rows) if water_body_id in s.also_on_water_body_ids]
+
+
+def list_spots_by_ids(db: Database, spot_ids: list[str]) -> list[Spot]:
+    """The spots with these ids, in id order. An id with no spot is skipped."""
+    out: list[Spot] = []
+    for i in range(0, len(spot_ids), 500):
+        chunk = spot_ids[i : i + 500]
+        rows = db.execute_returning_dicts(
+            f"SELECT * FROM spots WHERE spot_id IN ({', '.join('?' * len(chunk))})", chunk
+        )
+        out.extend(_row_to_spot(r) for r in rows)
+    return sorted(out, key=lambda s: s.spot_id)
 
 
 def get_spot(db: Database, spot_id: str) -> Spot | None:

@@ -1810,6 +1810,75 @@ def get_map_water_body(water_body_id: str, user: dict = Depends(get_current_user
     return detail
 
 
+@app.get("/map/sections")
+def get_map_sections(
+    bbox: str | None = None,
+    type: str | None = None,
+    tier: int = 2,
+    jurisdiction: str | None = None,
+    response: Response = None,
+    user: dict = Depends(get_current_user),
+):
+    """The overview map's layer: one shape per river section and per lake with an outline.
+
+    `bbox` is min_lon,min_lat,max_lon,max_lat. `type` is one or more comma-separated
+    water types (river, creek, lake, pond, great_lake). Each feature carries its name,
+    `kind`, `type` and `counts` of what is inside (spots by kind, shoreline and depth
+    features by kind, and the caller's own weed reports). `labels` holds the lakes and
+    bays with no outline: a name and a place, no shape. `tier` is the highest spot tier
+    counted, as on /map/spots. Open one with GET /map/sections/{section_id}.
+    """
+    from src.models.water_body import WaterBodyType
+    from src.services.sections import sections_geojson
+    from src.storage.database import get_db
+
+    box = _parse_bbox(bbox)
+    types = None
+    if type:
+        types = [t.strip() for t in type.split(",") if t.strip()]
+        valid = set(WaterBodyType.__args__)
+        bad = [t for t in types if t not in valid]
+        if bad:
+            raise HTTPException(
+                status_code=422, detail=f"unknown type {bad[0]!r}; one of {sorted(valid)}"
+            )
+    if tier not in (1, 2, 3):
+        raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
+    # The weed counts are the caller's own: never let a browser or proxy keep them for anyone else.
+    response.headers["Cache-Control"] = "private, no-store"
+    return sections_geojson(
+        get_db(), user["id"], bbox=box, types=types, jurisdiction=jurisdiction, max_tier=tier
+    )
+
+
+@app.get("/map/sections/{section_id}")
+def get_map_section(
+    section_id: str,
+    response: Response,
+    tier: int = 2,
+    user: dict = Depends(get_current_user),
+):
+    """One section and every point of interest in it, as pins.
+
+    Dams and weirs (below-dam spots), places where creeks join, river mouths, public
+    fishing spots, a lake's shoreline and depth features, parking, trailheads and boat
+    launches near them, and the caller's own weed reports. Each pin keeps the id of the
+    spot or feature it stands for. 404 for an unknown section id, and for a lake with
+    no outline, which is not a section.
+    """
+    from src.services.sections import section_detail
+    from src.storage.database import get_db
+
+    if tier not in (1, 2, 3):
+        raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
+    detail = section_detail(get_db(), section_id, user["id"], max_tier=tier)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"No section with id {section_id!r}")
+    # The weed reports are the caller's own, so nothing here may be kept for the next person.
+    response.headers["Cache-Control"] = "private, no-store"
+    return detail
+
+
 @app.get("/map/layers/getting-there")
 def get_map_layers_getting_there(
     bbox: str | None = None,
