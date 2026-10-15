@@ -877,8 +877,18 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
             assert set(e["response"]) == {"detail"}
         elif route == "/map/spots/labels":
             assert e["response"] == spot_labels.labels_payload()
-        elif route.endswith("/features"):
-            assert e["response"]["type"] == "FeatureCollection"
+        elif route.startswith("/map/water-bodies/") and route.endswith("/features"):
+            body = e["response"]
+            assert body["type"] == "FeatureCollection"
+            assert body["water_body_id"] in route
+            for f in body["features"]:
+                p = f["properties"]
+                assert f["id"] == p["feature_id"]
+                assert f["id"].startswith(f"{body['water_body_id']}:")
+                assert p["kind"] in spot_labels.FEATURE_KINDS
+                assert p["derivation"] in spot_labels.FEATURE_DERIVATION_LABELS
+                assert p["provenance"] in ("record", "inference")
+                assert p["note"]
         elif route.startswith("/map/water-bodies/"):
             detail = {
                 k: v
@@ -900,6 +910,11 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
                 assert f["properties"]["jurisdiction"]
                 assert f["properties"]["name_source"] in spot_labels.NAME_SOURCE_LABELS
                 assert f["properties"]["type"] in spot_labels.WATER_BODY_TYPES
+        elif route.startswith("/map/layers/"):
+            assert e["response"]["type"] == "FeatureCollection"
+            for f in e["response"]["features"]:
+                assert f["geometry"]
+                assert f["properties"]
         elif route.startswith("/map/spots/"):
             detail = {
                 k: v

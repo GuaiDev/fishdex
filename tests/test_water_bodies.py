@@ -677,6 +677,73 @@ def test_shoreline_features_round_trip_through_storage(db):
     assert list_shoreline_features(db, "great_lake:lake-ontario", kinds=["island"]) == []
 
 
+def pier_feature(**over):
+    base = dict(
+        feature_id="great_lake:lake-ontario:pier:way/33656131",
+        water_body_id="great_lake:lake-ontario",
+        jurisdiction=JURISDICTION,
+        kind="pier",
+        name="Bronte Pier",
+        geometry={"type": "LineString", "coordinates": [[-79.7, 43.39], [-79.69, 43.39]]},
+        source="OpenStreetMap",
+        derivation="osm_feature",
+        provenance="record",
+        length_m=120.0,
+        built_at=BUILT,
+    )
+    return ShorelineFeature(**{**base, **over})
+
+
+def test_a_pier_round_trips_through_storage(db):
+    from src.storage.spots import replace_spots
+
+    replace_spots(db, JURISDICTION, [], [lake_body()], [pier_feature()])
+    (read,) = list_shoreline_features(db, "great_lake:lake-ontario", kinds=["pier"])
+    assert read == pier_feature()
+    assert read.derivation == "osm_feature"
+    assert read.source == "OpenStreetMap"
+    assert read.length_m == 120.0
+
+
+def test_the_pier_note_credits_openstreetmap(db):
+    from src.storage.spots import replace_spots
+
+    replace_spots(db, JURISDICTION, [], [lake_body()], [pier_feature()])
+    (f,) = water_body_features_geojson(db, "great_lake:lake-ontario")["features"]
+    assert f["geometry"]["type"] == "LineString"
+    assert f["properties"]["derivation"] == "osm_feature"
+    assert "OpenStreetMap" in f["properties"]["note"]
+
+
+def test_classify_attaches_a_mapped_structure_to_the_lake():
+    from src.models.water_feature import ShoreStructure
+
+    pier = ShoreStructure(
+        osm_id="way/1",
+        kind="pier",
+        name="Rice Lake Pier",
+        geometry={"type": "LineString", "coordinates": [[-78.095, 44.19], [-78.095, 44.21]]},
+        lat=44.2,
+        lng=-78.095,
+        jurisdiction=JURISDICTION,
+        tags={},
+    )
+    result = classify(
+        [mouth(43.4, -79.5)],
+        [stretch()],
+        JURISDICTION,
+        {"credit-lower": StretchHints(lake="Rice Lake")},
+        BUILT,
+        outlines={"Rice Lake": outline()},
+        shore_structures=[pier],
+    )
+    (f,) = [x for x in result.shoreline_features if x.kind == "pier"]
+    assert f.water_body_id == "lake:rice-lake"
+    assert f.name == "Rice Lake Pier"
+    assert result.report.shore_structures_fetched == 1
+    assert result.report.shoreline_features_by_kind["pier"] == 1
+
+
 def test_a_rebuild_with_no_features_clears_the_stored_ones(db):
     from src.storage.spots import replace_spots
 
@@ -748,6 +815,7 @@ def test_labels_serve_the_shoreline_feature_vocabulary():
         "shoreline_outline",
         "watercourse_endpoint",
         "bathymetry_contours",
+        "osm_feature",
     }
     assert payload["bathymetry_data_note"]
 

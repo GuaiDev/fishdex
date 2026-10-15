@@ -360,13 +360,14 @@ def water_body_features_geojson(db: Database, water_body_id: str) -> dict | None
     """A lake's shoreline features as a GeoJSON FeatureCollection. None for an unknown id.
 
     The inlets, outlets, islands, points and peninsulas derived from the water
-    body's outline, plus the drop-offs and humps derived from its survey contours.
+    body's outline, plus the drop-offs and humps derived from its survey contours
+    and the piers, breakwaters and harbours OpenStreetMap maps on its shore.
     `derivation` says how the shape was made: `watercourse_endpoint` (a mapped OHN
     stream at the shore), `shoreline_outline` (geometry read off the outline
-    itself), or `bathymetry_contours` (read off a lake survey); the note sticks to
-    that either way, and `attributes` carries the survey facts behind a contour
-    feature. A river has no features, so an empty collection is the honest answer,
-    not an error.
+    itself), `bathymetry_contours` (read off a lake survey) or `osm_feature` (a
+    structure mapped in OpenStreetMap); the note sticks to that either way, and
+    `attributes` carries the survey facts behind a contour feature. A river has no
+    features, so an empty collection is the honest answer, not an error.
     """
     from src.storage.water_bodies import list_shoreline_features
 

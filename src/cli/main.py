@@ -1648,6 +1648,7 @@ def _print_spot_report(report) -> None:
             "  lakes with no survey contours",
             str(report.lakes_without_survey_contours),
         )
+    table.add_row("shore structures fetched (OSM)", str(report.shore_structures_fetched))
     table.add_row("shoreline features", str(report.shoreline_features_total))
     for kind, n in sorted(report.shoreline_features_by_kind.items()):
         table.add_row(f"  {kind}", str(n))

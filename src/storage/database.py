@@ -240,7 +240,8 @@ def _ensure_shoreline_features(db: Database) -> None:
 
     The inlets, outlets, islands, points and peninsulas derived from a lake's
     outline (services/shoreline_features.py), plus the drop-offs and humps
-    derived from a lake's bathymetry (services/bathymetry.py). Rebuilt wholesale
+    derived from a lake's bathymetry (services/bathymetry.py) and the piers,
+    breakwaters and harbours OpenStreetMap maps on its shore. Rebuilt wholesale
     with the water bodies, in the same transaction, so a water body never points
     at a feature the rebuild removed. No foreign key, for the same reason as
     water_bodies.

@@ -319,6 +319,77 @@ def capture_special_here(client, capture, records_db: Path) -> None:
         shutil.rmtree(scratch, ignore_errors=True)
 
 
+# A real lake build has hundreds of shoreline features and outlines of tens of
+# thousands of vertices; the fixture only needs enough to show every shape.
+KEEP_PER_KIND = 3
+MAX_VERTICES = 120
+MAX_HOLES = 3
+MAX_PARTS = 4
+
+
+def _decimate(coords):
+    """Thin a long coordinate list to MAX_VERTICES, keeping the ends (a ring stays closed)."""
+    if not isinstance(coords, list) or not coords:
+        return coords
+    if isinstance(coords[0], (int, float)):
+        return coords
+    if isinstance(coords[0][0], (int, float)):
+        if len(coords) <= MAX_VERTICES:
+            return coords
+        step = len(coords) / (MAX_VERTICES - 1)
+        thinned = [coords[int(i * step)] for i in range(MAX_VERTICES - 1)]
+        return thinned + [coords[-1]]
+    return [_decimate(c) for c in coords]
+
+
+def _trim(path: str, body, note: str) -> tuple[object, str]:
+    """Shrink a response to a readable example; returns the body and the note to store."""
+    if not isinstance(body, (dict, list)):
+        return body, note
+    trimmed: list[str] = []
+    if path.endswith("/features") and isinstance(body, dict) and body.get("features"):
+        total = len(body["features"])
+        per_kind: dict[str, int] = {}
+        kept = []
+        for f in body["features"]:
+            kind = f["properties"]["kind"]
+            if per_kind.get(kind, 0) < KEEP_PER_KIND:
+                per_kind[kind] = per_kind.get(kind, 0) + 1
+                kept.append(f)
+        if len(kept) < total:
+            body = {**body, "features": kept}
+            trimmed.append(
+                f"features trimmed to {len(kept)} of {total} (up to {KEEP_PER_KIND} per kind)"
+            )
+
+    def walk(node):
+        if isinstance(node, dict):
+            if "coordinates" in node and node.get("type") in {
+                "Polygon",
+                "MultiPolygon",
+                "LineString",
+                "MultiLineString",
+            }:
+                coords = node["coordinates"]
+                if node["type"] == "Polygon":
+                    coords = coords[: 1 + MAX_HOLES]
+                elif node["type"] == "MultiPolygon":
+                    coords = [poly[: 1 + MAX_HOLES] for poly in coords[:MAX_PARTS]]
+                new = _decimate(coords)
+                if new != node["coordinates"]:
+                    trimmed.append("long geometries thinned")
+                return {**node, "coordinates": new}
+            return {k: walk(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [walk(v) for v in node]
+        return node
+
+    body = walk(body)
+    if trimmed:
+        note = f"{note} (fixture only: {'; '.join(dict.fromkeys(trimmed))})"
+    return body, note
+
+
 def main() -> None:
     if len(sys.argv) > 1:
         database.DB_PATH = Path(sys.argv[1])
@@ -334,12 +405,13 @@ def main() -> None:
 
     def capture(path: str, note: str) -> dict:
         response = client.get(path)
+        stored, stored_note = _trim(path, response.json(), note)
         entries.append(
             {
                 "request": f"GET {path}",
-                "note": note,
+                "note": stored_note,
                 "status": response.status_code,
-                "response": response.json(),
+                "response": stored,
             }
         )
         return response.json()
@@ -387,7 +459,8 @@ def main() -> None:
         if isinstance(detail, dict) and detail.get("geometry"):
             capture(
                 f"/map/water-bodies/{water_body_id}/features",
-                "a lake's shoreline features: inlets, outlets, islands, points, peninsulas",
+                "a lake's shoreline features: inlets, outlets, islands, points, "
+                "peninsulas, piers, breakwaters, harbours",
             )
     for water_body_id in FEATURE_LAKES:
         detail = client.get(f"/map/water-bodies/{water_body_id}")
@@ -397,7 +470,8 @@ def main() -> None:
         if features.status_code == 200 and features.json()["features"]:
             capture(
                 f"/map/water-bodies/{water_body_id}/features",
-                "shoreline features derived from a matched lake outline",
+                "shoreline features derived from a matched lake outline, plus the "
+                "piers, breakwaters and harbours OpenStreetMap maps on its shore",
             )
     for path, note in ERRORS:
         capture(path, note)

@@ -5,13 +5,18 @@ creek enters, an island, a point — derived from a named, dated source and stor
 against the water body it belongs to. It is not a fish claim: no field says what
 lives near it. The words the map shows for a kind live in services/spot_labels.py.
 
-Two kinds come from the outline (inlet, outlet, island, point, peninsula) and two
-from a lake's surveyed depth contours (drop_off, hump). `provenance` follows
-src/models/context.py: an island is a ring inside the OHN polygon and an inlet is
-a mapped stream (both RECORD), while a point, peninsula, drop-off or hump is a
-shape *computed* from the geometry (INFERENCE). `derivation` says where the shape
-came from, so the map can say "from the shoreline outline" or "from a 1970
-survey, transect".
+Kinds come from the outline (inlet, outlet, island, point, peninsula), from a
+lake's surveyed depth contours (drop_off, hump) and from OpenStreetMap (pier,
+breakwater, harbour). `provenance` follows src/models/context.py: an island is a
+ring inside the OHN polygon and an inlet is a mapped stream (both RECORD), while a
+point, peninsula, drop-off or hump is a shape *computed* from the geometry
+(INFERENCE). `derivation` says where the shape came from, so the map can say "from
+the shoreline outline" or "from a 1970 survey, transect".
+
+A pier, breakwater or harbour is a different sort of thing: it is a mapped
+structure read straight from OpenStreetMap (`derivation == "osm_feature"`), not
+computed from any outline. It carries its OSM element id and the source name,
+and — like every feature here — says nothing about fish.
 """
 
 from typing import Literal
@@ -21,11 +26,25 @@ from pydantic import BaseModel, Field, field_validator
 from src.models.context import ProvenanceKind
 from src.models.jurisdiction import JurisdictionCode
 
-FeatureKind = Literal["inlet", "outlet", "point", "peninsula", "island", "drop_off", "hump"]
+FeatureKind = Literal[
+    "inlet",
+    "outlet",
+    "point",
+    "peninsula",
+    "island",
+    "drop_off",
+    "hump",
+    "pier",
+    "breakwater",
+    "harbour",
+]
 
 # How the feature was obtained: read straight out of a source record, worked out
-# from the outline's shape, or computed from a lake's surveyed depth contours.
-Derivation = Literal["watercourse_endpoint", "shoreline_outline", "bathymetry_contours"]
+# from the outline's shape, computed from a lake's surveyed depth contours, or a
+# mapped structure read from OpenStreetMap.
+Derivation = Literal[
+    "watercourse_endpoint", "shoreline_outline", "bathymetry_contours", "osm_feature"
+]
 
 
 class ShorelineFeature(BaseModel):
@@ -37,9 +56,10 @@ class ShorelineFeature(BaseModel):
     kind: FeatureKind
     name: str | None = None
     geometry: dict
-    """GeoJSON Point (inlet, outlet, point, peninsula, drop_off) or Polygon (island, hump)."""
+    """GeoJSON Point (inlet, outlet, point, peninsula, drop_off), Polygon (island, hump,
+    harbour) or LineString (a pier or breakwater drawn as a line)."""
     source: str
-    """'OHN Waterbody', 'OHN Watercourse' or 'LIO Bathymetry'."""
+    """'OHN Waterbody', 'OHN Watercourse', 'LIO Bathymetry' or 'OpenStreetMap'."""
     source_date: str | None = None
     provenance: ProvenanceKind = ProvenanceKind.RECORD
     derivation: Derivation
@@ -64,8 +84,8 @@ class ShorelineFeature(BaseModel):
     @field_validator("geometry")
     @classmethod
     def _geometry_shape(cls, v: dict) -> dict:
-        if v.get("type") not in ("Point", "Polygon"):
-            raise ValueError("shoreline feature geometry must be a Point or a Polygon")
+        if v.get("type") not in ("Point", "Polygon", "LineString"):
+            raise ValueError("shoreline feature geometry must be a Point, Polygon or LineString")
         if not v.get("coordinates"):
             raise ValueError("shoreline feature geometry must not be empty")
         return v

@@ -178,11 +178,14 @@ class SpotBuildReport(BaseModel):
     shoreline_features_by_kind: dict[str, int] = Field(default_factory=dict)
     shoreline_features_dropped: dict[str, int] = Field(default_factory=dict)
     # Upstream lake fetches that failed and were skipped so the rest of the build
-    # could finish, by step: lake_outline, lake_outline_widen, shore_watercourses,
+    # could finish, by step: lake_outline, lake_outline_widen, shore_watercourses, shore_structures,
     # bathymetry. A lake that failed here is missing something (its outline, an
     # inlet, its depth), which says nothing about the lake. Re-running the build
     # retries only these, because every fetch that worked is cached.
     upstream_failures: dict[str, int] = Field(default_factory=dict)
+    # OSM piers, breakwaters and harbours fetched at the lakes' shores. Kept or
+    # dropped (off-shore) they are counted against the shoreline features above.
+    shore_structures_fetched: int = 0
 
     def drop(self, reason: str, n: int = 1) -> None:
         if n > 0:  # a zero would read as a reason that fired
