@@ -308,7 +308,14 @@
             "plain": "Where the bottom gets deep quickly",
             "technical": "Drop-off",
             "definition": "A drop-off is a place where the bottom of a lake or river slopes steeply from shallow to deep water.",
-            "mapped_from": null
+            "mapped_from": "Ontario government lake depth surveys (depth contours)"
+          },
+          {
+            "term_id": "hump",
+            "plain": "A shallow rise in the lake bottom",
+            "technical": "Hump",
+            "definition": "A hump is a place where the bottom of a lake rises to shallower water than the water around it.",
+            "mapped_from": "Ontario government lake depth surveys (depth contours)"
           },
           {
             "term_id": "weed_edge",
