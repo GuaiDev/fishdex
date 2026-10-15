@@ -221,7 +221,7 @@ All user-facing strings, in display order (Quiet water last).
       "kind": "outlet",
       "label": "Outlet",
       "chip": "Outlets",
-      "one_liner": "The lake drains out here."
+      "one_liner": "A mapped stream starts at the shore here and flows away."
     },
     {
       "kind": "island",
@@ -910,7 +910,8 @@ made of, and every spot on it.
 }
 ```
 
-A lake whose outline was not matched has no geometry, and its spots are the river mouths that
+A bay with no outline of its own (Humber Bay, Long Point Bay, Owen Sound) is never drawn as the
+lake it opens off: it has no geometry and is labelled only. A lake whose outline was not matched has no geometry, and its spots are the river mouths that
 open onto it:
 
 ```json
@@ -1975,6 +1976,10 @@ A per-user hook and block, filled only for the logged-in caller:
   response across users.
 - **No user, or nothing new:** `card.new_to_you` is `null` and the hook is whatever the
   chain gives next (`structure`, `honest_empty`, `kind_description`).
+- **Not before ten species.** The hook only replaces the card's sentence about the water once
+  the caller has confirmed at least `MIN_SPECIES_FOR_HOOK` (10) different species; before that
+  nearly every recorded fish is new and the hook would read the same on every card. The
+  `card.new_to_you` block and the `new_to_me` filter are not gated.
 - **Shown as a prompt, not a score:** "3 species recorded here you haven't caught yet" in the
   hook; the names behind a tap on `card.new_to_you.species[]`. No ranking, no total across
   spots, nothing to share.
