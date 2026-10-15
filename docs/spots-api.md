@@ -8,8 +8,10 @@ river lines; the river is context ("more spots on this river").
 The spots and water-body endpoints are read-only GETs, and every endpoint here needs the same
 `Authorization: Bearer <token>` as the other `/map/*` endpoints. The one exception to read-only is
 the private [weed reports](#weed-reports) the user writes themselves. The older `/map/stretches`,
-`/map/stretches/{id}/anchors` and `/map/segments` endpoints are served only for the previous
-web map; they keep their old field names and the spots UI should not use them.
+`/map/stretches/{id}/anchors` and `/map/segments` endpoints are **legacy**: they are served only
+for the old `web/` AnchorSheet and five-type legend, are not part of the spots API, keep their
+old stretch/anchor field names, and will be removed together with the AnchorSheet. The spots UI
+should not use them.
 
 You can build the whole UI without a running server: **`tests/fixtures/spots_api_responses.json`**
 holds real responses from every endpoint below (the examples in this file are copied

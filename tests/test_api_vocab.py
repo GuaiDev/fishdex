@@ -4,6 +4,11 @@ The tables, stored JSON and internal modules keep those words. Only what a
 client sees is checked here: every field name, and every string a person could
 read, in the committed response fixtures and in live detail responses built
 from rows that still carry the stored names.
+
+Scope: the spots API only. The legacy `/map/stretches`,
+`/map/stretches/{stretch_id}/anchors` and `/map/segments` endpoints serve the
+old web AnchorSheet and five-type legend, keep their old vocabulary on
+purpose, and are excluded until they are removed with the AnchorSheet.
 """
 
 import json
