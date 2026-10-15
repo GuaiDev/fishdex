@@ -1,45 +1,6 @@
 {
  "elements": [
   {
-   "type": "node",
-   "id": 385027413,
-   "lat": 43.3941739,
-   "lon": -79.7038821,
-   "tags": {
-    "leisure": "marina",
-    "name": "Bronte Outer Harbour Marina",
-    "seamark:harbour:category": "marina",
-    "seamark:type": "harbour"
-   }
-  },
-  {
-   "type": "node",
-   "id": 558655950,
-   "lat": 43.4412035,
-   "lon": -79.6685039,
-   "tags": {
-    "leisure": "marina",
-    "seamark:harbour:category": "marina",
-    "seamark:type": "harbour"
-   }
-  },
-  {
-   "type": "node",
-   "id": 558756150,
-   "lat": 43.3932783,
-   "lon": -79.7103354,
-   "tags": {
-    "attribution": "Natural Resources Canada",
-    "canvec:CODE": "1000060",
-    "canvec:UUID": "f4066ecaa20e47dfb63cfe57f2f4b893",
-    "leisure": "marina",
-    "name": "Bronte Harbour",
-    "seamark:harbour:category": "marina",
-    "seamark:type": "harbour",
-    "source": "CanVec_Import_2009"
-   }
-  },
-  {
    "type": "way",
    "id": 33656131,
    "bounds": {

@@ -1164,3 +1164,20 @@ def test_the_water_body_words_carry_no_jargon_or_unnamed_titles():
         assert not JARGON.search(text), text
     for entry in spot_labels.WATER_BODY_TYPES.values():
         assert not entry["unnamed"].lower().startswith("unnamed")
+
+
+def test_skipped_shore_cells_reach_the_build_failures():
+    from src.services.spots import _lake_outline_inputs
+
+    failures: dict[str, int] = {}
+    mouths = [anchor("lake_mouth", "m", 44.2, -78.2, sid="s", name="Rice Lake", shore_ogf_ids=[1])]
+    _outlines, _watercourses, structures = _lake_outline_inputs(
+        mouths,
+        JURISDICTION,
+        outline_resolver=lambda _m: {"Rice Lake": outline()},
+        watercourse_fetcher=lambda *_c: [],
+        structure_fetcher=lambda _cells: ([], 2),
+        failures=failures,
+    )
+    assert structures == []
+    assert failures == {"shore_structures": 2}

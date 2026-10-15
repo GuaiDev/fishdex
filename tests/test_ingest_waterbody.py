@@ -234,10 +234,11 @@ def test_by_name_pages_are_small_so_heavy_geometry_never_500s(cache_dir):
         fetch_waterbodies_by_name("Test Lake")
 
     assert sink["resultRecordCount"] == str(_BY_NAME_PAGE_SIZE)
-    assert _BY_NAME_PAGE_SIZE < 10
 
 
-def test_an_empty_page_served_as_the_last_one_is_counted_and_warned(cache_dir):
+def test_an_empty_page_served_as_the_last_one_fails_loudly(cache_dir):
+    import pytest
+
     from src.ingest.jurisdictions.ca_on.waterbody import fetch_waterbodies_by_name
 
     pages = [
@@ -247,12 +248,35 @@ def test_an_empty_page_served_as_the_last_one_is_counted_and_warned(cache_dir):
     with (
         patch(_HTTP, side_effect=_paged_get(15, pages)),
         patch(_CACHE, cache_dir),
-        patch("src.ingest.jurisdictions.ca_on.waterbody.logger.warning") as warn,
+        pytest.raises(RuntimeError, match="5 of 15"),
     ):
+        fetch_waterbodies_by_name("Test Lake")
+
+
+def test_a_lake_sliced_into_hundreds_of_polygons_is_pulled_whole(cache_dir):
+    from src.ingest.jurisdictions.ca_on.waterbody import (
+        _BY_NAME_PAGE_SIZE,
+        fetch_waterbodies_by_name,
+    )
+
+    total = _BY_NAME_PAGE_SIZE * 40 + 3
+
+    def get(_url, params=None, **_k):
+        params = params or {}
+        if params.get("returnCountOnly") == "true":
+            return MagicMock(json=lambda: {"count": total})
+        start = int(params["resultOffset"])
+        stop = min(start + _BY_NAME_PAGE_SIZE, total)
+        page = {
+            "features": [_feature(i) for i in range(start, stop)],
+            "exceededTransferLimit": stop < total,
+        }
+        return MagicMock(json=lambda: page)
+
+    with patch(_HTTP, side_effect=get), patch(_CACHE, cache_dir):
         bodies = fetch_waterbodies_by_name("Test Lake")
 
-    assert len(bodies) == 5  # short, but loudly short
-    assert any(call.args[-2:] == (5, 15) for call in warn.call_args_list)
+    assert len(bodies) == total
 
 
 def test_a_service_that_answers_no_count_falls_back_to_the_transfer_flag(cache_dir):

@@ -1012,7 +1012,7 @@ Unknown id is a `404`:
 The shoreline features of one lake, as a GeoJSON `FeatureCollection`: where a mapped stream
 enters (`inlet`) or leaves (`outlet`), an island (`island`), a point or peninsula of land
 reaching out (`point`, `peninsula`), the structures OpenStreetMap maps on its shore — a
-`pier`, a `breakwater`, a `harbour` — kept when they sit on the shore or within 500 m of it, and —
+`pier`, a `breakwater`, a `harbour` — kept when they sit on the shore or within 500 m of it (at most 50 per lake, named and longer first), and —
 where the lake has a digital survey — where the bottom falls away quickly (`drop_off`) or rises
 into a shallower shoal (`hump`). The outline kinds are read off the lake's OHN Waterbody outline
 and the OHN streams that end at its shore; the structures come from OpenStreetMap (ODbL); the

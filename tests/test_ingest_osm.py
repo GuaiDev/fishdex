@@ -437,7 +437,8 @@ def _shore(osm, tmp_path, response, cells=None):
         patch.object(osm, "_CACHE_DIR", tmp_path),
         patch.object(osm, "fetch_shore_structures", _REAL_FETCH_SHORE),
     ):
-        return osm.fetch_shore_structures(cells or SHORE_CELL, "CA-ON"), post
+        structures, _failed = osm.fetch_shore_structures(cells or SHORE_CELL, "CA-ON")
+        return structures, post
 
 
 def test_shore_structures_parse_every_kind_from_a_recorded_response(tmp_path):
@@ -446,7 +447,7 @@ def test_shore_structures_parse_every_kind_from_a_recorded_response(tmp_path):
     osm = importlib.import_module("src.ingest.global.osm")
     structures, _ = _shore(osm, tmp_path, _load_fixture("osm_shore_structures.json"))
 
-    assert {"pier", "breakwater", "harbour"} <= {s.kind for s in structures}
+    assert {"pier", "breakwater"} <= {s.kind for s in structures}
     assert all(s.jurisdiction == "CA-ON" for s in structures)
     assert len({s.osm_id for s in structures}) == len(structures)
 
@@ -474,8 +475,8 @@ def test_shore_structure_kinds_from_tags():
     assert kind({"man_made": "pier"}) == "pier"
     assert kind({"man_made": "breakwater"}) == "breakwater"
     assert kind({"harbour": "yes"}) == "harbour"
-    assert kind({"landuse": "harbour"}) == "harbour"
-    assert kind({"leisure": "marina"}) == "harbour"
+    assert kind({"landuse": "harbour"}) is None
+    assert kind({"leisure": "marina"}) is None
     assert kind({"man_made": "bridge"}) is None
 
 
@@ -490,8 +491,8 @@ def test_shore_query_names_the_tags_and_the_bbox(tmp_path):
     assert '["man_made"="pier"]' in query
     assert '["man_made"="breakwater"]' in query
     assert '["harbour"="yes"]' in query
-    assert '["landuse"="harbour"]' in query
-    assert '["leisure"="marina"]' in query
+    assert "landuse" not in query
+    assert "marina" not in query
 
 
 def test_shore_structures_query_each_cell_once_and_dedupe_by_id(tmp_path):
@@ -552,7 +553,7 @@ def test_shore_structures_with_no_cells_makes_no_request(tmp_path):
         patch.object(osm, "_CACHE_DIR", tmp_path),
         patch.object(osm, "fetch_shore_structures", _REAL_FETCH_SHORE),
     ):
-        assert osm.fetch_shore_structures([]) == []
+        assert osm.fetch_shore_structures([]) == ([], 0)
     post.assert_not_called()
 
 
@@ -585,3 +586,38 @@ def test_overpass_runtime_error_is_retried_and_never_cached(tmp_path):
     ):
         osm.fetch_stream_corridor(CORRIDOR_LINE)
     assert not list((tmp_path / "other").glob("*.json"))
+
+
+def test_shore_structures_report_how_many_cells_were_skipped(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    good = _make_mock_response(
+        {
+            "elements": [
+                {
+                    "type": "way",
+                    "id": 42,
+                    "geometry": [{"lat": 43.4, "lon": -79.7}, {"lat": 43.4, "lon": -79.69}],
+                    "tags": {"man_made": "pier"},
+                }
+            ]
+        }
+    )
+
+    def post(_url, data=None, **_k):
+        if "(43.30000,-79.60000," in data["data"]:
+            raise RuntimeError("overpass down")
+        return good
+
+    cells = [(-79.74, 43.37, -79.63, 43.47), (-79.6, 43.3, -79.5, 43.4)]
+    with (
+        patch("httpx.post", side_effect=post),
+        patch("time.sleep"),
+        patch.object(osm, "_CACHE_DIR", tmp_path),
+        patch.object(osm, "_RETRY_DELAYS", ()),
+    ):
+        structures, failed = _REAL_FETCH_SHORE(cells, "CA-ON")
+
+    assert len(structures) == 1
+    assert failed == 1  # one quarter of the second cell never answered

@@ -60,6 +60,7 @@ MIN_ISLAND_AREA_M2 = 10_000.0
 MAX_ISLANDS = 25
 MAX_PROMONTORIES = 25
 MAX_STREAM_FEATURES = 50
+MAX_SHORE_STRUCTURES = 50
 # The outline is simplified this far (degrees, ~55 m) before the convexity work:
 # the promontory rule is about the shape of the shore, not its pixel noise.
 CONVEXITY_SIMPLIFY_DEG = 0.0005
@@ -113,7 +114,7 @@ def derive_shoreline_features(
     segments = list(watercourses) if watercourses else []
     structures = list(shore_structures) if shore_structures else []
     result = ShorelineFeatureSet()
-    lakes: list[tuple[str, object, LakeOutline]] = []
+    lakes: list[tuple[str, object]] = []
     for name, outline in outlines.items():
         if not outline.matched or not outline.geometry:
             result.lakes_without_outline += 1
@@ -124,7 +125,7 @@ def derive_shoreline_features(
             continue
         result.lakes_with_outline += 1
         geom = shape(outline.geometry)
-        lakes.append((wb_id, geom, outline))
+        lakes.append((wb_id, geom.boundary))
         result.features += _islands(wb_id, geom, outline, jurisdiction, built_at, result)
         result.features += _promontories(wb_id, geom, outline, jurisdiction, built_at, result)
         if segments:
@@ -306,7 +307,7 @@ def _stream_junctions(
 
 
 def _shore_structures(
-    lakes: list[tuple[str, object, LakeOutline]],
+    lakes: list[tuple[str, object]],
     structures: list[ShoreStructure],
     jurisdiction: JurisdictionCode,
     built_at: str,
@@ -316,21 +317,27 @@ def _shore_structures(
 
     A structure is kept when a lake's shore is within HARBOUR_SHORE_BUFFER_M of
     it; one near no lake is counted, not attached to the closest by default.
+    Each lake keeps at most MAX_SHORE_STRUCTURES: named before unnamed, then the
+    larger first, so a cottage-dock shore cannot bury the lake's other features.
     """
-    out: list[ShorelineFeature] = []
+    for _, boundary in lakes:
+        shapely.prepare(boundary)
+    by_lake: dict[str, list[ShorelineFeature]] = {}
     for st in structures:
         geom = shape(st.geometry)
         buffer_deg = HARBOUR_SHORE_BUFFER_M / (M_PER_DEG * math.cos(math.radians(st.lat)))
-        best: tuple[float, str, LakeOutline] | None = None
-        for wb_id, lake_geom, outline in lakes:
-            d_deg = lake_geom.boundary.distance(geom)
-            if d_deg <= buffer_deg and (best is None or d_deg < best[0]):
-                best = (d_deg, wb_id, outline)
+        best: tuple[float, str] | None = None
+        for wb_id, boundary in lakes:
+            if not shapely.dwithin(boundary, geom, buffer_deg):
+                continue
+            d_deg = boundary.distance(geom)
+            if best is None or d_deg < best[0]:
+                best = (d_deg, wb_id)
         if best is None:
             result.drop("shore_structure_off_shore")
             continue
-        _, wb_id, outline = best
-        out.append(
+        wb_id = best[1]
+        by_lake.setdefault(wb_id, []).append(
             ShorelineFeature(
                 feature_id=f"{wb_id}:{st.kind}:{st.osm_id}",
                 water_body_id=wb_id,
@@ -354,6 +361,13 @@ def _shore_structures(
                 built_at=built_at,
             )
         )
+    out: list[ShorelineFeature] = []
+    for features in by_lake.values():
+        features.sort(
+            key=lambda f: (f.name is None, -(f.length_m or 0.0), -(f.area_m2 or 0.0), f.feature_id)
+        )
+        result.drop("shore_structure_over_cap", max(0, len(features) - MAX_SHORE_STRUCTURES))
+        out += features[:MAX_SHORE_STRUCTURES]
     return out
 
 

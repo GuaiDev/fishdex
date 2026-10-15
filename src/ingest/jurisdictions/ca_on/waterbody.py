@@ -44,9 +44,8 @@ _PAGE_SIZE = 1000
 # sliced lake (Georgian Bay) are too heavy for one 1000-record page — the
 # service answers 500 — and at some sizes in between it answers an EMPTY page
 # as if it were the last one. A small page plus the count yardstick in
-# _fetch_all_pages turns both into either a complete pull or a loud warning.
-_BY_NAME_PAGE_SIZE = 5
-_MAX_PAGES = 20
+# _fetch_all_pages turns both into either a complete pull or a loud failure.
+_BY_NAME_PAGE_SIZE = 10
 
 # The layer's own `copyrightText`. The Open Government Licence – Ontario lets us
 # copy and adapt with attribution, so the attribution is not optional.
@@ -200,36 +199,30 @@ def _fetch_all_pages(url: str, params: dict) -> list[dict]:
     one page, and an empty page as if it were the last when a heavy-geometry
     page is too big to serialize — so a short or empty page is never trusted as
     the end. Completeness is judged against the service's own count for the
-    same query (the same yardstick the watercourse tiles use), and a pull that
-    comes up short of it is logged at WARNING. A count the service does not
-    give falls back to the `exceededTransferLimit` flag alone.
+    same query (the same yardstick the watercourse tiles use). There is no page
+    ceiling: paging runs until the count is met, and a pull the service ends
+    early raises rather than return a partial lake. A count the service does
+    not give falls back to the `exceededTransferLimit` flag alone.
     """
     expected = _count_features(url, params)
     page_size = int(params.get("resultRecordCount", _PAGE_SIZE))
     features: list[dict] = []
-    for page in range(_MAX_PAGES):
+    page = 0
+    while True:
         data = _cached_get(url, {**params, "resultOffset": str(page * page_size)})
+        page += 1
         batch = data.get("features", [])
         features.extend(batch)
-        if expected is not None and len(features) >= expected:
+        if expected is not None:
+            if len(features) >= expected:
+                return features
+            if not batch:
+                raise RuntimeError(
+                    f"OHN waterbody: service ended paging at {len(features)} of "
+                    f"{expected} features it counts for this query"
+                )
+        elif not data.get("exceededTransferLimit") or not batch:
             return features
-        if not data.get("exceededTransferLimit") or not batch:
-            break
-    else:
-        logger.warning(
-            "OHN waterbody: query still truncated after %d pages (%d features); "
-            "matches may be wrong",
-            _MAX_PAGES,
-            len(features),
-        )
-    if expected is not None and len(features) < expected:
-        logger.warning(
-            "OHN waterbody: got %d of %d features the service counts for this "
-            "query; matches may be wrong",
-            len(features),
-            expected,
-        )
-    return features
 
 
 def _count_features(url: str, params: dict) -> int | None:

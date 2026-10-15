@@ -281,6 +281,31 @@ def test_a_structure_with_no_matched_outline_has_nowhere_to_go():
     assert result.dropped.get("shore_structure_off_shore") == 1
 
 
+def test_a_lake_keeps_only_its_named_and_longest_structures_over_the_cap():
+    from src.services import shoreline_features as sf
+
+    def pier(i, name, length):
+        return structure(
+            osm_id=f"way/{i}",
+            name=name,
+            geometry={
+                "type": "LineString",
+                "coordinates": [[0.0102, 0.0], [0.0102, length]],
+            },
+        )
+
+    docks = [pier(i, None, 0.0001 * (i + 1)) for i in range(sf.MAX_SHORE_STRUCTURES)]
+    named = pier(900, "Bronte Pier", 0.0001)
+    result = derive(outline_of(BASE), structures=[*docks, named])
+
+    kept = [x for x in result.features if x.kind == "pier"]
+    assert len(kept) == sf.MAX_SHORE_STRUCTURES
+    assert "Bronte Pier" in {x.name for x in kept}
+    shortest_dock = "lake:test-lake:pier:way/0"
+    assert shortest_dock not in {x.feature_id for x in kept}
+    assert result.dropped["shore_structure_over_cap"] == 1
+
+
 def test_no_structures_means_no_osm_features():
     result = derive(outline_of(BASE))
     assert not [x for x in result.features if x.derivation == "osm_feature"]

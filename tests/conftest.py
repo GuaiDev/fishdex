@@ -50,7 +50,7 @@ def _no_live_ohn(monkeypatch):
     osm = importlib.import_module("src.ingest.global.osm")
     monkeypatch.setattr(lake_outlines, "resolve_lake_outlines", lambda mouths, **k: {})
     monkeypatch.setattr(hydro_network, "fetch_watercourses_bbox", lambda *_a: [])
-    monkeypatch.setattr(osm, "fetch_shore_structures", lambda *_a, **_k: [])
+    monkeypatch.setattr(osm, "fetch_shore_structures", lambda *_a, **_k: ([], 0))
     monkeypatch.setattr(
         bathymetry, "fetch_lake_bathymetry", lambda *_a, **_k: bathymetry.LakeBathymetry(None, [])
     )

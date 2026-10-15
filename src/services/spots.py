@@ -807,7 +807,9 @@ def build_spots(
     | None = None,
     watercourse_fetcher: Callable[[float, float, float, float], list[StreamSegment]] | None = None,
     bathymetry_fetcher: Callable[[LakeOutline], LakeBathymetry] | None = None,
-    structure_fetcher: Callable[[list[tuple[float, float, float, float]]], list[ShoreStructure]]
+    structure_fetcher: Callable[
+        [list[tuple[float, float, float, float]]], tuple[list[ShoreStructure], int]
+    ]
     | None = None,
     quiet_water_areas: list[IngestArea] | None = None,
 ) -> SpotBuildReport:
@@ -907,7 +909,9 @@ def _lake_outline_inputs(
     outline_resolver: Callable[[dict[str, list[tuple[float, float]]]], dict[str, LakeOutline]]
     | None = None,
     watercourse_fetcher: Callable[[float, float, float, float], list[StreamSegment]] | None = None,
-    structure_fetcher: Callable[[list[tuple[float, float, float, float]]], list[ShoreStructure]]
+    structure_fetcher: Callable[
+        [list[tuple[float, float, float, float]]], tuple[list[ShoreStructure], int]
+    ]
     | None = None,
     failures: dict[str, int] | None = None,
 ) -> tuple[dict[str, LakeOutline], list[StreamSegment], list[ShoreStructure]]:
@@ -921,8 +925,9 @@ def _lake_outline_inputs(
     tests; the defaults are the cached OHN and OSM adapters.
 
     One failed fetch costs that lake (or that shore cell) its piece and is counted
-    into `failures`; it never stops the build. The default resolver isolates each
-    lake itself and flags it `lookup_failed`; a resolver that raises is caught here.
+    into `failures` (the OSM fetcher returns its skipped-cell count with its
+    structures); it never stops the build. The default resolver isolates each lake
+    itself and flags it `lookup_failed`; a resolver that raises is caught here.
     """
     from shapely.geometry import shape as _shape
 
@@ -986,7 +991,9 @@ def _lake_outline_inputs(
     shore_structures: list[ShoreStructure] = []
     if cells:
         try:
-            shore_structures = structure_fetcher(cells)
+            shore_structures, cells_failed = structure_fetcher(cells)
+            if cells_failed:
+                failures["shore_structures"] = failures.get("shore_structures", 0) + cells_failed
         except Exception:  # noqa: BLE001 - a flaky OSM query must not stop the build
             logger.warning("shore structure fetch failed; no piers this run", exc_info=True)
             failures["shore_structures"] = failures.get("shore_structures", 0) + 1

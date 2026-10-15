@@ -135,7 +135,7 @@ def fetch_stream_corridor(
 def fetch_shore_structures(
     bboxes: list[tuple[float, float, float, float]],
     jurisdiction: str | None = None,
-) -> list[ShoreStructure]:
+) -> tuple[list[ShoreStructure], int]:
     """Piers, breakwaters and harbours at a lake shore. Cached 30 days.
 
     `bboxes` are (min_lon, min_lat, max_lon, max_lat) cells the shoreline
@@ -146,9 +146,10 @@ def fetch_shore_structures(
     A cell Overpass cannot answer (after the usual retries) is split in four and
     each quarter tried; a quarter that still fails is logged at WARNING and
     skipped, so one heavy cell does not lose the lake's other structures and a
-    re-run fetches only what is missing (everything answered is cached). Raises
-    only when every cell failed. An empty list means Overpass answered and found
-    nothing — the two are different facts.
+    re-run fetches only what is missing (everything answered is cached). Returns
+    the structures and the number of cells skipped, so a partly answered lake is
+    reported rather than silently thin. Raises only when every cell failed. An
+    empty list with no skipped cells means Overpass answered and found nothing.
     """
     found: dict[str, ShoreStructure] = {}
     failed: list[tuple[float, float, float, float]] = []
@@ -183,7 +184,7 @@ def fetch_shore_structures(
         fetch(cell)
     if failed and not answered:
         raise RuntimeError(f"Overpass answered none of {len(failed)} shore-structure cells")
-    return list(found.values())
+    return list(found.values()), len(failed)
 
 
 def _shore_structure_query(south: float, west: float, north: float, east: float) -> str:
@@ -194,8 +195,6 @@ def _shore_structure_query(south: float, west: float, north: float, east: float)
         f'  nw["man_made"="pier"]{bbox};\n'
         f'  nw["man_made"="breakwater"]{bbox};\n'
         f'  nw["harbour"="yes"]{bbox};\n'
-        f'  nw["landuse"="harbour"]{bbox};\n'
-        f'  nw["leisure"="marina"]{bbox};\n'
         ");\n"
         "out geom tags;"
     )
@@ -407,13 +406,7 @@ def _shore_structure_kind(tags: dict) -> str | None:
         return "pier"
     if tags.get("man_made") == "breakwater":
         return "breakwater"
-    # A marina is a harbour for boats (OSM defines leisure=marina as a harbour
-    # or a section of one), so it is a harbour where it is one on the water;
-    # the shore buffer in services/shoreline_features.py drops any that sit
-    # inland of every lake.
-    if tags.get("harbour") == "yes" or tags.get("landuse") == "harbour":
-        return "harbour"
-    if tags.get("leisure") == "marina":
+    if tags.get("harbour") == "yes":
         return "harbour"
     return None
 
