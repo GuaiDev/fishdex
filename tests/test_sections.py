@@ -627,6 +627,16 @@ def test_a_river_has_no_features_and_a_lake_with_none_has_an_empty_list(db):
 # ── weed reports: the caller's own, nobody else's ─────────────────────────────
 
 
+def test_a_weed_report_is_placed_among_all_of_a_rivers_sections_not_just_those_in_view(built):
+    weed(built, 1, "river:humber-river", pt(-79.601, 43.78))
+    lower_only = (-79.65, 43.64, -79.55, 43.66)
+    in_view = by_id(sections_geojson(built, user_id=1, bbox=lower_only))
+    assert set(in_view) == {"humber-lower"}
+    assert in_view["humber-lower"]["properties"]["counts"]["weed_reports"] == 0
+    detail = section_detail(built, "humber-lower", user_id=1)["features"]
+    assert not [p for p in detail if p["properties"]["pin_type"] == "weed_report"]
+
+
 def test_weed_reports_are_the_callers_own_and_placed_in_the_nearest_section(built):
     ann_upper = weed(built, 1, "river:humber-river", pt(-79.601, 43.78), "above the bridge")
     ann_line = weed(

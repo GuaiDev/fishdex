@@ -340,6 +340,11 @@ def sections_geojson(
     counts are the caller's own and nobody else's, so the response must not be shared.
     """
     sections, unshaped = _load(db, jurisdiction)
+    weed = (
+        _weed_by_section(weed_store.list_weed_reports(db, user_id), sections)
+        if user_id is not None
+        else {}
+    )
     view = shapely_box(*bbox) if bbox is not None else None
     if view is not None:
         sections = [s for s in sections if _in_view(s, view)]
@@ -363,11 +368,6 @@ def sections_geojson(
 
     memberships = list_spot_memberships(db, max_tier, jurisdiction)
     feature_counts = count_shoreline_features_by_kind(db, jurisdiction)
-    weed = (
-        _weed_by_section(weed_store.list_weed_reports(db, user_id), sections)
-        if user_id is not None
-        else {}
-    )
     features = []
     for s in sections:
         counts = _counts(
