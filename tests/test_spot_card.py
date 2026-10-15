@@ -21,7 +21,7 @@ from src.models.species_range import SpeciesRange
 from src.models.spot import AccessRef, Spot
 from src.models.spot_card import HOOK_MAX_CHARS, CardHook, SpotCard
 from src.services import spot_card as spot_card_service
-from src.services import terms
+from src.services import spot_labels, terms
 from src.services.context import render, translate
 from src.services.spot_card import build_spot_card
 from src.storage.gbif_observations import upsert_gbif_observations
@@ -186,7 +186,9 @@ def test_hook_chain_order_and_the_slot_that_is_not_built_yet():
         "honest_empty",
     ]
     unbuilt = {r.kind for r in render.HOOK_CHAIN if r.build is None}
-    assert unbuilt == {"distinctive"}  # "new_to_you" is built, see tests/test_new_to_you.py
+    assert (
+        unbuilt == set()
+    )  # "new_to_you": tests/test_new_to_you.py; "distinctive": test_special_here.py
 
 
 def test_unbuilt_and_per_user_hook_slots_show_nothing_to_an_anonymous_card(db):
@@ -475,8 +477,6 @@ def test_the_general_reasoning_is_the_dictionary_entry_labelled_as_inference(db,
 
 
 def test_every_kind_has_one_two_sentence_entry():
-    from src.services import spot_labels
-
     assert set(translate.WHY_FISH_GATHER) == set(spot_labels.KIND_ORDER)
     for text in translate.WHY_FISH_GATHER.values():
         assert len(re.findall(r"[.!?](?:\s|$)", text)) == 2, text
@@ -810,3 +810,38 @@ def test_the_fixture_cards_pass_the_same_lint():
         allowed |= {t["text"] for t in card["terms"]}
         for text in walk(card, skip=NOT_TEXT):
             assert text in allowed or not BANNED.search(text), text
+
+
+# ── quiet water and special-here in the fixture ──────────────────────────────
+
+
+def test_the_fixture_has_quiet_water_with_its_caveats_listed_last():
+    path = Path(__file__).parent / "fixtures" / "spots_api_responses.json"
+    entries = json.loads(path.read_text())["requests"]
+    listing = next(e for e in entries if e["request"] == "GET /map/spots?kind=quiet_water")
+    features = listing["response"]["features"]
+    assert features and all(f["properties"]["kind"] == "quiet_water" for f in features)
+    for f in features:
+        caveats = f["properties"]["caveats"]
+        assert caveats[0]["text"] == spot_labels.QUIET_RECORDS_CAVEAT
+        measured = f["properties"]["signals"]["access_is_measured"]
+        assert (len(caveats) == 1) == (measured is True)
+    detail = next(e for e in entries if e["request"].startswith("GET /map/spots/quiet_water:"))
+    card = SpotCard.model_validate(detail["response"]["card"])
+    assert [c.kind for c in card.caveats][0] == "records"
+    assert card.meta.special_here == "not_applicable"
+
+
+def test_the_fixture_shows_a_recorded_more_often_here_card_built_from_real_records():
+    (entry, card), *_ = [c for c in fixture_cards() if c[1]["hook"]["kind"] == "distinctive"]
+    block = card["might_find"]["special_here"]
+    assert card["meta"]["special_here"] == "found"
+    assert block["label"].startswith("Recorded more often here than along the rest of the")
+    assert "real iNaturalist and GBIF records" in entry["note"]
+    for line in block["species"]:
+        assert line["here_total"] >= 10 and line["elsewhere_total"] >= 30
+        assert line["here_records"] >= 3
+        assert line["here_records"] / line["here_total"] >= 2 * (
+            line["elsewhere_records"] / line["elsewhere_total"]
+        )
+    assert "lives here" not in json.dumps(card).lower()

@@ -94,10 +94,10 @@ def names(card):
 # ── the hook ────────────────────────────────────────────────────────────────
 
 
-def test_hook_chain_now_builds_new_to_you_and_only_distinctive_is_unbuilt():
+def test_hook_chain_builds_every_slot():
     from src.services.context import render
 
-    assert {r.kind for r in render.HOOK_CHAIN if r.build is None} == {"distinctive"}
+    assert {r.kind for r in render.HOOK_CHAIN if r.build is None} == set()
 
 
 def test_a_caller_with_no_user_gets_the_shared_card_unchanged(db):

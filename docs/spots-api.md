@@ -13,7 +13,8 @@ the private [weed reports](#weed-reports) the user writes themselves. The older 
 You can build the whole UI without a running server: **`tests/fixtures/spots_api_responses.json`**
 holds real responses from every endpoint below (the examples in this file are copied
 from it). Each entry is `{request, note, status, response}`.
-The species, near, getting-there and bridges examples will be captured at the next fixture refresh from a full build.
+The fixture also holds the `near` example, both layer endpoints, the quiet-water list and card,
+and a card with a "recorded more often here" line.
 
 ## The flow
 
@@ -44,7 +45,10 @@ pressure from anglers, and a map must not blur them.
 - Never show `tier`. It decides what appears at which zoom and is not a quality claim.
   There is no rating, no score, no "popular", and none should be invented.
 - Quiet water (`distinct: true`) looks different from the other kinds and is listed last.
-  No spots of that kind exist yet (see "Not here yet").
+  It is a ranking of reaches, not a located structure, and it means only that few public
+  records exist there: few anglers, or just few observers. Show each spot's `caveats` with it.
+  Never word it as a claim about fish, "undiscovered", "untouched" or "good" (see
+  [Quiet water](#quiet-water)).
 - Parking, trailheads and boat launches are details of a spot (`getting_there`), not map
   pins of their own. Road crossings (`bridges`) are a layer that is **off by default**
   (`layers.bridges.default_on`).
@@ -83,6 +87,9 @@ All user-facing strings, in display order (Quiet water last).
   `properties.new_to_you.text` already arrive filled in), `tap_prompt` ("Tap to see which")
   and `note` (whose catches it is based on).
 - `filters.new_to_me` — `chip` and `one_liner` for the "New to me" toggle.
+- `quiet_water` — the words only quiet water needs: `titles` (the two title templates the build
+  fills), `caveats` (`records`, `access_not_measured`, `access_coverage_unknown`) and `not_built`
+  (what `meta.notes` says when none has been built).
 - `layers` — the Getting there and Bridges layers: `label`, `kinds`, `default_on`, `note`.
 - `access_labels` — display names for `getting_there[].kind` and `bridges[].kind`.
 - `water_body_types[]` — for each water body `type`: `chip` (plural, for a filter), `label`
@@ -236,6 +243,18 @@ All user-facing strings, in display order (Quiet water last).
     "shoreline_outline": "from the shoreline outline",
     "watercourse_endpoint": "where a mapped stream meets the shore"
   },
+  "quiet_water": {
+    "titles": {
+      "named": "A quiet part of {name}",
+      "near": "Quiet water near {name}"
+    },
+    "caveats": {
+      "records": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there.",
+      "access_not_measured": "Access not measured here: our road and parking map does not reach this far, so there is no access figure for this water.",
+      "access_coverage_unknown": "We cannot say whether access was measured here: the stored access figures predate the record of where roads and parking were mapped."
+    },
+    "not_built": "No quiet water is built yet. It needs the explore scores for this area, which have not been worked out."
+  },
   "layers": {
     "getting_there": {
       "label": "Getting there",
@@ -272,7 +291,7 @@ GeoJSON `FeatureCollection` of points, light enough to load for a whole viewport
 | Query | Meaning |
 |---|---|
 | `bbox` | `min_lon,min_lat,max_lon,max_lat`. Omit for everywhere. |
-| `kind` | One or more of `river_mouth`, `creek_junction`, `below_dam`, `public_fishing`, `quiet_water`, comma-separated. Omit for all. |
+| `kind` | One or more of `river_mouth`, `creek_junction`, `below_dam`, `public_fishing`, `quiet_water`, comma-separated. Omit for all. `quiet_water` is built from the explore score cache; see [Quiet water](#quiet-water). |
 | `tier` | The highest tier to include, **cumulative**: `1` headline spots only, `2` adds the normal ones (**default**), `3` everything, including junctions of small unnamed creeks that are hidden by default. A sensible mapping is tier 1 at province zoom, 2 at regional zoom, 3 at street zoom. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
 | `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
@@ -289,6 +308,13 @@ Each feature's `properties`: `spot_id`, `kind`, `title`, `subtitle`, `tier`,
 `/map/water-bodies`), `water_id`, `water_name` (the river section it sits on) and `signals`.
 With `new_to_me=true` each feature also has `new_to_you` = `{count, text}` (`text` is the
 ready-made "2 species recorded here you haven't caught yet"), and `meta.new_to_me` is `true`.
+Quiet-water features add `caveats`, `[{kind, text}]`, already written: `records` always, plus
+`access` unless the access figure was measured. The key is absent on every other kind. They have
+`water_body_id: null` and `water_id: null` on purpose: a quiet reach belongs to no curated river.
+
+`meta.notes` is present only when a kind that was asked for has nothing to show because of the
+build, not the viewport. Today that is quiet water before its first build: the text says so
+(`labels.quiet_water.not_built`). Features still come back, as an empty list.
 
 ```json
 {
@@ -1117,16 +1143,18 @@ Every user-facing string is in it, including block titles.
 
 | Block | Field | What it holds |
 |---|---|---|
-| 1. Why it's interesting | `card.hook` | `title`, `kind`, `text`: at most two lines. The first rule with data wins: `protected_species` (a care message that replaces everything else), then `structure` (one plain sentence about the water, only where a record supports it), then `honest_empty` ("No fish records within 2 km, so this is a place to find out."). `kind_description` is used when fish are recorded but nothing above has anything specific to say; it is the kind's one-liner. `new_to_you` is the first hook for a logged-in user who has something new (see [New to you](#new-to-you)); it sits after `protected_species`, so a care message still replaces it, and when it has nothing the chain falls through to `structure` as before. `distinctive` is reserved for a later phase and never appears yet. |
-| 2. You might find | `card.might_find` | `species[]` (top 5), `more_text`, `caveat` ("Recorded nearby, not a catch guarantee."), `empty_text` (why there is no list), `note` (why some recorded species are left out), `radius_km`. Each species has `name`, `scientific_name`, `source`, `date`, `evidence`, `cite` (`"iNaturalist, 2024-06-03"`, ready to show in brackets) and `note` (`"Older record"` for a record a decade old or more). Standardised surveys (`evidence: "survey"`) come first, then photos and sightings, each most recent first. |
+| 1. Why it's interesting | `card.hook` | `title`, `kind`, `text`: at most two lines. The first rule with data wins: `protected_species` (a care message that replaces everything else), then `structure` (one plain sentence about the water, only where a record supports it), then `honest_empty` ("No fish records within 2 km, so this is a place to find out."). `kind_description` is used when fish are recorded but nothing above has anything specific to say; it is the kind's one-liner. `new_to_you` is the first hook for a logged-in user who has something new (see [New to you](#new-to-you)); it sits after `protected_species`, so a care message still replaces it, and when it has nothing the chain falls through to `structure` as before. `distinctive` follows `new_to_you`: a species recorded more often here than along the rest of the river (see [Special here](#special-here)). |
+| 2. You might find | `card.might_find` | `species[]` (top 5), `more_text`, `caveat` ("Recorded nearby, not a catch guarantee."), `empty_text` (why there is no list), `note` (why some recorded species are left out), `radius_km`. Each species has `name`, `scientific_name`, `source`, `date`, `evidence`, `cite` (`"iNaturalist, 2024-06-03"`, ready to show in brackets) and `note` (`"Older record"` for a record a decade old or more). Standardised surveys (`evidence: "survey"`) come first, then photos and sightings, each most recent first. `special_here` is `null` unless a species stands out; see [Special here](#special-here). |
 | 3. Why fish gather here | `card.why_gather` | `what_it_is` (the kind in plain words), `general` = `{text, label, provenance: "inference"}`: the kind's two sentences, shown with the label "General reasoning, not a record about this spot". Then `facts_title` and `facts[]`: facts about this spot, each `{text, provenance: "record", source}`. They are listed apart from the reasoning on purpose. |
 | 4. Getting there | `card.getting_there` | `items[]`: the nearest parking, trailhead, boat launch and public road crossing, each `{kind, label, text, distance_m, details[], source}` (`text` is "Parking about 150 m away"; `details` are mapped tags such as "mapped as free"). `empty_text` when there are none. `crown_land` = `{state, text, source}` where `state` is `mapped`, `none_found` or `not_checked`. `unverified_title` and `unverified[]`: what has not been checked on the ground. |
 
-Also on the card: `new_to_you` (see below; `null` when there is nothing new), and `terms[]`, entries from the term registry (`{term, term_id, text}`,
+Also on the card: `new_to_you` (see below; `null` when there is nothing new); `caveats[]`, `[{kind, text}]` limits on what the card means (`records` and `access`; only quiet water has any today, so it is `[]` for the other kinds); and `terms[]`, entries from the term registry (`{term, term_id, text}`,
 `src/services/terms.py`) for the hard words that appear in this card's own text (for a
 weir, "weir"), to show behind a "What's a weir?" link; and `meta`, counts for a Sources view that are not shown on the card face:
 `species_shown`, `species_withheld_protected` (a number, never names),
-`species_withheld_imprecise`, `species_status_unchecked`, `cache_key`.
+`species_withheld_imprecise`, `species_status_unchecked`, `special_here` (why there is, or is not,
+a "recorded more often here" line: `found`, `none_stands_out`, `too_few_records_here`,
+`too_few_records_along_river`, `no_river_section`, or `not_applicable` for quiet water), `cache_key`.
 
 `GET /map/spots/labels` also carries `terms[]`, the whole term registry (`term_id`,
 `plain`, `technical`, `definition`, `mapped_from`); each kind and shoreline feature
@@ -1145,6 +1173,100 @@ species file. A species the file does not know at all is still shown, and counte
 **What a card is built from.** The spot, and `describe(map_tap)` within 2 km: no model
 call, no live lookup, no web search. The response has `Cache-Control: private,
 no-store`, because the "new to you" hook depends on who asks.
+
+### Special here
+
+`card.might_find.special_here` and the `distinctive` hook say that a species is **recorded more
+often here than along the rest of the river**. It is a statement about records, and records follow
+the people who look as well as the fish, so the wording is "recorded more often", never "lives
+here", and the block's own `caveat` says why. It compares *frequency*, not count: a fish with
+thirty records at a busy bridge is not special if it is just as large a share of the records
+along the whole river.
+
+For each species, its share of the records within 2 km of the spot is compared with its share of
+the records along the rest of the spot's river section (the curated river section the spot is on,
+`water_id`: anything within 2 km of its line, minus the spot's own 2 km). A species is named
+only when **all** of these hold, each a named constant in `src/services/context/special.py`:
+
+| Rule | Constant | Value |
+|---|---|---|
+| Records within 2 km of the spot | `MIN_RECORDS_HERE` | at least 10 |
+| Records along the rest of the river section | `MIN_RECORDS_ELSEWHERE` | at least 30 |
+| Records of the species here | `MIN_SPECIES_RECORDS_HERE` | at least 3 |
+| Its share here against its share elsewhere | `MIN_SHARE_RATIO` | at least 2 times |
+| Its share here minus its share elsewhere | `MIN_SHARE_GAP` | at least 0.05 (five points) |
+| Species named | `MAX_SPECIES` | at most 3, largest gap first |
+
+**When either side is short, there is no line at all**, not a weak one: `special_here` is `null`,
+the hook falls through to the next rule, and `meta.special_here` says which side was short
+(`too_few_records_here` or `too_few_records_along_river`). `none_stands_out` means there were
+enough records on both sides and no species stood out. `no_river_section` means the spot is not on
+a curated river section or the section's line is missing.
+
+- **Surveys outrank photos.** The shares are made from standardised survey records when both
+  sides have enough of them (`evidence: "survey"`), and from photo and sighting records otherwise
+  (`evidence: "sighting"`). The two are never mixed in one share. `basis_text` says which.
+- **One record per fish per visit.** For sightings, one per person per day per species; for
+  surveys, one per survey. One person logging fifty of a fish at their favourite bridge would
+  otherwise make that fish "special" there, and in the first run on real records one did.
+- Records with a deliberately fuzzed location (about 22 km) are on neither side. The user's own
+  catches are not read: the card is the same for every user.
+- A species with a listing signal is never named, and when one is recorded within 2 km the
+  care message replaces the hook and `special_here` is `null`.
+- Nothing about months or seasons.
+
+Each line is `{name, scientific_name, text, here_records, here_total, elsewhere_records,
+elsewhere_total}`; `text` is already written ("19 of 108 records here (18%), against 3% along the
+rest of the Otonabee River"). A card with a line, captured from the real iNaturalist and GBIF
+records in the main database (the hook, then the block):
+
+```json
+{
+  "title": "Why it's interesting",
+  "kind": "distinctive",
+  "text": "Yellow Perch and 2 more are recorded more often here than along the rest of the Otonabee River."
+}
+```
+
+```json
+{
+  "title": "Recorded more often here",
+  "label": "Recorded more often here than along the rest of the Otonabee River",
+  "species": [
+    {
+      "name": "Yellow Perch",
+      "scientific_name": "Perca flavescens",
+      "text": "19 of 108 records here (18%), against 3% along the rest of the Otonabee River",
+      "here_records": 19,
+      "here_total": 108,
+      "elsewhere_records": 2,
+      "elsewhere_total": 68
+    },
+    {
+      "name": "White Sucker",
+      "scientific_name": "Catostomus commersonii",
+      "text": "7 of 108 records here (6%), against 1% along the rest of the Otonabee River",
+      "here_records": 7,
+      "here_total": 108,
+      "elsewhere_records": 1,
+      "elsewhere_total": 68
+    },
+    {
+      "name": "Bluegill",
+      "scientific_name": "Lepomis macrochirus",
+      "text": "7 of 108 records here (6%), against 1% along the rest of the Otonabee River",
+      "here_records": 7,
+      "here_total": 108,
+      "elsewhere_records": 1,
+      "elsewhere_total": 68
+    }
+  ],
+  "evidence": "sighting",
+  "basis_text": "Counted from photo and sighting records only, one for each fish per person per day.",
+  "caveat": "This compares how often each fish was recorded. Records follow where people look as well as where fish are, so it does not mean the fish are found only here.",
+  "radius_km": 2.0
+}
+```
 
 The card payload for a spot whose structure gives nothing specific to say and where nothing is
 recorded (an honest-empty card):
@@ -1313,6 +1435,161 @@ fish recorded nearby are still listed:
     "species_status_unchecked": 4,
     "cache_key": "creek_junction:n7966741_4355566@2026-10-12T21:43:44+00:00"
   }
+}
+```
+
+## Quiet water
+
+`kind=quiet_water` spots are **reaches with few public observation records**. That can mean few
+anglers, or just few observers, or hard access. It is not a claim about fish: fewer records never
+implies absence or presence, and nothing in the title, the card or the caveats says otherwise.
+It is the one kind that is a ranking rather than a located structure, and it is the one kind
+that depends on a cache, so read this section before building the chip.
+
+**Where the spots come from.** `make build-spots` wraps the `explore()` ranking (the untapped-water
+scorer) for each labelled ingest area of the jurisdiction (`data/ingest_areas.json`; outside
+them every reach has few records, because nothing was collected there, so "quiet" would only mean
+"not ingested"). Per area the best 5 reaches are tier 2 and the next 10 tier 3, spaced at least 2 km
+apart so one creek is not fifteen spots. Spots are the same for every user: `explore()` runs with
+no user, so reaches an angler has fished are not removed here.
+
+**It needs the score cache.** `data/processed/untapped_potential.parquet`, written by
+`make compute-untapped`. Without it there are no quiet-water spots: the build still finishes, prints
+`quiet water: no score cache, none built` and logs a warning, `GET /map/spots?kind=quiet_water`
+returns an empty `features` list with `meta.notes` carrying the words for it, and nothing crashes.
+Existing spots are untouched. A stale cache gives stale spots, not wrong ids: ids come from the
+reach's coordinates.
+
+**Titles.** "A quiet part of {name}" for a named reach; "Quiet water near {name}" for a reach with no
+name of its own, titled after the nearest named water within 3 km. A reach with neither is not
+published (and is counted in the build report). `labels.quiet_water.titles` holds the templates.
+
+**Coverage caveats.** Every quiet-water feature and card carries `caveats`:
+
+| `kind` | When | Text |
+|---|---|---|
+| `records` | always | "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there." |
+| `access` | `signals.access_is_measured` is `false` | "Access not measured here: our road and parking map does not reach this far, so there is no access figure for this water." |
+| `access` | `signals.access_is_measured` is `null` | "We cannot say whether access was measured here: the stored access figures predate the record of where roads and parking were mapped." |
+
+`access_is_measured` is tri-state because there are three facts with three remedies. `true`: the
+road and parking map covers the reach, no caveat. `false`: the reach is outside the OpenStreetMap
+footprint (about 55 km of home), so the access term is a placeholder; the reach is still ranked
+on what is real out there, and the caveat says so. `null`: the cached scores predate coverage
+tracking, a pipeline gap that `make compute-access` settles. The UI shows the text as given.
+
+**First Nations waters are left out.** No boundary layer exists, so reaches inside the boxes of
+`data/curation/first_nations_waters_ca_on.toml` (the Grand between Brantford and Caledonia, the
+Thames between Delaware and Thamesville, the St. Clair delta) are dropped before ranking. The boxes
+are generous on purpose; see the file.
+
+**What a quiet-water spot has.** `signals` is `{named, access_is_measured}` and nothing else: no
+score, no pressure number (those would be a leaderboard). `structure_type` is `quiet_reach`,
+`structure_attrs` has the OHN `ogf_id` of the reach, its `stream_order` and the ingest `area`, and
+`sources[0].kind` is `explore_ranking`. `water_id`, `water_body_id` and `subtitle` are `null`. The
+card is the usual four blocks: the hook is the kind's one-liner or the honest-empty line, "Why fish
+gather here" is the kind's general reasoning (labelled inference), and there is no "recorded
+more often here" line (`meta.special_here` is `not_applicable`).
+
+**Ordering.** Quiet water is last in `kinds` and last within its tier in every list, as the
+`distinct` flag asks. It has tiers 2 and 3 only, so `tier=1` (province zoom) never shows it.
+
+One feature from the list, then the detail of a spot (card omitted here; see the fixture):
+
+```json
+{
+  "type": "FeatureCollection",
+  "meta": {
+    "count": 1,
+    "kind_counts": {
+      "river_mouth": 31,
+      "creek_junction": 230,
+      "below_dam": 9,
+      "public_fishing": 0,
+      "quiet_water": 10
+    },
+    "max_tier": 2
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "quiet_water:n7933778_4317874",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.33778303982308,
+          43.17874158743132
+        ]
+      },
+      "properties": {
+        "spot_id": "quiet_water:n7933778_4317874",
+        "kind": "quiet_water",
+        "title": "A quiet part of Eighteen Mile Creek",
+        "subtitle": null,
+        "tier": 2,
+        "jurisdiction": "CA-ON",
+        "water_id": null,
+        "water_name": "Eighteen Mile Creek",
+        "water_body_id": null,
+        "signals": {
+          "access_is_measured": false,
+          "named": true
+        },
+        "caveats": [
+          {
+            "kind": "records",
+            "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+          },
+          {
+            "kind": "access",
+            "text": "Access not measured here: our road and parking map does not reach this far, so there is no access figure for this water."
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+```json
+{
+  "spot_id": "quiet_water:n7933778_4317874",
+  "kind": "quiet_water",
+  "jurisdiction": "CA-ON",
+  "lat": 43.17874158743132,
+  "lng": -79.33778303982308,
+  "water_id": null,
+  "water_name": "Eighteen Mile Creek",
+  "water_body_id": null,
+  "also_on_water_body_ids": [],
+  "title": "A quiet part of Eighteen Mile Creek",
+  "subtitle": null,
+  "tier": 2,
+  "structure_type": "quiet_reach",
+  "structure_attrs": {
+    "area": "Grand River Dunnville",
+    "named": true,
+    "ogf_id": 127939961,
+    "stream_order": 3
+  },
+  "signals": {
+    "access_is_measured": false,
+    "named": true
+  },
+  "getting_there": [],
+  "bridges": [],
+  "sources": [
+    {
+      "kind": "explore_ranking",
+      "ref": "ogf:127939961",
+      "anchor_ids": [],
+      "built_at": "2026-10-14T04:26:26+00:00"
+    }
+  ],
+  "built_at": "2026-10-14T04:26:26+00:00",
+  "water_body": null,
+  "also_on_water_bodies": [],
+  "more_on_this_water": []
 }
 ```
 
@@ -1662,8 +1939,6 @@ id nobody has used. Their layer and list are simply empty of it.
 
 ## What is not here yet
 
-- **"Recorded more often here than along the rest of the river"** hook. A slot in the
-  hook chain with no text yet; it needs frequency along the river (phase 6).
 - **Seasons and gear.** The card makes no claim about when or how to fish.
 - **Water body outlines** are built for the curated lakes: a lake's OHN Waterbody polygon is
   matched by position at build time and served as `geometry`, with the source OGF_IDs, name,
@@ -1675,8 +1950,9 @@ id nobody has used. Their layer and list are simply empty of it.
   no drop-off or hump. The only weed edges anywhere are the private ones a user reports themselves
   (see [Weed reports](#weed-reports)); none is derived, and none appears on a spot, a card or a
   water body.
-- **Quiet water** spots (a ranking of reaches, not a located structure). The kind and its
-  chip exist in `labels` so the filter row can be designed now; no spot has that kind.
+- **Quiet water outside the ingest areas.** It is built only for the areas the weekly ingest
+  covers; elsewhere "few records" would mean "nothing collected".
+- **Month or season claims** on "recorded more often here". Not made: too few dated records.
 
 ### New to you
 
@@ -1778,7 +2054,10 @@ build has no public fishing spots. River mouths take their lake from the curatio
 their lakes are named. A full build fills the rest in. Shapes do not change.
 
 No fish records have been ingested into the database the fixture was taken from, so the
-spot cards in it are honest-empty or show the structure hook. Two entries are the
+spot cards in it are honest-empty or show the structure hook. The exception to "no records" is
+the card with a "recorded more often here" line: its note says it was captured from a throwaway
+copy that also holds the real iNaturalist and GBIF records of the main project database, and the
+counts in it are those records'. Quiet water was built from the real score cache. Two entries are the
 exception, and their `note` says so: the card with fish records and the protected-species
 card were captured from a throwaway copy of the database with **example** records added
 (four common fish, one of them a survey record, and one Redside Dace marked Endangered).
@@ -1794,7 +2073,11 @@ produces the same payload.
   and caches, later runs are offline. `make build-anchors` and `make build-stretches`
   run it at the end, and print what was dropped, held back at tier 3, or given a
   generic title because the source had no name.
-- `uv run python scripts/export_spots_fixture.py [db]` recaptures the fixture from a database.
+- `make compute-untapped` writes the score cache quiet water is built from; run it before
+  `make build-spots`, and again when the ingested observations change.
+- `uv run python scripts/export_spots_fixture.py [db [records-db]]` recaptures the fixture from a
+  database. The optional second database lends its iNaturalist and GBIF records to a throwaway copy
+  so the "recorded more often here" card can be captured; without it that entry is skipped.
 - `uv run python scripts/export_weed_reports_fixture.py` recaptures the weed-report fixture. It builds a
   throwaway database from the water bodies in the spots fixture and never touches the real one.
 - Water bodies are rebuilt with the spots, in the same transaction, from the curated river

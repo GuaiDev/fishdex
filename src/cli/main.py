@@ -1620,6 +1620,13 @@ def _print_spot_report(report) -> None:
         table.add_row(f"[dim]not kept: {reason}[/dim]", f"[dim]{n}[/dim]")
     for reason, n in sorted(report.title_fallbacks.items()):
         table.add_row(f"[yellow]generic title: {reason}[/yellow]", f"[yellow]{n}[/yellow]")
+    table.add_row("quiet water: areas read", str(report.quiet_water_areas))
+    table.add_row("quiet water: reaches ranked", str(report.quiet_water_candidates))
+    if report.quiet_water_cache_missing:
+        table.add_row(
+            "[yellow]quiet water: no score cache, none built[/yellow]",
+            "[yellow]run `make compute-untapped`[/yellow]",
+        )
     table.add_row("getting-there anchors", str(report.access_anchors))
     table.add_row("spots with no access nearby", str(report.spots_without_access))
     table.add_row("water bodies", str(report.water_bodies_total))

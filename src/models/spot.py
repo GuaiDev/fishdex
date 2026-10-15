@@ -29,7 +29,7 @@ from src.models.water_body import WaterBody
 SpotKind = Literal["river_mouth", "creek_junction", "below_dam", "quiet_water", "public_fishing"]
 SpotTier = Literal[1, 2, 3]
 # Kinds the classifier builds from stretch anchors. quiet_water comes from the
-# explore() ranking, which is a later phase.
+# explore() ranking instead (services/quiet_water.py).
 ANCHOR_SPOT_KINDS: tuple[SpotKind, ...] = (
     "river_mouth",
     "creek_junction",
@@ -37,7 +37,7 @@ ANCHOR_SPOT_KINDS: tuple[SpotKind, ...] = (
     "public_fishing",
 )
 
-SpotSourceKind = Literal["ohn_topology", "osm", "curation"]
+SpotSourceKind = Literal["ohn_topology", "osm", "curation", "explore_ranking"]
 
 _ID_PATTERN = re.compile(
     r"^(river_mouth|creek_junction|below_dam|quiet_water|public_fishing):n?\d+_n?\d+$"
@@ -48,7 +48,9 @@ class SpotSource(BaseModel):
     """Where a spot's facts came from, so a surveyed fact reads apart from a derived one."""
 
     kind: SpotSourceKind
-    ref: str  # "ogf:123,456" (OHN segments), "way/123" (OSM element), "curation:<stretch id>"
+    # "ogf:123,456" (OHN segments), "way/123" (OSM element), "curation:<stretch id>",
+    # "ogf:123" for the reach an explore() ranking picked
+    ref: str
     anchor_ids: list[str] = Field(default_factory=list)  # extraction rows merged into the spot
     built_at: str
 
@@ -143,6 +145,12 @@ class SpotBuildReport(BaseModel):
     # Spots published at tier 3 (hidden by default) because they failed a gate,
     # by reason. Held back, not dropped: a tier 3 spot is still a row.
     held_back: dict[str, int] = Field(default_factory=dict)
+    # Quiet water, built apart from the anchors: ingest areas read, reaches ranked by
+    # explore(), and the reason the score cache was missing if it was. A missing
+    # cache means no quiet-water spots at all, which is not the same as none found.
+    quiet_water_areas: int = 0
+    quiet_water_candidates: int = 0
+    quiet_water_cache_missing: bool = False
     # Titles built from a fallback because the source had no name: a share that
     # grows run over run means the names are thinning, not the water.
     title_fallbacks: dict[str, int] = Field(default_factory=dict)

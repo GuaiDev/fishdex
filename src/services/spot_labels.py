@@ -258,6 +258,55 @@ UNNAMED_TRIBUTARY = {
 }
 UNNAMED_LARGER_RIVER = "a larger river"
 
+# ── quiet water ───────────────────────────────────────────────────────────────
+# Quiet water is a reach with few public records, found by the explore ranking.
+# Its titles name the water; a reach with no name of its own is titled by the
+# nearest named water, with "near", never by a type word alone.
+QUIET_TITLES = {
+    "named": "A quiet part of {name}",
+    "near": "Quiet water near {name}",
+}
+# The three caveats a quiet-water spot can carry. "records" always applies;
+# exactly one of the access ones applies when access was not measured.
+CAVEAT_KINDS = ("records", "access")
+QUIET_RECORDS_CAVEAT = (
+    "Few public records here can mean few anglers, or just few observers. "
+    "It says nothing about whether fish are there."
+)
+ACCESS_NOT_MEASURED = (
+    "Access not measured here: our road and parking map does not reach this far, "
+    "so there is no access figure for this water."
+)
+ACCESS_COVERAGE_UNKNOWN = (
+    "We cannot say whether access was measured here: the stored access figures "
+    "predate the record of where roads and parking were mapped."
+)
+# `meta.notes` on the spots list, when quiet water was asked for and none is built.
+QUIET_WATER_NOT_BUILT = (
+    "No quiet water is built yet. It needs the explore scores for this area, "
+    "which have not been worked out."
+)
+
+
+def caveats_for(kind: str, signals: dict) -> list[dict]:
+    """The caveats that travel with a spot, as `{kind, text}`; empty for most kinds.
+
+    Quiet water always carries the records caveat (fewer records is not fewer
+    fish). It adds an access caveat unless the access figure behind it was
+    measured: `access_is_measured` False means the reach is outside the mapped
+    footprint, None means the cached scores predate coverage tracking. Those are
+    different facts with different remedies, so they read differently.
+    """
+    if kind != "quiet_water":
+        return []
+    out = [{"kind": "records", "text": QUIET_RECORDS_CAVEAT}]
+    measured = signals.get("access_is_measured")
+    if measured is False:
+        out.append({"kind": "access", "text": ACCESS_NOT_MEASURED})
+    elif measured is None:
+        out.append({"kind": "access", "text": ACCESS_COVERAGE_UNKNOWN})
+    return out
+
 
 def labels_payload() -> dict:
     """The whole vocabulary as JSON: what `GET /map/spots/labels` serves."""
@@ -299,6 +348,15 @@ def labels_payload() -> dict:
         },
         "filters": {"new_to_me": NEW_TO_ME_FILTER},
         "bathymetry_data_note": BATHYMETRY_DATA_NOTE,
+        "quiet_water": {
+            "titles": QUIET_TITLES,
+            "caveats": {
+                "records": QUIET_RECORDS_CAVEAT,
+                "access_not_measured": ACCESS_NOT_MEASURED,
+                "access_coverage_unknown": ACCESS_COVERAGE_UNKNOWN,
+            },
+            "not_built": QUIET_WATER_NOT_BUILT,
+        },
         "layers": LAYERS,
         "access_labels": ACCESS_LABELS,
         # Every map/habitat concept, with plain and technical wording and a
@@ -333,4 +391,11 @@ def all_strings() -> list[str]:
         *NEW_TO_ME_FILTER.values(),
     ]
     out += list(TITLES.values()) + list(UNNAMED_TRIBUTARY.values()) + [UNNAMED_LARGER_RIVER]
+    out += list(QUIET_TITLES.values())
+    out += [
+        QUIET_RECORDS_CAVEAT,
+        ACCESS_NOT_MEASURED,
+        ACCESS_COVERAGE_UNKNOWN,
+        QUIET_WATER_NOT_BUILT,
+    ]
     return out

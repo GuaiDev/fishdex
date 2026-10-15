@@ -199,6 +199,18 @@
           }
         },
         "bathymetry_data_note": "Depth is measured at the survey's own water level, not today's. The source does not state the unit; metres is taken from the values.",
+        "quiet_water": {
+          "titles": {
+            "named": "A quiet part of {name}",
+            "near": "Quiet water near {name}"
+          },
+          "caveats": {
+            "records": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there.",
+            "access_not_measured": "Access not measured here: our road and parking map does not reach this far, so there is no access figure for this water.",
+            "access_coverage_unknown": "We cannot say whether access was measured here: the stored access figures predate the record of where roads and parking were mapped."
+          },
+          "not_built": "No quiet water is built yet. It needs the explore scores for this area, which have not been worked out."
+        },
         "layers": {
           "getting_there": {
             "label": "Getting there",
@@ -540,7 +552,7 @@
             "creek_junction": 352,
             "below_dam": 9,
             "public_fishing": 0,
-            "quiet_water": 0
+            "quiet_water": 36
           },
           "max_tier": 3
         },
@@ -793,6 +805,444 @@
       }
     },
     {
+      "request": "GET /map/spots?kind=quiet_water",
+      "note": "quiet water: reaches with few public records, each with its caveats. Needs the explore score cache; without it the list is empty and meta.notes says so",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "count": 10,
+          "kind_counts": {
+            "river_mouth": 31,
+            "creek_junction": 230,
+            "below_dam": 9,
+            "public_fishing": 0,
+            "quiet_water": 10
+          },
+          "max_tier": 2
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7933778_4317874",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.33778303982308,
+                43.17874158743132
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7933778_4317874",
+              "kind": "quiet_water",
+              "title": "A quiet part of Eighteen Mile Creek",
+              "subtitle": null,
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": "Eighteen Mile Creek",
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": false,
+                "named": true
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                },
+                {
+                  "kind": "access",
+                  "text": "Access not measured here: our road and parking map does not reach this far, so there is no access figure for this water."
+                }
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7980408_4305110",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.80408383420811,
+                43.05110304983229
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7980408_4305110",
+              "kind": "quiet_water",
+              "title": "A quiet part of Elsie Creek",
+              "subtitle": null,
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": "Elsie Creek",
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": true,
+                "named": true
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                }
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7981418_4369914",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.81418475372824,
+                43.699144470545626
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7981418_4369914",
+              "kind": "quiet_water",
+              "title": "Quiet water near Etobicoke Creek",
+              "subtitle": null,
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": null,
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": true,
+                "named": false
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                }
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7982929_4372092",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.82928658148556,
+                43.72092369119007
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7982929_4372092",
+              "kind": "quiet_water",
+              "title": "Quiet water near Etobicoke Creek",
+              "subtitle": null,
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": null,
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": true,
+                "named": false
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                }
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7990244_4363863",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.90243900497593,
+                43.63862729343676
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7990244_4363863",
+              "kind": "quiet_water",
+              "title": "Quiet water near Black Creek",
+              "subtitle": null,
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": null,
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": true,
+                "named": false
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                }
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7991348_4366375",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.91348221180921,
+                43.663749478118945
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7991348_4366375",
+              "kind": "quiet_water",
+              "title": "Quiet water near Black Creek",
+              "subtitle": null,
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": null,
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": true,
+                "named": false
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                }
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7991812_4382007",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.91812217112259,
+                43.820074250014144
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7991812_4382007",
+              "kind": "quiet_water",
+              "title": "A quiet part of Little Credit River",
+              "subtitle": null,
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": "Little Credit River",
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": true,
+                "named": true
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                }
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7993678_4281467",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.93677910315668,
+                42.814673086567815
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7993678_4281467",
+              "kind": "quiet_water",
+              "title": "Quiet water near Spring Creek",
+              "subtitle": null,
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": null,
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": false,
+                "named": false
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                },
+                {
+                  "kind": "access",
+                  "text": "Access not measured here: our road and parking map does not reach this far, so there is no access figure for this water."
+                }
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7994277_4362404",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.94277037345668,
+                43.6240412135569
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7994277_4362404",
+              "kind": "quiet_water",
+              "title": "A quiet part of Black Creek",
+              "subtitle": null,
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": "Black Creek",
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": true,
+                "named": true
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                }
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "quiet_water:n8097374_4307765",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.97373937041726,
+                43.077647192273446
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n8097374_4307765",
+              "kind": "quiet_water",
+              "title": "Quiet water near Middle Thames River",
+              "subtitle": null,
+              "tier": 2,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": null,
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": false,
+                "named": false
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                },
+                {
+                  "kind": "access",
+                  "text": "Access not measured here: our road and parking map does not reach this far, so there is no access figure for this water."
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/spots?kind=quiet_water&tier=3&near=43.47,-79.69,15",
+      "note": "quiet water at every tier within 15 km of home, nearest first",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "count": 2,
+          "kind_counts": {
+            "river_mouth": 31,
+            "creek_junction": 352,
+            "below_dam": 9,
+            "public_fishing": 0,
+            "quiet_water": 36
+          },
+          "max_tier": 3
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7969901_4356771",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.69901356888793,
+                43.5677070498819
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7969901_4356771",
+              "kind": "quiet_water",
+              "title": "A quiet part of Mullet Creek",
+              "subtitle": null,
+              "tier": 3,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": "Mullet Creek",
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": true,
+                "named": true
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                }
+              ]
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "quiet_water:n7962777_4359642",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -79.62777060687466,
+                43.596423813725615
+              ]
+            },
+            "properties": {
+              "spot_id": "quiet_water:n7962777_4359642",
+              "kind": "quiet_water",
+              "title": "A quiet part of Cooksville Creek",
+              "subtitle": null,
+              "tier": 3,
+              "jurisdiction": "CA-ON",
+              "water_id": null,
+              "water_name": "Cooksville Creek",
+              "water_body_id": null,
+              "signals": {
+                "access_is_measured": true,
+                "named": true
+              },
+              "caveats": [
+                {
+                  "kind": "records",
+                  "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "request": "GET /map/spots/below_dam:n8038314_4319587",
       "note": "one below_dam spot in full, with its card",
       "status": 200,
@@ -919,7 +1369,8 @@
             "empty_text": "We hold no fish records for this area yet.",
             "note": null,
             "radius_km": 2.0,
-            "default_open": true
+            "default_open": true,
+            "special_here": null
           },
           "why_gather": {
             "title": "Why fish gather here",
@@ -974,6 +1425,7 @@
             "default_open": false
           },
           "new_to_you": null,
+          "caveats": [],
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -981,6 +1433,7 @@
             "species_withheld_protected": 0,
             "species_withheld_imprecise": 0,
             "species_status_unchecked": 0,
+            "special_here": "too_few_records_here",
             "cache_key": "below_dam:n8038314_4319587@2026-10-12T21:43:44+00:00"
           }
         }
@@ -1143,7 +1596,8 @@
             "empty_text": "We hold no fish records for this area yet.",
             "note": null,
             "radius_km": 2.0,
-            "default_open": true
+            "default_open": true,
+            "special_here": null
           },
           "why_gather": {
             "title": "Why fish gather here",
@@ -1202,6 +1656,7 @@
             "default_open": false
           },
           "new_to_you": null,
+          "caveats": [],
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -1209,6 +1664,7 @@
             "species_withheld_protected": 0,
             "species_withheld_imprecise": 0,
             "species_status_unchecked": 0,
+            "special_here": "too_few_records_here",
             "cache_key": "creek_junction:n8038226_4319286@2026-10-12T21:43:44+00:00"
           }
         }
@@ -1315,7 +1771,8 @@
             "empty_text": "We hold no fish records for this area yet.",
             "note": null,
             "radius_km": 2.0,
-            "default_open": true
+            "default_open": true,
+            "special_here": null
           },
           "why_gather": {
             "title": "Why fish gather here",
@@ -1352,6 +1809,7 @@
             "default_open": false
           },
           "new_to_you": null,
+          "caveats": [],
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -1359,7 +1817,119 @@
             "species_withheld_protected": 0,
             "species_withheld_imprecise": 0,
             "species_status_unchecked": 0,
+            "special_here": "too_few_records_here",
             "cache_key": "river_mouth:n7957731_4354567@2026-10-12T21:43:44+00:00"
+          }
+        }
+      }
+    },
+    {
+      "request": "GET /map/spots/quiet_water:n7933778_4317874",
+      "note": "one quiet_water spot in full, with its card",
+      "status": 200,
+      "response": {
+        "spot_id": "quiet_water:n7933778_4317874",
+        "kind": "quiet_water",
+        "jurisdiction": "CA-ON",
+        "lat": 43.17874158743132,
+        "lng": -79.33778303982308,
+        "water_id": null,
+        "water_name": "Eighteen Mile Creek",
+        "water_body_id": null,
+        "also_on_water_body_ids": [],
+        "title": "A quiet part of Eighteen Mile Creek",
+        "subtitle": null,
+        "tier": 2,
+        "structure_type": "quiet_reach",
+        "structure_attrs": {
+          "area": "Grand River Dunnville",
+          "named": true,
+          "ogf_id": 127939961,
+          "stream_order": 3
+        },
+        "signals": {
+          "access_is_measured": false,
+          "named": true
+        },
+        "getting_there": [],
+        "bridges": [],
+        "sources": [
+          {
+            "kind": "explore_ranking",
+            "ref": "ogf:127939961",
+            "anchor_ids": [],
+            "built_at": "2026-10-14T04:26:26+00:00"
+          }
+        ],
+        "built_at": "2026-10-14T04:26:26+00:00",
+        "water_body": null,
+        "also_on_water_bodies": [],
+        "more_on_this_water": [],
+        "card": {
+          "spot_id": "quiet_water:n7933778_4317874",
+          "hook": {
+            "title": "Why it's interesting",
+            "kind": "honest_empty",
+            "text": "No fish records within 2 km, so this is a place to find out."
+          },
+          "might_find": {
+            "title": "You might find",
+            "species": [],
+            "more_text": null,
+            "caveat": "Recorded nearby, not a catch guarantee.",
+            "empty_text": "We hold no fish records for this area yet.",
+            "note": null,
+            "radius_km": 2.0,
+            "default_open": true,
+            "special_here": null
+          },
+          "why_gather": {
+            "title": "Why fish gather here",
+            "what_it_is": "Reaches with few public observation records, which may mean few anglers or just few observers.",
+            "general": {
+              "text": "These reaches have few public observation records. That can mean fewer anglers, few observers or hard access, and it never tells you whether fish are there.",
+              "label": "General reasoning, not a record about this spot",
+              "provenance": "inference"
+            },
+            "facts_title": "What our records say about this spot",
+            "facts": [],
+            "default_open": false
+          },
+          "getting_there": {
+            "title": "Getting there",
+            "items": [],
+            "empty_text": "No parking, trailhead or boat launch found within 1.5 km in our map data.",
+            "crown_land": {
+              "state": "not_checked",
+              "text": "We have no Crown land data for this area.",
+              "source": null
+            },
+            "unverified_title": "Not checked on the ground",
+            "unverified": [
+              "Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.",
+              "Fishing rules and permission to cross private land are not checked here."
+            ],
+            "default_open": false
+          },
+          "caveats": [
+            {
+              "kind": "records",
+              "text": "Few public records here can mean few anglers, or just few observers. It says nothing about whether fish are there."
+            },
+            {
+              "kind": "access",
+              "text": "Access not measured here: our road and parking map does not reach this far, so there is no access figure for this water."
+            }
+          ],
+          "terms": [],
+          "meta": {
+            "records_radius_km": 2.0,
+            "species_shown": 0,
+            "species_withheld_protected": 0,
+            "species_withheld_imprecise": 0,
+            "species_status_unchecked": 0,
+            "special_here": "not_applicable",
+            "cache_key": "quiet_water:n7933778_4317874@2026-10-14T04:26:26+00:00"
           }
         }
       }
@@ -1451,7 +2021,8 @@
             "empty_text": "We hold no fish records for this area yet.",
             "note": null,
             "radius_km": 2.0,
-            "default_open": true
+            "default_open": true,
+            "special_here": null
           },
           "why_gather": {
             "title": "Why fish gather here",
@@ -1482,6 +2053,7 @@
             "default_open": false
           },
           "new_to_you": null,
+          "caveats": [],
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -1489,6 +2061,7 @@
             "species_withheld_protected": 0,
             "species_withheld_imprecise": 0,
             "species_status_unchecked": 0,
+            "special_here": "too_few_records_here",
             "cache_key": "creek_junction:n7742945_4424383@2026-10-12T21:43:44+00:00"
           }
         }
@@ -1658,7 +2231,8 @@
             "empty_text": null,
             "note": null,
             "radius_km": 2.0,
-            "default_open": true
+            "default_open": true,
+            "special_here": null
           },
           "why_gather": {
             "title": "Why fish gather here",
@@ -1762,6 +2336,7 @@
             "note": "Based on the catches you have confirmed. Only you see this.",
             "default_open": false
           },
+          "caveats": [],
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -1769,6 +2344,7 @@
             "species_withheld_protected": 0,
             "species_withheld_imprecise": 0,
             "species_status_unchecked": 4,
+            "special_here": "too_few_records_here",
             "cache_key": "below_dam:n8038314_4319587@2026-10-12T21:43:44+00:00"
           }
         }
@@ -2251,7 +2827,8 @@
             "empty_text": null,
             "note": "Protected species recorded nearby are not listed.",
             "radius_km": 2.0,
-            "default_open": true
+            "default_open": true,
+            "special_here": null
           },
           "why_gather": {
             "title": "Why fish gather here",
@@ -2319,6 +2896,7 @@
             "note": "Based on the catches you have confirmed. Only you see this.",
             "default_open": false
           },
+          "caveats": [],
           "terms": [],
           "meta": {
             "records_radius_km": 2.0,
@@ -2326,7 +2904,310 @@
             "species_withheld_protected": 1,
             "species_withheld_imprecise": 0,
             "species_status_unchecked": 4,
+            "special_here": "too_few_records_here",
             "cache_key": "creek_junction:n7966741_4355566@2026-10-12T21:43:44+00:00"
+          }
+        }
+      }
+    },
+    {
+      "request": "GET /map/spots/creek_junction:n7828679_4437395",
+      "note": "card with a recorded-more-often-here line. Captured from a throwaway copy of the database that also holds the real iNaturalist and GBIF records ingested in the main project database; the counts in the line are those records'",
+      "status": 200,
+      "response": {
+        "spot_id": "creek_junction:n7828679_4437395",
+        "kind": "creek_junction",
+        "jurisdiction": "CA-ON",
+        "lat": 44.37395,
+        "lng": -78.28679,
+        "water_id": "otonabee-lakefield-rice-lake",
+        "water_name": "Otonabee River — Lakefield to Rice Lake",
+        "water_body_id": "river:otonabee-river",
+        "also_on_water_body_ids": [],
+        "title": "Where a small creek joins the Otonabee River",
+        "subtitle": "Otonabee River — Lakefield to Rice Lake",
+        "tier": 3,
+        "structure_type": "confluence",
+        "structure_attrs": {
+          "joining_ogf_ids": [
+            124222797
+          ],
+          "joining_upstream_km": 11.0,
+          "stretch_flows_on": true,
+          "stretch_upstream_km": 12560.8
+        },
+        "signals": {
+          "named": false,
+          "size_class": "small"
+        },
+        "getting_there": [],
+        "bridges": [],
+        "sources": [
+          {
+            "kind": "ohn_topology",
+            "ref": "ogf:124222425,124222797,124223490",
+            "anchor_ids": [
+              "otonabee-lakefield-rice-lake:confluence:n7828679_4437395"
+            ],
+            "built_at": "2026-10-12T21:43:44+00:00"
+          }
+        ],
+        "built_at": "2026-10-12T21:43:44+00:00",
+        "water_body": {
+          "water_body_id": "river:otonabee-river",
+          "name": "Otonabee River",
+          "display_name": "Otonabee River",
+          "name_source": "curated",
+          "type": "river"
+        },
+        "also_on_water_bodies": [],
+        "more_on_this_water": [
+          {
+            "spot_id": "river_mouth:n7824095_4419156",
+            "kind": "river_mouth",
+            "title": "Where the Otonabee River meets Rice Lake",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n7826346_4440242",
+            "kind": "creek_junction",
+            "title": "Where Sawers Creek joins the Otonabee River",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n7830687_4429084",
+            "kind": "creek_junction",
+            "title": "Where Meade Creek joins the Otonabee River",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n7832600_4418537",
+            "kind": "creek_junction",
+            "title": "Where Squirrel Creek joins the Otonabee River",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n7834658_4419678",
+            "kind": "creek_junction",
+            "title": "Where Baxter Creek joins the Otonabee River",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n7835093_4421971",
+            "kind": "creek_junction",
+            "title": "Where Cavan Creek joins the Otonabee River",
+            "tier": 1
+          },
+          {
+            "spot_id": "creek_junction:n7828572_4420842",
+            "kind": "creek_junction",
+            "title": "Where a creek joins the Otonabee River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n7829174_4436443",
+            "kind": "creek_junction",
+            "title": "Where the Otonabee River joins the Otonabee River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n7830472_4419964",
+            "kind": "creek_junction",
+            "title": "Where a creek joins the Otonabee River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n7830551_4429705",
+            "kind": "creek_junction",
+            "title": "Where Whitlaw Creek joins the Otonabee River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n7834148_4419167",
+            "kind": "creek_junction",
+            "title": "Where Lepers Creek joins the Otonabee River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n7834572_4422733",
+            "kind": "creek_junction",
+            "title": "Where a creek joins the Otonabee River",
+            "tier": 2
+          },
+          {
+            "spot_id": "creek_junction:n7824098_4419233",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Otonabee River",
+            "tier": 3
+          },
+          {
+            "spot_id": "creek_junction:n7832371_4427216",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Otonabee River",
+            "tier": 3
+          },
+          {
+            "spot_id": "creek_junction:n7833759_4424392",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Otonabee River",
+            "tier": 3
+          },
+          {
+            "spot_id": "creek_junction:n7834313_4423505",
+            "kind": "creek_junction",
+            "title": "Where a small creek joins the Otonabee River",
+            "tier": 3
+          }
+        ],
+        "card": {
+          "spot_id": "creek_junction:n7828679_4437395",
+          "hook": {
+            "title": "Why it's interesting",
+            "kind": "distinctive",
+            "text": "Yellow Perch and 2 more are recorded more often here than along the rest of the Otonabee River."
+          },
+          "might_find": {
+            "title": "You might find",
+            "species": [
+              {
+                "name": "Longnose Dace",
+                "scientific_name": "Rhinichthys cataractae",
+                "source": "iNaturalist",
+                "date": "2026-09-24",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2026-09-24",
+                "note": null
+              },
+              {
+                "name": "Rock Bass",
+                "scientific_name": "Ambloplites rupestris",
+                "source": "iNaturalist",
+                "date": "2026-09-16",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2026-09-16",
+                "note": null
+              },
+              {
+                "name": "Walleye",
+                "scientific_name": "Sander vitreus",
+                "source": "iNaturalist",
+                "date": "2026-09-16",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2026-09-16",
+                "note": null
+              },
+              {
+                "name": "Yellow Perch",
+                "scientific_name": "Perca flavescens",
+                "source": "iNaturalist",
+                "date": "2026-09-15",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2026-09-15",
+                "note": null
+              },
+              {
+                "name": "Pumpkinseed",
+                "scientific_name": "Lepomis gibbosus",
+                "source": "iNaturalist",
+                "date": "2026-09-15",
+                "evidence": "sighting",
+                "cite": "iNaturalist, 2026-09-15",
+                "note": null
+              }
+            ],
+            "more_text": "and 14 more species recorded nearby",
+            "caveat": "Recorded nearby, not a catch guarantee.",
+            "empty_text": null,
+            "note": null,
+            "radius_km": 2.0,
+            "default_open": true,
+            "special_here": {
+              "title": "Recorded more often here",
+              "label": "Recorded more often here than along the rest of the Otonabee River",
+              "species": [
+                {
+                  "name": "Yellow Perch",
+                  "scientific_name": "Perca flavescens",
+                  "text": "19 of 108 records here (18%), against 3% along the rest of the Otonabee River",
+                  "here_records": 19,
+                  "here_total": 108,
+                  "elsewhere_records": 2,
+                  "elsewhere_total": 68
+                },
+                {
+                  "name": "White Sucker",
+                  "scientific_name": "Catostomus commersonii",
+                  "text": "7 of 108 records here (6%), against 1% along the rest of the Otonabee River",
+                  "here_records": 7,
+                  "here_total": 108,
+                  "elsewhere_records": 1,
+                  "elsewhere_total": 68
+                },
+                {
+                  "name": "Bluegill",
+                  "scientific_name": "Lepomis macrochirus",
+                  "text": "7 of 108 records here (6%), against 1% along the rest of the Otonabee River",
+                  "here_records": 7,
+                  "here_total": 108,
+                  "elsewhere_records": 1,
+                  "elsewhere_total": 68
+                }
+              ],
+              "evidence": "sighting",
+              "basis_text": "Counted from photo and sighting records only, one for each fish per person per day.",
+              "caveat": "This compares how often each fish was recorded. Records follow where people look as well as where fish are, so it does not mean the fish are found only here.",
+              "radius_km": 2.0
+            }
+          },
+          "why_gather": {
+            "title": "Why fish gather here",
+            "what_it_is": "Two streams meeting. Different temperature, speed and food mix at the join.",
+            "general": {
+              "text": "Two flows mixing makes a seam between fast and slow water, which fish use for shelter with food drifting past. A creek that runs cooler than the river can also give fish a place to ease out of warm water.",
+              "label": "General reasoning, not a record about this spot",
+              "provenance": "inference"
+            },
+            "facts_title": "What our records say about this spot",
+            "facts": [
+              {
+                "text": "The smaller stream has about 11 km of channel upstream of this point; the larger has about 12561 km.",
+                "provenance": "record",
+                "source": "Ontario Hydro Network"
+              },
+              {
+                "text": "124 fish records within 2 km, covering 19 species.",
+                "provenance": "record",
+                "source": "iNaturalist"
+              }
+            ],
+            "default_open": false
+          },
+          "getting_there": {
+            "title": "Getting there",
+            "items": [],
+            "empty_text": "No parking, trailhead or boat launch found within 1.5 km in our map data.",
+            "crown_land": {
+              "state": "not_checked",
+              "text": "We have no Crown land data for this area.",
+              "source": null
+            },
+            "unverified_title": "Not checked on the ground",
+            "unverified": [
+              "Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.",
+              "Fishing rules and permission to cross private land are not checked here."
+            ],
+            "default_open": false
+          },
+          "caveats": [],
+          "terms": [],
+          "meta": {
+            "records_radius_km": 2.0,
+            "species_shown": 19,
+            "species_withheld_protected": 0,
+            "species_withheld_imprecise": 0,
+            "species_status_unchecked": 19,
+            "special_here": "found",
+            "cache_key": "creek_junction:n7828679_4437395@2026-10-12T21:43:44+00:00"
           }
         }
       }
@@ -3115,7 +3996,7 @@
     },
     {
       "request": "GET /map/water-bodies?type=great_lake,lake",
-      "note": "type filter: lakes have geometry null (no outline on file) and a box from their mouths",
+      "note": "type filter: the lakes, with their geometry when an outline was matched and a box",
       "status": 200,
       "response": {
         "type": "FeatureCollection",
@@ -4089,6 +4970,205 @@
               "spot_counts": {
                 "creek_junction": 3,
                 "river_mouth": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/layers/getting-there?bbox=-80.40,43.17,-80.30,43.25",
+      "note": "getting there features in box",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.3815019,
+                43.196501
+              ]
+            },
+            "properties": {
+              "kind": "parking",
+              "name": null,
+              "attributes": {}
+            }
+          },
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.3843379,
+                43.1936867
+              ]
+            },
+            "properties": {
+              "kind": "parking",
+              "name": null,
+              "attributes": {
+                "access": "yes",
+                "fee": "no",
+                "surface": "asphalt"
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.3839275,
+                43.1930835
+              ]
+            },
+            "properties": {
+              "kind": "parking",
+              "name": null,
+              "attributes": {
+                "access": "yes",
+                "fee": "no",
+                "surface": "asphalt"
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.3837112,
+                43.1921315
+              ]
+            },
+            "properties": {
+              "kind": "parking",
+              "name": null,
+              "attributes": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/layers/bridges?bbox=-80.40,43.17,-80.30,43.25",
+      "note": "bridges features in box",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.383334,
+                43.194342
+              ]
+            },
+            "properties": {
+              "kind": "road_crossing",
+              "name": "William Street",
+              "attributes": {
+                "ref": "CR 50"
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.374248,
+                43.189487
+              ]
+            },
+            "properties": {
+              "kind": "road_crossing",
+              "name": "Dundas Street",
+              "attributes": {
+                "ref": "CH 2",
+                "surface": "asphalt"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/spots?near=43.20,-80.35&bbox=-80.40,43.17,-80.30,43.25",
+      "note": "near filter example",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "meta": {
+          "count": 2,
+          "kind_counts": {
+            "river_mouth": 0,
+            "creek_junction": 1,
+            "below_dam": 1,
+            "public_fishing": 0,
+            "quiet_water": 0
+          },
+          "max_tier": 2
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "below_dam:n8038314_4319587",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.38314,
+                43.195868
+              ]
+            },
+            "properties": {
+              "spot_id": "below_dam:n8038314_4319587",
+              "kind": "below_dam",
+              "title": "Below the Paris Dam",
+              "subtitle": "Grand River · Cambridge to Paris",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "grand-cambridge-paris",
+              "water_name": "Cambridge to Paris",
+              "water_body_id": "river:grand-river",
+              "signals": {
+                "named": true,
+                "nearest_bridge_m": 171,
+                "nearest_parking_m": 150
+              }
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "creek_junction:n8038226_4319286",
+            "geometry": {
+              "type": "Point",
+              "coordinates": [
+                -80.38226,
+                43.19286
+              ]
+            },
+            "properties": {
+              "spot_id": "creek_junction:n8038226_4319286",
+              "kind": "creek_junction",
+              "title": "Where the Nith River joins the Grand River",
+              "subtitle": "Grand River · Cambridge to Paris",
+              "tier": 1,
+              "jurisdiction": "CA-ON",
+              "water_id": "grand-cambridge-paris",
+              "water_name": "Cambridge to Paris",
+              "water_body_id": "river:grand-river",
+              "signals": {
+                "named": true,
+                "nearest_bridge_m": 187,
+                "nearest_parking_m": 138,
+                "size_class": "large"
               }
             }
           }
@@ -5193,8 +6273,23 @@
       }
     },
     {
+      "request": "GET /map/water-bodies/river:credit-river/features",
+      "note": "a lake's shoreline features: inlets, outlets, islands, points, peninsulas",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "water_body_id": "river:credit-river",
+        "water_body_name": "Credit River",
+        "meta": {
+          "count": 0,
+          "by_kind": {}
+        },
+        "features": []
+      }
+    },
+    {
       "request": "GET /map/water-bodies/great_lake:lake-ontario",
-      "note": "a lake: no geometry, with the river mouths that open onto it",
+      "note": "a lake: its outline, its shoreline features, the mouths onto it",
       "status": 200,
       "response": {
         "water_body_id": "great_lake:lake-ontario",
@@ -5639,6 +6734,21 @@
       }
     },
     {
+      "request": "GET /map/water-bodies/creek:bronte-creek/features",
+      "note": "a lake's shoreline features: inlets, outlets, islands, points, peninsulas",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "water_body_id": "creek:bronte-creek",
+        "water_body_name": "Bronte Creek",
+        "meta": {
+          "count": 0,
+          "by_kind": {}
+        },
+        "features": []
+      }
+    },
+    {
       "request": "GET /map/spots?kind=lake",
       "note": "an unknown kind is a 422",
       "status": 422,
@@ -5664,6 +6774,14 @@
     },
     {
       "request": "GET /map/water-bodies/river:no-such-river",
+      "note": "an unknown water body id is a 404",
+      "status": 404,
+      "response": {
+        "detail": "No water body with id 'river:no-such-river'"
+      }
+    },
+    {
+      "request": "GET /map/water-bodies/river:no-such-river/features",
       "note": "an unknown water body id is a 404",
       "status": 404,
       "response": {

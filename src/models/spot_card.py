@@ -12,8 +12,9 @@ card and joins nothing: not the records, not the labels, not the access data.
 The card is the same for everyone except two per-user things, both empty unless
 the caller is a logged-in user: the "new to you" hook and the `new_to_you` block
 that names those species. They are computed per request from that user's own
-confirmed catches and are never stored or cached. The "special here" hook is a
-later phase and has no field yet.
+confirmed catches and are never stored or cached. The "recorded more often here"
+line (`special_here`) is not per-user: it compares records and is the same for
+everyone.
 
 Records and reasoning never share a field. Anything that came from a record
 carries `provenance="record"` and its source; the general explanation carries
@@ -62,6 +63,36 @@ class CardSpecies(BaseModel):
     note: str | None = None  # "Older record" when the date is a decade or more back
 
 
+class SpecialHereSpeciesLine(BaseModel):
+    """One species recorded more often at this spot than along the rest of its river."""
+
+    name: str  # common name when we have one
+    scientific_name: str | None = None
+    text: str  # "14 of 40 records here (35%), against 8% along the rest of the Grand River"
+    here_records: int
+    here_total: int
+    elsewhere_records: int
+    elsewhere_total: int
+
+
+class SpecialHereBlock(BaseModel):
+    """The "recorded more often here" lines, with what they were counted from.
+
+    Present only when both sides have enough records and at least one species
+    stands out; otherwise the card says nothing rather than something weak.
+    """
+
+    title: str
+    label: str  # "Recorded more often here than along the rest of the Grand River"
+    species: list[SpecialHereSpeciesLine]
+    # "survey" counts standardised hauls only; "sighting" counts photo and
+    # casual records only. Never both in one share.
+    evidence: Literal["survey", "sighting"]
+    basis_text: str  # "Counted from fish surveys only."
+    caveat: str  # records follow observers as well as fish; not "lives here"
+    radius_km: float
+
+
 class MightFindBlock(BaseModel):
     title: str
     species: list[CardSpecies] = Field(default_factory=list)
@@ -71,6 +102,8 @@ class MightFindBlock(BaseModel):
     note: str | None = None  # why some recorded species are not shown
     radius_km: float
     default_open: bool = True
+    # Species recorded clearly more often here than along the rest of the river.
+    special_here: SpecialHereBlock | None = None
 
 
 class CardFact(BaseModel):
@@ -132,6 +165,17 @@ class GettingThereBlock(BaseModel):
     default_open: bool = False
 
 
+class CardCaveat(BaseModel):
+    """A plain-words limit on what the spot's card means.
+
+    Quiet water carries two: fewer records is not fewer fish ("records"), and
+    the access figure behind it was not measured everywhere ("access").
+    """
+
+    kind: Literal["records", "access"]
+    text: str
+
+
 class GlossaryTerm(BaseModel):
     """A hard word on the card and its definition, from `services/terms.py`."""
 
@@ -149,6 +193,9 @@ class CardMeta(BaseModel):
     species_withheld_protected: int = 0  # a count only; never names
     species_withheld_imprecise: int = 0  # records whose location is fuzzed ~22 km
     species_status_unchecked: int = 0  # not in the local species file
+    # Why there is, or is not, a "recorded more often here" line: a SpecialHereStatus
+    # or "not_applicable". "none_stands_out" is a result; "too_few_records_here" is not.
+    special_here: str = "not_applicable"
     cache_key: str  # "{spot_id}@{built_at}"; keys the shared part of the card only
 
 
@@ -159,5 +206,6 @@ class SpotCard(BaseModel):
     why_gather: WhyGatherBlock
     getting_there: GettingThereBlock
     new_to_you: NewToYouBlock | None = None  # only for a logged-in user with something new
+    caveats: list[CardCaveat] = Field(default_factory=list)
     terms: list[GlossaryTerm] = Field(default_factory=list)
     meta: CardMeta
