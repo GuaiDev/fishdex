@@ -18,9 +18,12 @@ yet: it is in the registry so literacy can be tracked against it the day a
 layer arrives.
 
 This replaced `translate.GLOSSARY`, which held three of these definitions as
-bare strings with no id. The definition text for weir, confluence and
-tailwater is unchanged apart from the one word "stretch" in tailwater's, so spot
-cards say what they said before.
+bare strings with no id.
+
+The ids `confluence` and `tailwater` are kept, because literacy evidence is
+stored against them, but neither word is ever shown: not as plain wording, not
+as the "technical" name, not in the definition. The technical names are "Stream
+junction" and "Below the dam".
 """
 
 from typing import TypedDict
@@ -45,8 +48,8 @@ TERMS: dict[str, Term] = {
         Term(
             term_id="confluence",
             plain="Where two streams join",
-            technical="Confluence",
-            definition="A confluence is the place where two streams meet and become one.",
+            technical="Stream junction",
+            definition="A stream junction is the place where two streams meet and become one.",
             mapped_from=_OHN,
         ),
         Term(
@@ -79,8 +82,8 @@ TERMS: dict[str, Term] = {
         Term(
             term_id="tailwater",
             plain="The water just below a dam",
-            technical="Tailwater",
-            definition="A tailwater is the part of a river just downstream of a dam.",
+            technical="Below the dam",
+            definition="The water below a dam is the part of a river just downstream of it.",
             mapped_from=_OSM_DAMS,
         ),
         Term(
@@ -102,9 +105,9 @@ TERMS: dict[str, Term] = {
         ),
         Term(
             term_id="outlet",
-            plain="Where a lake drains out",
+            plain="Where a stream leaves a lake",
             technical="Outlet",
-            definition="An outlet is the place where water leaves a lake as a stream.",
+            definition="An outlet is a place where a stream starts at a lake and flows away.",
             mapped_from=_OHN_OUTLINE,
         ),
         Term(

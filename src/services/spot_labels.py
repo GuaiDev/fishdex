@@ -164,7 +164,7 @@ FEATURE_KINDS: dict[str, dict[str, str]] = {
     "outlet": {
         "label": "Outlet",
         "chip": "Outlets",
-        "one_liner": "The lake drains out here.",
+        "one_liner": "A mapped stream starts at the shore here and flows away.",
     },
     "island": {"label": "Island", "chip": "Islands", "one_liner": "Land inside the water."},
     "point": {"label": "Point", "chip": "Points", "one_liner": "A point of land reaches out."},

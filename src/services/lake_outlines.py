@@ -8,11 +8,12 @@ Ontario)"). The rules, in order:
 1. **By name, near a mouth.** If a lake-type polygon near one of the lake's
    curated river mouths carries the curated name (bracket stripped), it is the
    match. This is how a lake is picked when its name is on the record.
-2. **Largest lake-type polygon within tolerance.** Otherwise the largest
-   lake-type polygon near a mouth is the parent water — the way a bay whose own
-   name nobody mapped (Humber Bay, Long Point Bay, Owen Sound) lands on the lake
-   it opens off. A small pond mapped at the mouth never wins over the lake.
-3. **No match.** The outline stays empty rather than guessed.
+2. **No outline of its own.** If no nearby lake-type polygon carries the curated
+   name, the lake has no outline here. A bay whose own name nobody mapped (Humber
+   Bay, Long Point Bay, Owen Sound) used to take the largest lake polygon near
+   its mouths, which is the lake it opens off: Humber Bay was drawn as all of
+   Lake Ontario. It now draws no shape and is labelled only. The largest nearby
+   water is named in the note, so the build report can say why.
 
 For the Great Lakes and Georgian Bay only, the match is then widened to every
 same-named lake polygon and unioned: their shore is sliced into several polygons
@@ -33,7 +34,7 @@ from shapely.geometry import MultiPolygon, Point, mapping, shape
 from shapely.ops import unary_union
 
 from src.ingest.jurisdictions.ca_on.waterbody import OhnWaterbody
-from src.models.lake_outline import MATCH_LARGEST, MATCH_NAME, MATCH_NONE, LakeOutline
+from src.models.lake_outline import MATCH_NAME, MATCH_NONE, LakeOutline
 from src.services.geometry_utils import M_PER_DEG, polygons_of
 from src.services.water_bodies import GREAT_LAKES
 
@@ -70,15 +71,22 @@ def match_lake_outline(
         )
 
     named = [c for c in lake_candidates if c.name == curated_name]
-    if named:
-        anchor = max(named, key=lambda c: c.area_m2 or 0.0)
-        basis = MATCH_NAME
-    else:
-        anchor = max(lake_candidates, key=lambda c: c.area_m2 or 0.0)
-        basis = MATCH_LARGEST
+    if not named:
+        parent = max(lake_candidates, key=lambda c: c.area_m2 or 0.0)
+        return LakeOutline(
+            curated_name=curated_name,
+            matched=False,
+            match_basis=MATCH_NONE,
+            note=(
+                f"no OHN polygon near a mouth is named {curated_name!r}; the largest nearby "
+                f"water is {parent.name or 'unnamed'!r} ({parent.ogf_id}), which is not this "
+                "water's outline, so none is drawn"
+            ),
+        )
 
+    anchor = max(named, key=lambda c: c.area_m2 or 0.0)
     distance = _mouth_distance_m(mouths, anchor.geometry)
-    note = _note(curated_name, anchor, basis, len(lake_candidates))
+    note = _note(anchor, len(lake_candidates))
     return LakeOutline(
         curated_name=curated_name,
         matched=True,
@@ -86,7 +94,7 @@ def match_lake_outline(
         ogf_ids=[anchor.ogf_id],
         ohn_name=anchor.name,
         effective_datetime=anchor.effective_datetime,
-        match_basis=basis,
+        match_basis=MATCH_NAME,
         distance_m=distance,
         note=note,
     )
@@ -120,10 +128,24 @@ def resolve_lake_outlines(
 
     out: dict[str, LakeOutline] = {}
     for name, mouths in mouths_by_lake.items():
-        candidates: dict[int, OhnWaterbody] = {}
-        for lat, lon in mouths:
-            for wb in fetch_near(lon, lat, tol_m):
-                candidates.setdefault(wb.ogf_id, wb)
+        # One lake's flaky upstream fetch must not take the other lakes' outlines
+        # (or the whole spots build) down with it. A failed lake is returned
+        # unmatched and flagged `lookup_failed`, so the build can count it.
+        try:
+            candidates: dict[int, OhnWaterbody] = {}
+            for lat, lon in mouths:
+                for wb in fetch_near(lon, lat, tol_m):
+                    candidates.setdefault(wb.ogf_id, wb)
+        except Exception as exc:  # noqa: BLE001 - network and service errors vary by adapter
+            logger.warning("OHN outline lookup failed for %r", name, exc_info=True)
+            out[name] = LakeOutline(
+                curated_name=name,
+                matched=False,
+                match_basis=MATCH_NONE,
+                note=f"outline lookup failed ({type(exc).__name__}); says nothing about the lake",
+                lookup_failed=True,
+            )
+            continue
         outline = match_lake_outline(name, mouths, list(candidates.values()), tol_m)
         if outline.matched and name.strip().lower() in GREAT_LAKES:
             outline = _widen_great_lake(outline, fetch_by_name)
@@ -155,10 +177,28 @@ def _with_licence(outline: LakeOutline, licence: str, licence_url: str) -> LakeO
 
 
 def _widen_great_lake(outline: LakeOutline, fetch_by_name: FetchByName) -> LakeOutline:
-    """Union every same-named lake polygon into one outline (Great Lakes are sliced)."""
+    """Union every same-named lake polygon into one outline (Great Lakes are sliced).
+
+    If the by-name fetch fails, the matched slice is kept and flagged, because a
+    slice drawn as the whole lake is wrong in a way the flag lets the build report.
+    """
+    from dataclasses import replace
+
+    try:
+        found = fetch_by_name(outline.curated_name)
+    except Exception as exc:  # noqa: BLE001 - network and service errors vary by adapter
+        logger.warning("OHN by-name widening failed for %r", outline.curated_name, exc_info=True)
+        return replace(
+            outline,
+            lookup_failed=True,
+            note=(
+                f"{outline.note} The by-name fetch that joins the sliced polygons failed "
+                f"({type(exc).__name__}), so this may be only part of the lake."
+            ),
+        )
     pooled = [
         w
-        for w in fetch_by_name(outline.curated_name)
+        for w in found
         if w.name == outline.curated_name and w.waterbody_type in LAKE_TYPES and w.geometry
     ]
     if len(pooled) <= 1:
@@ -202,13 +242,8 @@ def _mouth_distance_m(mouths: list[tuple[float, float]], geometry: dict) -> floa
     return round(best * M_PER_DEG, 1)
 
 
-def _note(curated_name: str, anchor: OhnWaterbody, basis: str, n_candidates: int) -> str:
-    if basis == MATCH_NAME:
-        return (
-            f"matched OHN polygon {anchor.ogf_id} by name; "
-            f"{n_candidates} lake-type polygons were near a mouth"
-        )
+def _note(anchor: OhnWaterbody, n_candidates: int) -> str:
     return (
-        f"no OHN polygon near a mouth is named {curated_name!r}; "
-        f"took the largest lake-type polygon ({anchor.ogf_id}) of {n_candidates} in range"
+        f"matched OHN polygon {anchor.ogf_id} by name; "
+        f"{n_candidates} lake-type polygons were near a mouth"
     )

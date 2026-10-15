@@ -30,9 +30,6 @@ RETIRED = re.compile(r"(stretch|anchor|confluence|tailwater)", re.IGNORECASE)
 # reads: an id slug is derived from a source name and may contain a retired word.
 # Term ids are kept on purpose; they are how literacy is tracked.
 ID_KEYS = {"term_id", "term_ids", "ref", "merged_record_ids", "cache_key"}
-# The one place a retired word is the thing being taught: the registry's own
-# technical name and definition for the terms a person can choose to learn.
-TEACHING_KEYS = {"technical"}
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
@@ -47,20 +44,13 @@ def field_names(value):
 
 
 def user_facing_strings(value):
-    return _walk(value, skip=ID_KEYS | TEACHING_KEYS)
-
-
-def taught_definitions():
-    return {terms.TERMS[t]["definition"] for t in ("confluence", "tailwater") if t in terms.TERMS}
+    return _walk(value, skip=ID_KEYS)
 
 
 def assert_clean(payload, where):
-    allowed = taught_definitions()
     bad_names = sorted({n for n in field_names(payload) if RETIRED.search(n)})
     assert not bad_names, f"{where}: retired word in field name {bad_names}"
     for text in user_facing_strings(payload):
-        if text in allowed:
-            continue
         assert not RETIRED.search(text), f"{where}: retired word in {text!r}"
 
 
@@ -156,11 +146,17 @@ def test_the_checker_catches_each_kind_of_leak():
         raise AssertionError(f"not caught: {leaky}")
 
 
-def test_the_term_registry_keeps_its_ids_and_loses_the_retired_prose():
+def test_the_term_registry_keeps_its_ids_and_loses_the_retired_words():
+    """The ids stay (literacy evidence is stored against them); no wording shows them."""
     assert {"confluence", "tailwater"} <= set(terms.TERMS)
     for term_id, term in terms.TERMS.items():
-        if term_id in ("confluence", "tailwater"):
-            assert term["term_id"] == term_id
-        text = term["definition"]
-        # A definition may name its own term; it may not use the other retired words.
-        assert not re.search(r"stretch|anchor", text, re.IGNORECASE), text
+        assert term["term_id"] == term_id
+        for field in ("plain", "technical", "definition"):
+            assert not RETIRED.search(term[field]), (term_id, field, term[field])
+
+
+def test_the_labels_and_terms_payloads_say_none_of_the_retired_words():
+    from src.services import spot_labels
+
+    for payload in (spot_labels.labels_payload(), terms.terms_payload()):
+        assert_clean(payload, "labels payload")

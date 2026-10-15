@@ -976,6 +976,105 @@ def test_build_stores_the_survey_contours_and_their_features(db, curation):
     assert humps[0].derivation == "bathymetry_contours"
 
 
+# ── one flaky upstream fetch does not stop the build ─────────────────────────
+
+
+def test_a_failed_watercourse_fetch_costs_that_lakes_inlets_not_the_build(db, curation):
+    store(db, [mouth(name="Rice Lake")], [stretch()])
+
+    def flaky(*_cell):
+        raise TimeoutError("read timed out")
+
+    report = build_spots(
+        db,
+        curation,
+        outline_resolver=lambda mouths: {"Rice Lake": outline()},
+        watercourse_fetcher=flaky,
+        bathymetry_fetcher=lambda _o: _no_bathymetry(),
+    )
+    assert report.spots_total >= 1  # the spots were still written
+    assert report.upstream_failures["shore_watercourses"] >= 1
+    assert report.lakes_with_outline == 1
+
+
+def test_a_failed_bathymetry_fetch_leaves_the_lake_without_contours(db, curation):
+    store(db, [mouth(name="Rice Lake")], [stretch()])
+
+    def flaky(_outline):
+        raise RuntimeError("OHN returned an error body")
+
+    report = build_spots(
+        db,
+        curation,
+        outline_resolver=lambda mouths: {"Rice Lake": outline()},
+        watercourse_fetcher=lambda *_: [],
+        bathymetry_fetcher=flaky,
+    )
+    assert report.upstream_failures == {"bathymetry": 1}
+    assert report.lakes_with_survey_contours == 0
+    assert report.spots_total >= 1
+
+
+def test_a_failed_outline_lookup_is_counted_and_the_other_lakes_keep_theirs(db, curation):
+    store(db, [mouth(name="Rice Lake")], [stretch()])
+
+    def resolver(mouths):
+        return {
+            "Rice Lake": outline(),
+            "Lake Ontario": LakeOutline(
+                curated_name="Lake Ontario",
+                matched=False,
+                note="outline lookup failed (ReadTimeout)",
+                lookup_failed=True,
+            ),
+        }
+
+    report = build_spots(
+        db,
+        curation,
+        outline_resolver=resolver,
+        watercourse_fetcher=lambda *_: [],
+        bathymetry_fetcher=lambda _o: _no_bathymetry(),
+    )
+    assert report.upstream_failures == {"lake_outline": 1}
+    assert report.lakes_with_outline == 1
+
+
+def test_a_resolver_that_raises_does_not_stop_the_build(db, curation):
+    store(db, [mouth(name="Rice Lake")], [stretch()])
+
+    def broken(_mouths):
+        raise RuntimeError("OHN returned HTTP 200 with a 500 error body")
+
+    report = build_spots(
+        db,
+        curation,
+        outline_resolver=broken,
+        watercourse_fetcher=lambda *_: [],
+        bathymetry_fetcher=lambda _o: _no_bathymetry(),
+    )
+    assert report.upstream_failures == {"lake_outline": 1}
+    assert report.spots_total >= 1
+
+
+def test_a_clean_build_reports_no_upstream_failures(db, curation):
+    store(db, [mouth(name="Rice Lake")], [stretch()])
+    report = build_spots(
+        db,
+        curation,
+        outline_resolver=lambda mouths: {"Rice Lake": outline()},
+        watercourse_fetcher=lambda *_: [],
+        bathymetry_fetcher=lambda _o: _no_bathymetry(),
+    )
+    assert report.upstream_failures == {}
+
+
+def _no_bathymetry():
+    from src.services.bathymetry import LakeBathymetry
+
+    return LakeBathymetry(None, [])
+
+
 # ── the words ─────────────────────────────────────────────────────────────────
 
 
