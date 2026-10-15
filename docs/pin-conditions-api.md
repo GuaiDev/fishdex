@@ -5,8 +5,8 @@ question: what is true at this pin's coordinates right now, and how do we know?
 
 You can build the panel without a running server: **`tests/fixtures/pin_conditions_response.json`**
 is a real response, recorded from the live sources (Open-Meteo, the Water Survey of Canada
-gauge network, and Ontario's PWQMN water samples) for a pin on Bronte Creek in Oakville. No gauge reports on Bronte Creek, so its flow rows come
-from the nearest one, on Fourteen Mile Creek, and say so (`on_pin_water: false`).
+gauge network, and Ontario's PWQMN water samples) for a pin on Bronte Creek in Oakville. No gauge reports on Bronte Creek, so its flow rows
+come from the nearest one, on Fourteen Mile Creek, and say so (`on_pin_water: false`).
 
 ## `GET /pins/{pin_id}/conditions`
 
