@@ -57,6 +57,7 @@ from src.models.spot import (
 )
 from src.models.stretch import FishingStretch
 from src.models.stretch_anchor import StretchAnchor
+from src.services import api_vocab
 from src.services import spot_labels as words
 from src.services.bathymetry import (
     BathymetryFeatureSet,
@@ -1129,7 +1130,7 @@ def get_spot_detail(db: Database, spot_id: str, user_id: int | None = None) -> d
     ]
     others.sort(key=lambda o: (o["tier"], _KIND_ORDER[o["kind"]], o["spot_id"]))
     return {
-        **spot.model_dump(),
+        **api_vocab.spot_for_api(spot.model_dump()),
         "water_body": _water_body_ref(db, spot.water_body_id),
         "also_on_water_bodies": [
             ref for i in spot.also_on_water_body_ids if (ref := _water_body_ref(db, i))

@@ -885,6 +885,11 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
                 for k, v in e["response"].items()
                 if k not in ("display_name", "spots", "also_here_spots")
             }
+            # The API says section_ids / section_union; the model keeps the stored names.
+            detail["stretch_ids"] = detail.pop("section_ids")
+            detail["geometry_source"] = {"section_union": "stretch_union"}.get(
+                detail["geometry_source"], detail["geometry_source"]
+            )
             assert WaterBody.model_validate(detail).water_body_id == route.removeprefix(
                 "/map/water-bodies/"
             )

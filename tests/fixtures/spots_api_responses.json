@@ -270,7 +270,7 @@
             "term_id": "tailwater",
             "plain": "The water just below a dam",
             "technical": "Tailwater",
-            "definition": "A tailwater is the stretch of river just downstream of a dam.",
+            "definition": "A tailwater is the part of a river just downstream of a dam.",
             "mapped_from": "OpenStreetMap volunteers (dams and weirs)"
           },
           {
@@ -1263,7 +1263,7 @@
         "structure_attrs": {
           "dam_kind": "dam",
           "reach_m": 410,
-          "tailwater_verified": true
+          "below_dam_verified": true
         },
         "signals": {
           "named": true,
@@ -1311,7 +1311,7 @@
           {
             "kind": "osm",
             "ref": "way/248706708",
-            "anchor_ids": [
+            "merged_record_ids": [
               "grand-cambridge-paris:tailwater:osm-way-248706708"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -1319,7 +1319,7 @@
           {
             "kind": "osm",
             "ref": "way/248706708",
-            "anchor_ids": [
+            "merged_record_ids": [
               "grand-cambridge-paris:dam:osm-way-248706708"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -1458,7 +1458,7 @@
         "title": "Where the Nith River joins the Grand River",
         "subtitle": "Grand River · Cambridge to Paris",
         "tier": 1,
-        "structure_type": "confluence",
+        "structure_type": "junction",
         "structure_attrs": {
           "also_on_water_ids": [
             "nith-ayr-paris"
@@ -1467,8 +1467,8 @@
             127449221
           ],
           "joining_upstream_km": 1377.5,
-          "stretch_flows_on": true,
-          "stretch_upstream_km": 4298.4,
+          "river_flows_on": true,
+          "river_upstream_km": 4298.4,
           "tributary_name_from_water_id": "nith-ayr-paris"
         },
         "signals": {
@@ -1530,7 +1530,7 @@
           {
             "kind": "ohn_topology",
             "ref": "ogf:127449216,127449221,127449252",
-            "anchor_ids": [
+            "merged_record_ids": [
               "grand-cambridge-paris:confluence:n8038226_4319286"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -1538,7 +1538,7 @@
           {
             "kind": "ohn_topology",
             "ref": "ogf:127449221,127449252",
-            "anchor_ids": [
+            "merged_record_ids": [
               "nith-ayr-paris:confluence:n8038226_4319286"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -1707,7 +1707,7 @@
           {
             "kind": "ohn_topology",
             "ref": "ogf:214624516,214624565,214624585",
-            "anchor_ids": [
+            "merged_record_ids": [
               "credit-streetsville-port-credit:lake_mouth:n7957731_4354567"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -1857,7 +1857,7 @@
           {
             "kind": "explore_ranking",
             "ref": "ogf:127939961",
-            "anchor_ids": [],
+            "merged_record_ids": [],
             "built_at": "2026-10-14T04:26:26+00:00"
           }
         ],
@@ -1951,15 +1951,15 @@
         "title": "Where Palliser Creek joins the Moira River",
         "subtitle": "Moira River — Foxboro to Belleville",
         "tier": 1,
-        "structure_type": "confluence",
+        "structure_type": "junction",
         "structure_attrs": {
           "joining_ogf_ids": [
             214561918
           ],
           "joining_upstream_km": 100.8,
           "name_from_ogf_id": 121770066,
-          "stretch_flows_on": true,
-          "stretch_upstream_km": 0.0
+          "river_flows_on": true,
+          "river_upstream_km": 0.0
         },
         "signals": {
           "named": true,
@@ -1971,7 +1971,7 @@
           {
             "kind": "ohn_topology",
             "ref": "ogf:214561918,214562103",
-            "anchor_ids": [
+            "merged_record_ids": [
               "moira-foxboro-belleville:confluence:n7742945_4424383"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -2088,7 +2088,7 @@
         "structure_attrs": {
           "dam_kind": "dam",
           "reach_m": 410,
-          "tailwater_verified": true
+          "below_dam_verified": true
         },
         "signals": {
           "named": true,
@@ -2136,7 +2136,7 @@
           {
             "kind": "osm",
             "ref": "way/248706708",
-            "anchor_ids": [
+            "merged_record_ids": [
               "grand-cambridge-paris:tailwater:osm-way-248706708"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -2144,7 +2144,7 @@
           {
             "kind": "osm",
             "ref": "way/248706708",
-            "anchor_ids": [
+            "merged_record_ids": [
               "grand-cambridge-paris:dam:osm-way-248706708"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -2371,7 +2371,7 @@
         "structure_attrs": {
           "dam_kind": "dam",
           "reach_m": 410,
-          "tailwater_verified": true
+          "below_dam_verified": true
         },
         "signals": {
           "named": true,
@@ -2419,7 +2419,7 @@
           {
             "kind": "osm",
             "ref": "way/248706708",
-            "anchor_ids": [
+            "merged_record_ids": [
               "grand-cambridge-paris:tailwater:osm-way-248706708"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -2427,7 +2427,7 @@
           {
             "kind": "osm",
             "ref": "way/248706708",
-            "anchor_ids": [
+            "merged_record_ids": [
               "grand-cambridge-paris:dam:osm-way-248706708"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -2714,15 +2714,15 @@
         "title": "Where Mullet Creek joins the Credit River",
         "subtitle": "Credit River · Lower Credit — Streetsville to Port Credit",
         "tier": 1,
-        "structure_type": "confluence",
+        "structure_type": "junction",
         "structure_attrs": {
           "joining_ogf_ids": [
             214624304
           ],
           "joining_upstream_km": 46.0,
           "name_from_ogf_id": 67870681,
-          "stretch_flows_on": true,
-          "stretch_upstream_km": 1238.2
+          "river_flows_on": true,
+          "river_upstream_km": 1238.2
         },
         "signals": {
           "named": true,
@@ -2734,7 +2734,7 @@
           {
             "kind": "ohn_topology",
             "ref": "ogf:214624303,214624304,214624337",
-            "anchor_ids": [
+            "merged_record_ids": [
               "credit-streetsville-port-credit:confluence:n7966741_4355566"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -2927,14 +2927,14 @@
         "title": "Where a small creek joins the Otonabee River",
         "subtitle": "Otonabee River — Lakefield to Rice Lake",
         "tier": 3,
-        "structure_type": "confluence",
+        "structure_type": "junction",
         "structure_attrs": {
           "joining_ogf_ids": [
             124222797
           ],
           "joining_upstream_km": 11.0,
-          "stretch_flows_on": true,
-          "stretch_upstream_km": 12560.8
+          "river_flows_on": true,
+          "river_upstream_km": 12560.8
         },
         "signals": {
           "named": false,
@@ -2946,7 +2946,7 @@
           {
             "kind": "ohn_topology",
             "ref": "ogf:124222425,124222797,124223490",
-            "anchor_ids": [
+            "merged_record_ids": [
               "otonabee-lakefield-rice-lake:confluence:n7828679_4437395"
             ],
             "built_at": "2026-10-12T21:43:44+00:00"
@@ -5177,7 +5177,7 @@
     },
     {
       "request": "GET /map/water-bodies/river:credit-river",
-      "note": "a river in full: its line, its stretches, the spots on it",
+      "note": "a river in full: its line, its river sections, the spots on it",
       "status": 200,
       "response": {
         "water_body_id": "river:credit-river",
@@ -6114,14 +6114,14 @@
           ],
           "type": "MultiLineString"
         },
-        "geometry_source": "stretch_union",
+        "geometry_source": "section_union",
         "bbox": [
           -79.98834,
           43.53952,
           -79.57731,
           43.81619
         ],
-        "stretch_ids": [
+        "section_ids": [
           "credit-forks-glen-williams",
           "credit-glen-williams-streetsville",
           "credit-streetsville-port-credit"
@@ -6305,7 +6305,7 @@
           -78.29204,
           43.93725
         ],
-        "stretch_ids": [
+        "section_ids": [
           "bowmanville-soper",
           "bronte-lowville-bronte",
           "credit-streetsville-port-credit",
@@ -6681,14 +6681,14 @@
           ],
           "type": "MultiLineString"
         },
-        "geometry_source": "stretch_union",
+        "geometry_source": "section_union",
         "bbox": [
           -79.85031,
           43.37634,
           -79.6854,
           43.42883
         ],
-        "stretch_ids": [
+        "section_ids": [
           "bronte-lowville-bronte"
         ],
         "attributes": {

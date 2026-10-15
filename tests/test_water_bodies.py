@@ -536,7 +536,7 @@ def test_detail_lists_the_spots_on_a_water_body_and_those_also_there(db, curatio
     built(db, curation)
     river = get_water_body_detail(db, "river:credit-river")
     assert river["name"] == "Credit River"
-    assert river["stretch_ids"] == ["credit-lower"]
+    assert river["section_ids"] == ["credit-lower"]
     assert {s["kind"] for s in river["spots"]} >= {"river_mouth", "below_dam"}
     assert river["also_here_spots"] == []
     lake = get_water_body_detail(db, "great_lake:lake-ontario")

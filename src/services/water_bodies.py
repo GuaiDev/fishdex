@@ -33,6 +33,7 @@ from src.models.lake_outline import LakeOutline
 from src.models.spot import Spot
 from src.models.stretch import FishingStretch
 from src.models.water_body import NameSource, WaterBody, WaterBodyType
+from src.services import api_vocab
 from src.services import spot_labels as words
 from src.storage.spots import list_spots, list_spots_also_on
 from src.storage.water_bodies import get_water_body, list_water_bodies
@@ -348,7 +349,7 @@ def get_water_body_detail(db: Database, water_body_id: str) -> dict | None:
     own = list_spots(db, max_tier=3, water_body_id=water_body_id)
     also = list_spots_also_on(db, water_body_id)
     return {
-        **wb.model_dump(),
+        **api_vocab.water_body_for_api(wb.model_dump()),
         "display_name": _display_name(wb),
         "spots": ranked(own),
         "also_here_spots": ranked(also),

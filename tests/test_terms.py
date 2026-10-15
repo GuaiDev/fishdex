@@ -61,6 +61,6 @@ def test_card_linked_words_keep_their_old_definitions():
         "A confluence is the place where two streams meet and become one."
     )
     assert terms.TERMS["tailwater"]["definition"] == (
-        "A tailwater is the stretch of river just downstream of a dam."
+        "A tailwater is the part of a river just downstream of a dam."
     )
     assert set(terms.CARD_LINKED_TERMS) <= set(terms.TERMS)
