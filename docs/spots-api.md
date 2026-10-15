@@ -5,7 +5,7 @@ to one place on the water: where a river runs out into a lake, where a creek joi
 river, the water just below a dam, an official fishing spot. The map shows spots, not
 river lines; the river is context ("more spots on this river").
 
-The spots and water-body endpoints are read-only GETs, and every endpoint here needs the same
+The spots, water-body and section endpoints are read-only GETs, and every endpoint here needs the same
 `Authorization: Bearer <token>` as the other `/map/*` endpoints. The one exception to read-only is
 the private [weed reports](#weed-reports) the user writes themselves. The older `/map/stretches`,
 `/map/stretches/{id}/anchors` and `/map/segments` endpoints are **legacy**: they are served only
@@ -31,7 +31,9 @@ and a card with a "recorded more often here" line.
    spots sit on, `GET /map/water-bodies/{water_body_id}` for "more spots on this river", and
    `GET /map/water-bodies/{water_body_id}/features` for a lake's shoreline (inlets, outlets,
    islands, points).
-5. `GET /map/weed-reports/layer?bbox=…` for the user's own reported weed edges, and
+5. `GET /map/sections?bbox=…` instead of the pins at overview zoom, and
+   `GET /map/sections/{section_id}` when a section is tapped. See [Sections](#sections).
+6. `GET /map/weed-reports/layer?bbox=…` for the user's own reported weed edges, and
    `POST /map/weed-reports` when they report one on a water body. Private to them; see
    [Weed reports](#weed-reports).
 
@@ -52,6 +54,8 @@ pressure from anglers, and a map must not blur them.
   records exist there: few anglers, or just few observers. Show each spot's `caveats` with it.
   Never word it as a claim about fish, "undiscovered", "untouched" or "good" (see
   [Quiet water](#quiet-water)).
+- At overview zoom draw [sections](#sections), not spot pins: nine near-identical pins a few
+  hundred metres apart are noise, and a section is one shape with a count. Pins appear after a tap.
 - Parking, trailheads and boat launches are details of a spot (`getting_there`), not map
   pins of their own. Road crossings (`bridges`) are a layer that is **off by default**
   (`layers.bridges.default_on`).
@@ -93,6 +97,10 @@ All user-facing strings, in display order (Quiet water last).
 - `quiet_water` — the words only quiet water needs: `titles` (the two title templates the build
   fills), `caveats` (`records`, `access_not_measured`, `access_coverage_unknown`) and `not_built`
   (what `meta.notes` says when none has been built).
+- `sections` — the words the [sections](#sections) layer needs: `kinds[]` (`kind`, `label`, `one_liner`),
+  `pin_types` (a word for each pin type), `count_phrases` (`one` and `many` for each thing a
+  section counts, which is what `summary` is built from), `empty_summary`, `label_only_note`
+  (why a water with no outline is a name only), `weed_count_note` and `not_built`.
 - `layers` — the Getting there and Bridges layers: `label`, `kinds`, `default_on`, `note`.
 - `access_labels` — display names for `getting_there[].kind` and `bridges[].kind`.
 - `water_body_types[]` — for each water body `type`: `chip` (plural, for a filter), `label`
@@ -1139,6 +1147,621 @@ Each feature's `properties`:
 }
 ```
 
+## Sections
+
+At overview zoom, drawing every spot is noise: one city view was fifty pins, nine of them
+"Below the weir on the Humber River" a few hundred metres apart. So the overview draws
+**sections** instead, and the pins appear only after a tap.
+
+A **section** is one tappable piece of water:
+
+- a **river section**: one curated run of a river or creek, like "Lower Humber — Woodbridge to
+  Humber Bay". Its id is the section id already on a spot's `water_id` and a water body's
+  `section_ids`;
+- a **lake with an outline**, drawn as its outline. Its id is the water body id
+  (`lake:rice-lake`), so a lake id and a river-section id can never be the same string.
+
+A lake or bay with **no outline** is not a section: there is no shape to tap. It comes back in
+the list's `labels` as a name at a place, and nothing opens from it.
+
+Nothing is stored for sections. They are read off the stored river sections, water bodies, spots
+and shoreline features on every call, so a rebuild changes them with no second step.
+
+**`tests/fixtures/sections_api_responses.json`** holds the responses below, captured by
+`scripts/export_sections_fixture.py` (the examples here are copied from it, trimmed where marked).
+The river sections, spots and counts are from a real build. Two things in it are examples, and the
+entry's `note` says which: no build has a lake outline yet, so the lake entries are from a
+hand-drawn **example** lake (Rice Lake, with an island, a drop-off and a hump); and weed reports
+are private, so the weed edge is an **example** added to a throwaway copy.
+
+### How the UI uses sections
+
+1. **Low zoom: sections, no pins.** Call `GET /map/sections?bbox=…` when the map moves and draw
+   one shape per feature. Do **not** call `GET /map/spots` at this zoom. Label each shape with
+   `name` and show `summary` (the counts in words) on hover or tap. Draw `labels` as plain
+   text with no tap target.
+2. **A tap on a section: its pins.** Call `GET /map/sections/{section_id}`, zoom to
+   `section.properties.bbox`, and draw `features` as pins. Nine weirs on one river are nine pins
+   here, inside one section, where they can be told apart.
+3. **A tap on a pin: the card that already exists.** Branch on `properties.pin_type`:
+
+   | `pin_type` | What it is | Opens |
+   |---|---|---|
+   | `spot` | a spot: below a dam, where creeks join, a river mouth, a public fishing spot | `GET /map/spots/{spot_id}`, the spot card |
+   | `feature` | a lake's shoreline or depth feature: inlet, outlet, island, point, peninsula, drop-off, hump | the feature's own properties, already in the pin (same as `GET /map/water-bodies/{id}/features`) |
+   | `getting_there` | parking, a trailhead or a boat launch near the section's spots | nothing: `serves` names the spot ids it is near |
+   | `weed_report` | a weed edge **you** reported | `PATCH` / `DELETE /map/weed-reports/{report_id}` |
+
+4. **A pin is not a new thing.** `id` is always the id of what the pin stands for: the spot id, the
+   feature id, `kind:source_ref` for getting there, or the weed report id. A spot pin has the same
+   properties as a feature in `GET /map/spots`.
+
+`GET /map/spots` is **unchanged**. It still lists every spot, so a client that has not moved to
+sections keeps working. Keep using it for the kind chips, `new_to_me` and `near`. Quiet water has no
+water of its own, so it is in no section and stays on `GET /map/spots?kind=quiet_water`.
+
+### `GET /map/sections`
+
+Returns a GeoJSON FeatureCollection: one feature per river section and per lake with an outline,
+plus `labels`. Parameters, all optional:
+
+| Parameter | Meaning |
+|---|---|
+| `bbox` | `min_lon,min_lat,max_lon,max_lat`. A section is in view when its drawn shape crosses the box, not merely when its bounding box does. A label is in view when its place is. A bad box is a 422 |
+| `type` | comma-separated water types: `river`, `creek`, `lake`, `pond`, `great_lake`. An unknown type is a 422 |
+| `tier` | the highest spot tier counted: `1`, `2` (default) or `3`; cumulative, as on `GET /map/spots`. Anything else is a 422 |
+| `jurisdiction` | ISO 3166-2 code, for example `CA-ON` |
+
+Sorted by type (river, creek, lake, pond, great lake), then name. Each feature's properties:
+
+| Field | Meaning |
+|---|---|
+| `section_id` | the id; also the feature's `id`. Pass it to `GET /map/sections/{section_id}` |
+| `kind` | `river_section` or `lake`. Words for each are in `GET /map/spots/labels` under `sections.kinds` |
+| `type`, `type_label` | the water's type (`river`, `creek`, `lake`, `pond`, `great_lake`) and its word |
+| `name` | the section's name. Never "Unnamed …": a lake with no source name gets its type's own word |
+| `water_body_id`, `water_body_name` | the river, creek or lake it belongs to |
+| `region`, `length_km` | a river section's place and length; `null` for a lake |
+| `bbox`, `label_point` | where to zoom, and where to put the name (inside a lake's outline, mid-run on a river) |
+| `counts` | what is inside, below |
+| `summary` | the counts in a sentence: `1 river mouth, 7 places where creeks join`, or "Nothing mapped here yet" |
+
+`counts` is `{spots, features, weed_reports, total}`. `spots` and `features` are objects keyed by
+kind, in display order, and a kind with none is absent (never `0`). `spots` holds
+`river_mouth`, `creek_junction`, `below_dam` and `public_fishing`: a spot listed under two river
+sections counts in both, and a river mouth counts on the lake it opens onto. `features` holds a
+lake's `inlet`, `outlet`, `island`, `point`, `peninsula`, `drop_off` and `hump`, and is empty on a
+river. `weed_reports` is **your own** weed edges only (see below). `total` is all three added up,
+and is exactly the number of spot, feature and weed pins the section opens to (getting-there points
+are details of the spots and are not counted).
+
+**Payload.** A river section's line is the curated line (about a hundred points for a long run). A
+lake outline is simplified to about 200 m, drawn whole with no islands cut out (islands are pins
+of their own), with parts under about 0.12 km² dropped, and rounded to five decimal places. A city
+view is about ten kilobytes.
+
+```json
+{
+  "type": "FeatureCollection",
+  "meta": {
+    "count": 4,
+    "label_count": 1,
+    "type_counts": {
+      "river": 4,
+      "creek": 0,
+      "lake": 1,
+      "pond": 0,
+      "great_lake": 0
+    },
+    "max_tier": 2,
+    "weed_reports_note": "Weed edges you reported. Only you see them."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "humber-woodbridge-humber-bay",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -79.58995,
+            43.78818
+          ],
+          [
+            -79.58941,
+            43.78552
+          ],
+          [
+            -79.59171,
+            43.7835
+          ],
+          "… 103 more points"
+        ]
+      },
+      "properties": {
+        "section_id": "humber-woodbridge-humber-bay",
+        "kind": "river_section",
+        "type": "river",
+        "type_label": "River",
+        "name": "Lower Humber — Woodbridge to Humber Bay",
+        "water_body_id": "river:humber-river",
+        "water_body_name": "Humber River",
+        "region": "Lake Ontario",
+        "jurisdiction": "CA-ON",
+        "length_km": 33.52,
+        "bbox": [
+          -79.59211,
+          43.62106,
+          -79.4508,
+          43.78818
+        ],
+        "label_point": [
+          -79.5391,
+          43.71132
+        ],
+        "counts": {
+          "spots": {
+            "river_mouth": 1,
+            "creek_junction": 7
+          },
+          "features": {},
+          "weed_reports": 0,
+          "total": 8
+        },
+        "summary": "1 river mouth, 7 places where creeks join"
+      }
+    },
+    "… 3 more sections"
+  ],
+  "labels": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "id": "lake:humber-bay",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [
+            -79.4675,
+            43.63037
+          ]
+        },
+        "properties": {
+          "water_body_id": "lake:humber-bay",
+          "name": "Humber Bay",
+          "display_name": "Humber Bay",
+          "type": "lake",
+          "type_label": "Lake",
+          "jurisdiction": "CA-ON",
+          "bbox": [
+            -79.4675,
+            43.63037,
+            -79.4675,
+            43.63037
+          ],
+          "note": "No outline is on file for this water, so it is a name on the map only."
+        }
+      }
+    ]
+  }
+}
+```
+
+A lake with an outline (the **example** Rice Lake), from `?type=lake`:
+
+```json
+{
+  "type": "FeatureCollection",
+  "meta": {
+    "count": 1,
+    "label_count": 0,
+    "type_counts": {
+      "river": 2,
+      "creek": 1,
+      "lake": 1,
+      "pond": 0,
+      "great_lake": 1
+    },
+    "max_tier": 2,
+    "weed_reports_note": "Weed edges you reported. Only you see them."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "lake:rice-lake",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": "… simplified outline"
+      },
+      "properties": {
+        "section_id": "lake:rice-lake",
+        "kind": "lake",
+        "type": "lake",
+        "type_label": "Lake",
+        "name": "Rice Lake",
+        "water_body_id": "lake:rice-lake",
+        "water_body_name": "Rice Lake",
+        "region": null,
+        "jurisdiction": "CA-ON",
+        "length_km": null,
+        "bbox": [
+          -78.3,
+          44.0,
+          -78.0,
+          44.2
+        ],
+        "label_point": [
+          -78.15,
+          44.1
+        ],
+        "counts": {
+          "spots": {
+            "river_mouth": 1
+          },
+          "features": {
+            "inlet": 2,
+            "island": 1,
+            "drop_off": 1,
+            "hump": 1
+          },
+          "weed_reports": 0,
+          "total": 6
+        },
+        "summary": "1 river mouth, 2 inlets, 1 island, 1 drop-off, 1 hump"
+      }
+    }
+  ],
+  "labels": {
+    "type": "FeatureCollection",
+    "features": []
+  }
+}
+```
+
+**Empty and unbuilt.** A box with nothing in it is a normal response with `count: 0`. A database
+whose river sections have not been built returns the same shape with `meta.notes` saying so; draw
+nothing and fall back to `GET /map/spots`.
+
+**Weed counts are private.** `counts.weed_reports` and `counts.total` include the weed edges the
+caller reported, and nobody else's: another login gets `0`. Because of that the response carries
+`Cache-Control: private, no-store`, like the card's "new to you" line. A river's weed reports
+are filed on the whole river, so each is counted in the **one** section of that river it is
+nearest, never in two. That is decided across all of the river's sections, not just the ones in
+the `bbox` or passing the `type` filter, so panning never moves a report between sections and the
+list count always matches the section's own pins. Never show the number to anyone but the person who made the reports.
+
+### `GET /map/sections/{section_id}`
+
+Every point of interest in one section, as pins. A lake id contains a colon
+(`lake:rice-lake`) and works in the path as it is. An unknown id is a 404, and so is a lake
+with no outline: it is not a section. Parameter: `tier`, as above.
+
+The response is a FeatureCollection of Points:
+
+| Field | Meaning |
+|---|---|
+| `section` | the same feature the list carries, so a link straight to a section can draw it |
+| `meta` | `count`, `by_pin_type` (`spot`, `feature`, `getting_there`, `weed_report`), `max_tier`, `weed_reports_note` |
+| `features` | the pins, in this order: spots (by tier, then kind, then id), features, getting there, your weed reports |
+
+Every pin is a Point with an `id` and a `properties.pin_type`.
+
+**`spot`** pins carry exactly the properties of a feature in `GET /map/spots` (`spot_id`, `kind`,
+`title`, `subtitle`, `signals` and the rest) plus `pin_type`. Tap one and call
+`GET /map/spots/{spot_id}`. Below-dam spots, places where creeks join, river mouths and public
+fishing spots are all spots. A section holds the ones on its own run, the ones listed under it as
+a second section (a creek joining it) and, for a lake, the river mouths that open onto it.
+
+```json
+{
+  "type": "Feature",
+  "id": "creek_junction:n7951147_4366924",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -79.51147,
+      43.66924
+    ]
+  },
+  "properties": {
+    "pin_type": "spot",
+    "spot_id": "creek_junction:n7951147_4366924",
+    "kind": "creek_junction",
+    "title": "Where Black Creek joins the Humber River",
+    "subtitle": "Humber River · Lower Humber — Woodbridge to Humber Bay",
+    "tier": 1,
+    "jurisdiction": "CA-ON",
+    "water_id": "humber-woodbridge-humber-bay",
+    "water_name": "Lower Humber — Woodbridge to Humber Bay",
+    "water_body_id": "river:humber-river",
+    "signals": {
+      "named": true,
+      "size_class": "medium"
+    }
+  }
+}
+```
+
+**`feature`** pins (lakes only) carry the properties of a feature in
+`GET /map/water-bodies/{id}/features`: `feature_id`, `kind`, `derivation`, `provenance`, `source`,
+`note`, `attributes` and the rest, plus a `label` ("Hump"). Drop-offs and humps come from a
+depth survey and say so in `note`; inlets, outlets, islands, points and peninsulas are read from
+the shoreline outline. An island or hump is an area: its pin sits inside it, and its outline comes
+along as `properties.shape` for when you want to draw it after a tap.
+
+```json
+{
+  "type": "Feature",
+  "id": "lake:rice-lake:hump:1",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -78.235,
+      44.03
+    ]
+  },
+  "properties": {
+    "pin_type": "feature",
+    "feature_id": "lake:rice-lake:hump:1",
+    "water_body_id": "lake:rice-lake",
+    "kind": "hump",
+    "name": null,
+    "derivation": "bathymetry_contours",
+    "provenance": "record",
+    "source": "LIO Bathymetry",
+    "source_date": null,
+    "note": "A shallower rise in the bottom. From a 1970 survey.",
+    "attributes": {
+      "survey_year": 1970
+    },
+    "area_m2": null,
+    "length_m": null,
+    "label": "Hump",
+    "shape": {
+      "coordinates": [
+        [
+          [
+            -78.25,
+            44.02
+          ],
+          [
+            -78.22,
+            44.02
+          ],
+          [
+            -78.22,
+            44.04
+          ],
+          [
+            -78.25,
+            44.04
+          ],
+          [
+            -78.25,
+            44.02
+          ]
+        ]
+      ],
+      "type": "Polygon"
+    }
+  }
+}
+```
+
+**`getting_there`** pins are parking, trailheads and boat launches found near the section's
+spots, each place once however many spots it serves. `properties.serves` lists the spot ids
+it is near and `id` is `kind:source_ref`. They are details of those spots, so draw them small, or
+only when the section is open.
+
+**`weed_report`** pins are the caller's own weed reports in this section, still private and
+still "reported, not verified": the same words (`caption`, `status_label`, `provenance_label`) as
+the weed-report routes, and `id` is the weed report id. A weed line is a pin at the middle of the
+line, with the line itself in `properties.shape`. Do not style one as a fact about the water or
+mix it into spot text; see [Weed reports](#weed-reports). The response is `Cache-Control: private,
+no-store` for the same reason as the list.
+
+```json
+{
+  "type": "Feature",
+  "id": 1,
+  "geometry": {
+    "type": "Point",
+    "coordinates": [
+      -79.53822,
+      43.7269
+    ]
+  },
+  "properties": {
+    "pin_type": "weed_report",
+    "weed_report_id": 1,
+    "water_body_id": "river:humber-river",
+    "water_body_name": "Humber River",
+    "jurisdiction": "CA-ON",
+    "shape_label": "A spot on the edge",
+    "observed_on": "2026-09-20",
+    "note": "Example note: weeds along the inside bend",
+    "provenance": "user_reported",
+    "provenance_label": "Reported by you",
+    "kind_label": "Weed edge",
+    "status_label": "reported, not verified",
+    "date_label": "seen 2026-09-20",
+    "caption": "Weed edge · reported, not verified · seen 2026-09-20"
+  }
+}
+```
+
+A river section (the lower Humber, with the example weed edge), trimmed:
+
+```json
+{
+  "type": "FeatureCollection",
+  "section": {
+    "type": "Feature",
+    "id": "humber-woodbridge-humber-bay",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [
+          -79.58995,
+          43.78818
+        ],
+        [
+          -79.58941,
+          43.78552
+        ],
+        [
+          -79.59171,
+          43.7835
+        ],
+        "… 103 more points"
+      ]
+    },
+    "properties": {
+      "section_id": "humber-woodbridge-humber-bay",
+      "kind": "river_section",
+      "type": "river",
+      "type_label": "River",
+      "name": "Lower Humber — Woodbridge to Humber Bay",
+      "water_body_id": "river:humber-river",
+      "water_body_name": "Humber River",
+      "region": "Lake Ontario",
+      "jurisdiction": "CA-ON",
+      "length_km": 33.52,
+      "bbox": [
+        -79.59211,
+        43.62106,
+        -79.4508,
+        43.78818
+      ],
+      "label_point": [
+        -79.5391,
+        43.71132
+      ],
+      "counts": {
+        "spots": {
+          "river_mouth": 1,
+          "creek_junction": 7
+        },
+        "features": {},
+        "weed_reports": 1,
+        "total": 9
+      },
+      "summary": "1 river mouth, 7 places where creeks join, 1 weed edge you reported"
+    }
+  },
+  "meta": {
+    "count": 9,
+    "by_pin_type": {
+      "spot": 8,
+      "feature": 0,
+      "getting_there": 0,
+      "weed_report": 1
+    },
+    "max_tier": 2,
+    "weed_reports_note": "Weed edges you reported. Only you see them."
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "id": "river_mouth:n7946750_4363037",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.4675,
+          43.63037
+        ]
+      },
+      "properties": {
+        "pin_type": "spot",
+        "spot_id": "river_mouth:n7946750_4363037",
+        "kind": "river_mouth",
+        "title": "Where the Humber River meets Humber Bay",
+        "subtitle": "Humber River · Lower Humber — Woodbridge to Humber Bay",
+        "tier": 1,
+        "jurisdiction": "CA-ON",
+        "water_id": "humber-woodbridge-humber-bay",
+        "water_name": "Lower Humber — Woodbridge to Humber Bay",
+        "water_body_id": "river:humber-river",
+        "signals": {
+          "named": true
+        }
+      }
+    },
+    "… 6 more spots",
+    {
+      "type": "Feature",
+      "id": 1,
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -79.53822,
+          43.7269
+        ]
+      },
+      "properties": {
+        "pin_type": "weed_report",
+        "weed_report_id": 1,
+        "water_body_id": "river:humber-river",
+        "water_body_name": "Humber River",
+        "jurisdiction": "CA-ON",
+        "shape_label": "A spot on the edge",
+        "observed_on": "2026-09-20",
+        "note": "Example note: weeds along the inside bend",
+        "provenance": "user_reported",
+        "provenance_label": "Reported by you",
+        "kind_label": "Weed edge",
+        "status_label": "reported, not verified",
+        "date_label": "seen 2026-09-20",
+        "caption": "Weed edge · reported, not verified · seen 2026-09-20"
+      }
+    }
+  ]
+}
+```
+
+(Trimmed here; the fixture has every pin.) The same call on a lake returns its shoreline and depth
+features instead. One of the **example** Rice Lake's pins:
+
+```json
+{
+  "type": "Feature",
+  "id": "lake:rice-lake:drop_off:1",
+  "geometry": {
+    "coordinates": [
+      -78.1,
+      44.15
+    ],
+    "type": "Point"
+  },
+  "properties": {
+    "pin_type": "feature",
+    "feature_id": "lake:rice-lake:drop_off:1",
+    "water_body_id": "lake:rice-lake",
+    "kind": "drop_off",
+    "name": null,
+    "derivation": "bathymetry_contours",
+    "provenance": "record",
+    "source": "LIO Bathymetry",
+    "source_date": null,
+    "note": "The bottom falls away quickly here. From a 1970 survey.",
+    "attributes": {
+      "survey_year": 1970
+    },
+    "area_m2": null,
+    "length_m": null,
+    "label": "Drop-off"
+  }
+}
+```
+
+An unknown section, or a lake with no outline:
+
+```json
+{
+  "detail": "No section with id 'no-such-section'"
+}
+```
+
 ## The spot card
 
 `card` on `GET /map/spots/{spot_id}` is one read model with four fixed blocks. Blocks 1
@@ -1606,8 +2229,9 @@ and plant records do not say where an edge runs), so nothing is derived, guessed
 in: every weed edge on the map is one a person wrote down, and each says so.
 
 **They are private.** A report is visible only to the user who made it, like a personal pin.
-There is no sharing, no export, no public layer, and no count of reports anywhere: not on a
-water body, a spot, or the layer's `meta`. Another user's report answers `404`, exactly as an
+There is no sharing, no export, no public layer, and no count of reports anywhere a stranger
+could read: not on a water body, a spot, or the layer's `meta`. The one count is on a
+[section](#sections): `counts.weed_reports` is the caller's own, and `0` for anyone else. Another user's report answers `404`, exactly as an
 id nobody has used does. The reporter is always the login on the request; the body cannot name
 one.
 
@@ -2086,6 +2710,9 @@ produces the same payload.
 - `uv run python scripts/export_spots_fixture.py [db [records-db]]` recaptures the fixture from a
   database. The optional second database lends its iNaturalist and GBIF records to a throwaway copy
   so the "recorded more often here" card can be captured; without it that entry is skipped.
+- `uv run python scripts/export_sections_fixture.py path/to/fishing.db` recaptures the sections fixture
+  from a copy of a built database. Sections need no build step of their own: they are read off the
+  river sections, water bodies, spots and shoreline features on every call.
 - `uv run python scripts/export_weed_reports_fixture.py` recaptures the weed-report fixture. It builds a
   throwaway database from the water bodies in the spots fixture and never touches the real one.
 - Water bodies are rebuilt with the spots, in the same transaction, from the curated river

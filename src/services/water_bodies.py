@@ -30,6 +30,7 @@ from sqlite_utils.db import Database
 
 from src.models.jurisdiction import JurisdictionCode
 from src.models.lake_outline import LakeOutline
+from src.models.shoreline_feature import ShorelineFeature
 from src.models.spot import Spot
 from src.models.stretch import FishingStretch
 from src.models.water_body import NameSource, WaterBody, WaterBodyType
@@ -356,6 +357,24 @@ def get_water_body_detail(db: Database, water_body_id: str) -> dict | None:
     }
 
 
+def shoreline_feature_properties(f: ShorelineFeature) -> dict:
+    """What the API says about one shoreline or depth feature, wherever it is served."""
+    return {
+        "feature_id": f.feature_id,
+        "water_body_id": f.water_body_id,
+        "kind": f.kind,
+        "name": f.name,
+        "derivation": f.derivation,
+        "provenance": f.provenance,
+        "source": f.source,
+        "source_date": f.source_date,
+        "note": words.shoreline_feature_note(f.kind, f.derivation, f.name, f.attributes),
+        "attributes": f.attributes,
+        "area_m2": f.area_m2,
+        "length_m": f.length_m,
+    }
+
+
 def water_body_features_geojson(db: Database, water_body_id: str) -> dict | None:
     """A lake's shoreline features as a GeoJSON FeatureCollection. None for an unknown id.
 
@@ -383,22 +402,7 @@ def water_body_features_geojson(db: Database, water_body_id: str) -> dict | None
                 "type": "Feature",
                 "id": f.feature_id,
                 "geometry": f.geometry,
-                "properties": {
-                    "feature_id": f.feature_id,
-                    "water_body_id": f.water_body_id,
-                    "kind": f.kind,
-                    "name": f.name,
-                    "derivation": f.derivation,
-                    "provenance": f.provenance,
-                    "source": f.source,
-                    "source_date": f.source_date,
-                    "note": words.shoreline_feature_note(
-                        f.kind, f.derivation, f.name, f.attributes
-                    ),
-                    "attributes": f.attributes,
-                    "area_m2": f.area_m2,
-                    "length_m": f.length_m,
-                },
+                "properties": shoreline_feature_properties(f),
             }
         )
     return {
