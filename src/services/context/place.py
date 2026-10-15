@@ -381,24 +381,19 @@ def water_names_at(db: Database, place: Place, within_km: float = 1.0) -> list[s
     """Names of the named watercourses that pass within `within_km` of the place.
 
     Nearest first. These are the place's own waters: what a gauge has to be on
-    to count as the same river. Reads the place's segments, so it works for any
-    jurisdiction whose hydro network is in `stream_segments` with names. An
+    to count as the same river. Searches every named segment rather than the
+    place's capped segment set, so dense areas cannot hide the pin's own river.
+    Works for any jurisdiction whose hydro network is in `stream_segments`. An
     empty list means no named water passes that close, not that there is none.
     """
-    if not place.segment_ids or "stream_segments" not in db.table_names():
+    if "stream_segments" not in db.table_names():
         return []
     best: dict[str, float] = {}
-    ids = place.segment_ids
-    for i in range(0, len(ids), 400):
-        chunk = ids[i : i + 400]
-        marks = ",".join("?" * len(chunk))
-        for row in db["stream_segments"].rows_where(
-            f"ogf_id IN ({marks}) AND name IS NOT NULL AND name != ''", chunk
-        ):
-            dist = _segment_distance_km(row, place.lat, place.lng)
-            if dist is not None and dist <= within_km:
-                name = str(row["name"]).strip()
-                best[name] = min(dist, best.get(name, dist))
+    for row in db["stream_segments"].rows_where("name IS NOT NULL AND name != ''"):
+        dist = _segment_distance_km(row, place.lat, place.lng)
+        if dist is not None and dist <= within_km:
+            name = str(row["name"]).strip()
+            best[name] = min(dist, best.get(name, dist))
     return sorted(best, key=best.__getitem__)
 
 
