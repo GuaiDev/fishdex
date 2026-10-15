@@ -4,8 +4,10 @@ Four kinds, all from sources the repo already reads, none of them a fish claim:
 
 - **inlets / outlets** — where a mapped OHN watercourse meets the shore. The
   stream's digitised direction says which: a stream whose *downstream* end sits
-  on the shore flows in (an inlet), one whose *upstream* end sits there drains
-  the lake (an outlet). A junction whose flow direction OHN has not verified is
+  on the shore flows in (an inlet), one whose *upstream* end sits there starts
+  at the shore and flows away (an outlet). That is what the map shows, not a
+  claim that the lake drains here: Lake Ontario has 24 such streams and drains
+  through one river. A junction whose flow direction OHN has not verified is
   not classified, and is counted, never guessed.
 - **islands** — the holes in the outline polygon. A hole is land inside the
   water, straight out of the record.

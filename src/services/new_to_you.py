@@ -12,6 +12,13 @@ length of the request. Only confirmed catches count (`confirmed_only=True`,
 the same rule the FishDex screen uses), so a photo-ID or text-parser guess the
 user has not confirmed is never "caught".
 
+The hook only speaks once the angler has caught enough different species
+(`MIN_SPECIES_FOR_HOOK`). Before that, nearly every fish recorded at nearly
+every spot is "new", so "N species you haven't caught yet" is the same sentence
+on every card and says nothing about the place; the card falls back to its
+sentence about the water. The `new_to_you` block and the `new_to_me` filter are
+not gated: they still list exactly which species are new.
+
 Names are matched as a set of keys per species (canonical scientific name and
 lowercase common name) because a catch row holds the common name the angler
 confirmed, while a record holds whatever its source called the fish.
@@ -23,6 +30,12 @@ from src.services.species_family import canonical_scientific_name
 from src.services.species_mapping import COMMON_TO_SCIENTIFIC
 from src.storage.catches import get_all_catches_for_user
 from src.storage.species_ranges import query_deduped_species_ranges_for_jurisdiction
+
+# Distinct confirmed species before the "new to you" hook may replace the card's
+# sentence about the water. Measured on the Toronto walkthrough: with 0 or 5
+# catches, 37 of 50 cards opened with the same sentence and the filter kept
+# 49 of 50 spots.
+MIN_SPECIES_FOR_HOOK = 10
 
 
 def species_keys(scientific: str | None, common: str | None) -> frozenset[str]:
@@ -64,3 +77,14 @@ def caught_keys(db: Database, user_id: int, jurisdiction: str = "CA-ON") -> froz
 
 def is_caught(caught: frozenset[str], scientific: str | None, common: str | None) -> bool:
     return bool(caught & species_keys(scientific, common))
+
+
+def caught_species_count(db: Database, user_id: int) -> int:
+    """How many different species this user has confirmed catching (not catches)."""
+    return len(
+        {
+            (row.get("species") or "").strip().lower()
+            for row in get_all_catches_for_user(db, user_id, confirmed_only=True)
+            if (row.get("species") or "").strip()
+        }
+    )

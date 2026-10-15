@@ -177,10 +177,20 @@ class SpotBuildReport(BaseModel):
     shoreline_features_total: int = 0
     shoreline_features_by_kind: dict[str, int] = Field(default_factory=dict)
     shoreline_features_dropped: dict[str, int] = Field(default_factory=dict)
+    # Upstream lake fetches that failed and were skipped so the rest of the build
+    # could finish, by step: lake_outline, lake_outline_widen, shore_watercourses,
+    # bathymetry. A lake that failed here is missing something (its outline, an
+    # inlet, its depth), which says nothing about the lake. Re-running the build
+    # retries only these, because every fetch that worked is cached.
+    upstream_failures: dict[str, int] = Field(default_factory=dict)
 
     def drop(self, reason: str, n: int = 1) -> None:
         if n > 0:  # a zero would read as a reason that fired
             self.dropped[reason] = self.dropped.get(reason, 0) + n
+
+    def upstream_failed(self, step: str, n: int = 1) -> None:
+        if n > 0:  # a zero would read as a step that failed
+            self.upstream_failures[step] = self.upstream_failures.get(step, 0) + n
 
     def hold_back(self, reason: str, n: int = 1) -> None:
         if n > 0:  # a zero would read as a reason that fired

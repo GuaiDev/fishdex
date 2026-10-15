@@ -11,13 +11,13 @@ from dataclasses import dataclass, field
 
 # How the polygon was chosen for the curated name, recorded so a weak match is
 # visible rather than silently published.
-#   name_match              an OHN polygon's stripped name equals the curated name
-#   largest_within_tolerance  no name match; the largest lake-type polygon near a mouth
+#   name_match   an OHN polygon's stripped name equals the curated name
+#   no_match     nothing near a mouth carries the name, so no outline is drawn. A bay
+#                is not drawn as the lake it opens off.
 MatchBasis = str
 
 # an OHN polygon matched to a lake by name, unioned for the Great Lakes.
 MATCH_NAME = "name_match"
-MATCH_LARGEST = "largest_within_tolerance"
 MATCH_NONE = "no_match"
 
 
@@ -38,3 +38,7 @@ class LakeOutline:
     licence: str = ""
     licence_url: str = ""
     note: str = ""
+    lookup_failed: bool = False
+    """An upstream fetch for this lake failed (timeout, error body). The outline is then empty
+    or only partly widened, which says nothing about the lake: re-running the build retries
+    only what failed, because every fetch that succeeded is cached."""

@@ -13,7 +13,7 @@ import pytest
 
 from src.models.spot_card import SpotCard
 from src.services import spot_labels
-from src.services.new_to_you import caught_keys
+from src.services.new_to_you import MIN_SPECIES_FOR_HOOK, caught_keys, caught_species_count
 from src.services.spot_card import build_spot_card
 from src.services.spots import spots_geojson
 from src.storage.catches import insert_catch
@@ -87,6 +87,20 @@ def catch(db, user_id, common, confirmed=True):
     )
 
 
+# Species that are never recorded in these tests, so catching them makes an angler
+# experienced enough for the hook without changing what is new at the spot.
+ELSEWHERE = [
+    "walleye", "northern pike", "lake trout", "brook trout", "brown trout", "channel catfish",
+    "yellow perch", "white sucker", "rock bass", "black crappie", "bowfin", "freshwater drum",
+]  # fmt: skip
+
+
+def experienced(db, user_id, n=MIN_SPECIES_FOR_HOOK):
+    """Log `n` confirmed catches of `n` different species that are not recorded at the spot."""
+    for common in ELSEWHERE[:n]:
+        catch(db, user_id, common)
+
+
 def names(card):
     return [s.name for s in card.new_to_you.species]
 
@@ -108,12 +122,13 @@ def test_a_caller_with_no_user_gets_the_shared_card_unchanged(db):
     assert "new to you" not in json.dumps(card.model_dump()).lower()
 
 
-def test_a_user_with_no_catches_has_every_recorded_species_new(db):
+def test_a_user_with_no_catches_has_every_recorded_species_new_but_no_hook_about_it(db):
+    """Everything is new to someone with no catches, so saying so tells them nothing:
+    the card opens with its sentence about the water, and the block still lists the fish."""
     record_three(db)
     card = build_spot_card(db, junction(), ALICE)
-    assert card.hook.kind == "new_to_you"
-    assert card.hook.title == "Why it's interesting"
-    assert card.hook.text == "3 species recorded here you haven't caught yet"
+    assert card.hook.kind == "structure"
+    assert "haven't caught" not in card.hook.text
     assert card.new_to_you.count == 3
     assert card.new_to_you.title == spot_labels.NEW_TO_YOU_TITLE
     assert card.new_to_you.tap_prompt == "Tap to see which"
@@ -124,9 +139,15 @@ def test_a_user_with_no_catches_has_every_recorded_species_new(db):
 
 def test_a_confirmed_catch_removes_that_species_and_the_count_follows(db):
     record_three(db)
+    experienced(db, ALICE)
     catch(db, ALICE, "creek chub")
     card = build_spot_card(db, junction(), ALICE)
+    assert card.hook.kind == "new_to_you"
+    assert card.hook.title == "Why it's interesting"
     assert card.hook.text == "2 species recorded here you haven't caught yet"
+    assert card.new_to_you.count == 2
+    assert card.new_to_you.title == spot_labels.NEW_TO_YOU_TITLE
+    assert card.new_to_you.tap_prompt == "Tap to see which"
     assert "Creek Chub" not in names(card)
 
 
@@ -149,9 +170,41 @@ def test_an_unconfirmed_guess_never_counts_as_caught(db):
 
 def test_one_new_species_uses_the_singular_wording(db):
     inat(db, *CHUB)
+    experienced(db, ALICE)
     card = build_spot_card(db, junction(), ALICE)
     assert card.hook.text == "1 species recorded here you haven't caught yet"
     assert card.new_to_you.count == 1
+
+
+def test_the_hook_speaks_only_after_enough_different_species_are_caught(db):
+    record_three(db)
+    experienced(db, ALICE, MIN_SPECIES_FOR_HOOK - 1)
+    assert caught_species_count(db, ALICE) == MIN_SPECIES_FOR_HOOK - 1
+    just_short = build_spot_card(db, junction(), ALICE)
+    assert just_short.hook.kind == "structure"
+    assert just_short.hook.text.startswith("Two streams meet here")
+    assert just_short.new_to_you.count == 3  # the list itself is never withheld
+
+    catch(db, ALICE, ELSEWHERE[MIN_SPECIES_FOR_HOOK - 1])
+    enough = build_spot_card(db, junction(), ALICE)
+    assert caught_species_count(db, ALICE) == MIN_SPECIES_FOR_HOOK
+    assert enough.hook.kind == "new_to_you"
+
+
+def test_the_same_species_caught_many_times_counts_once(db):
+    for _ in range(MIN_SPECIES_FOR_HOOK + 2):
+        catch(db, ALICE, "walleye")
+    assert caught_species_count(db, ALICE) == 1
+    record_three(db)
+    assert build_spot_card(db, junction(), ALICE).hook.kind == "structure"
+
+
+def test_an_unconfirmed_guess_does_not_count_toward_the_hook(db):
+    for common in ELSEWHERE[:MIN_SPECIES_FOR_HOOK]:
+        catch(db, ALICE, common, confirmed=False)
+    assert caught_species_count(db, ALICE) == 0
+    record_three(db)
+    assert build_spot_card(db, junction(), ALICE).hook.kind == "structure"
 
 
 def test_nothing_recorded_means_no_new_to_you_and_the_honest_hook(db):
@@ -278,11 +331,21 @@ def test_the_plain_list_carries_no_per_user_property(db):
 def test_the_filter_and_the_card_agree(db):
     record_three(db)
     replace_spots(db, "CA-ON", [junction()])
+    experienced(db, ALICE)
     catch(db, ALICE, "smallmouth bass")
     card = build_spot_card(db, junction(), ALICE)
     feature = spots_geojson(db, max_tier=3, new_to_me=True, user_id=ALICE)["features"][0]
     assert feature["properties"]["new_to_you"]["count"] == card.new_to_you.count == 2
     assert feature["properties"]["new_to_you"]["text"] == card.hook.text
+
+
+def test_the_filter_and_the_block_agree_even_while_the_hook_is_quiet(db):
+    record_three(db)
+    replace_spots(db, "CA-ON", [junction()])
+    card = build_spot_card(db, junction(), ALICE)
+    feature = spots_geojson(db, max_tier=3, new_to_me=True, user_id=ALICE)["features"][0]
+    assert card.hook.kind == "structure"
+    assert feature["properties"]["new_to_you"]["count"] == card.new_to_you.count == 3
 
 
 def test_new_to_me_combines_with_the_kind_filter(db):
@@ -339,6 +402,7 @@ def client(tmp_path, monkeypatch, _template_db):
 
 
 def test_the_spot_endpoint_serves_the_hook_for_the_caller_and_is_not_cacheable(client):
+    experienced(client.db, ALICE)
     response = client.get(f"/map/spots/{junction().spot_id}")
     card = response.json()["card"]
     assert card["hook"]["kind"] == "new_to_you"

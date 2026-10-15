@@ -712,7 +712,8 @@ def test_no_jargon_in_any_fixed_string_the_renderer_owns():
 def test_the_term_registry_is_the_only_place_the_hard_words_are_allowed():
     linked = {t: terms.TERMS[t]["definition"] for t in terms.CARD_LINKED_TERMS}
     banned_in_definitions = {t for t, text in linked.items() if BANNED.search(text)}
-    assert banned_in_definitions == {"confluence", "tailwater"}
+    # confluence and tailwater keep their ids but are no longer shown in any wording
+    assert banned_in_definitions == set()
 
 
 def test_every_hook_fits_two_lines(db):

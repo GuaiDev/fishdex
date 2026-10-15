@@ -55,12 +55,35 @@ def test_the_labels_payload_carries_term_ids_not_presentation():
         assert feature["term_ids"] == [feature["kind"]]
 
 
-def test_card_linked_words_keep_their_old_definitions():
-    """The three words cards link were moved here from translate.GLOSSARY unchanged."""
+def test_card_linked_words_are_defined_without_the_retired_words():
+    """Confluence and tailwater keep their ids (literacy evidence is stored against
+    them) but the words are never shown: not plain, not technical, not defined."""
     assert terms.TERMS["confluence"]["definition"] == (
-        "A confluence is the place where two streams meet and become one."
+        "A stream junction is the place where two streams meet and become one."
     )
     assert terms.TERMS["tailwater"]["definition"] == (
-        "A tailwater is the part of a river just downstream of a dam."
+        "The water below a dam is the part of a river just downstream of it."
     )
     assert set(terms.CARD_LINKED_TERMS) <= set(terms.TERMS)
+
+
+def test_confluence_and_tailwater_are_never_shown_in_any_wording():
+    retired = re.compile(r"confluence|tailwater", re.IGNORECASE)
+    for term_id in ("confluence", "tailwater"):
+        t = terms.TERMS[term_id]
+        assert t["term_id"] == term_id
+        for field in ("plain", "technical", "definition"):
+            assert not retired.search(t[field]), (term_id, field, t[field])
+    assert terms.TERMS["confluence"]["technical"] == "Stream junction"
+    assert terms.TERMS["tailwater"]["technical"] == "Below the dam"
+
+
+def test_an_outlet_does_not_claim_the_lake_drains_there():
+    """The shoreline feature is a mapped stream that starts at the shore. Lake Ontario
+    has 24 of them and drains through one river, so no wording may say 'drains'."""
+    for text in (
+        spot_labels.FEATURE_KINDS["outlet"]["one_liner"],
+        terms.TERMS["outlet"]["plain"],
+        terms.TERMS["outlet"]["definition"],
+    ):
+        assert "drain" not in text.lower(), text

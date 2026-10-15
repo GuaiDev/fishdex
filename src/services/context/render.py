@@ -64,7 +64,7 @@ from src.models.spot_card import (
 )
 from src.services import spot_labels, terms
 from src.services.context import translate
-from src.services.new_to_you import is_caught
+from src.services.new_to_you import MIN_SPECIES_FOR_HOOK, is_caught
 
 # A record older than this is called out in the rendering. Not a cutoff and not
 # a confidence penalty — the angler weighs it. We only make sure the date is
@@ -633,6 +633,9 @@ class _CardInputs:
     # Species in `shown` the logged-in user has not caught, ranked like `shown`.
     # None for a caller with no user; [] for a user with nothing new.
     new_species: list[CardSpecies] | None = None
+    # Different species the user has confirmed catching. The "new to you" hook
+    # stays quiet below `MIN_SPECIES_FOR_HOOK`.
+    caught_species: int = 0
     special: SpecialHere | None = None
 
     @property
@@ -652,8 +655,12 @@ def _hook_protected(c: _CardInputs) -> str | None:
 
 
 def _hook_new_to_you(c: _CardInputs) -> str | None:
-    """ "3 species recorded here you haven't caught yet": only for a user with something new."""
-    return spot_labels.new_to_you_hook(len(c.new_species)) if c.new_species else None
+    """ "3 species recorded here you haven't caught yet": only for a user with something new,
+    and only once they have caught enough different species for "new" to mean something.
+    Before that the chain falls through to the card's sentence about the water."""
+    if not c.new_species or c.caught_species < MIN_SPECIES_FOR_HOOK:
+        return None
+    return spot_labels.new_to_you_hook(len(c.new_species))
 
 
 def _hook_structure(c: _CardInputs) -> str | None:
@@ -742,8 +749,9 @@ def _hook_honest_empty(c: _CardInputs) -> str | None:
 
 
 # First rule that has data wins. "new_to_you" is per-user: it speaks only when
-# the caller is a logged-in user with a recorded species they have not caught,
-# and otherwise the chain falls through to "structure". "distinctive" needs
+# the caller is a logged-in user with a recorded species they have not caught
+# and at least `MIN_SPECIES_FOR_HOOK` species caught, and otherwise the chain
+# falls through to "structure". "distinctive" needs
 # the special-here line: frequency here against the rest of the river section.
 HOOK_CHAIN: tuple[HookRule, ...] = (
     HookRule("protected_species", _hook_protected),
@@ -1064,6 +1072,7 @@ def render_spot(
     unchecked: int = 0,
     caught: frozenset[str] | None = None,
     special: SpecialHere | None = None,
+    caught_species: int = 0,
 ) -> SpotCard:
     """The whole tap card for one spot: four blocks, every string already written.
 
@@ -1080,9 +1089,10 @@ def render_spot(
 
     The card is the same for every user, with one exception. `caught` is the
     match keys of the logged-in user's confirmed catches (`new_to_you.caught_keys`)
-    and is None for a caller with no user. Only then are the "new to you" hook and
-    block filled; `ctx` is never built from a person's history, so nothing else
-    on the card changes with who asks.
+    and is None for a caller with no user. Only then is the "new to you" block
+    filled, and the hook too once `caught_species` (how many different species they
+    have confirmed) reaches `MIN_SPECIES_FOR_HOOK`. `ctx` is never built from a
+    person's history, so nothing else on the card changes with who asks.
     """
     radius = ctx.place.radius_km if ctx else 2.0
     ranked, n_protected, n_imprecise = _rank_recorded(ctx, protected)
@@ -1100,6 +1110,7 @@ def render_spot(
         n_protected=n_protected,
         n_imprecise=n_imprecise,
         new_species=new_species,
+        caught_species=caught_species,
         special=special,
     )
     hook = _choose_hook(inputs)

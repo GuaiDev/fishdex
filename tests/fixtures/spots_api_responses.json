@@ -129,7 +129,7 @@
             "kind": "outlet",
             "label": "Outlet",
             "chip": "Outlets",
-            "one_liner": "The lake drains out here.",
+            "one_liner": "A mapped stream starts at the shore here and flows away.",
             "term_ids": [
               "outlet"
             ]
@@ -241,8 +241,8 @@
           {
             "term_id": "confluence",
             "plain": "Where two streams join",
-            "technical": "Confluence",
-            "definition": "A confluence is the place where two streams meet and become one.",
+            "technical": "Stream junction",
+            "definition": "A stream junction is the place where two streams meet and become one.",
             "mapped_from": "Ontario government water map (stream lines)"
           },
           {
@@ -269,8 +269,8 @@
           {
             "term_id": "tailwater",
             "plain": "The water just below a dam",
-            "technical": "Tailwater",
-            "definition": "A tailwater is the part of a river just downstream of a dam.",
+            "technical": "Below the dam",
+            "definition": "The water below a dam is the part of a river just downstream of it.",
             "mapped_from": "OpenStreetMap volunteers (dams and weirs)"
           },
           {
@@ -289,9 +289,9 @@
           },
           {
             "term_id": "outlet",
-            "plain": "Where a lake drains out",
+            "plain": "Where a stream leaves a lake",
             "technical": "Outlet",
-            "definition": "An outlet is the place where water leaves a lake as a stream.",
+            "definition": "An outlet is a place where a stream starts at a lake and flows away.",
             "mapped_from": "Ontario government water map (lake outlines)"
           },
           {

@@ -19,7 +19,8 @@ records slice would otherwise fold in, cannot reach the shared part.
 
 The one per-user piece is "new to you" (`new_to_you.py`): when a user id is
 given, their confirmed catches are read for this request, subtracted from the
-nameable recorded species, and used to fill the hook and the `new_to_you` block.
+nameable recorded species, and used to fill the `new_to_you` block and, once they
+have caught enough different species (`new_to_you.MIN_SPECIES_FOR_HOOK`), the hook.
 They are read fresh each time and never written anywhere shared. With no user id
 the card is exactly the shared one.
 """
@@ -32,7 +33,7 @@ from src.services.context import describe
 from src.services.context.render import new_species_for_user, render_spot
 from src.services.context.special import special_here
 from src.services.context.species import listing_check
-from src.services.new_to_you import caught_keys
+from src.services.new_to_you import caught_keys, caught_species_count
 
 CARD_RADIUS_KM = 2.0
 # No such user exists (ids start at 1), so the records slice finds no personal
@@ -62,6 +63,7 @@ def screen_species(db: Database, ctx) -> tuple[frozenset[str], int]:
 
 def build_spot_card(db: Database, spot: Spot, user_id: int | None = None) -> SpotCard:
     caught = caught_keys(db, user_id, spot.jurisdiction) if user_id else None
+    caught_species = caught_species_count(db, user_id) if user_id else 0
     ctx = describe(
         db,
         lat=spot.lat,
@@ -75,7 +77,13 @@ def build_spot_card(db: Database, spot: Spot, user_id: int | None = None) -> Spo
     # section, so there is nothing to compare it with.
     special = None if spot.kind == "quiet_water" else special_here(db, spot, protected)
     return render_spot(
-        spot, ctx, protected=protected, unchecked=unchecked, special=special, caught=caught
+        spot,
+        ctx,
+        protected=protected,
+        unchecked=unchecked,
+        special=special,
+        caught=caught,
+        caught_species=caught_species,
     )
 
 

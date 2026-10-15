@@ -823,8 +823,11 @@ def build_spots(
     jurisdiction = curation.jurisdiction
     anchors = list_anchors(db, jurisdiction=jurisdiction)
     stretches = list_stretches(db, jurisdiction)
-    outlines, watercourses = _lake_outline_inputs(anchors, outline_resolver, watercourse_fetcher)
-    bathymetry = _bathymetry_inputs(outlines, bathymetry_fetcher)
+    failures: dict[str, int] = {}
+    outlines, watercourses = _lake_outline_inputs(
+        anchors, outline_resolver, watercourse_fetcher, failures
+    )
+    bathymetry = _bathymetry_inputs(outlines, bathymetry_fetcher, failures)
     built_at = datetime.now(UTC).isoformat(timespec="seconds")
     result = classify(
         anchors,
@@ -847,6 +850,16 @@ def build_spots(
     )
 
     report = result.report
+    for step, n in failures.items():
+        report.upstream_failed(step, n)
+    if failures:
+        logger.warning(
+            "%d upstream lake fetches failed and were skipped (%s): the lakes involved are "
+            "missing an outline, an inlet or a depth, which says nothing about the water. "
+            "Run the build again; only the failed fetches are retried.",
+            sum(failures.values()),
+            ", ".join(f"{step} x{n}" for step, n in sorted(failures.items())),
+        )
     if not anchors:
         logger.warning(
             "no stretch anchors stored for %s: spots are empty; run build-stretches first",
@@ -880,6 +893,7 @@ def _lake_outline_inputs(
     outline_resolver: Callable[[dict[str, list[tuple[float, float]]]], dict[str, LakeOutline]]
     | None = None,
     watercourse_fetcher: Callable[[float, float, float, float], list[StreamSegment]] | None = None,
+    failures: dict[str, int] | None = None,
 ) -> tuple[dict[str, LakeOutline], list[StreamSegment]]:
     """Named lake mouths in the anchors → outlines plus the watercourses for their inlets.
 
@@ -887,8 +901,14 @@ def _lake_outline_inputs(
     the first build. A lake with no curated name gets no outline (an unnamed
     mouth is not enough to match a polygon). The resolver and fetcher are
     injected in tests; the defaults are the cached OHN adapters.
+
+    One failed fetch costs that lake (or that shore cell) its piece and is counted
+    into `failures`; it never stops the build. The default resolver isolates each
+    lake itself and flags it `lookup_failed`; a resolver that raises is caught here.
     """
     from shapely.geometry import shape as _shape
+
+    failures = failures if failures is not None else {}
 
     mouths_by_lake: dict[str, list[tuple[float, float]]] = {}
     for a in anchors:
@@ -906,7 +926,16 @@ def _lake_outline_inputs(
         from src.ingest.jurisdictions.ca_on.hydro_network import fetch_watercourses_bbox
 
         watercourse_fetcher = fetch_watercourses_bbox
-    outlines = outline_resolver(mouths_by_lake)
+    try:
+        outlines = outline_resolver(mouths_by_lake)
+    except Exception:  # noqa: BLE001 - a flaky upstream must not stop the build
+        logger.warning("lake outline resolver failed; no lake outlines this run", exc_info=True)
+        failures["lake_outline"] = failures.get("lake_outline", 0) + len(mouths_by_lake)
+        return {}, []
+    for outline in outlines.values():
+        if outline.lookup_failed:
+            step = "lake_outline_widen" if outline.matched else "lake_outline"
+            failures[step] = failures.get(step, 0) + 1
 
     watercourses: list[StreamSegment] = []
     seen_ogf: set[int] = set()
@@ -914,7 +943,18 @@ def _lake_outline_inputs(
         if not outline.matched or not outline.geometry:
             continue
         for cell in _shore_cells(_shape(outline.geometry).boundary):
-            for seg in watercourse_fetcher(*cell):
+            try:
+                segments = watercourse_fetcher(*cell)
+            except Exception:  # noqa: BLE001 - one flaky tile must not stop the build
+                logger.warning(
+                    "shore watercourse fetch failed for %r cell %s",
+                    outline.curated_name,
+                    cell,
+                    exc_info=True,
+                )
+                failures["shore_watercourses"] = failures.get("shore_watercourses", 0) + 1
+                continue
+            for seg in segments:
                 if seg.ogf_id not in seen_ogf:
                     seen_ogf.add(seg.ogf_id)
                     watercourses.append(seg)
@@ -924,14 +964,17 @@ def _lake_outline_inputs(
 def _bathymetry_inputs(
     outlines: dict[str, LakeOutline],
     bathymetry_fetcher: Callable[[LakeOutline], LakeBathymetry] | None = None,
+    failures: dict[str, int] | None = None,
 ) -> dict[str, LakeBathymetry]:
     """Each matched lake's surveyed contours, keyed by curated name.
 
     Every call goes through a cache, so this stays cheap offline after the first
     build. The fetcher is injected in tests; the default is the cached LIO
     Bathymetry adapter. A lake with no overlapping survey is left out, so the
-    derivation counts it as one with no contours.
+    derivation counts it as one with no contours. A fetch that fails is counted into
+    `failures` and treated the same way for this run, so one lake cannot stop the build.
     """
+    failures = failures if failures is not None else {}
     matched = {name: o for name, o in outlines.items() if o.matched and o.geometry}
     if not matched:
         return {}
@@ -941,7 +984,12 @@ def _bathymetry_inputs(
         bathymetry_fetcher = fetch_lake_bathymetry
     out: dict[str, LakeBathymetry] = {}
     for name, outline in matched.items():
-        lake = bathymetry_fetcher(outline)
+        try:
+            lake = bathymetry_fetcher(outline)
+        except Exception:  # noqa: BLE001 - one flaky survey fetch must not stop the build
+            logger.warning("bathymetry fetch failed for %r", name, exc_info=True)
+            failures["bathymetry"] = failures.get("bathymetry", 0) + 1
+            continue
         if lake.index is not None or lake.contours:
             out[name] = lake
     return out
@@ -1031,8 +1079,8 @@ def spots_geojson(
     if species:
         species_l = species.strip().lower()
         # avoid naming matches that reveal listed status - just filter by records presence
-        allowed = set(_species_within_2km(db, species_l)) if species_l else set()
-        shown = [s for s in shown if s.spot_id in allowed] if allowed else []
+        # Only the spots about to be shown are looked up, not every spot built.
+        shown = _spots_with_species(db, shown, species_l) if species_l else []
     if near:
         nlat, nlon, nr = near
         if nr is None:
@@ -1140,77 +1188,54 @@ def get_spot_detail(db: Database, spot_id: str, user_id: int | None = None) -> d
     }
 
 
-def _species_within_2km(db: Database, species_l: str) -> list[str]:
-    """Return spot_ids where the given species has records within 2 km."""
-    from src.services.context import slices
-    from src.services.context.species import describe_species
-    from src.storage.gbif_observations import query_gbif_observations
-    from src.storage.observations import query_observations
+def _spots_with_species(db: Database, spots: list[Spot], species_l: str) -> list[Spot]:
+    """The given spots with records of the named species within 2 km and no listed fish in the way.
 
-    spot_ids = []
-    for spot in list_spots(db, max_tier=3):
-        found = False
-        matched = set()
+    The records are the cleaned ones the spot card uses (`slices.build_records`):
+    hybrids and groups are gone, a hybrid with a listed parent counts as a record
+    of that parent, and the angler's own catches are not read, so another user's
+    logged stops can never put a spot into this answer.
+
+    Fails closed in three ways, because this filter must never be a way to ask
+    where a protected fish lives:
+      * a query that names a listed species returns nothing, whatever the records say;
+      * a spot is dropped when any record its query matched is listed;
+      * a matched record whose name the species file does not know is treated as
+        potentially listed, so a scientific-name-only row for a listed fish cannot slip
+        through (the file knows 69 species, so the filter answers for those and no more).
+    """
+    from src.models.context import Place
+    from src.services.context import slices
+    from src.services.context.species import listing_check
+    from src.services.spot_card import NO_USER
+
+    if listing_check(db, scientific_name=species_l, common_name=species_l) is True:
+        return []
+
+    found: list[Spot] = []
+    for spot in spots:
+        place = Place(query=spot.spot_id, lat=spot.lat, lng=spot.lng, radius_km=2.0)
         try:
-            obs, _ = query_observations(
-                db,
-                lat=spot.lat,
-                lng=spot.lng,
-                radius_km=2.0,
-                days_back=3650,
-                species_filter=species_l,
-                limit=50,
-            )
-            for o in obs:
-                names = [getattr(o, "species", "") or "", getattr(o, "common_name", "") or ""]
-                if any(species_l in n.lower() for n in names):
-                    found = True
-                    matched.update(n for n in names if n)
-        except Exception:
-            pass
-        if not found:
-            try:
-                gb = query_gbif_observations(
-                    db, lat=spot.lat, lng=spot.lng, radius_km=2.0, species_filter=species_l
-                )
-                for o in gb:
-                    names = [getattr(o, "species", "") or "", getattr(o, "common_name", "") or ""]
-                    if any(species_l in n.lower() for n in names):
-                        found = True
-                        matched.update(n for n in names if n)
-            except Exception:
-                pass
-        if not found:
-            try:
-                deg = 2.0 / 111.0
-                rows = list(
-                    db.execute(
-                        "SELECT st.species_caught FROM stops st JOIN sessions s "
-                        "ON st.session_id = s.id WHERE st.lat BETWEEN ? AND ? "
-                        "AND st.lng BETWEEN ? AND ?",
-                        [spot.lat - deg, spot.lat + deg, spot.lng - deg, spot.lng + deg],
-                    ).fetchall()
-                )
-                for r in rows:
-                    for sp in slices._load_species_list(r[0]):
-                        if species_l in sp.lower():
-                            found = True
-                            matched.add(sp)
-            except Exception:
-                pass
-        if found:
-            listed = False
-            for m in matched:
-                try:
-                    sc = describe_species(db, m)
-                    if getattr(sc, "status_known_listed", False):
-                        listed = True
-                        break
-                except Exception:
-                    listed = True  # fail closed
-            if not listed:
-                spot_ids.append(spot.spot_id)
-    return spot_ids
+            # No species filter on the query: a row filed under the scientific name
+            # alone does not contain the common name the angler typed, and is only
+            # given its common name by the cleaning that runs after the query.
+            records = slices.build_records(
+                db, place, species_filter=None, user_id=NO_USER, escalate=False
+            ).species
+        except Exception:  # noqa: BLE001 - one spot's lookup must not fail the map
+            logger.warning("species filter lookup failed at %s", spot.spot_id, exc_info=True)
+            continue
+        matched = [r for r in records if species_l in f"{r.species} {r.common_name or ''}".lower()]
+        if not matched:
+            continue
+        # True = listed, None = the species file does not know it: neither may pass.
+        if any(
+            listing_check(db, scientific_name=r.species, common_name=r.common_name) is not False
+            for r in matched
+        ):
+            continue
+        found.append(spot)
+    return found
 
 
 def _water_body_ref(db: Database, water_body_id: str | None) -> dict | None:
@@ -1225,51 +1250,6 @@ def _water_body_ref(db: Database, water_body_id: str | None) -> dict | None:
         "name_source": wb.name_source,
         "type": wb.type,
     }
-
-
-def species_within_2km_of_spot(db: Database, lat: float, lng: float, species: str) -> bool:
-    """Small helper: does the species have records within 2 km of (lat,lng)?"""
-    from src.services.context.species import describe_species
-    from src.storage.gbif_observations import query_gbif_observations
-    from src.storage.observations import query_observations
-
-    if describe_species(db, species).status_known_listed:
-        return False
-    try:
-        obs, _ = query_observations(
-            db, lat=lat, lng=lng, radius_km=2.0, days_back=3650, species_filter=species, limit=1
-        )
-        if obs:
-            return True
-    except Exception:
-        pass
-    try:
-        gb = query_gbif_observations(db, lat=lat, lng=lng, radius_km=2.0, species_filter=species)
-        if gb:
-            return True
-    except Exception:
-        pass
-    try:
-        from src.services.context import slices
-
-        deg = 2.0 / 111.0
-        rows = list(
-            db.execute(
-                "SELECT st.species_caught FROM stops st JOIN sessions s ON st.session_id = s.id "
-                "WHERE st.lat BETWEEN ? AND ? AND st.lng BETWEEN ? AND ?",
-                [lat - deg, lat + deg, lng - deg, lng + deg],
-            ).fetchall()
-        )
-        sl = species.strip().lower()
-        for r in rows:
-            for sp in (
-                slices._load_species_list(r[0]) if hasattr(slices, "_load_species_list") else []
-            ):
-                if sp.strip().lower() == sl:
-                    return True
-    except Exception:
-        pass
-    return False
 
 
 def _access_layer_geojson(

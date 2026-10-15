@@ -5,7 +5,7 @@ The fetchers are injected, so nothing here touches the network: the tests hand
 """
 
 from src.ingest.jurisdictions.ca_on.waterbody import OhnWaterbody
-from src.models.lake_outline import MATCH_LARGEST, MATCH_NAME, MATCH_NONE
+from src.models.lake_outline import MATCH_NAME, MATCH_NONE
 from src.services.lake_outlines import (
     MATCH_TOLERANCE_M,
     match_lake_outline,
@@ -38,12 +38,30 @@ def test_a_named_polygon_wins_over_a_larger_unnamed_one():
     assert out.match_basis == MATCH_NAME
 
 
-def test_without_a_name_match_the_largest_lake_type_polygon_is_the_parent():
+def test_a_bay_with_no_polygon_of_its_own_draws_no_shape():
+    """Humber Bay was drawn as all of Lake Ontario. A bay nobody mapped is labelled only."""
     pond = wb(2, "Duck Pond", area=5.0)
-    lake = wb(3, "Somewhere Bay", area=500.0)
+    lake = wb(3, "Lake Ontario", area=500.0)
     out = match_lake_outline("Humber Bay", [(0.005, 0.005)], [pond, lake])
-    assert out.ogf_ids == [3]
-    assert out.match_basis == MATCH_LARGEST
+    assert out.matched is False
+    assert out.geometry is None
+    assert out.ogf_ids == []
+    assert out.match_basis == MATCH_NONE
+    # the build report can say why: what was nearby, and that it was not used
+    assert "Lake Ontario" in out.note and "none is drawn" in out.note
+
+
+def test_a_bay_is_not_given_the_parent_lakes_polygon_through_the_resolver():
+    lake = wb(3, "Lake Ontario", area=500.0)
+    outlines = resolve_lake_outlines(
+        {"Humber Bay": [(43.6, -79.47)], "Lake Ontario": [(43.6, -79.47)]},
+        fetch_near=lambda lon, lat, r: [lake],
+        fetch_by_name=lambda name: [lake],
+    )
+    assert outlines["Humber Bay"].matched is False
+    assert outlines["Humber Bay"].geometry is None
+    assert outlines["Lake Ontario"].matched is True
+    assert outlines["Lake Ontario"].match_basis == MATCH_NAME
 
 
 def test_non_lake_types_are_never_matched():
@@ -133,3 +151,44 @@ def test_an_inland_lake_is_never_widened_even_if_the_name_repeats():
         fetch_by_name=fetch_by_name,
     )
     assert outlines["Rice Lake"].ogf_ids == [1]
+
+
+# ── a flaky upstream fetch costs one lake, not the run ───────────────────────
+
+
+def test_one_lakes_failed_fetch_leaves_the_others_resolved():
+    rice = wb(1, "Rice Lake", area=100.0)
+
+    def fetch_near(lon, lat, radius_m):
+        if lat > 45:  # the second lake's mouth
+            raise TimeoutError("read timed out")
+        return [rice]
+
+    outlines = resolve_lake_outlines(
+        {"Rice Lake": [(44.2, -78.24)], "Lake Nipigon": [(49.8, -88.4)]},
+        fetch_near=fetch_near,
+        fetch_by_name=lambda name: [],
+    )
+    assert outlines["Rice Lake"].matched is True
+    assert outlines["Rice Lake"].lookup_failed is False
+    failed = outlines["Lake Nipigon"]
+    assert failed.matched is False and failed.geometry is None
+    assert failed.lookup_failed is True
+    assert "TimeoutError" in failed.note
+
+
+def test_a_failed_great_lake_widening_keeps_the_slice_and_says_so():
+    slice_ = wb(7, "Lake Ontario", area=100.0)
+
+    def by_name(name):
+        raise RuntimeError("OHN returned HTTP 200 with an error body")
+
+    outlines = resolve_lake_outlines(
+        {"Lake Ontario": [(0.005, 0.005)]},
+        fetch_near=lambda lon, lat, r: [slice_],
+        fetch_by_name=by_name,
+    )
+    out = outlines["Lake Ontario"]
+    assert out.matched is True and out.ogf_ids == [7]
+    assert out.lookup_failed is True
+    assert "only part of the lake" in out.note

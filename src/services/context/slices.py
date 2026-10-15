@@ -29,6 +29,7 @@ from src.models.context import (
 )
 from src.models.freshness import GAUGE_STALE_S, WATER_QUALITY_STALE_S, WEATHER_STALE_S
 from src.services.context import translate
+from src.services.species_labels import clean_species_records
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +57,16 @@ def build_records(
     """
     found: dict[str, SpeciesRecord] = {}
 
-    for rec in _inat_records(db, place, species_filter, days_back):
-        _merge(found, rec)
-    for rec in _gbif_records(db, place, species_filter):
-        _merge(found, rec)
-    for rec in _survey_records(db, place, species_filter):
+    # What contributors filed is cleaned before anything counts it: hybrids,
+    # groups and aquarium fish are not species, and one fish recorded under two
+    # names is one entry (services/species_labels.py). The angler's own logged
+    # catches are their words and are left exactly as typed.
+    external = (
+        _inat_records(db, place, species_filter, days_back)
+        + _gbif_records(db, place, species_filter)
+        + _survey_records(db, place, species_filter)
+    )
+    for rec in clean_species_records(db, external):
         _merge(found, rec)
     for rec in _user_catch_records(db, place, species_filter, user_id):
         _merge(found, rec)
