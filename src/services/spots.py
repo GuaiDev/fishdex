@@ -902,8 +902,16 @@ def spots_geojson(
     jurisdiction: str | None = None,
     species: str | None = None,
     near: tuple[float, float, float | None] | None = None,
+    new_to_me: bool = False,
+    user_id: int | None = None,
 ) -> dict:
     """Spots as a GeoJSON FeatureCollection of points, light enough for a whole map.
+
+    `new_to_me` keeps only spots with at least one nameable recorded species the
+    user (`user_id`) has not caught, and adds `properties.new_to_you` to each. It
+    is per-user, computed in this call from that user's confirmed catches, and
+    stored nowhere; with no `user_id` it is ignored. It runs a records lookup per
+    spot, so pass a `bbox`.
 
     `max_tier` is cumulative: 1 is the headline spots only, 3 is everything.
     `kinds` counts in the `meta` are taken before the kind filter, so the
@@ -931,9 +939,30 @@ def spots_geojson(
         )
     else:
         shown.sort(key=lambda s: (s.tier, _KIND_ORDER[s.kind], s.spot_id))
+    new_counts: dict[str, int] = {}
+    new_to_me_applied = bool(new_to_me and user_id)
+    if new_to_me_applied:
+        from src.services.new_to_you import caught_keys
+        from src.services.spot_card import new_species_at_spot
+
+        caught_by_jurisdiction: dict[str, frozenset[str]] = {}
+        kept = []
+        for s in shown:
+            caught = caught_by_jurisdiction.get(s.jurisdiction)
+            if caught is None:
+                caught = caught_by_jurisdiction[s.jurisdiction] = caught_keys(
+                    db, user_id, s.jurisdiction
+                )
+            if n := len(new_species_at_spot(db, s, caught)):
+                new_counts[s.spot_id] = n
+                kept.append(s)
+        shown = kept
+    meta = {"count": len(shown), "kind_counts": counts, "max_tier": max_tier}
+    if new_to_me_applied:
+        meta["new_to_me"] = True
     return {
         "type": "FeatureCollection",
-        "meta": {"count": len(shown), "kind_counts": counts, "max_tier": max_tier},
+        "meta": meta,
         "features": [
             {
                 "type": "Feature",
@@ -950,6 +979,11 @@ def spots_geojson(
                     "water_name": s.water_name,
                     "water_body_id": s.water_body_id,
                     "signals": s.signals,
+                    **(
+                        {"new_to_you": _new_to_you_property(new_counts[s.spot_id])}
+                        if s.spot_id in new_counts
+                        else {}
+                    ),
                 },
             }
             for s in shown
@@ -957,12 +991,19 @@ def spots_geojson(
     }
 
 
-def get_spot_detail(db: Database, spot_id: str) -> dict | None:
+def _new_to_you_property(count: int) -> dict:
+    from src.services import spot_labels
+
+    return {"count": count, "text": spot_labels.new_to_you_hook(count)}
+
+
+def get_spot_detail(db: Database, spot_id: str, user_id: int | None = None) -> dict | None:
     """One spot in full: its facts, the other spots on the same river, and its card.
 
     The card is the four resolved blocks (why it's interesting, you might find,
     why fish gather here, getting there) with every string written, so the
-    front end joins nothing. It is the same for every user.
+    front end joins nothing. It is the same for every user except for the
+    "new to you" hook and block, which are filled only when `user_id` is given.
     """
     from src.services.spot_card import build_spot_card
 
@@ -982,7 +1023,7 @@ def get_spot_detail(db: Database, spot_id: str) -> dict | None:
             ref for i in spot.also_on_water_body_ids if (ref := _water_body_ref(db, i))
         ],
         "more_on_this_water": others,
-        "card": build_spot_card(db, spot).model_dump(),
+        "card": build_spot_card(db, spot, user_id).model_dump(),
     }
 
 

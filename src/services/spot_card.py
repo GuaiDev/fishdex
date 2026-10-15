@@ -10,11 +10,16 @@ records, the labels and the access data itself. The pieces are:
     not be named.
   * `render_spot()`, the only place card text is produced.
 
-The card is the same for every user and is keyed by `(spot_id, built_at)`; the
-key travels in `card.meta.cache_key`. Nothing per-user is computed here: the
-describe call is made with no user at all, so the angler's own logged catches,
-which the records slice would otherwise fold in, cannot reach a card that is
-meant to be identical for everyone.
+The shared part of the card is the same for every user and is keyed by
+`(spot_id, built_at)`; the key travels in `card.meta.cache_key`. The describe
+call is made with no user at all, so the angler's own logged catches, which the
+records slice would otherwise fold in, cannot reach the shared part.
+
+The one per-user piece is "new to you" (`new_to_you.py`): when a user id is
+given, their confirmed catches are read for this request, subtracted from the
+nameable recorded species, and used to fill the hook and the `new_to_you` block.
+They are read fresh each time and never written anywhere shared. With no user id
+the card is exactly the shared one.
 """
 
 from sqlite_utils.db import Database
@@ -22,8 +27,9 @@ from sqlite_utils.db import Database
 from src.models.spot import Spot
 from src.models.spot_card import SpotCard
 from src.services.context import describe
-from src.services.context.render import render_spot
+from src.services.context.render import new_species_for_user, render_spot
 from src.services.context.species import listing_check
+from src.services.new_to_you import caught_keys
 
 CARD_RADIUS_KM = 2.0
 # No such user exists (ids start at 1), so the records slice finds no personal
@@ -51,7 +57,8 @@ def screen_species(db: Database, ctx) -> tuple[frozenset[str], int]:
     return frozenset(protected), unchecked
 
 
-def build_spot_card(db: Database, spot: Spot) -> SpotCard:
+def build_spot_card(db: Database, spot: Spot, user_id: int | None = None) -> SpotCard:
+    caught = caught_keys(db, user_id, spot.jurisdiction) if user_id else None
     ctx = describe(
         db,
         lat=spot.lat,
@@ -61,4 +68,22 @@ def build_spot_card(db: Database, spot: Spot) -> SpotCard:
         user_id=NO_USER,
     )
     protected, unchecked = screen_species(db, ctx)
-    return render_spot(spot, ctx, protected=protected, unchecked=unchecked)
+    return render_spot(spot, ctx, protected=protected, unchecked=unchecked, caught=caught)
+
+
+def new_species_at_spot(db: Database, spot: Spot, caught: frozenset[str]) -> list:
+    """The species the card would call new to this user, for the `new_to_me` filter.
+
+    Same describe call, same listed-species screen and same ranking as the card,
+    so the filter and the card agree by construction.
+    """
+    ctx = describe(
+        db,
+        lat=spot.lat,
+        lng=spot.lng,
+        radius_km=CARD_RADIUS_KM,
+        caller="map_tap",
+        user_id=NO_USER,
+    )
+    protected, _ = screen_species(db, ctx)
+    return new_species_for_user(ctx, protected, caught)

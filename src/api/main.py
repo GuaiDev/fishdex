@@ -1710,6 +1710,8 @@ def get_map_spots(
     jurisdiction: str | None = None,
     species: str | None = None,
     near: str | None = None,
+    new_to_me: bool = False,
+    response: Response = None,
     user: dict = Depends(get_current_user),
 ):
     """Spots for the explore map, as GeoJSON points.
@@ -1719,12 +1721,29 @@ def get_map_spots(
     `tier` is the highest tier to include, cumulative: 1 headline spots only, 2 adds
     the normal ones (default), 3 everything. Built by `make build-spots` (and at the
     end of `make build-anchors`); an empty collection means it has not been run.
+    `new_to_me=true` keeps only spots with a recorded species the caller has not caught
+    (confirmed catches only), and is computed for the caller alone. It needs a `bbox`.
     """
     from src.services.spots import spots_geojson
     from src.storage.database import get_db
 
     box, kinds, species_f, near_f = _parse_spot_filters(bbox, kind, tier, species, near)
-    return spots_geojson(get_db(), box, kinds, tier, jurisdiction, species=species_f, near=near_f)
+    if new_to_me:
+        if box is None:
+            raise HTTPException(status_code=422, detail="new_to_me needs a bbox")
+        # Per-user answer: never let a browser or proxy keep it for the next person.
+        response.headers["Cache-Control"] = "private, no-store"
+    return spots_geojson(
+        get_db(),
+        box,
+        kinds,
+        tier,
+        jurisdiction,
+        species=species_f,
+        near=near_f,
+        new_to_me=new_to_me,
+        user_id=user["id"],
+    )
 
 
 @app.get("/map/spots/{spot_id}")
@@ -1732,17 +1751,18 @@ def get_map_spot(spot_id: str, response: Response, user: dict = Depends(get_curr
     """One spot in full: title, structure facts, separate signals, nearby parking and
     bridges, sources, the other spots on the same river, and `card`: the four resolved
     blocks a tap reveals (why it's interesting, you might find, why fish gather here,
-    getting there) with every string written. The card is the same for every user.
+    getting there) with every string written. The card is the same for every user except
+    its "new to you" hook and block, which come from the caller's own confirmed catches.
     404 for an unknown id."""
     from src.services.spots import get_spot_detail
     from src.storage.database import get_db
 
-    detail = get_spot_detail(get_db(), spot_id)
+    detail = get_spot_detail(get_db(), spot_id, user["id"])
     if detail is None:
         raise HTTPException(status_code=404, detail=f"No spot with id {spot_id!r}")
-    # The card is user-independent and keyed by (spot_id, built_at): safe to
-    # keep briefly, but not shared (records can arrive without a spot rebuild).
-    response.headers["Cache-Control"] = "private, max-age=300"
+    # The card now depends on who is asking (the "new to you" hook), and a catch
+    # confirmed a minute ago must show: no caching at all, shared or private.
+    response.headers["Cache-Control"] = "private, no-store"
     return detail
 
 

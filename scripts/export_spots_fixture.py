@@ -100,6 +100,7 @@ def seed_examples_and_capture(client, capture, seen: dict[str, str]) -> None:
     from src.models.gbif_observation import GBIFObservation
     from src.models.observation import Observation
     from src.models.species_range import SpeciesRange
+    from src.storage.catches import insert_catch
     from src.storage.gbif_observations import upsert_gbif_observations
     from src.storage.observations import upsert_observations
     from src.storage.species_ranges import upsert_species_ranges
@@ -204,14 +205,52 @@ def seed_examples_and_capture(client, capture, seen: dict[str, str]) -> None:
         database.DB_PATH = copy
         capture(
             f"/map/spots/{with_fish_id}",
-            "card with fish records. EXAMPLE records added to a throwaway copy of the "
-            "database to show the shape; they are not observations",
+            "card with fish records, for a logged-in angler who has caught nothing yet, so "
+            "the hook is `new_to_you` and `card.new_to_you` names every recorded species. "
+            "EXAMPLE records added to a throwaway copy of the database to show the shape; "
+            "they are not observations",
+        )
+        # Two confirmed catches by the same angler (user 1): those species leave the
+        # per-user list, an unconfirmed guess (not inserted here) never would have.
+        session_id = db["sessions"].insert({"date": "2026-06-01", "user_id": 1}).last_pk
+        stop_id = (
+            db["stops"]
+            .insert({"session_id": session_id, "location_text": "Example", "species_caught": "[]"})
+            .last_pk
+        )
+        for common in ("Creek Chub", "Rainbow Darter"):
+            insert_catch(
+                db,
+                stop_id=stop_id,
+                session_id=session_id,
+                user_id=1,
+                species=common,
+                species_confirmed=True,
+            )
+        capture(
+            f"/map/spots/{with_fish_id}",
+            "the same card after the angler confirmed catching Creek Chub and Rainbow Darter: "
+            "the hook counts what is left and `card.new_to_you` lists only those. A different "
+            "user asking gets the previous entry, not this one. EXAMPLE records and catches in "
+            "a throwaway copy of the database",
+        )
+        box = (
+            f"{here.lng - 0.05:.4f},{here.lat - 0.05:.4f},"
+            f"{here.lng + 0.05:.4f},{here.lat + 0.05:.4f}"
+        )
+        capture(
+            f"/map/spots?bbox={box}&tier=3&new_to_me=true",
+            "the New to me filter for that angler: only spots with a recorded species they have "
+            "not caught, each with `properties.new_to_you`. The care-message spot is absent "
+            "unless a non-listed fish is recorded there. EXAMPLE records and catches in a "
+            "throwaway copy of the database",
         )
         capture(
             f"/map/spots/{protected_id}",
             "protected-species card: the hook is a care message and the listed fish is "
-            "named nowhere. An EXAMPLE listed record was added to a throwaway copy of "
-            "the database; it is not an observation",
+            "named nowhere, not even in `card.new_to_you`, which lists only the other fish "
+            "this angler has not caught. An EXAMPLE listed record was added to a throwaway "
+            "copy of the database; it is not an observation",
         )
     finally:
         database.DB_PATH = real_path
