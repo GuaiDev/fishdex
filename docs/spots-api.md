@@ -1426,7 +1426,9 @@ nothing and fall back to `GET /map/spots`.
 caller reported, and nobody else's: another login gets `0`. Because of that the response carries
 `Cache-Control: private, no-store`, like the card's "new to you" line. A river's weed reports
 are filed on the whole river, so each is counted in the **one** section of that river it is
-nearest, never in two. Never show the number to anyone but the person who made the reports.
+nearest, never in two. That is decided across all of the river's sections, not just the ones in
+the `bbox` or passing the `type` filter, so panning never moves a report between sections and the
+list count always matches the section's own pins. Never show the number to anyone but the person who made the reports.
 
 ### `GET /map/sections/{section_id}`
 
