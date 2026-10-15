@@ -306,6 +306,41 @@ def test_a_lake_keeps_only_its_named_and_longest_structures_over_the_cap():
     assert result.dropped["shore_structure_over_cap"] == 1
 
 
+def test_named_piers_over_the_cap_never_push_out_a_named_harbour():
+    from src.services import shoreline_features as sf
+
+    piers = [
+        structure(
+            osm_id=f"way/{i}",
+            name=f"Pier {i}",
+            geometry={
+                "type": "LineString",
+                "coordinates": [[0.0102, 0.0], [0.0102, 0.0001 * (i + 1)]],
+            },
+        )
+        for i in range(sf.MAX_SHORE_STRUCTURES + 5)
+    ]
+    ring = [
+        [0.0102, -0.0005],
+        [0.0102, 0.0005],
+        [0.0105, 0.0005],
+        [0.0105, -0.0005],
+        [0.0102, -0.0005],
+    ]
+    harbour = structure(
+        kind="harbour",
+        name="Bronte Harbour",
+        osm_id="way/900",
+        geometry={"type": "Polygon", "coordinates": [ring]},
+    )
+    result = derive(outline_of(BASE), structures=[*piers, harbour])
+
+    kinds = [x.kind for x in result.features if x.derivation == "osm_feature"]
+    assert kinds.count("pier") == sf.MAX_SHORE_STRUCTURES
+    assert kinds.count("harbour") == 1
+    assert result.dropped["shore_structure_over_cap"] == 5
+
+
 def test_no_structures_means_no_osm_features():
     result = derive(outline_of(BASE))
     assert not [x for x in result.features if x.derivation == "osm_feature"]

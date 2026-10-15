@@ -317,8 +317,8 @@ def _shore_structures(
 
     A structure is kept when a lake's shore is within HARBOUR_SHORE_BUFFER_M of
     it; one near no lake is counted, not attached to the closest by default.
-    Each lake keeps at most MAX_SHORE_STRUCTURES: named before unnamed, then the
-    larger first, so a cottage-dock shore cannot bury the lake's other features.
+    Each lake keeps at most MAX_SHORE_STRUCTURES of each kind, so piers never crowd
+    out its harbours: named before unnamed, then the longer (perimeter) first.
     """
     for _, boundary in lakes:
         shapely.prepare(boundary)
@@ -363,11 +363,11 @@ def _shore_structures(
         )
     out: list[ShorelineFeature] = []
     for features in by_lake.values():
-        features.sort(
-            key=lambda f: (f.name is None, -(f.length_m or 0.0), -(f.area_m2 or 0.0), f.feature_id)
-        )
-        result.drop("shore_structure_over_cap", max(0, len(features) - MAX_SHORE_STRUCTURES))
-        out += features[:MAX_SHORE_STRUCTURES]
+        for kind in ("pier", "breakwater", "harbour"):
+            of_kind = [f for f in features if f.kind == kind]
+            of_kind.sort(key=lambda f: (f.name is None, -shape(f.geometry).length, f.feature_id))
+            result.drop("shore_structure_over_cap", len(of_kind) - MAX_SHORE_STRUCTURES)
+            out += of_kind[:MAX_SHORE_STRUCTURES]
     return out
 
 
