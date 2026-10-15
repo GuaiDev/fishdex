@@ -7,8 +7,9 @@ river lines; the river is context ("more spots on this river").
 
 The spots and water-body endpoints are read-only GETs, and every endpoint here needs the same
 `Authorization: Bearer <token>` as the other `/map/*` endpoints. The one exception to read-only is
-the private [weed reports](#weed-reports) the user writes themselves. The older `/map/stretches` and
-`/map/stretches/{id}/anchors` endpoints still work and are unchanged.
+the private [weed reports](#weed-reports) the user writes themselves. The older `/map/stretches`,
+`/map/stretches/{id}/anchors` and `/map/segments` endpoints are served only for the previous
+web map; they keep their old field names and the spots UI should not use them.
 
 You can build the whole UI without a running server: **`tests/fixtures/spots_api_responses.json`**
 holds real responses from every endpoint below (the examples in this file are copied
@@ -412,12 +413,12 @@ renamed, and contain no river or section id. Saving a spot means saving its id.
 | `water_body_id` | The river or creek the spot is a child of, e.g. `river:credit-river`. Null only when the build could not place the spot's river section (the build reports a count). Every spot of a river mouth, junction, dam or fishing spot is a child of its **river**; the lake is context. |
 | `also_on_water_body_ids[]` | Other water bodies it is also on: the lake a river mouth opens onto (`great_lake:lake-ontario`), or the other river a junction is listed under. |
 | `water_id`, `water_name` | The river section the spot is on. A junction that two sections both list is attached to one; the other is in `structure_attrs.also_on_water_ids`. |
-| `structure_type` | Internal kind of structure: `lake_mouth`, `confluence`, `dam`, `weir`, `fishing_spot`. For code and the bot, not for display. |
-| `structure_attrs` | Facts about this structure. Junctions: `joining_upstream_km`, `stretch_upstream_km`. Dams: `dam_kind`, `tailwater_verified` (when `false` the title says "At the …" because the water below could not be verified), `reach_m`. River mouths: `lake` (the lake's name; null when no source gave one) and `lake_name_source` (`curated`, `curated_region` or `ohn`). The lake's name here and the name of the lake water body are always the same string. |
+| `structure_type` | Internal kind of structure: `lake_mouth`, `junction`, `dam`, `weir`, `fishing_spot`. For code and the bot, not for display. |
+| `structure_attrs` | Facts about this structure. Junctions: `joining_upstream_km`, `river_upstream_km` (the size of the river the spot is on) and `river_flows_on` (false when that river ends at the junction). Dams: `dam_kind`, `below_dam_verified` (when `false` the title says "At the …" because the water below could not be verified), `reach_m`. River mouths: `lake` (the lake's name; null when no source gave one) and `lake_name_source` (`curated`, `curated_region` or `ohn`). The lake's name here and the name of the lake water body are always the same string. |
 | `signals` | Separate numbers, never combined into a score: `named`, `size_class` (`small`/`medium`/`large`, junctions), `nearest_parking_m`, `nearest_launch_m`, `nearest_bridge_m`. |
 | `getting_there[]` | Nearest parking, trailheads and boat launches within 1.5 km, at most two of each kind: `kind`, `name`, `lat`, `lng`, `distance_m` (straight line), `source_ref`, `attributes` (OSM tags such as `access`, `fee`, `surface`). Volunteer-mapped; say so. |
 | `bridges[]` | Nearest public road crossings within 1 km, same shape. A way to reach small water, not a place to fish. |
-| `sources[]` | Where the facts came from: `kind` (`ohn_topology`, `osm`, `curation`; a river mouth taken from the curation file is `curation`), `ref`, the `anchor_ids` merged into the spot, `built_at`. Behind a "Sources" link, not on the card face. |
+| `sources[]` | Where the facts came from: `kind` (`ohn_topology`, `osm`, `curation`; a river mouth taken from the curation file is `curation`), `ref`, the `merged_record_ids` merged into the spot, `built_at`. Behind a "Sources" link, not on the card face. |
 | `water_body` | `{water_body_id, name, display_name, name_source, type}` for the river or creek the spot is a child of, or null. Enough for a breadcrumb; `GET /map/water-bodies/{id}` for the rest. |
 | `also_on_water_bodies[]` | The same short form for each id in `also_on_water_body_ids`. |
 | `more_on_this_water[]` | Other spots on the same river **section**: kept as it was. For "more spots on this river" across all its sections, use the water body's `spots`. |
@@ -441,7 +442,7 @@ renamed, and contain no river or section id. Saving a spot means saving its id.
   "structure_attrs": {
     "dam_kind": "dam",
     "reach_m": 410,
-    "tailwater_verified": true
+    "below_dam_verified": true
   },
   "signals": {
     "named": true,
@@ -489,7 +490,7 @@ renamed, and contain no river or section id. Saving a spot means saving its id.
     {
       "kind": "osm",
       "ref": "way/248706708",
-      "anchor_ids": [
+      "merged_record_ids": [
         "grand-cambridge-paris:tailwater:osm-way-248706708"
       ],
       "built_at": "2026-10-12T20:30:44+00:00"
@@ -497,7 +498,7 @@ renamed, and contain no river or section id. Saving a spot means saving its id.
     {
       "kind": "osm",
       "ref": "way/248706708",
-      "anchor_ids": [
+      "merged_record_ids": [
         "grand-cambridge-paris:dam:osm-way-248706708"
       ],
       "built_at": "2026-10-12T20:30:44+00:00"
@@ -574,7 +575,7 @@ A river mouth, whose lake name is read from the curation file when it has one:
     {
       "kind": "ohn_topology",
       "ref": "ogf:214624516,214624565,214624585",
-      "anchor_ids": [
+      "merged_record_ids": [
         "credit-streetsville-port-credit:lake_mouth:n7957731_4354567"
       ],
       "built_at": "2026-10-12T20:30:44+00:00"
@@ -809,8 +810,8 @@ made of, and every spot on it.
 | Field | Meaning |
 |---|---|
 | `water_body_id`, `name`, `display_name`, `name_source`, `type`, `jurisdiction`, `bbox` | As in the list. |
-| `geometry`, `geometry_source` | The line (`stretch_union`: the river's sections drawn together) or polygon (`ohn_waterbody`: the matched OHN Waterbody outline) — or `null` / `none` for a lake with no outline on file. |
-| `stretch_ids[]` | The river sections that make up a river or creek, or that open onto a lake. Their detail is at `/map/stretches`; the spot UI rarely needs them. |
+| `geometry`, `geometry_source` | The line (`section_union`: the river's sections drawn together) or polygon (`ohn_waterbody`: the matched OHN Waterbody outline) — or `null` / `none` for a lake with no outline on file. |
+| `section_ids[]` | The river sections that make up a river or creek, or that open onto a lake. The spot UI rarely needs them. |
 | `attributes` | How the row was made. `type_basis` says why it has this type (`name_suffix`, `great_lakes_list`, `default_for_a_named_lake`, `name_contains_pond`); `part_of` names the larger lake a bay belongs to; `also_spelled` lists other spellings that were folded into this one; `bbox_basis` is `"river_mouths"` (a lake's box comes from the mouths that open onto it) or `"outline"` (from the matched polygon). When an outline was matched: `outline_source`, `outline_ogf_ids[]`, `outline_ohn_name`, `outline_effective_datetime`, `outline_match_basis` and the `outline_licence` / `outline_licence_url` to credit. For code and attribution, not for display. |
 | `spots[]` | The spots that are children of this water body, headline-first, all tiers: `spot_id`, `kind`, `title`, `tier`, `lat`, `lng`. This is "more spots on this river". |
 | `also_here_spots[]` | Spots that belong to another water body but are also on this one, same shape: the river mouths that open onto a lake. |
@@ -852,14 +853,14 @@ made of, and every spot on it.
     ],
     "type": "MultiLineString"
   },
-  "geometry_source": "stretch_union",
+  "geometry_source": "section_union",
   "bbox": [
     -79.98834,
     43.53952,
     -79.57731,
     43.81619
   ],
-  "stretch_ids": [
+  "section_ids": [
     "credit-forks-glen-williams",
     "credit-glen-williams-streetsville",
     "credit-streetsville-port-credit"
@@ -925,7 +926,7 @@ open onto it:
     -78.29204,
     43.93725
   ],
-  "stretch_ids": [
+  "section_ids": [
     "bowmanville-soper",
     "bronte-lowville-bronte",
     "credit-streetsville-port-credit",
@@ -1582,7 +1583,7 @@ One feature from the list, then the detail of a spot (card omitted here; see the
     {
       "kind": "explore_ranking",
       "ref": "ogf:127939961",
-      "anchor_ids": [],
+      "merged_record_ids": [],
       "built_at": "2026-10-14T04:26:26+00:00"
     }
   ],
@@ -2048,7 +2049,7 @@ something new, each with its count (`meta.new_to_me` is `true`):
 ## About the example data
 
 The fixture was captured from a build that read the caches and fetched only what
-Overpass would serve in time, so OpenStreetMap data covers part of the 61 stretches: most
+Overpass would serve in time, so OpenStreetMap data covers part of the 61 curated river sections: most
 spots show an empty `getting_there` (so their cards say nothing was found nearby) and the
 build has no public fishing spots. River mouths take their lake from the curation file, so
 their lakes are named. A full build fills the rest in. Shapes do not change.

@@ -19,7 +19,8 @@ layer arrives.
 
 This replaced `translate.GLOSSARY`, which held three of these definitions as
 bare strings with no id. The definition text for weir, confluence and
-tailwater is unchanged, so spot cards say exactly what they said before.
+tailwater is unchanged apart from the one word "stretch" in tailwater's, so spot
+cards say what they said before.
 """
 
 from typing import TypedDict
@@ -79,7 +80,7 @@ TERMS: dict[str, Term] = {
             term_id="tailwater",
             plain="The water just below a dam",
             technical="Tailwater",
-            definition="A tailwater is the stretch of river just downstream of a dam.",
+            definition="A tailwater is the part of a river just downstream of a dam.",
             mapped_from=_OSM_DAMS,
         ),
         Term(

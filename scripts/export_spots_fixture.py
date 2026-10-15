@@ -80,7 +80,7 @@ LAYERS = [
     ("/map/layers/bridges?bbox=-80.40,43.17,-80.30,43.25", "bridges features in box"),
 ]
 WATER_BODY_DETAILS = [
-    ("river:credit-river", "a river in full: its line, its stretches, the spots on it"),
+    ("river:credit-river", "a river in full: its line, its river sections, the spots on it"),
     ("great_lake:lake-ontario", "a lake: its outline, its shoreline features, the mouths onto it"),
     ("creek:bronte-creek", "a creek"),
 ]
