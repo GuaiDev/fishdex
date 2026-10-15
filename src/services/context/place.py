@@ -11,12 +11,15 @@ returns an honest failure rather than a confident guess at the wrong river.
 """
 
 import logging
+import math
 import re
+from collections.abc import Sequence
 from functools import lru_cache
 
 from sqlite_utils import Database
 
 from src.models.context import Place
+from src.services.water_names import normalize_water_name
 
 logger = logging.getLogger(__name__)
 
@@ -374,6 +377,67 @@ def segments_near(db: Database, lat: float, lng: float, radius_km: float) -> lis
             if len(out) >= _MAX_SEGMENTS_PER_PLACE:
                 break
     return out
+
+
+def water_names_at(
+    db: Database, place: Place, among: Sequence[str], within_km: float = 1.0
+) -> list[str] | None:
+    """Which of the `among` water names pass within `within_km` of the place.
+
+    Nearest first, returned as the hydro network spells them. These are the
+    place's own waters: what a gauge has to be on to count as the same river.
+    Only segments whose name is the same water as one of `among` are read, so
+    the cost follows the candidate gauges, not the size of the network, and a
+    dense area cannot hide the pin's own river. Works for any jurisdiction
+    whose hydro network is in `stream_segments`. An empty list means none of
+    them passes that close, not that no water does. None means the network holds
+    no water by any of those names (or no network at all), so the question
+    cannot be answered.
+    """
+    wanted = {n for n in map(normalize_water_name, among) if n}
+    if not wanted or "stream_segments" not in db.table_names():
+        return None
+    names = [
+        r[0]
+        for r in db.execute(
+            "SELECT DISTINCT name FROM stream_segments WHERE name IS NOT NULL AND name != ''"
+        ).fetchall()
+        if normalize_water_name(r[0]) in wanted
+    ]
+    if not names:
+        return None
+    best: dict[str, float] = {}
+    for i in range(0, len(names), 400):
+        chunk = names[i : i + 400]
+        marks = ",".join("?" * len(chunk))
+        for row in db["stream_segments"].rows_where(f"name IN ({marks})", chunk):
+            dist = _segment_distance_km(row, place.lat, place.lng)
+            if dist is not None and dist <= within_km:
+                name = str(row["name"]).strip()
+                best[name] = min(dist, best.get(name, dist))
+    return sorted(best, key=best.__getitem__)
+
+
+def _segment_distance_km(row: dict, lat: float, lng: float) -> float | None:
+    """Distance from a point to the nearest vertex of the segment's line."""
+    wkt = row.get("geom_wkt")
+    if not wkt:
+        return None
+    cos = math.cos(math.radians(lat))
+    best = None
+    try:
+        inner = wkt[wkt.index("(") + 1 : wkt.rindex(")")].replace("(", "").replace(")", "")
+        for p in inner.split(","):
+            parts = p.split()
+            if len(parts) < 2:
+                continue
+            dy = (float(parts[1]) - lat) * _KM_PER_DEGREE
+            dx = (float(parts[0]) - lng) * _KM_PER_DEGREE * cos
+            d = math.hypot(dx, dy)
+            best = d if best is None else min(best, d)
+    except (ValueError, IndexError):
+        return None
+    return best
 
 
 def _segment_name(db: Database, segment_id: int) -> str | None:

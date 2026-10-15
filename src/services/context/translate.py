@@ -117,19 +117,6 @@ def flow_trend(trend: str | None) -> tuple[str, str] | None:
     return None
 
 
-def pressure_trend(trend: str | None) -> str | None:
-    if not trend:
-        return None
-    match trend.strip().lower():
-        case "falling":
-            return "falling pressure ahead of weather often triggers a feeding window"
-        case "rising":
-            return "rising pressure after a front usually means a slower bite"
-        case "steady":
-            return None  # steady pressure implies nothing actionable
-    return None
-
-
 def stream_order(order: int | None) -> str | None:
     if order is None:
         return None

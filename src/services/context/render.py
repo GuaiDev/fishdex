@@ -201,15 +201,25 @@ def render_access(access: AccessSlice) -> str:
     )
 
 
+def _gauge_label(base: str, field) -> str:
+    """Name the water a gauge reading is from, so it is never read as this pin's own."""
+    prov = field.provenance
+    if prov is None or not prov.water:
+        return base
+    if prov.same_water is False:
+        return f"{base} on {prov.water} (a different water from this place)"
+    return f"{base} on {prov.water}"
+
+
 def render_conditions(conditions: ConditionsSlice) -> str:
     return _block(
         "Conditions now",
         [
             _line("air temp", conditions.air_temp_c),
             _line("pressure", conditions.pressure_trend),
-            _line("river flow", conditions.flow_cms),
-            _line("flow trend", conditions.flow_trend),
-            _line("water level", conditions.level_m),
+            _line(_gauge_label("flow", conditions.flow_cms), conditions.flow_cms),
+            _line(_gauge_label("flow trend", conditions.flow_trend), conditions.flow_trend),
+            _line(_gauge_label("water level", conditions.level_m), conditions.level_m),
             _line("water temp", conditions.water_temp_c),
         ],
     )

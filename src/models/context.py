@@ -143,6 +143,13 @@ class Provenance(BaseModel):
     distance_km: float | None = None
     """How far that station is from the place."""
 
+    water: str | None = None
+    """The watercourse the station is on, by its own name, when the source gives one."""
+
+    same_water: bool | None = None
+    """Whether that watercourse is the place's own: True, False, or None when the
+    place's water is not known. A False here means the value is a neighbour's."""
+
     verified: bool = True
     """Web provenance is never verified."""
 
@@ -157,6 +164,12 @@ class Provenance(BaseModel):
         bits = [self.source] if self.source else []
         if self.station and self.station not in (self.source or ""):
             bits.append(self.station)
+        if self.water and self.same_water is not True:
+            bits.append(
+                f"on {self.water}, not this place's water"
+                if self.same_water is False
+                else f"on {self.water}"
+            )
         if self.distance_km is not None:
             bits.append(f"{self.distance_km:g} km away")
         when = self.observed_at or self.date
@@ -209,6 +222,8 @@ class ContextField(BaseModel):
         stale_after_s: int | None = None,
         station: str | None = None,
         distance_km: float | None = None,
+        water: str | None = None,
+        same_water: bool | None = None,
         now: datetime | None = None,
     ) -> "ContextField":
         """A sourced value. Give `observed_at` and `stale_after_s` together to
@@ -223,6 +238,8 @@ class ContextField(BaseModel):
                 observed_at=when,
                 station=station,
                 distance_km=distance_km,
+                water=water,
+                same_water=same_water,
             ),
             meaning=meaning,
             stale=stale_after_s is not None and is_stale(when, stale_after_s, now),

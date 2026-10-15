@@ -399,7 +399,7 @@ def test_prompt_rendering_marks_stale_values_and_names_the_station(db, sources):
     text = render.render_conditions(
         build_conditions(db, describe(db, lat=HOME[0], lng=HOME[1], caller="pin_panel").place)
     )
-    assert "river flow" in text and "stale" in text
+    assert "flow on Credit River" in text and "stale" in text
     assert "CREDIT RIVER AT STREETSVILLE" in text
     assert "normal" not in text.lower()
 
