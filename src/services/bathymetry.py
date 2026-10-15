@@ -237,6 +237,8 @@ def _humps(
 
     candidates: list[tuple[float, _Ring, _Ring]] = []
     for i, ring in enumerate(rings):
+        if ring.contour.depth_m >= -_SHORE_EPS:
+            continue  # a shoreline ring (island or outline) is not a rise in the bottom
         parent = rings[parents[i]] if parents[i] is not None else None
         if parent is None or parent.contour.depth_m >= ring.contour.depth_m - _DEPTH_EPS:
             continue  # no deeper ring around it: not a rise in the bottom
