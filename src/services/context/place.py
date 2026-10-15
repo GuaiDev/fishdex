@@ -11,6 +11,7 @@ returns an honest failure rather than a confident guess at the wrong river.
 """
 
 import logging
+import math
 import re
 from functools import lru_cache
 
@@ -374,6 +375,53 @@ def segments_near(db: Database, lat: float, lng: float, radius_km: float) -> lis
             if len(out) >= _MAX_SEGMENTS_PER_PLACE:
                 break
     return out
+
+
+def water_names_at(db: Database, place: Place, within_km: float = 1.0) -> list[str]:
+    """Names of the named watercourses that pass within `within_km` of the place.
+
+    Nearest first. These are the place's own waters: what a gauge has to be on
+    to count as the same river. Reads the place's segments, so it works for any
+    jurisdiction whose hydro network is in `stream_segments` with names. An
+    empty list means no named water passes that close, not that there is none.
+    """
+    if not place.segment_ids or "stream_segments" not in db.table_names():
+        return []
+    best: dict[str, float] = {}
+    ids = place.segment_ids
+    for i in range(0, len(ids), 400):
+        chunk = ids[i : i + 400]
+        marks = ",".join("?" * len(chunk))
+        for row in db["stream_segments"].rows_where(
+            f"ogf_id IN ({marks}) AND name IS NOT NULL AND name != ''", chunk
+        ):
+            dist = _segment_distance_km(row, place.lat, place.lng)
+            if dist is not None and dist <= within_km:
+                name = str(row["name"]).strip()
+                best[name] = min(dist, best.get(name, dist))
+    return sorted(best, key=best.__getitem__)
+
+
+def _segment_distance_km(row: dict, lat: float, lng: float) -> float | None:
+    """Distance from a point to the nearest vertex of the segment's line."""
+    wkt = row.get("geom_wkt")
+    if not wkt:
+        return None
+    cos = math.cos(math.radians(lat))
+    best = None
+    try:
+        inner = wkt[wkt.index("(") + 1 : wkt.rindex(")")].replace("(", "").replace(")", "")
+        for p in inner.split(","):
+            parts = p.split()
+            if len(parts) < 2:
+                continue
+            dy = (float(parts[1]) - lat) * _KM_PER_DEGREE
+            dx = (float(parts[0]) - lng) * _KM_PER_DEGREE * cos
+            d = math.hypot(dx, dy)
+            best = d if best is None else min(best, d)
+    except (ValueError, IndexError):
+        return None
+    return best
 
 
 def _segment_name(db: Database, segment_id: int) -> str | None:

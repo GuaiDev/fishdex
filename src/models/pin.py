@@ -173,7 +173,9 @@ class PinConditionRow(BaseModel):
     own history. `source`, `station`, `distance_km`, `observed_at` and `age_s`
     say where the value came from and how old it is; a gauge or sampling
     station can be on a different river from the pin, so its name and distance
-    are always given.
+    are always given. `station_water` names the watercourse the station is on and
+    `on_pin_water` says whether that is the pin's own (None when the pin's water
+    is not known); a gauge row's `label` already says so in words.
     """
 
     field: str
@@ -185,6 +187,8 @@ class PinConditionRow(BaseModel):
     source: str | None = None
     station: str | None = None
     distance_km: float | None = None
+    station_water: str | None = None
+    on_pin_water: bool | None = None
     observed_at: str | None = None
     age_s: int | None = None
     age_label: str | None = None

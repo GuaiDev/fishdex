@@ -35,6 +35,8 @@ ROW_KEYS = {
     "source",
     "station",
     "distance_km",
+    "station_water",
+    "on_pin_water",
     "observed_at",
     "age_s",
     "age_label",

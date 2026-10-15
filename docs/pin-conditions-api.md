@@ -5,7 +5,8 @@ question: what is true at this pin's coordinates right now, and how do we know?
 
 You can build the panel without a running server: **`tests/fixtures/pin_conditions_response.json`**
 is a real response, recorded from the live sources (Open-Meteo, the Water Survey of Canada
-gauge network, and Ontario's PWQMN water samples) for a pin on Bronte Creek in Oakville.
+gauge network, and Ontario's PWQMN water samples) for a pin on Bronte Creek in Oakville. No gauge reports on Bronte Creek, so its flow rows come
+from the nearest one, on Fourteen Mile Creek, and say so (`on_pin_water: false`).
 
 ## `GET /pins/{pin_id}/conditions`
 
@@ -18,13 +19,15 @@ no `value`.
 | key | meaning |
 |---|---|
 | `field` | stable key, e.g. `flow_cms` |
-| `label`, `group` | display name and the group it sits in (`weather`, `water_flow`, `water_temperature`, `water_quality`) |
+| `label`, `group` | display name and the group it sits in (`weather`, `water_flow`, `water_temperature`, `water_quality`). A gauge row's label names the water the gauge is on: "Flow on Credit River", or, when no gauge is on the pin's own water, "Flow on Cooksville Creek, 6.4 km away". Show it as given |
 | `value` | a number, or a word for the trend rows; `null` when there is none |
 | `unit` | `"°C"`, `"m³/s"`, … or `null` for words and pH |
 | `meaning` | a plain-language note when there is one, else `null` |
 | `source` | where it came from: `Open-Meteo`, `WSC station 02HB027`, `PWQMN` |
 | `station` | the gauge or sampling station, by name. It can be on a different river from the pin |
 | `distance_km` | how far that station is from the pin |
+| `station_water` | the river or creek the gauge is on, by its own name (`null` for weather, water samples and any gauge whose network gives no river name) |
+| `on_pin_water` | `true`: the gauge is on the same watercourse as the pin. `false`: it is on a neighbouring water, the nearest gauge that reports. `null`: the pin's own water is not known, or the row is not a gauge row |
 | `observed_at` | when it was measured (ISO-8601 UTC, or a bare date when that is all the source gives) |
 | `age_s`, `age_label` | how old it is now, in seconds and in words ("12 min ago") |
 | `stale` | older than the limit for its source; see below |
@@ -40,8 +43,16 @@ Exactly one of `value` and `empty_reason` is set.
   "no data". The limits (`stale_limits_s` in `/pins/labels`) are weather 2 h, gauge 6 h,
   water quality 30 days. Phase 3's match will skip stale rows.
 - **Show the source and the age on every value.** `source`, `station`, `distance_km` and
-  `age_label`. A river gauge can be a few kilometres away and on another creek; the station
-  name and distance are how the reader judges that.
+  `age_label`. A river gauge can be a few kilometres away and on another creek; the label,
+  the station name and the distance are how the reader judges that.
+- **Flow and level come from the pin's own river when a gauge is on it.** The pin's water is
+  the named watercourse(s) within 1 km of it in the hydro network, and a gauge on the same
+  water (matched by name, so it works for any province or state whose gauge network and hydro
+  network are loaded) within 25 km wins over a nearer gauge on another creek. If none reports,
+  the nearest gauge is used and `on_pin_water` is `false`; the label then carries the
+  station's own water and the distance. Never relabel such a row as the pin's river.
+- **Pressure has no `meaning`.** The reading and its trend are shown; there is no sourced link
+  between pressure and catch rates, so no line claims one.
 - **Water temperature has no live source.** Anywhere. The row holds the nearest *dated*
   sample from PWQMN, almost always months or years old and therefore `stale: true`, or
   `empty_reason: "no_live_source"` when no sample is on record nearby. Do not present it
@@ -52,7 +63,8 @@ Exactly one of `value` and `empty_reason` is set.
   `falling` or `steady` over the last three hours. There is no seasonal baseline behind
   this feed, so nothing here may say normal, high or low.
 - **Every word comes from `GET /pins/labels`:** `condition_fields` (order, label, unit,
-  group), `condition_group_labels`, `empty_reason_labels`, `trend_labels`, `stale_label`,
+  group), `gauge_water_labels` and `gauge_distance_suffix` (a gauge row's wording),
+  `condition_group_labels`, `empty_reason_labels`, `trend_labels`, `stale_label`,
   `stale_note`, `stale_limits_s`. Do not hardcode them. An `empty_reason` with no label is
   a bug in the API; report it, do not invent wording.
 - The panel is a set of facts about the moment. It is not a prediction and not a score:
@@ -93,7 +105,7 @@ Three of the twelve rows, as recorded (the file has all twelve):
   },
   {
     "field": "flow_cms",
-    "label": "River flow",
+    "label": "Flow on Fourteen Mile Creek, 3 km away",
     "group": "water_flow",
     "value": 0.105,
     "unit": "m³/s",
@@ -101,6 +113,8 @@ Three of the twelve rows, as recorded (the file has all twelve):
     "source": "WSC station 02HB027",
     "station": "FOURTEEN MILE CREEK AT OAKVILLE",
     "distance_km": 3.0,
+    "station_water": "Fourteen Mile Creek",
+    "on_pin_water": false,
     "observed_at": "2026-10-13T15:05:00+00:00",
     "age_s": 3618,
     "age_label": "60 min ago",

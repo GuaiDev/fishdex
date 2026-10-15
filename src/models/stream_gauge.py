@@ -47,3 +47,7 @@ class NearestGauge(BaseModel):
 
     reading: StreamGaugeReading
     distance_km: float
+    same_water: bool | None = None
+    """True when the station is on the same watercourse as the place asking, False
+    when the place's own water is known and no gauge on it reports (this is the
+    nearest one instead), None when the place's water is not known."""

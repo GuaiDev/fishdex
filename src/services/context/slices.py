@@ -29,6 +29,7 @@ from src.models.context import (
 )
 from src.models.freshness import GAUGE_STALE_S, WATER_QUALITY_STALE_S, WEATHER_STALE_S
 from src.services.context import translate
+from src.services.context.place import water_names_at
 from src.services.species_labels import clean_species_records
 
 logger = logging.getLogger(__name__)
@@ -850,7 +851,7 @@ def build_conditions(db: Database, place: Place, now: datetime | None = None) ->
     now = now or datetime.now(UTC)
     out = ConditionsSlice()
     _fill_weather(place, out, now)
-    _fill_gauge(place, out, now)
+    _fill_gauge(db, place, out, now)
     _fill_water_samples(db, place, out, now)
     return out
 
@@ -890,7 +891,6 @@ def _fill_weather(place: Place, out: ConditionsSlice, now: datetime) -> None:
         unavailable = EmptyReason.LIVE_LOOKUP_FAILED
 
     seen = raw.get("time")
-    trend = raw.get("pressure_trend")
 
     def field(key: str, meaning: str | None = None) -> ContextField:
         return _live_field(
@@ -901,15 +901,20 @@ def _fill_weather(place: Place, out: ConditionsSlice, now: datetime) -> None:
     out.wind_speed_kmh = field("wind_speed_kmh")
     out.precipitation_mm = field("precipitation_mm")
     out.pressure_hpa = field("pressure_hpa")
-    out.pressure_trend = field("pressure_trend", translate.pressure_trend(trend))
+    out.pressure_trend = field("pressure_trend")
 
 
-def _fill_gauge(place: Place, out: ConditionsSlice, now: datetime) -> None:
+def _fill_gauge(db: Database, place: Place, out: ConditionsSlice, now: datetime) -> None:
     from src.services.stream_gauge import nearest_gauge
 
     fields = ("flow_cms", "flow_trend", "level_m", "level_trend")
     try:
-        gauge = nearest_gauge(place.lat, place.lng)
+        own_water = water_names_at(db, place)
+    except Exception:  # noqa: BLE001 - no hydro names means nearest-gauge, labelled as such
+        logger.warning("could not name the water at this place", exc_info=True)
+        own_water = []
+    try:
+        gauge = nearest_gauge(place.lat, place.lng, own_water=own_water)
     except Exception:  # noqa: BLE001 - live fetch must never break describe()
         logger.warning("gauge lookup failed", exc_info=True)
         for name in fields:
@@ -925,6 +930,8 @@ def _fill_gauge(place: Place, out: ConditionsSlice, now: datetime) -> None:
         "source": f"WSC station {r.station_id}",
         "station": r.station_name or r.station_id,
         "distance_km": gauge.distance_km,
+        "water": r.river_name,
+        "same_water": gauge.same_water,
         "observed_at": r.reading_datetime,
         "stale_after_s": GAUGE_STALE_S,
         "now": now,
