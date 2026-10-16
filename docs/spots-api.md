@@ -41,7 +41,8 @@ These come from the project's central idea: records of fish are not the same as
 pressure from anglers, and a map must not blur them.
 
 - Show `title` and `subtitle` as given. Titles are built from the river's name and never
-  read "Unnamed …".
+  read "Unnamed …". Two spots of one kind never share a title: see
+  [Repeated structures](#repeated-structures).
 - The "why fish gather here" paragraph is **general reasoning about a kind of water, not a
   record about the spot**. Show it with its `label` ("General reasoning, not a record about
   this spot"), never as a fact about the spot.
@@ -90,6 +91,9 @@ All user-facing strings, in display order (Quiet water last).
   `properties.new_to_you.text` already arrive filled in), `tap_prompt` ("Tap to see which")
   and `note` (whose catches it is based on).
 - `filters.new_to_me` — `chip` and `one_liner` for the "New to me" toggle.
+- `repeated_titles` — the templates the build uses to tell spots apart when several would share a
+  title (`templates`: `road`, `access`, `junction`, `order`) and the two `directions` words. The
+  titles in `/map/spots` arrive already filled in; see [Repeated structures](#repeated-structures).
 - `quiet_water` — the words only quiet water needs: `titles` (the two title templates the build
   fills), `caveats` (`records`, `access_not_measured`, `access_coverage_unknown`) and `not_built`
   (what `meta.notes` says when none has been built).
@@ -245,6 +249,18 @@ All user-facing strings, in display order (Quiet water last).
   "shoreline_derivations": {
     "shoreline_outline": "from the shoreline outline",
     "watercourse_endpoint": "where a mapped stream meets the shore"
+  },
+  "repeated_titles": {
+    "templates": {
+      "road": "{title}, near {place}",
+      "access": "{title}, near {place}",
+      "junction": "{title}, near where {place} joins",
+      "order": "{title} ({n} of {total}, {direction})"
+    },
+    "directions": {
+      "west_to_east": "west to east",
+      "north_to_south": "north to south"
+    }
   },
   "quiet_water": {
     "titles": {
@@ -417,6 +433,7 @@ renamed, and contain no river or section id. Saving a spot means saving its id.
 | `water_id`, `water_name` | The river section the spot is on. A junction that two sections both list is attached to one; the other is in `structure_attrs.also_on_water_ids`. |
 | `structure_type` | Internal kind of structure: `lake_mouth`, `junction`, `dam`, `weir`, `fishing_spot`. For code and the bot, not for display. |
 | `structure_attrs` | Facts about this structure. Junctions: `joining_upstream_km`, `river_upstream_km` (the size of the river the spot is on) and `river_flows_on` (false when that river ends at the junction). Dams: `dam_kind`, `below_dam_verified` (when `false` the title says "At the …" because the water below could not be verified), `reach_m`. River mouths: `lake` (the lake's name; null when no source gave one) and `lake_name_source` (`curated`, `curated_region` or `ohn`). The lake's name here and the name of the lake water body are always the same string. |
+| `structure_attrs` (repeats) | When the build merged repeats into this spot, `merged_spot_ids` lists the ids it absorbed. When the title had to be told apart from another spot's, `title_distinguished_by` is `road`, `access`, `junction` or `order`. Junctions carry `tributary_name` when the joining creek has a name. See [Repeated structures](#repeated-structures). |
 | `signals` | Separate numbers, never combined into a score: `named`, `size_class` (`small`/`medium`/`large`, junctions), `nearest_parking_m`, `nearest_launch_m`, `nearest_bridge_m`. |
 | `getting_there[]` | Nearest parking, trailheads and boat launches within 1.5 km, at most two of each kind: `kind`, `name`, `lat`, `lng`, `distance_m` (straight line), `source_ref`, `attributes` (OSM tags such as `access`, `fee`, `surface`). Volunteer-mapped; say so. |
 | `bridges[]` | Nearest public road crossings within 1 km, same shape. A way to reach small water, not a place to fish. |
@@ -1441,6 +1458,42 @@ fish recorded nearby are still listed:
   }
 }
 ```
+
+## Repeated structures
+
+A river can have a weir every few hundred metres, or a run of small unnamed creeks. The build
+used to give each one its own spot with the same title and overlapping record circles, so a list
+could not tell them apart and one set of records counted several times. Two steps in the build
+now deal with it. Both read only what exists for every province and state (the spots, and the
+OpenStreetMap roads and parking already attached to them); nothing is specific to Ontario.
+
+**Merging.** Spots of the same `kind` with the same `title` (the title carries the water, so this
+is the same structure on the same water) that sit within a radius of each other become one spot.
+The radius is `REPEAT_MERGE_M` in `src/services/spot_repeats.py`: 400 m for dams and weirs, 250 m
+for creek junctions. River mouths, public fishing spots and quiet water are not merged. The best
+spot (lowest `tier`, then lowest id) keeps its place and id and takes over the others' `sources`;
+the ids it absorbed are in `structure_attrs.merged_spot_ids`. A spot joins a group by its distance
+to the group's lead, never to the last member, so a line of weirs does not chain into one pin.
+A saved id of an absorbed spot is not served after a rebuild (404): look at the merged spot instead.
+
+**Titles.** Spots that still share a kind and title get a place phrase added, in this order, by the
+first that exists. The words come from `labels.repeated_titles`.
+
+| `structure_attrs.title_distinguished_by` | Source | Title |
+|---|---|---|
+| `road` | the nearest named road crossing in `bridges` | `Below the weir on the Humber River, near Steeles Avenue East` |
+| `access` | the nearest named parking, trailhead or boat launch in `getting_there` | `Below the weir on the Humber River, near Old Mill Parking` |
+| `junction` | the nearest other named creek that joins within `NEARBY_JUNCTION_M` (2 km) | `Where a small creek joins the Credit River, near where Black Creek joins` |
+| `order` | nothing nearby has a name: the spot's place in the group, counted along the direction the group spreads most | `Where a small creek joins the Credit River (2 of 6, north to south)` |
+
+If two spots in a group would get the same phrase (one bridge between two weirs), both fall back to
+`order`. The "N of M" counts every spot that shared the original title, so a number can skip. The
+direction word is plain compass order, not upstream or downstream. The subtitle is not changed.
+The result is that, within one list of anchor-derived spots, a title appears once. Quiet water is
+titled by the nearest water and can still repeat.
+
+The build report prints how many spots were merged (`not kept: repeat_structure_merged`) and how
+each remaining repeat was told apart (`repeated title told apart by …`).
 
 ## Quiet water
 

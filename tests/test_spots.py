@@ -925,6 +925,14 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
                 if f["properties"]["kind"] != "quiet_water":
                     assert f["properties"]["water_body_id"]
                 assert not JARGON.search(f["properties"]["title"])
+            # One title per structure: a repeat is merged or told apart. Quiet water
+            # is a ranking of reaches, titled by the nearest water, and is left out.
+            titles = [
+                f["properties"]["title"]
+                for f in e["response"]["features"]
+                if f["properties"]["kind"] != "quiet_water"
+            ]
+            assert len(titles) == len(set(titles)), route
 
 
 # ── the commands ─────────────────────────────────────────────────────────────
