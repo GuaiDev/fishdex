@@ -298,13 +298,23 @@ GeoJSON `FeatureCollection` of points, light enough to load for a whole viewport
 | `tier` | The highest tier to include, **cumulative**: `1` headline spots only, `2` adds the normal ones (**default**), `3` everything, including junctions of small unnamed creeks that are hidden by default. A sensible mapping is tier 1 at province zoom, 2 at regional zoom, 3 at street zoom. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
 | `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
-| `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, nearest first. Radius defaults to 50 km and is capped at 200 km. |
+| `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, nearest first. Radius defaults to 50 km and is capped at 200 km. Each feature then carries `properties.distance_km` (straight-line, one decimal), and `meta.near` says what was applied (see below). |
 | `new_to_me` | `true` keeps only spots with at least one species recorded within 2 km that **the caller** has not caught (see [New to you](#new-to-you)). Per-user, computed for this request, never cached; the response is `Cache-Control: private, no-store`. Combines with every other filter. It reads the records around each spot, so a `bbox` is required: without one the request is rejected with 422 (`new_to_me needs a bbox`). Default `false`. |
 
 `meta.kind_counts` counts the spots in view for **every** kind, ignoring the `kind`
-filter, so the chips can show how many each would add. `meta.count` is how many
+filter, so the chips can show how many each would add. It is present in every mode, `near`
+included, where "in view" also means inside the radius, so the chips add up to what the radius
+holds. `meta.count` is how many
 features this response holds. Features come headline-first, then by kind, then by id —
 never by any measure of how popular a place is.
+
+With `near`, `meta.near` is `{lat, lng, radius_km, radius_capped}`: the radius actually used
+(the default, or the request cut to 200) and whether it was cut, so a 500 km request can say it
+was shown 200. Without `near`, `meta.near` and `distance_km` are absent.
+
+`subtitle` is the river, then the section, always joined by ` · ` (for example
+`Credit River · Lower Credit`); a section's own name may contain `—`, which is folded into the
+same separator, so a subtitle never mixes the two. `water_name` is a name and is shown as it is.
 
 Each feature's `properties`: `spot_id`, `kind`, `title`, `subtitle`, `tier`,
 `jurisdiction`, `water_body_id` (the river, creek or lake it is a child of, see
@@ -557,7 +567,7 @@ A river mouth, whose lake name is read from the curation file when it has one:
     "great_lake:lake-ontario"
   ],
   "title": "Where the Credit River meets Lake Ontario",
-  "subtitle": "Credit River · Lower Credit — Streetsville to Port Credit",
+  "subtitle": "Credit River · Lower Credit · Streetsville to Port Credit",
   "tier": 1,
   "structure_type": "lake_mouth",
   "structure_attrs": {
@@ -1008,11 +1018,12 @@ Each feature's `properties`:
 | `name` | The mapped stream's name for an inlet or outlet, else `null`. |
 | `derivation` | How it was obtained: `watercourse_endpoint` (a mapped OHN stream that ends at the shore), `shoreline_outline` (a shape read off the outline's own edge), or `bathymetry_contours` (a shape read off a lake survey's depth contours). Phrase in `labels.shoreline_derivations`. |
 | `provenance` | `record` for an island (a ring inside the source polygon) or a stream junction; `inference` for a point, peninsula, drop-off or hump (a shape computed from the outline or the contours). |
-| `note` | A full sentence for the card, already assembled from the vocabulary. Safe to show as-is. A drop-off or hump names its survey ("from a 1970 survey, transect") or says `survey date unknown`. |
+| `note` | A full sentence for the card, already assembled from the vocabulary. Safe to show as-is. A drop-off or hump names its survey ("From a 1970 survey (transect).", "From a survey of unknown date.") and never ends on a trailing comma. |
 | `attributes` | Survey facts behind a contour-derived feature: `contour_ogf_ids`, `survey_year`, `survey_method`, `depth_basis`, `depth_m`, and (for a drop-off) `depth_change_m` and `gap_m` or (for a hump) `area_m2`. Also the `attribution`, `licence` and `licence_url` to credit. `{}` for an outline-derived feature. |
 | `source`, `source_date` | The named source (`OHN Waterbody`, `OHN Watercourse` or `LIO Bathymetry`) and that record's effective date (`YYYY-MM-DD`, or `null` if the source gave none). Credit these. |
 | `area_m2` | An island's area or a hump's area, else `null`. |
-| `length_m` | How far a point or peninsula sticks out from the shore, or the depth change across a drop-off, in metres; else `null`. |
+| `length_m` | How far a point or peninsula sticks out from the shore, in metres; else `null`. **Changed:** it used to hold a drop-off's depth change, which is not a length. It is `null` for a drop-off now; read `depth_change_m`. |
+| `depth_change_m` | A drop-off's fall in depth between its two survey contours, in metres (the same number as `attributes.depth_change_m`); else `null`. At least 3 m: `DROP_OFF_MIN_DEPTH_CHANGE_M` in `src/services/bathymetry.py` is the floor, because a 2 m change (1 m to 3 m) is a gentle slope, not a bottom that "falls away quickly". Drop-offs below it are not built and are not served from a build made before the floor was raised. |
 | `geometry` | A `Point` for inlets, outlets, points, peninsulas and drop-offs; a `Polygon` for an island or hump. |
 
 ```json
@@ -1118,7 +1129,7 @@ Each feature's `properties`:
         "provenance": "inference",
         "source": "LIO Bathymetry",
         "source_date": "1970-07-10",
-        "note": "The bottom falls away quickly here. From a 1970 survey, Transect.",
+        "note": "The bottom falls away quickly here. From a 1970 survey (transect).",
         "attributes": {
           "contour_ogf_ids": [118431234, 118431235],
           "survey_year": 1970,
@@ -1132,7 +1143,8 @@ Each feature's `properties`:
           "licence_url": "https://www.ontario.ca/page/open-government-licence-ontario"
         },
         "area_m2": null,
-        "length_m": 4.0
+        "length_m": null,
+        "depth_change_m": 4.0
       }
     }
   ]
@@ -1149,7 +1161,7 @@ Every user-facing string is in it, including block titles.
 |---|---|---|
 | 1. Why it's interesting | `card.hook` | `title`, `kind`, `text`: at most two lines. The first rule with data wins: `protected_species` (a care message that replaces everything else), then `structure` (one plain sentence about the water, only where a record supports it), then `honest_empty` ("No fish records within 2 km, so this is a place to find out."). `kind_description` is used when fish are recorded but nothing above has anything specific to say; it is the kind's one-liner. `new_to_you` is the first hook for a logged-in user who has something new (see [New to you](#new-to-you)); it sits after `protected_species`, so a care message still replaces it, and when it has nothing the chain falls through to `structure` as before. `distinctive` follows `new_to_you`: a species recorded more often here than along the rest of the river (see [Special here](#special-here)). |
 | 2. You might find | `card.might_find` | `species[]` (top 5), `more_text`, `caveat` ("Recorded nearby, not a catch guarantee."), `empty_text` (why there is no list), `note` (why some recorded species are left out), `radius_km`. Each species has `name`, `scientific_name`, `source`, `date`, `evidence`, `cite` (`"iNaturalist, 2024-06-03"`, ready to show in brackets) and `note` (`"Older record"` for a record a decade old or more). Standardised surveys (`evidence: "survey"`) come first, then photos and sightings, each most recent first. `special_here` is `null` unless a species stands out; see [Special here](#special-here). |
-| 3. Why fish gather here | `card.why_gather` | `what_it_is` (the kind in plain words), `general` = `{text, label, provenance: "inference"}`: the kind's two sentences, shown with the label "General reasoning, not a record about this spot". Then `facts_title` and `facts[]`: facts about this spot, each `{text, provenance: "record", source}`. They are listed apart from the reasoning on purpose. |
+| 3. Why fish gather here | `card.why_gather` | `what_it_is` (the kind in plain words), `general` = `{text, label, provenance: "inference"}`: the kind's two sentences, shown with the label "General reasoning, not a record about this spot". Then `facts_title` and `facts[]`: facts about this spot, each `{text, provenance: "record", source}`. They are listed apart from the reasoning on purpose. Every count in a fact agrees with its noun ("1 fish record within 2 km, covering 1 species."). |
 | 4. Getting there | `card.getting_there` | `items[]`: the nearest parking, trailhead, boat launch and public road crossing, each `{kind, label, text, distance_m, details[], source}` (`text` is "Parking about 150 m away"; `details` are mapped tags such as "mapped as free"). `empty_text` when there are none. `crown_land` = `{state, text, source}` where `state` is `mapped`, `none_found` or `not_checked`. `unverified_title` and `unverified[]`: what has not been checked on the ground. |
 
 Also on the card: `new_to_you` (see below; `null` when there is nothing new); `caveats[]`, `[{kind, text}]` limits on what the card means (`records` and `access`; only quiet water has any today, so it is `[]` for the other kinds); and `terms[]`, entries from the term registry (`{term, term_id, text}`,
@@ -2099,8 +2111,14 @@ produces the same payload.
 
 ## `GET /map/layers/getting-there`
 
-Returns GeoJSON point features (FeatureCollection) for parking, trailheads and boat launches. Parameters: `bbox` (optional, `min_lon,min_lat,max_lon,max_lat`) and `jurisdiction` (optional, ISO 3166-2). The bbox is applied to the access points themselves, and a point shared by several spots appears once. Labels come from the labels endpoint's `layers.getting_there` and `access_labels`. Properties: `kind`, `name`, `attributes`.
+Returns GeoJSON point features (FeatureCollection) for parking, trailheads and boat launches. Parameters: `bbox` (optional, `min_lon,min_lat,max_lon,max_lat`) and `jurisdiction` (optional, ISO 3166-2). The bbox is applied to the access points themselves, and a point shared by several spots appears once. Labels come from the labels endpoint's `layers.getting_there` and `access_labels`.
+
+Each feature has a stable `id` (also `properties.feature_id`): the kind plus the OpenStreetMap element, such as `parking:way/475398031`. It is the same on every request and every rebuild from the same map data, so a UI can key on it. Properties: `feature_id`, `kind`, `name`, `name_source`, `jurisdiction`, `attributes`.
+
+`name` is never `null`. When OpenStreetMap volunteers named the point, `name_source` is `osm` and `name` is theirs. When they did not (most parking points), `name_source` is `fallback` and `name` is the kind plus the water it is near: `Parking near the Credit River`, or just `Parking` when no water is known. Show a `fallback` name as it is, but do not treat it as something OSM said.
+
+`meta` is `{count, kind_counts}`: `count` is how many features this response holds and `kind_counts` how many of each of the layer's kinds (`parking`, `trail_head`, `boat_launch`), zeros included. Features are ordered by `id`.
 
 ## `GET /map/layers/bridges`
 
-Returns GeoJSON point features (FeatureCollection) for road crossings. Bridges are off by default in the UI. Parameters: `bbox` (optional) and `jurisdiction` (optional), filtered and de-duplicated as for getting-there. Labels come from `layers.bridges` and `access_labels`. Properties: `kind`, `name`, `attributes`.
+Returns GeoJSON point features (FeatureCollection) for road crossings. Bridges are off by default in the UI. Parameters: `bbox` (optional) and `jurisdiction` (optional), filtered, de-duplicated and shaped as for getting-there (stable `id`, `meta.kind_counts` with the one kind `road_crossing`, and a `name` that falls back to `Road crossing near …`). Labels come from `layers.bridges` and `access_labels`. Properties: `feature_id`, `kind`, `name`, `name_source`, `jurisdiction`, `attributes`.

@@ -761,6 +761,140 @@ def test_geojson_filters_by_bbox_kind_and_tier(db, curation):
     assert [f["properties"]["kind"] for f in south["features"]] == ["river_mouth"]
 
 
+def test_near_serves_each_distance_the_radius_applied_and_counts_inside_it(db, curation):
+    store(db, sample_anchors(), [stretch()])
+    build_spots(db, curation)
+
+    # Sheldon Creek's junction is at 43.5,-79.6; the others are 11 km or more away.
+    body = spots_geojson(db, max_tier=3, near=(43.5, -79.6, 5.0))
+    (only,) = body["features"]
+    assert only["properties"]["distance_km"] == 0.0
+    assert body["meta"]["near"] == {
+        "lat": 43.5,
+        "lng": -79.6,
+        "radius_km": 5.0,
+        "radius_capped": False,
+    }
+    # The chips add up to what the radius holds, kind filter aside.
+    assert sum(body["meta"]["kind_counts"].values()) == 1
+    assert body["meta"]["kind_counts"]["creek_junction"] == 1
+
+    wide = spots_geojson(db, max_tier=3, near=(43.5, -79.6, None))
+    distances = [f["properties"]["distance_km"] for f in wide["features"]]
+    assert distances == sorted(distances) and len(distances) == 4
+    assert wide["meta"]["near"]["radius_km"] == 50.0
+
+    capped = spots_geojson(db, max_tier=3, near=(43.5, -79.6, 500.0))
+    assert capped["meta"]["near"]["radius_km"] == 200.0
+    assert capped["meta"]["near"]["radius_capped"] is True
+
+
+def test_a_request_without_near_has_no_distance_and_no_near_meta(db, curation):
+    store(db, sample_anchors(), [stretch()])
+    build_spots(db, curation)
+    body = spots_geojson(db, max_tier=3)
+    assert "near" not in body["meta"]
+    assert all("distance_km" not in f["properties"] for f in body["features"])
+
+
+def test_subtitles_keep_one_separator_even_when_a_stored_one_has_the_other():
+    assert spot_labels.subtitle_join("Credit River", "Lower Credit — Streetsville") == (
+        "Credit River · Lower Credit · Streetsville"
+    )
+    assert spot_labels.subtitle_join(None, "Sixteen Mile Creek — Milton") == (
+        "Sixteen Mile Creek · Milton"
+    )
+    assert spot_labels.subtitle_join(None, None) is None
+    assert spot_labels.normalise_subtitle("A — B · C") == "A · B · C"
+    assert spot_labels.normalise_subtitle(None) is None
+
+
+def test_served_subtitles_never_mix_the_two_separators(db, curation):
+    store(db, sample_anchors(), [stretch(name="Lower Credit — Streetsville to Port Credit")])
+    build_spots(db, curation)
+    db.execute("UPDATE spots SET subtitle = 'Credit River · Lower Credit — Streetsville'")
+    db.conn.commit()
+    body = spots_geojson(db, max_tier=3)
+    subtitles = {f["properties"]["subtitle"] for f in body["features"]} - {None}
+    assert subtitles and not any(" — " in t for t in subtitles)
+    detail = get_spot_detail(db, body["features"][0]["id"])
+    assert " — " not in (detail["subtitle"] or "")
+
+
+def test_counts_agree_with_their_noun():
+    assert spot_labels.count_phrase(1, "fish record") == "1 fish record"
+    assert spot_labels.count_phrase(0, "fish record") == "0 fish records"
+    assert spot_labels.count_phrase(2, "fish record") == "2 fish records"
+    assert spot_labels.count_phrase(1, "species", "species") == "1 species"
+    assert spot_labels.count_phrase(3, "species", "species") == "3 species"
+
+
+def test_a_layer_has_stable_ids_meta_and_a_name_for_every_unnamed_point(db, curation):
+    from src.services.spots import getting_there_geojson
+
+    store(db, sample_anchors(), [stretch()])
+    build_spots(db, curation)
+    first = getting_there_geojson(db)
+    again = getting_there_geojson(db)
+    assert first == again
+    (feature,) = first["features"]
+    assert feature["id"] == "parking:way/2" == feature["properties"]["feature_id"]
+    assert feature["properties"]["jurisdiction"] == JURISDICTION
+    assert first["meta"] == {
+        "count": 1,
+        "kind_counts": {"parking": 1, "trail_head": 0, "boat_launch": 0},
+    }
+    assert feature["properties"]["name"] == "Parking near the Credit River"
+    assert feature["properties"]["name_source"] == "fallback"
+
+
+def test_an_unnamed_point_with_no_known_water_is_named_by_its_kind_alone():
+    assert spot_labels.access_fallback_name("parking", None) == "Parking"
+    assert spot_labels.access_fallback_name("road_crossing", "Bronte Creek") == (
+        "Road crossing near Bronte Creek"
+    )
+
+
+def test_an_unnamed_parking_point_is_named_for_the_water_it_is_near(db, curation):
+    from src.models.water_body import WaterBody
+    from src.services.spots import getting_there_geojson
+    from src.storage.spots import list_spots, replace_spots
+
+    store(db, sample_anchors(), [stretch()])
+    build_spots(db, curation)
+    wb = WaterBody(
+        water_body_id="river:credit-river",
+        jurisdiction=JURISDICTION,
+        name="Credit River",
+        name_source="curated",
+        type="river",
+        geometry={"type": "LineString", "coordinates": [[-79.6, 43.5], [-79.7, 43.6]]},
+        geometry_source="stretch_union",
+        stretch_ids=["credit-lower"],
+        built_at="2026-01-01",
+    )
+    spots = [
+        s.model_copy(update={"water_body_id": wb.water_body_id}) for s in list_spots(db, max_tier=3)
+    ]
+    replace_spots(db, JURISDICTION, spots, [wb])
+    (feature,) = getting_there_geojson(db)["features"]
+    assert feature["properties"]["name"] == "Parking near the Credit River"
+    assert feature["properties"]["name_source"] == "fallback"
+
+
+def test_an_osm_name_is_kept_and_marked_as_osm(db, curation):
+    from src.services.spots import getting_there_geojson
+
+    anchors = sample_anchors()[:-1] + [
+        access("parking", "way/9", 43.5 + 200 * M, -79.6, name="Mill Street Lot")
+    ]
+    store(db, anchors, [stretch()])
+    build_spots(db, curation)
+    (feature,) = getting_there_geojson(db)["features"]
+    assert feature["properties"]["name"] == "Mill Street Lot"
+    assert feature["properties"]["name_source"] == "osm"
+
+
 def test_geojson_orders_headline_spots_first_and_never_by_a_quality_score(db, curation):
     store(db, sample_anchors(), [stretch()])
     build_spots(db, curation)
@@ -873,6 +1007,13 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
     assert {e["status"] for e in entries} == {200, 404, 422}
     for e in entries:
         route = e["request"].removeprefix("GET ")
+        if "near=" in route and route.startswith("/map/spots?"):
+            meta = e["response"]["meta"]
+            assert meta["near"]["radius_km"] > 0 and meta["kind_counts"]
+            km = [f["properties"]["distance_km"] for f in e["response"]["features"]]
+            assert km == sorted(km)
+        for f in e["response"].get("features", []) if e["status"] == 200 else []:
+            assert " — " not in (f["properties"].get("subtitle") or "")
         if e["status"] != 200:
             assert set(e["response"]) == {"detail"}
         elif route == "/map/spots/labels":
@@ -915,8 +1056,15 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
             assert SpotCard.model_validate(e["response"]["card"]).spot_id == detail["spot_id"]
         elif route.startswith("/map/layers/"):
             assert e["response"]["type"] == "FeatureCollection"
+            meta = e["response"]["meta"]
+            assert meta["count"] == len(e["response"]["features"])
+            ids = [f["id"] for f in e["response"]["features"]]
+            assert len(set(ids)) == len(ids)
             for f in e["response"]["features"]:
                 assert f["properties"]["kind"] in spot_labels.ACCESS_LABELS
+                assert f["id"] == f["properties"]["feature_id"]
+                assert f["properties"]["name"], "an unnamed point is named by its kind"
+                assert f["properties"]["name_source"] in {"osm", "fallback"}
         else:
             assert e["response"]["type"] == "FeatureCollection"
             for f in e["response"]["features"]:

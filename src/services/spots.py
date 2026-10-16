@@ -86,6 +86,11 @@ BIG_JOINING_KM = 25.0
 SMALL_KM = 25.0
 LARGE_KM = 100.0
 
+# `near=` with no radius uses DEFAULT_NEAR_KM; a larger one is cut to MAX_NEAR_KM,
+# and the response says so (`meta.near.radius_capped`).
+DEFAULT_NEAR_KM = 50.0
+MAX_NEAR_KM = 200.0
+
 # How far from a spot to look for a way in, and how many of each to keep.
 GETTING_THERE_RADIUS_M = 1500.0
 BRIDGE_RADIUS_M = 1000.0
@@ -234,7 +239,8 @@ class _Context:
         if s is None:
             return None, None
         river = self.river(stretch_id)
-        subtitle = s.name if river.lower() in s.name.lower() else f"{river} · {s.name}"
+        lead = None if river.lower() in s.name.lower() else river
+        subtitle = words.subtitle_join(lead, s.name)
         return s.name, subtitle
 
 
@@ -1072,6 +1078,22 @@ def spots_geojson(
     the build rather than of the viewport (quiet water needs the explore scores).
     """
     in_view = list_spots(db, bbox=bbox, max_tier=max_tier, jurisdiction=jurisdiction)
+    distances: dict[str, float] = {}
+    near_meta: dict | None = None
+    if near:
+        nlat, nlon, requested = near
+        radius = DEFAULT_NEAR_KM if requested is None else min(requested, MAX_NEAR_KM)
+        for s in in_view:
+            distances[s.spot_id] = _haversine_km(nlat, nlon, s.lat, s.lng)
+        # The kind counts below describe what is inside the radius, so the chips
+        # in near mode add up to what the radius holds.
+        in_view = [s for s in in_view if distances[s.spot_id] <= radius]
+        near_meta = {
+            "lat": nlat,
+            "lng": nlon,
+            "radius_km": radius,
+            "radius_capped": requested is not None and requested > MAX_NEAR_KM,
+        }
     counts = {kind: 0 for kind in words.KIND_ORDER}
     for s in in_view:
         counts[s.kind] += 1
@@ -1082,15 +1104,7 @@ def spots_geojson(
         # Only the spots about to be shown are looked up, not every spot built.
         shown = _spots_with_species(db, shown, species_l) if species_l else []
     if near:
-        nlat, nlon, nr = near
-        if nr is None:
-            nr = 50.0
-        if nr > 200.0:
-            nr = 200.0  # sensible max
-        shown = sorted(
-            (s for s in shown if _haversine_km(nlat, nlon, s.lat, s.lng) <= nr),
-            key=lambda s: _haversine_km(nlat, nlon, s.lat, s.lng),
-        )
+        shown.sort(key=lambda s: (distances[s.spot_id], s.spot_id))
     else:
         shown.sort(key=lambda s: (s.tier, _KIND_ORDER[s.kind], s.spot_id))
     new_counts: dict[str, int] = {}
@@ -1112,6 +1126,8 @@ def spots_geojson(
                 kept.append(s)
         shown = kept
     meta: dict = {"count": len(shown), "kind_counts": counts, "max_tier": max_tier}
+    if near_meta:
+        meta["near"] = near_meta
     notes = []
     if (not kinds or "quiet_water" in kinds) and count_spots_of_kind(db, "quiet_water") == 0:
         notes.append(words.QUIET_WATER_NOT_BUILT)
@@ -1122,16 +1138,20 @@ def spots_geojson(
     return {
         "type": "FeatureCollection",
         "meta": meta,
-        "features": [_feature(s, new_counts.get(s.spot_id)) for s in shown],
+        "features": [
+            _feature(s, new_counts.get(s.spot_id), distances.get(s.spot_id)) for s in shown
+        ],
     }
 
 
-def _feature(s: Spot, new_to_you_count: int | None = None) -> dict:
+def _feature(
+    s: Spot, new_to_you_count: int | None = None, distance_km: float | None = None
+) -> dict:
     properties = {
         "spot_id": s.spot_id,
         "kind": s.kind,
         "title": s.title,
-        "subtitle": s.subtitle,
+        "subtitle": words.normalise_subtitle(s.subtitle),
         "tier": s.tier,
         "jurisdiction": s.jurisdiction,
         "water_id": s.water_id,
@@ -1144,6 +1164,9 @@ def _feature(s: Spot, new_to_you_count: int | None = None) -> dict:
         properties["caveats"] = caveats
     if new_to_you_count is not None:
         properties["new_to_you"] = _new_to_you_property(new_to_you_count)
+    # Present only for a `near` request, where the list is ordered by it.
+    if distance_km is not None:
+        properties["distance_km"] = round(distance_km, 1)
     return {
         "type": "Feature",
         "id": s.spot_id,
@@ -1179,6 +1202,7 @@ def get_spot_detail(db: Database, spot_id: str, user_id: int | None = None) -> d
     others.sort(key=lambda o: (o["tier"], _KIND_ORDER[o["kind"]], o["spot_id"]))
     return {
         **api_vocab.spot_for_api(spot.model_dump()),
+        "subtitle": words.normalise_subtitle(spot.subtitle),
         "water_body": _water_body_ref(db, spot.water_body_id),
         "also_on_water_bodies": [
             ref for i in spot.also_on_water_body_ids if (ref := _water_body_ref(db, i))
@@ -1258,31 +1282,56 @@ def _access_layer_geojson(
     bbox: tuple[float, float, float, float] | None,
     jurisdiction: str | None,
 ) -> dict:
+    """One access layer (parking, bridges) as GeoJSON, one feature per mapped element.
+
+    The id is the kind plus the OSM element, so it is the same on every request. An
+    element reached from several spots is kept once, against the nearest, whose
+    water gives the fallback name when OSM named nothing ("Parking near the Credit
+    River"). `meta.kind_counts` counts every kind the layer holds, zeros included.
+    """
     spots = list_spots(db, bbox=None, max_tier=3, jurisdiction=jurisdiction)
-    seen: set[tuple[str, float, float]] = set()
-    features = []
+    nearest: dict[str, tuple[int, AccessRef, Spot]] = {}
     for spot in spots:
         for a in getattr(spot, attr):
             if bbox is not None:
                 min_lon, min_lat, max_lon, max_lat = bbox
                 if not (min_lon <= a.lng <= max_lon and min_lat <= a.lat <= max_lat):
                     continue
-            key = (a.kind, a.lng, a.lat)
-            if key in seen:
-                continue
-            seen.add(key)
-            features.append(
-                {
-                    "type": "Feature",
-                    "geometry": {"type": "Point", "coordinates": [a.lng, a.lat]},
-                    "properties": {
-                        "kind": a.kind,
-                        "name": a.name,
-                        "attributes": a.attributes,
-                    },
-                }
-            )
-    return {"type": "FeatureCollection", "features": features}
+            key = f"{a.kind}:{a.source_ref}"
+            if key not in nearest or a.distance_m < nearest[key][0]:
+                nearest[key] = (a.distance_m, a, spot)
+    water_names: dict[str | None, str | None] = {}
+    features = []
+    for feature_id in sorted(nearest):
+        _, a, spot = nearest[feature_id]
+        if spot.water_body_id not in water_names:
+            wb = get_water_body(db, spot.water_body_id) if spot.water_body_id else None
+            water_names[spot.water_body_id] = wb.name if wb else None
+        water = water_names[spot.water_body_id]
+        name = a.name or words.access_fallback_name(a.kind, _the(water) if water else None)
+        features.append(
+            {
+                "type": "Feature",
+                "id": feature_id,
+                "geometry": {"type": "Point", "coordinates": [a.lng, a.lat]},
+                "properties": {
+                    "feature_id": feature_id,
+                    "kind": a.kind,
+                    "name": name,
+                    "name_source": "osm" if a.name else "fallback",
+                    "jurisdiction": spot.jurisdiction,
+                    "attributes": a.attributes,
+                },
+            }
+        )
+    kind_counts = {k: 0 for k in words.LAYERS[attr]["kinds"]}
+    for f in features:
+        kind_counts[f["properties"]["kind"]] += 1
+    return {
+        "type": "FeatureCollection",
+        "meta": {"count": len(features), "kind_counts": kind_counts},
+        "features": features,
+    }
 
 
 def getting_there_geojson(

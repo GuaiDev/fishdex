@@ -35,6 +35,7 @@ from src.models.stretch import FishingStretch
 from src.models.water_body import NameSource, WaterBody, WaterBodyType
 from src.services import api_vocab
 from src.services import spot_labels as words
+from src.services.bathymetry import DROP_OFF_MIN_DEPTH_CHANGE_M
 from src.storage.spots import list_spots, list_spots_also_on
 from src.storage.water_bodies import get_water_body, list_water_bodies
 
@@ -377,6 +378,11 @@ def water_body_features_geojson(db: Database, water_body_id: str) -> dict | None
     by_kind: dict[str, int] = {}
     out = []
     for f in features:
+        depth_change = f.attributes.get("depth_change_m") if f.kind == "drop_off" else None
+        if f.kind == "drop_off" and (
+            depth_change is None or depth_change < DROP_OFF_MIN_DEPTH_CHANGE_M
+        ):
+            continue  # built under an older, lower floor; see DROP_OFF_MIN_DEPTH_CHANGE_M
         by_kind[f.kind] = by_kind.get(f.kind, 0) + 1
         out.append(
             {
@@ -397,7 +403,9 @@ def water_body_features_geojson(db: Database, water_body_id: str) -> dict | None
                     ),
                     "attributes": f.attributes,
                     "area_m2": f.area_m2,
-                    "length_m": f.length_m,
+                    # How far a point or peninsula reaches; never a drop-off's depth change.
+                    "length_m": None if f.kind == "drop_off" else f.length_m,
+                    "depth_change_m": depth_change,
                 },
             }
         )
