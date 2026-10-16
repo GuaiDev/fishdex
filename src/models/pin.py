@@ -196,3 +196,113 @@ class PinConditionRow(BaseModel):
         if (self.value is None) == (self.empty_reason is None):
             raise ValueError("a row has a value or an empty_reason, never both and never neither")
         return self
+
+
+MatchStatus = Literal[
+    "hidden",
+    "similar",
+    "partly",
+    "different",
+    "not_enough_readings",
+    "few_good_trips",
+]
+MatchPosition = Literal["inside", "near", "below", "above"]
+MatchLeftOutReason = Literal["stale", "unavailable", "too_few_trips", "other_gauge", "old_samples"]
+TodaySort = Literal["match", "distance", "last_visited", "favourites"]
+
+
+class MatchComparison(BaseModel):
+    """One condition compared: today's reading against the user's best trips here."""
+
+    field: str
+    label: str
+    unit: str | None = None
+    current: float
+    low: float
+    high: float
+    trips: int
+    position: MatchPosition
+    text: str
+
+    @model_validator(mode="after")
+    def _range_is_ordered(self) -> "MatchComparison":
+        if self.low > self.high:
+            raise ValueError("low cannot be above high")
+        return self
+
+
+class MatchLeftOut(BaseModel):
+    """A condition that was not compared, and why."""
+
+    field: str
+    label: str
+    reason: MatchLeftOutReason
+    text: str
+    empty_reason: str | None = None
+
+
+class PinMatch(BaseModel):
+    """GET /pins/{id}/match: how today compares with the user's own best trips here.
+
+    Built only from the caller's trips at this pin that they rated. Recalled
+    visits, other anglers' trips and shared pins never enter it, and a reading
+    past its source's stale limit is left out, not compared.
+
+    `status` "hidden" means the pin has fewer rated trips than the minimum:
+    nothing else is filled in and the UI shows the conditions panel alone.
+    `score` is the share of compared conditions inside or close to the range
+    of the best trips, and is only a way to order pins: it is never shown as a
+    probability of catching anything.
+    """
+
+    pin_id: int
+    label: str
+    shown: bool
+    status: MatchStatus
+    status_label: str | None = None
+    rated_trips: int
+    min_rated_trips: int
+    best_trips: int = 0
+    best_months: list[str] = Field(default_factory=list)
+    compared: int = 0
+    inside: int = 0
+    score: float | None = Field(default=None, ge=0, le=1)
+    comparisons: list[MatchComparison] = Field(default_factory=list)
+    left_out: list[MatchLeftOut] = Field(default_factory=list)
+    headline: str
+    reason: str
+
+    @model_validator(mode="after")
+    def _hidden_carries_nothing_else(self) -> "PinMatch":
+        if self.status == "hidden":
+            if self.shown or self.comparisons or self.left_out or self.score is not None:
+                raise ValueError("a hidden match shows nothing beyond its counts")
+        elif not self.shown:
+            raise ValueError("only a hidden match is not shown")
+        return self
+
+
+class TodayRow(BaseModel):
+    """One of the user's own pins in the Today view, with why it is where it is."""
+
+    rank: int
+    pin_id: int
+    name: str
+    lat: float
+    lng: float
+    jurisdiction: str
+    is_favourite: bool
+    state: PinState
+    visits: int
+    last_visit: str | None = None
+    distance_km: float | None = None
+    reason: str = Field(min_length=1)
+    match: PinMatch | None = None
+
+
+class TodayResponse(BaseModel):
+    """GET /pins/today."""
+
+    sort: TodaySort
+    sort_label: str
+    rows: list[TodayRow]

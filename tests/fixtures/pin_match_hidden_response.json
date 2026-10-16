@@ -1,0 +1,18 @@
+{
+  "pin_id": 3,
+  "label": "Conditions match (placeholder)",
+  "shown": false,
+  "status": "hidden",
+  "status_label": null,
+  "rated_trips": 1,
+  "min_rated_trips": 3,
+  "best_trips": 0,
+  "best_months": [],
+  "compared": 0,
+  "inside": 0,
+  "score": null,
+  "comparisons": [],
+  "left_out": [],
+  "headline": "No match yet: 2 more rated trips here would show one.",
+  "reason": "No match yet: 2 more rated trips here would show one."
+}
