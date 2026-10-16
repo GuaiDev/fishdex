@@ -780,7 +780,7 @@ def get_conditions(
     # service itself reaches it via importlib. Reuse that exact module so this
     # endpoint reads through the identical code path the coach's tools use.
     _weather = importlib.import_module("src.ingest.global.weather")
-    from src.services.weather import _FISHING_NOTES
+    from src.services.weather_notes import note_for_user
     from src.storage.database import get_db
 
     if lat is not None and lng is not None:
@@ -814,6 +814,11 @@ def get_conditions(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Conditions unavailable: {e}")
 
+    # Literacy-gated, and a panel refresh is not proof it was read, so showing
+    # it here records no exposure; the client reports a sighting via
+    # POST /profile/concept-events using `pressure_note_term_id`.
+    note = note_for_user(get_db(), user["id"], trend.trend)
+
     return {
         "location": {
             "name": loc["name"],
@@ -830,7 +835,10 @@ def get_conditions(
         "pressure_hpa": conditions.pressure_hpa,
         "pressure_trend": trend.trend,
         "pressure_delta_24h_hpa": trend.delta_24h_hpa,
-        "pressure_note": _FISHING_NOTES[trend.trend],
+        "pressure_note": note.text if note else None,
+        "pressure_note_term_id": note.term_id if note else None,
+        "pressure_note_basis": note.basis if note else None,
+        "pressure_note_source": note.source if note else None,
     }
 
 
