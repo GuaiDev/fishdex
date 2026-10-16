@@ -332,9 +332,7 @@ def water_bodies_geojson(
     can tell a thinned outline from an outline that was never on file.
     """
     wanted = [f for f in LIST_FIELDS if fields is None or f in fields or f == "water_body_id"]
-    in_view = list_water_bodies(
-        db, bbox=bbox, jurisdiction=jurisdiction, include_geometry=geometry
-    )
+    in_view = list_water_bodies(db, bbox=bbox, jurisdiction=jurisdiction, include_geometry=geometry)
     if bbox is not None:
         view = shapely_box(*bbox)
         in_view = [wb for wb in in_view if _crosses_view(db, wb, view)]
