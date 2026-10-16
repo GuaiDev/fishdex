@@ -6,6 +6,7 @@ Rate limit: 0.5s sleep before every live request (Overpass polite use policy).
 
 import hashlib
 import json
+import logging
 import math
 import time
 from pathlib import Path
@@ -13,7 +14,9 @@ from pathlib import Path
 import httpx
 
 from src.jurisdictions.geo import jurisdiction_for_coords
-from src.models.water_feature import AccessPoint, CorridorFeature, WaterFeature
+from src.models.water_feature import AccessPoint, CorridorFeature, ShoreStructure, WaterFeature
+
+logger = logging.getLogger(__name__)
 
 # Primary + community mirror — tried in order on each attempt
 _OVERPASS_URLS = [
@@ -127,6 +130,74 @@ def fetch_stream_corridor(
             if feature is not None:
                 found.setdefault(feature.osm_id, feature)
     return list(found.values())
+
+
+def fetch_shore_structures(
+    bboxes: list[tuple[float, float, float, float]],
+    jurisdiction: str | None = None,
+) -> tuple[list[ShoreStructure], int]:
+    """Piers, breakwaters and harbours at a lake shore. Cached 30 days.
+
+    `bboxes` are (min_lon, min_lat, max_lon, max_lat) cells the shoreline
+    passes through — the same grid the lake's inlets are fetched on, so a
+    structure beside a lake two hours away is still found. One query per cell,
+    each cached on its own, so a re-run over an overlapping lake is offline.
+
+    A cell Overpass cannot answer (after the usual retries) is split in four and
+    each quarter tried; a quarter that still fails is logged at WARNING and
+    skipped, so one heavy cell does not lose the lake's other structures and a
+    re-run fetches only what is missing (everything answered is cached). Returns
+    the structures and the number of cells skipped, so a partly answered lake is
+    reported rather than silently thin. Raises only when every cell failed. An
+    empty list with no skipped cells means Overpass answered and found nothing.
+    """
+    found: dict[str, ShoreStructure] = {}
+    failed: list[tuple[float, float, float, float]] = []
+    answered = 0
+
+    def fetch(cell: tuple[float, float, float, float], depth: int = 0) -> None:
+        nonlocal answered
+        min_lon, min_lat, max_lon, max_lat = cell
+        try:
+            data = _overpass_query(_shore_structure_query(min_lat, min_lon, max_lat, max_lon))
+        except Exception as exc:
+            if depth == 0:
+                mid_lon, mid_lat = (min_lon + max_lon) / 2, (min_lat + max_lat) / 2
+                for quarter in (
+                    (min_lon, min_lat, mid_lon, mid_lat),
+                    (mid_lon, min_lat, max_lon, mid_lat),
+                    (min_lon, mid_lat, mid_lon, max_lat),
+                    (mid_lon, mid_lat, max_lon, max_lat),
+                ):
+                    fetch(quarter, depth + 1)
+                return
+            logger.warning("shore structures: cell %s skipped: %s", cell, exc)
+            failed.append(cell)
+            return
+        answered += 1
+        for element in data.get("elements", []):
+            structure = _parse_shore_structure(element, jurisdiction)
+            if structure is not None:
+                found.setdefault(structure.osm_id, structure)
+
+    for cell in bboxes:
+        fetch(cell)
+    if failed and not answered:
+        raise RuntimeError(f"Overpass answered none of {len(failed)} shore-structure cells")
+    return list(found.values()), len(failed)
+
+
+def _shore_structure_query(south: float, west: float, north: float, east: float) -> str:
+    bbox = f"({south:.5f},{west:.5f},{north:.5f},{east:.5f})"
+    return (
+        "[out:json][timeout:60];\n"
+        "(\n"
+        f'  nw["man_made"="pier"]{bbox};\n'
+        f'  nw["man_made"="breakwater"]{bbox};\n'
+        f'  nw["harbour"="yes"]{bbox};\n'
+        ");\n"
+        "out geom tags;"
+    )
 
 
 def _corridor_query(line: list[tuple[float, float]]) -> str:
@@ -303,6 +374,63 @@ def _corridor_kind(tags: dict) -> str | None:
     if tags.get("highway"):
         return "road"
     return None
+
+
+def _parse_shore_structure(element: dict, jurisdiction: str | None) -> ShoreStructure | None:
+    tags = element.get("tags", {})
+    kind = _shore_structure_kind(tags)
+    if kind is None:
+        return None
+    geometry = _element_geojson(element)
+    if geometry is None:
+        return None
+    centroid = _centroid(element)
+    if centroid is None:
+        return None
+    lat, lng = centroid
+
+    return ShoreStructure(
+        osm_id=f"{element.get('type')}/{element.get('id')}",
+        kind=kind,
+        name=tags.get("name") or None,
+        geometry=geometry,
+        lat=lat,
+        lng=lng,
+        jurisdiction=jurisdiction or jurisdiction_for_coords(lat, lng),
+        tags=tags,
+    )
+
+
+def _shore_structure_kind(tags: dict) -> str | None:
+    if tags.get("man_made") == "pier":
+        return "pier"
+    if tags.get("man_made") == "breakwater":
+        return "breakwater"
+    if tags.get("harbour") == "yes":
+        return "harbour"
+    return None
+
+
+def _element_geojson(element: dict) -> dict | None:
+    """A node/way element as GeoJSON: Point, LineString or closed-way Polygon.
+
+    A way whose first and last vertex coincide is a ring and becomes a Polygon;
+    anything else is a LineString. None when there is no usable geometry.
+    """
+    etype = element.get("type")
+    if etype == "node":
+        lat = element.get("lat")
+        lon = element.get("lon")
+        if lat is None or lon is None:
+            return None
+        return {"type": "Point", "coordinates": [float(lon), float(lat)]}
+    geometry = element.get("geometry", [])
+    coords = [[float(g["lon"]), float(g["lat"])] for g in geometry if "lat" in g and "lon" in g]
+    if len(coords) < 2:
+        return None
+    if len(coords) >= 4 and coords[0] == coords[-1]:
+        return {"type": "Polygon", "coordinates": [coords]}
+    return {"type": "LineString", "coordinates": coords}
 
 
 def _water_feature_type(tags: dict) -> str | None:

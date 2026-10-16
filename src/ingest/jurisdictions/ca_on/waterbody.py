@@ -40,7 +40,12 @@ logger = logging.getLogger(__name__)
 
 _WATERBODY_LAYER = 25
 _PAGE_SIZE = 1000
-_MAX_PAGES = 20
+# A by-name page is asked for in small pieces on purpose: the polygons of a
+# sliced lake (Georgian Bay) are too heavy for one 1000-record page — the
+# service answers 500 — and at some sizes in between it answers an EMPTY page
+# as if it were the last one. A small page plus the count yardstick in
+# _fetch_all_pages turns both into either a complete pull or a loud failure.
+_BY_NAME_PAGE_SIZE = 10
 
 # The layer's own `copyrightText`. The Open Government Licence – Ontario lets us
 # copy and adapt with attribution, so the attribution is not optional.
@@ -181,32 +186,56 @@ def fetch_waterbodies_by_name(name: str) -> list[OhnWaterbody]:
         "outFields": _OUT_FIELDS,
         "returnGeometry": "true",
         "outSR": "4326",
-        "resultRecordCount": str(_PAGE_SIZE),
+        "resultRecordCount": str(_BY_NAME_PAGE_SIZE),
         "f": "json",
     }
     return _parse_features(_fetch_all_pages(url, params))
 
 
 def _fetch_all_pages(url: str, params: dict) -> list[dict]:
-    """Every feature of a query, following `exceededTransferLimit` page by page.
+    """Every feature of a query, paged until the service's own count is met.
 
-    The service silently returns a thinned subset when a query is bigger than one
-    page, so a lake match made on page one could pick the wrong polygon without
-    a sign. A query still truncated at the page cap is logged at WARNING.
+    The service silently returns a thinned subset when a query is bigger than
+    one page, and an empty page as if it were the last when a heavy-geometry
+    page is too big to serialize — so a short or empty page is never trusted as
+    the end. Completeness is judged against the service's own count for the
+    same query (the same yardstick the watercourse tiles use). There is no page
+    ceiling: paging runs until the count is met, and a pull the service ends
+    early raises rather than return a partial lake. A count the service does
+    not give falls back to the `exceededTransferLimit` flag alone.
     """
+    expected = _count_features(url, params)
+    page_size = int(params.get("resultRecordCount", _PAGE_SIZE))
     features: list[dict] = []
-    for page in range(_MAX_PAGES):
-        data = _cached_get(url, {**params, "resultOffset": str(page * _PAGE_SIZE)})
+    page = 0
+    while True:
+        data = _cached_get(url, {**params, "resultOffset": str(page * page_size)})
+        page += 1
         batch = data.get("features", [])
         features.extend(batch)
-        if not data.get("exceededTransferLimit") or not batch:
+        if expected is not None:
+            if len(features) >= expected:
+                return features
+            if not batch:
+                raise RuntimeError(
+                    f"OHN waterbody: service ended paging at {len(features)} of "
+                    f"{expected} features it counts for this query"
+                )
+        elif not data.get("exceededTransferLimit") or not batch:
             return features
-    logger.warning(
-        "OHN waterbody: query still truncated after %d pages (%d features); matches may be wrong",
-        _MAX_PAGES,
-        len(features),
-    )
-    return features
+
+
+def _count_features(url: str, params: dict) -> int | None:
+    """The service's own count for the same query, or None when it gives none."""
+    count_params = {
+        k: v
+        for k, v in params.items()
+        if k not in ("resultRecordCount", "resultOffset", "outFields", "returnGeometry", "outSR")
+    }
+    count_params["returnCountOnly"] = "true"
+    data = _cached_get(url, count_params)
+    count = data.get("count")
+    return count if isinstance(count, int) else None
 
 
 def _escape_like(value: str) -> str:

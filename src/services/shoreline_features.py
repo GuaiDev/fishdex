@@ -14,6 +14,11 @@ Four kinds, all from sources the repo already reads, none of them a fish claim:
 - **points and peninsulas** — promontories found by convexity: the concave
   notches between the outline and its convex hull, kept when they are narrow and
   deep (a wedge of land), sized into a point (small) or a peninsula (large).
+- **piers, breakwaters and harbours** — mapped structures read from
+  OpenStreetMap (`man_made=pier` / `breakwater`, `harbour=yes`), attached to the
+  lake whose shore or near-shore they sit on. They are not derived from the
+  outline at all; they carry their OSM element id and are labelled "mapped by
+  OpenStreetMap volunteers".
 
 Everything is capped so one lake cannot flood the map, and every feature says
 where the shape came from. Point, peninsula and island features are geometry
@@ -21,19 +26,26 @@ read off the outline; they are labelled "from the shoreline outline".
 """
 
 import logging
+import math
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
+import shapely
 from shapely.geometry import Point, Polygon, mapping, shape
 from shapely.geometry.polygon import orient
-from shapely.prepared import prep
 
 from src.models.context import ProvenanceKind
 from src.models.hydrology import StreamSegment
 from src.models.jurisdiction import JurisdictionCode
 from src.models.lake_outline import LakeOutline
 from src.models.shoreline_feature import ShorelineFeature
-from src.services.geometry_utils import M_PER_DEG, approx_area_m2, polygons_of
+from src.models.water_feature import ShoreStructure
+from src.services.geometry_utils import (
+    M_PER_DEG,
+    approx_area_m2,
+    approx_length_m,
+    polygons_of,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,12 +60,17 @@ MIN_ISLAND_AREA_M2 = 10_000.0
 MAX_ISLANDS = 25
 MAX_PROMONTORIES = 25
 MAX_STREAM_FEATURES = 50
+MAX_SHORE_STRUCTURES = 50
 # The outline is simplified this far (degrees, ~55 m) before the convexity work:
 # the promontory rule is about the shape of the shore, not its pixel noise.
 CONVEXITY_SIMPLIFY_DEG = 0.0005
+# A mapped pier, breakwater or harbour this far from a lake's shore still counts
+# as on it: a breakwater runs parallel offshore, and OSM vertices are coarse.
+HARBOUR_SHORE_BUFFER_M = 500.0
 
 _OUTLINE_SOURCE = "OHN Waterbody"
 _STREAM_SOURCE = "OHN Watercourse"
+_OSM_SOURCE = "OpenStreetMap"
 
 
 @dataclass
@@ -81,15 +98,23 @@ def derive_shoreline_features(
     jurisdiction: JurisdictionCode,
     built_at: str,
     watercourses: Iterable[StreamSegment] | None = None,
+    shore_structures: Iterable[ShoreStructure] | None = None,
 ) -> ShorelineFeatureSet:
     """Every shoreline feature for every lake that has an outline.
 
     `water_body_id_by_lake` maps a curated lake name to the water body the build
     gave it (services/water_bodies.py). A lake with no outline contributes
     nothing — we cannot see its shore — and is counted.
+
+    `shore_structures` are the OSM piers, breakwaters and harbours fetched at
+    the lakes' shores; each is attached to the nearest lake it sits on, or
+    counted when none is near. They are placed globally, not per lake, so a
+    structure shared by two shores lands on one water body, not both.
     """
     segments = list(watercourses) if watercourses else []
+    structures = list(shore_structures) if shore_structures else []
     result = ShorelineFeatureSet()
+    lakes: list[tuple[str, object]] = []
     for name, outline in outlines.items():
         if not outline.matched or not outline.geometry:
             result.lakes_without_outline += 1
@@ -100,12 +125,15 @@ def derive_shoreline_features(
             continue
         result.lakes_with_outline += 1
         geom = shape(outline.geometry)
+        lakes.append((wb_id, geom.boundary))
         result.features += _islands(wb_id, geom, outline, jurisdiction, built_at, result)
         result.features += _promontories(wb_id, geom, outline, jurisdiction, built_at, result)
         if segments:
             result.features += _stream_junctions(
                 wb_id, geom, outline, segments, jurisdiction, built_at, result
             )
+    if structures:
+        result.features += _shore_structures(lakes, structures, jurisdiction, built_at, result)
     return result
 
 
@@ -231,7 +259,9 @@ def _stream_junctions(
 ) -> list[ShorelineFeature]:
     boundary = geom.boundary
     tol = STREAM_JUNCTION_TOLERANCE_M / M_PER_DEG
-    near_shore = prep(boundary.buffer(tol))
+    # Buffering a Great Lake's whole shoreline into one polygon takes gigabytes;
+    # an indexed dwithin asks the same question of the raw linework.
+    shapely.prepare(boundary)
     seen: set[tuple[float, float]] = set()
     out: list[ShorelineFeature] = []
     for seg in segments:
@@ -239,7 +269,7 @@ def _stream_junctions(
         end = _node(seg.end_node)
         if start is None or end is None:
             continue
-        if not (near_shore.contains(start) or near_shore.contains(end)):
+        if not (shapely.dwithin(boundary, start, tol) or shapely.dwithin(boundary, end, tol)):
             continue
         d_start = boundary.distance(start)
         d_end = boundary.distance(end)
@@ -273,6 +303,71 @@ def _stream_junctions(
                 built_at=built_at,
             )
         )
+    return out
+
+
+def _shore_structures(
+    lakes: list[tuple[str, object]],
+    structures: list[ShoreStructure],
+    jurisdiction: JurisdictionCode,
+    built_at: str,
+    result: ShorelineFeatureSet,
+) -> list[ShorelineFeature]:
+    """Attach each mapped OSM structure to the nearest lake it sits on.
+
+    A structure is kept when a lake's shore is within HARBOUR_SHORE_BUFFER_M of
+    it; one near no lake is counted, not attached to the closest by default.
+    Each lake keeps at most MAX_SHORE_STRUCTURES of each kind, so piers never crowd
+    out its harbours: named before unnamed, then the longer (perimeter) first.
+    """
+    for _, boundary in lakes:
+        shapely.prepare(boundary)
+    by_lake: dict[str, list[ShorelineFeature]] = {}
+    for st in structures:
+        geom = shape(st.geometry)
+        buffer_deg = HARBOUR_SHORE_BUFFER_M / (M_PER_DEG * math.cos(math.radians(st.lat)))
+        best: tuple[float, str] | None = None
+        for wb_id, boundary in lakes:
+            if not shapely.dwithin(boundary, geom, buffer_deg):
+                continue
+            d_deg = boundary.distance(geom)
+            if best is None or d_deg < best[0]:
+                best = (d_deg, wb_id)
+        if best is None:
+            result.drop("shore_structure_off_shore")
+            continue
+        wb_id = best[1]
+        by_lake.setdefault(wb_id, []).append(
+            ShorelineFeature(
+                feature_id=f"{wb_id}:{st.kind}:{st.osm_id}",
+                water_body_id=wb_id,
+                jurisdiction=jurisdiction,
+                kind=st.kind,
+                name=st.name,
+                geometry=st.geometry,
+                source=_OSM_SOURCE,
+                source_date=None,
+                provenance=ProvenanceKind.RECORD,
+                derivation="osm_feature",
+                note=None,
+                area_m2=(
+                    round(approx_area_m2(geom), 1) if geom.geom_type.endswith("Polygon") else None
+                ),
+                length_m=(
+                    round(approx_length_m(geom), 1)
+                    if geom.geom_type.endswith("LineString")
+                    else None
+                ),
+                built_at=built_at,
+            )
+        )
+    out: list[ShorelineFeature] = []
+    for features in by_lake.values():
+        for kind in ("pier", "breakwater", "harbour"):
+            of_kind = [f for f in features if f.kind == kind]
+            of_kind.sort(key=lambda f: (f.name is None, -shape(f.geometry).length, f.feature_id))
+            result.drop("shore_structure_over_cap", len(of_kind) - MAX_SHORE_STRUCTURES)
+            out += of_kind[:MAX_SHORE_STRUCTURES]
     return out
 
 

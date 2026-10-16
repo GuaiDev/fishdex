@@ -12,7 +12,9 @@ from shapely.geometry.polygon import orient
 from src.models.hydrology import StreamSegment
 from src.models.lake_outline import MATCH_NAME, LakeOutline
 from src.models.shoreline_feature import ShorelineFeature
+from src.models.water_feature import ShoreStructure
 from src.services.shoreline_features import (
+    HARBOUR_SHORE_BUFFER_M,
     MAX_ISLANDS,
     derive_shoreline_features,
 )
@@ -39,13 +41,28 @@ def outline_of(shell, holes=(), name="Test Lake", matched=True):
 BASE = [(-0.01, -0.01), (0.01, -0.01), (0.01, 0.01), (-0.01, 0.01), (-0.01, -0.01)]
 
 
-def derive(outline, wb_id="lake:test-lake", segments=()):
+def derive(outline, wb_id="lake:test-lake", segments=(), structures=()):
     return derive_shoreline_features(
         {outline.curated_name: outline},
         {outline.curated_name: wb_id},
         JURISDICTION,
         BUILT,
         list(segments),
+        list(structures),
+    )
+
+
+def structure(kind="pier", geometry=None, osm_id="way/1", name=None, lat=0.0, lng=0.0):
+    return ShoreStructure(
+        osm_id=osm_id,
+        kind=kind,
+        name=name,
+        geometry=geometry
+        or {"type": "LineString", "coordinates": [[0.0102, -0.001], [0.0102, 0.001]]},
+        lat=lat,
+        lng=lng,
+        jurisdiction=JURISDICTION,
+        tags={},
     )
 
 
@@ -191,6 +208,144 @@ def test_a_stream_far_from_the_shore_is_ignored():
     assert not [x for x in result.features if x.kind in ("inlet", "outlet")]
 
 
+# ── piers, breakwaters and harbours (OSM) ─────────────────────────────────────
+
+
+def test_a_pier_near_the_shore_becomes_a_feature():
+    pier = structure(name="Bronte Pier")
+    result = derive(outline_of(BASE), structures=[pier])
+    (f,) = [x for x in result.features if x.kind == "pier"]
+    assert f.water_body_id == "lake:test-lake"
+    assert f.name == "Bronte Pier"
+    assert f.geometry["type"] == "LineString"
+    assert f.source == "OpenStreetMap"
+    assert f.derivation == "osm_feature"
+    assert f.provenance == "record"
+    assert f.length_m and f.length_m > 0
+    assert f.area_m2 is None
+    assert f.feature_id == "lake:test-lake:pier:way/1"
+
+
+def test_a_breakwater_polygon_gets_an_area_not_a_length():
+    ring = [[0.0102, -0.001], [0.0102, 0.001], [0.0112, 0.001], [0.0112, -0.001], [0.0102, -0.001]]
+    bw = structure(
+        kind="breakwater", geometry={"type": "Polygon", "coordinates": [ring]}, osm_id="way/2"
+    )
+    (f,) = [x for x in derive(outline_of(BASE), structures=[bw]).features if x.kind == "breakwater"]
+    assert f.area_m2 and f.area_m2 > 0
+    assert f.length_m is None
+
+
+def test_a_harbour_node_within_the_buffer_attaches():
+    pt = structure(
+        kind="harbour", geometry={"type": "Point", "coordinates": [0.012, 0.0]}, osm_id="node/3"
+    )
+    (f,) = [x for x in derive(outline_of(BASE), structures=[pt]).features if x.kind == "harbour"]
+    assert f.geometry["type"] == "Point"
+
+
+def test_a_structure_beyond_the_buffer_is_dropped_and_counted():
+    far = structure(geometry={"type": "Point", "coordinates": [0.02, 0.0]}, osm_id="node/4")
+    result = derive(outline_of(BASE), structures=[far])
+    assert not [x for x in result.features if x.kind == "pier"]
+    assert result.dropped.get("shore_structure_off_shore") == 1
+
+
+def test_the_buffer_is_measured_from_the_shore_not_the_centre():
+    # just inside the buffer measured from the east shore (~0.0045 deg at the equator)
+    edge = HARBOUR_SHORE_BUFFER_M / 111_132.0 * 0.95
+    near = structure(geometry={"type": "Point", "coordinates": [0.01 + edge, 0.0]}, osm_id="node/5")
+    assert [x for x in derive(outline_of(BASE), structures=[near]).features if x.kind == "pier"]
+
+
+def test_a_structure_attaches_to_the_nearest_of_two_lakes():
+    near = outline_of(BASE, name="Near Lake")
+    far_shell = [(x + 0.05, y) for x, y in BASE]
+    far = outline_of(far_shell, name="Far Lake")
+    between = structure(geometry={"type": "Point", "coordinates": [0.012, 0.0]}, osm_id="node/6")
+    result = derive_shoreline_features(
+        {near.curated_name: near, far.curated_name: far},
+        {near.curated_name: "lake:near", far.curated_name: "lake:far"},
+        JURISDICTION,
+        BUILT,
+        shore_structures=[between],
+    )
+    (f,) = [x for x in result.features if x.kind == "pier"]
+    assert f.water_body_id == "lake:near"
+
+
+def test_a_structure_with_no_matched_outline_has_nowhere_to_go():
+    unmatched = outline_of(BASE, name="No Outline", matched=False)
+    result = derive(unmatched, structures=[structure(osm_id="node/7")])
+    assert not [x for x in result.features if x.kind == "pier"]
+    assert result.dropped.get("shore_structure_off_shore") == 1
+
+
+def test_a_lake_keeps_only_its_named_and_longest_structures_over_the_cap():
+    from src.services import shoreline_features as sf
+
+    def pier(i, name, length):
+        return structure(
+            osm_id=f"way/{i}",
+            name=name,
+            geometry={
+                "type": "LineString",
+                "coordinates": [[0.0102, 0.0], [0.0102, length]],
+            },
+        )
+
+    docks = [pier(i, None, 0.0001 * (i + 1)) for i in range(sf.MAX_SHORE_STRUCTURES)]
+    named = pier(900, "Bronte Pier", 0.0001)
+    result = derive(outline_of(BASE), structures=[*docks, named])
+
+    kept = [x for x in result.features if x.kind == "pier"]
+    assert len(kept) == sf.MAX_SHORE_STRUCTURES
+    assert "Bronte Pier" in {x.name for x in kept}
+    shortest_dock = "lake:test-lake:pier:way/0"
+    assert shortest_dock not in {x.feature_id for x in kept}
+    assert result.dropped["shore_structure_over_cap"] == 1
+
+
+def test_named_piers_over_the_cap_never_push_out_a_named_harbour():
+    from src.services import shoreline_features as sf
+
+    piers = [
+        structure(
+            osm_id=f"way/{i}",
+            name=f"Pier {i}",
+            geometry={
+                "type": "LineString",
+                "coordinates": [[0.0102, 0.0], [0.0102, 0.0001 * (i + 1)]],
+            },
+        )
+        for i in range(sf.MAX_SHORE_STRUCTURES + 5)
+    ]
+    ring = [
+        [0.0102, -0.0005],
+        [0.0102, 0.0005],
+        [0.0105, 0.0005],
+        [0.0105, -0.0005],
+        [0.0102, -0.0005],
+    ]
+    harbour = structure(
+        kind="harbour",
+        name="Bronte Harbour",
+        osm_id="way/900",
+        geometry={"type": "Polygon", "coordinates": [ring]},
+    )
+    result = derive(outline_of(BASE), structures=[*piers, harbour])
+
+    kinds = [x.kind for x in result.features if x.derivation == "osm_feature"]
+    assert kinds.count("pier") == sf.MAX_SHORE_STRUCTURES
+    assert kinds.count("harbour") == 1
+    assert result.dropped["shore_structure_over_cap"] == 5
+
+
+def test_no_structures_means_no_osm_features():
+    result = derive(outline_of(BASE))
+    assert not [x for x in result.features if x.derivation == "osm_feature"]
+
+
 # ── the set and its counts ────────────────────────────────────────────────────
 
 
@@ -230,14 +385,28 @@ def test_a_feature_id_without_a_body_is_rejected():
         )
 
 
-def test_a_line_is_not_a_shoreline_feature_geometry():
+def test_a_line_is_a_shoreline_feature_geometry_for_a_pier():
+    f = ShorelineFeature(
+        feature_id="great_lake:lake-ontario:pier:way/1",
+        water_body_id="great_lake:lake-ontario",
+        jurisdiction=JURISDICTION,
+        kind="pier",
+        geometry={"type": "LineString", "coordinates": [[0, 0], [1, 1]]},
+        source="OpenStreetMap",
+        derivation="osm_feature",
+        built_at=BUILT,
+    )
+    assert f.geometry["type"] == "LineString"
+
+
+def test_a_multipoint_is_not_a_shoreline_feature_geometry():
     with pytest.raises(ValidationError):
         ShorelineFeature(
             feature_id="great_lake:lake-ontario#inlet:1",
             water_body_id="great_lake:lake-ontario",
             jurisdiction=JURISDICTION,
             kind="inlet",
-            geometry={"type": "LineString", "coordinates": [[0, 0], [1, 1]]},
+            geometry={"type": "MultiPoint", "coordinates": [[0, 0], [1, 1]]},
             source="OHN Watercourse",
             derivation="watercourse_endpoint",
             built_at=BUILT,

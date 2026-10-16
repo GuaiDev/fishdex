@@ -1839,7 +1839,8 @@ def get_map_layers_bridges(
 @app.get("/map/water-bodies/{water_body_id}/features")
 def get_map_water_body_features(water_body_id: str, user: dict = Depends(get_current_user)):
     """A lake's shoreline features as GeoJSON: inlets, outlets, islands, points
-    and peninsulas, derived from its OHN outline. 404 for an unknown water body."""
+    and peninsulas derived from its OHN outline, plus the piers, breakwaters and
+    harbours OpenStreetMap maps on its shore. 404 for an unknown water body."""
     from src.services.water_bodies import water_body_features_geojson
     from src.storage.database import get_db
 

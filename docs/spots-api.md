@@ -30,7 +30,7 @@ and a card with a "recorded more often here" line.
 4. `GET /map/water-bodies?bbox=…&type=…` to name and group the rivers, creeks and lakes the
    spots sit on, `GET /map/water-bodies/{water_body_id}` for "more spots on this river", and
    `GET /map/water-bodies/{water_body_id}/features` for a lake's shoreline (inlets, outlets,
-   islands, points).
+   islands, points, and the piers, breakwaters and harbours on its shore).
 5. `GET /map/weed-reports/layer?bbox=…` for the user's own reported weed edges, and
    `POST /map/weed-reports` when they report one on a water body. Private to them; see
    [Weed reports](#weed-reports).
@@ -100,12 +100,13 @@ All user-facing strings, in display order (Quiet water last).
 - `name_sources` — a plain-words line for each `name_source`, for a "source" caption under a name.
 - `no_outline_note` — what to say when a lake has no shape on the map.
 - `shoreline_features[]` — for each shoreline feature `kind` (`inlet`, `outlet`, `island`,
-  `point`, `peninsula`, `drop_off`, `hump`): `label` (singular, for a card), `chip` (plural,
+  `point`, `peninsula`, `drop_off`, `hump`, `pier`, `breakwater`, `harbour`): `label` (singular, for a card), `chip` (plural,
   for a legend) and `one_liner` (what it is, in beginner words).
 - `shoreline_derivations` — a plain-words phrase for each `derivation`, for the caption under a
   shoreline feature: `shoreline_outline` (a shape read off the outline itself),
-  `watercourse_endpoint` (a mapped stream that ends at the shore) or `bathymetry_contours`
-  (a shape read off a lake's surveyed depth contours).
+  `watercourse_endpoint` (a mapped stream that ends at the shore) `bathymetry_contours`
+  (a shape read off a lake's surveyed depth contours) or `osm_feature` (a structure mapped by
+  OpenStreetMap volunteers).
 - `bathymetry_data_note` — a data note for contour-derived features (a drop-off or a hump):
   depth is at the survey's own water level, not today's, and the source states no unit. For a
   data-notes panel, never a card line.
@@ -240,11 +241,30 @@ All user-facing strings, in display order (Quiet water last).
       "label": "Peninsula",
       "chip": "Peninsulas",
       "one_liner": "A long point of land reaches out."
+    },
+    {
+      "kind": "pier",
+      "label": "Pier",
+      "chip": "Piers",
+      "one_liner": "A pier reaches out from the shore."
+    },
+    {
+      "kind": "breakwater",
+      "label": "Breakwater",
+      "chip": "Breakwaters",
+      "one_liner": "A breakwater stands offshore here."
+    },
+    {
+      "kind": "harbour",
+      "label": "Harbour",
+      "chip": "Harbours",
+      "one_liner": "A harbour is mapped here."
     }
   ],
   "shoreline_derivations": {
     "shoreline_outline": "from the shoreline outline",
-    "watercourse_endpoint": "where a mapped stream meets the shore"
+    "watercourse_endpoint": "where a mapped stream meets the shore",
+    "osm_feature": "mapped by OpenStreetMap volunteers"
   },
   "quiet_water": {
     "titles": {
@@ -991,9 +1011,11 @@ Unknown id is a `404`:
 
 The shoreline features of one lake, as a GeoJSON `FeatureCollection`: where a mapped stream
 enters (`inlet`) or leaves (`outlet`), an island (`island`), a point or peninsula of land
-reaching out (`point`, `peninsula`), and — where the lake has a digital survey — where the
-bottom falls away quickly (`drop_off`) or rises into a shallower shoal (`hump`). The first five
-are read off the lake's OHN Waterbody outline and the OHN streams that end at its shore; the
+reaching out (`point`, `peninsula`), the structures OpenStreetMap maps on its shore — a
+`pier`, a `breakwater`, a `harbour` — kept when they sit on the shore or within 500 m of it (at most 50 per lake, named and longer first), and —
+where the lake has a digital survey — where the bottom falls away quickly (`drop_off`) or rises
+into a shallower shoal (`hump`). The outline kinds are read off the lake's OHN Waterbody outline
+and the OHN streams that end at its shore; the structures come from OpenStreetMap (ODbL); the
 last two are read off the LIO Bathymetry depth contours. A located thing to show, never a claim
 about fish. A river has no shoreline, and a lake with no contours gets no drop-off or hump, so
 the honest answer is an **empty collection**, not an error; an unknown id is `404`.
@@ -1002,18 +1024,18 @@ Each feature's `properties`:
 
 | Field | Meaning |
 |---|---|
-| `feature_id` | Stable id: `{water_body_id}:{kind}:{key}`, where the key comes from the feature's location (or the stream's OGF_ID for an inlet or outlet). |
+| `feature_id` | Stable id: `{water_body_id}:{kind}:{key}`, where the key comes from the feature's location, the stream's OGF_ID for an inlet or outlet, or the OSM element id for a pier, breakwater or harbour. |
 | `water_body_id` | The lake the feature belongs to. |
-| `kind` | `inlet`, `outlet`, `island`, `point`, `peninsula`, `drop_off` or `hump`. Words in `labels.shoreline_features`. |
-| `name` | The mapped stream's name for an inlet or outlet, else `null`. |
-| `derivation` | How it was obtained: `watercourse_endpoint` (a mapped OHN stream that ends at the shore), `shoreline_outline` (a shape read off the outline's own edge), or `bathymetry_contours` (a shape read off a lake survey's depth contours). Phrase in `labels.shoreline_derivations`. |
-| `provenance` | `record` for an island (a ring inside the source polygon) or a stream junction; `inference` for a point, peninsula, drop-off or hump (a shape computed from the outline or the contours). |
+| `kind` | `inlet`, `outlet`, `island`, `point`, `peninsula`, `drop_off`, `hump`, `pier`, `breakwater` or `harbour`. Words in `labels.shoreline_features`. |
+| `name` | The mapped stream's name for an inlet or outlet, the mapped structure's name for a pier, breakwater or harbour, else `null`. |
+| `derivation` | How it was obtained: `watercourse_endpoint` (a mapped OHN stream that ends at the shore), `shoreline_outline` (a shape read off the outline's own edge), `bathymetry_contours` (a shape read off a lake survey's depth contours) or `osm_feature` (a structure mapped in OpenStreetMap). Phrase in `labels.shoreline_derivations`. |
+| `provenance` | `record` for an island (a ring inside the source polygon), a stream junction or a mapped structure; `inference` for a point, peninsula, drop-off or hump (a shape computed from the outline or the contours). |
 | `note` | A full sentence for the card, already assembled from the vocabulary. Safe to show as-is. A drop-off or hump names its survey ("from a 1970 survey, transect") or says `survey date unknown`. |
 | `attributes` | Survey facts behind a contour-derived feature: `contour_ogf_ids`, `survey_year`, `survey_method`, `depth_basis`, `depth_m`, and (for a drop-off) `depth_change_m` and `gap_m` or (for a hump) `area_m2`. Also the `attribution`, `licence` and `licence_url` to credit. `{}` for an outline-derived feature. |
-| `source`, `source_date` | The named source (`OHN Waterbody`, `OHN Watercourse` or `LIO Bathymetry`) and that record's effective date (`YYYY-MM-DD`, or `null` if the source gave none). Credit these. |
-| `area_m2` | An island's area or a hump's area, else `null`. |
-| `length_m` | How far a point or peninsula sticks out from the shore, or the depth change across a drop-off, in metres; else `null`. |
-| `geometry` | A `Point` for inlets, outlets, points, peninsulas and drop-offs; a `Polygon` for an island or hump. |
+| `source`, `source_date` | The named source (`OHN Waterbody`, `OHN Watercourse`, `LIO Bathymetry` or `OpenStreetMap`, credited ODbL) and that record's effective date (`YYYY-MM-DD`, or `null` if the source gave none — OpenStreetMap gives none). Credit these. |
+| `area_m2` | An island's area, a hump's area, or the area of a structure mapped as an area; else `null`. |
+| `length_m` | How far a point or peninsula sticks out from the shore, the length of a pier or breakwater drawn as a line, or the depth change across a drop-off, in metres; else `null`. |
+| `geometry` | A `Point` for inlets, outlets, points, peninsulas and drop-offs; a `Polygon` for an island, a hump or a structure mapped as an area; a `LineString` for a pier or breakwater drawn as a line. |
 
 ```json
 {
@@ -1021,11 +1043,12 @@ Each feature's `properties`:
   "water_body_id": "lake:rice-lake",
   "water_body_name": "Rice Lake",
   "meta": {
-    "count": 3,
+    "count": 4,
     "by_kind": {
       "inlet": 1,
       "island": 1,
-      "drop_off": 1
+      "drop_off": 1,
+      "pier": 1
     }
   },
   "features": [
@@ -1033,7 +1056,6 @@ Each feature's `properties`:
       "type": "Feature",
       "id": "lake:rice-lake:inlet:1",
       "geometry": {
-        "type": "Point",
         "coordinates": [
           -78.32,
           44.2
@@ -1058,7 +1080,6 @@ Each feature's `properties`:
       "type": "Feature",
       "id": "lake:rice-lake:island:-78.195_44.205",
       "geometry": {
-        "type": "Polygon",
         "coordinates": [
           [
             [
@@ -1082,14 +1103,15 @@ Each feature's `properties`:
               44.2
             ]
           ]
-        ]
+        ],
+        "type": "Polygon"
       },
       "properties": {
         "feature_id": "lake:rice-lake:island:-78.195_44.205",
         "water_body_id": "lake:rice-lake",
         "kind": "island",
         "name": null,
-        "derivation": "shoreline_outline",
+        "derivation": "osm_feature",
         "provenance": "record",
         "source": "OHN Waterbody",
         "source_date": "2021-04-08",
@@ -1133,6 +1155,31 @@ Each feature's `properties`:
         },
         "area_m2": null,
         "length_m": 4.0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "lake:rice-lake:pier:way/1036884186",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [-78.2, 44.18],
+          [-78.199, 44.1803]
+        ]
+      },
+      "properties": {
+        "feature_id": "lake:rice-lake:pier:way/1036884186",
+        "water_body_id": "lake:rice-lake",
+        "kind": "pier",
+        "name": null,
+        "derivation": "osm_feature",
+        "provenance": "record",
+        "source": "OpenStreetMap",
+        "source_date": null,
+        "note": "A pier reaches out from the shore. Mapped by OpenStreetMap volunteers (OpenStreetMap, ODbL).",
+        "attributes": {},
+        "area_m2": null,
+        "length_m": 124.7
       }
     }
   ]
@@ -1949,7 +1996,8 @@ id nobody has used. Their layer and list are simply empty of it.
   effective date and licence on `attributes` (see `GET /map/water-bodies/{id}/features`). A lake
   with no match stays `geometry: null`.
 - **Lake features** — inlets, outlets, islands, points and peninsulas — are built from a lake's
-  outline, and drop-offs and humps from the LIO Bathymetry depth contours of the ~3,500 surveyed
+  outline, the piers, breakwaters and harbours from the OpenStreetMap structures near its shore,
+  and drop-offs and humps from the LIO Bathymetry depth contours of the ~3,500 surveyed
   Ontario lakes, all served at `GET /map/water-bodies/{id}/features`. A lake with no survey gets
   no drop-off or hump. The only weed edges anywhere are the private ones a user reports themselves
   (see [Weed reports](#weed-reports)); none is derived, and none appears on a spot, a card or a
@@ -2077,8 +2125,9 @@ produces the same payload.
 ## Building and refreshing
 
 - `make build-spots` rebuilds spots from the stored anchors. It reads the
-  cached OHN Waterbody outlines and streams the lakes need — the first run fetches
-  and caches, later runs are offline. `make build-anchors` and `make build-stretches`
+  cached OHN Waterbody outlines, the OHN streams and the OSM shore structures (piers,
+  breakwaters, harbours) the lakes need — the first run fetches and caches each one, later
+  runs are offline. `make build-anchors` and `make build-stretches`
   run it at the end, and print what was dropped, held back at tier 3, or given a
   generic title because the source had no name.
 - `make compute-untapped` writes the score cache quiet water is built from; run it before
@@ -2090,8 +2139,10 @@ produces the same payload.
   throwaway database from the water bodies in the spots fixture and never touches the real one.
 - Water bodies are rebuilt with the spots, in the same transaction, from the curated river
   sections and the lake names on river mouths; each lake's outline comes from the OHN Waterbody
-  layer, matched by position and never by name alone. The build prints how many spots were
-  linked to a water body and how many were not, how many lakes got an outline, and how many
+  layer, matched by position and never by name alone, and the piers, breakwaters and harbours
+  on its shore come from OpenStreetMap (ODbL), kept when they sit on the shore or within 500 m
+  of it. The build prints how many spots were linked to a water body and how many were not,
+  how many lakes got an outline, how many shore structures were fetched, and how many
   shoreline features were derived and dropped.
 - User-facing words for the map live in `src/services/spot_labels.py`. The card's words
   are written by `render_spot()` in `src/services/context/render.py`, and the "why fish

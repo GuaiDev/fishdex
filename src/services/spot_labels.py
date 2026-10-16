@@ -148,13 +148,25 @@ NO_OUTLINE_NOTE = "No outline is on file for this water, so it has no shape on t
 
 
 # ── shoreline features ─────────────────────────────────────────────────────────
-# The inlets, outlets, islands, points and peninsulas a lake's outline shows.
-# `label` is the singular name on a card, `chip` the plural legend entry,
-# `one_liner` the sentence under the feature. A shape read off the outline's
-# edge says so ("from the shoreline outline"); a stream junction is its own line
-# ending at the shore.
+# The inlets, outlets, islands, points, peninsulas, piers, breakwaters and
+# harbours a lake's outline or its shore holds. `label` is the singular name on
+# a card, `chip` the plural legend entry, `one_liner` the sentence under the
+# feature. A shape read off the outline's edge says so ("from the shoreline
+# outline"); a stream junction is its own line ending at the shore; a pier,
+# breakwater or harbour is a structure mapped by OSM volunteers.
 
-FEATURE_KIND_ORDER = ("inlet", "outlet", "island", "point", "peninsula", "drop_off", "hump")
+FEATURE_KIND_ORDER = (
+    "inlet",
+    "outlet",
+    "island",
+    "point",
+    "peninsula",
+    "drop_off",
+    "hump",
+    "pier",
+    "breakwater",
+    "harbour",
+)
 FEATURE_KINDS: dict[str, dict[str, str]] = {
     "inlet": {
         "label": "Inlet",
@@ -185,16 +197,34 @@ FEATURE_KINDS: dict[str, dict[str, str]] = {
         "chip": "Humps",
         "one_liner": "A shallower rise in the bottom.",
     },
+    "pier": {
+        "label": "Pier",
+        "chip": "Piers",
+        "one_liner": "A pier reaches out from the shore.",
+    },
+    "breakwater": {
+        "label": "Breakwater",
+        "chip": "Breakwaters",
+        "one_liner": "A breakwater stands offshore here.",
+    },
+    "harbour": {
+        "label": "Harbour",
+        "chip": "Harbours",
+        "one_liner": "A harbour is mapped here.",
+    },
 }
-# What a derivation is, in words. The outline is the water's own edge, a stream
-# its own line, and the contours come from a government lake survey.
+# What a derivation is, in words. The outline and the stream come from the same
+# Ontario government water map, the contours from a government lake survey, and
+# the structures from OpenStreetMap volunteers.
 FEATURE_DERIVATION_LABELS: dict[str, str] = {
     "shoreline_outline": "from the shoreline outline",
     "watercourse_endpoint": "where a mapped stream meets the shore",
     "bathymetry_contours": "from a lake survey",
+    "osm_feature": "mapped by OpenStreetMap volunteers",
 }
 FEATURE_READ_FROM_OUTLINE = "Read from the shoreline outline"
 FEATURE_READ_FROM_MAP = "Read from the Ontario government water map"
+FEATURE_READ_FROM_OSM = "Mapped by OpenStreetMap volunteers (OpenStreetMap, ODbL)"
 # Shown when a survey's own date is missing on the contour and its index.
 SURVEY_DATE_UNKNOWN = "survey date unknown"
 # Depth is recorded relative to the level the lake was at on survey day, not
@@ -220,6 +250,10 @@ def shoreline_feature_note(
         if name:
             return f"{base} {name} is mapped here. {FEATURE_READ_FROM_MAP}."
         return f"{base} {FEATURE_READ_FROM_MAP}."
+    if derivation == "osm_feature":
+        if name:
+            return f"{base} {name} is mapped here. {FEATURE_READ_FROM_OSM}."
+        return f"{base} {FEATURE_READ_FROM_OSM}."
     return f"{base} {FEATURE_READ_FROM_OUTLINE}."
 
 
@@ -379,7 +413,12 @@ def all_strings() -> list[str]:
     for entry in FEATURE_KINDS.values():
         out += list(entry.values())
     out += list(FEATURE_DERIVATION_LABELS.values())
-    out += [FEATURE_READ_FROM_OUTLINE, FEATURE_READ_FROM_MAP, BATHYMETRY_DATA_NOTE]
+    out += [
+        FEATURE_READ_FROM_OUTLINE,
+        FEATURE_READ_FROM_MAP,
+        FEATURE_READ_FROM_OSM,
+        BATHYMETRY_DATA_NOTE,
+    ]
     for layer in LAYERS.values():
         out += [layer["label"], layer["note"]]
     out += [

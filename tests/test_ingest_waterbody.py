@@ -167,3 +167,128 @@ def test_fetch_near_asks_for_a_metre_radius_and_can_skip_geometry(cache_dir):
     assert sink["distance"] == "5000"
     assert sink["units"] == "esriSRUnit_Meter"
     assert sink["geometryType"] == "esriGeometryPoint"
+
+
+# ── paging: the count is the yardstick, never a short or empty page ─────────
+
+
+def _paged_get(count: int, pages: list[dict], sink: dict | None = None):
+    """A fake service: returnCountOnly answers `count`, the next call answers
+    the next page. A page missing `exceededTransferLimit` ends nothing — the
+    count decides."""
+
+    calls = {"count": 0, "pages": 0}
+
+    def get(_url, params=None, **_k):
+        params = params or {}
+        if sink is not None:
+            sink.update(params)
+        if params.get("returnCountOnly") == "true":
+            calls["count"] += 1
+            return MagicMock(json=lambda: {"count": count})
+        page = pages[min(calls["pages"], len(pages) - 1)]
+        calls["pages"] += 1
+        return MagicMock(json=lambda: page)
+
+    return get
+
+
+def _feature(i: int) -> dict:
+    return {
+        "attributes": {
+            "OGF_ID": 1000 + i,
+            "WATERBODY_TYPE": "Lake",
+            "OFFICIAL_NAME_LABEL": "Test Lake",
+            "SYSTEM_CALCULATED_AREA": 100.0,
+        },
+        "geometry": {"rings": [[[0, 0], [0, 1], [1, 1], [1, 0], [0, 0]]]},
+    }
+
+
+def test_fetch_by_name_pages_until_the_services_own_count_is_met(cache_dir):
+    from src.ingest.jurisdictions.ca_on.waterbody import fetch_waterbodies_by_name
+
+    pages = [
+        {"features": [_feature(i) for i in range(5)], "exceededTransferLimit": True},
+        {"features": [_feature(i) for i in range(5, 10)], "exceededTransferLimit": True},
+        {"features": [_feature(i) for i in range(10, 15)]},
+    ]
+    with patch(_HTTP, side_effect=_paged_get(15, pages)), patch(_CACHE, cache_dir):
+        bodies = fetch_waterbodies_by_name("Test Lake")
+
+    assert len(bodies) == 15
+    assert len({b.ogf_id for b in bodies}) == 15
+
+
+def test_by_name_pages_are_small_so_heavy_geometry_never_500s(cache_dir):
+    from src.ingest.jurisdictions.ca_on.waterbody import (
+        _BY_NAME_PAGE_SIZE,
+        fetch_waterbodies_by_name,
+    )
+
+    sink: dict = {}
+    with (
+        patch(_HTTP, side_effect=_paged_get(0, [{"features": []}], sink)),
+        patch(_CACHE, cache_dir),
+    ):
+        fetch_waterbodies_by_name("Test Lake")
+
+    assert sink["resultRecordCount"] == str(_BY_NAME_PAGE_SIZE)
+
+
+def test_an_empty_page_served_as_the_last_one_fails_loudly(cache_dir):
+    import pytest
+
+    from src.ingest.jurisdictions.ca_on.waterbody import fetch_waterbodies_by_name
+
+    pages = [
+        {"features": [_feature(i) for i in range(5)], "exceededTransferLimit": True},
+        {"features": []},  # the service's silent truncation: an empty "last" page
+    ]
+    with (
+        patch(_HTTP, side_effect=_paged_get(15, pages)),
+        patch(_CACHE, cache_dir),
+        pytest.raises(RuntimeError, match="5 of 15"),
+    ):
+        fetch_waterbodies_by_name("Test Lake")
+
+
+def test_a_lake_sliced_into_hundreds_of_polygons_is_pulled_whole(cache_dir):
+    from src.ingest.jurisdictions.ca_on.waterbody import (
+        _BY_NAME_PAGE_SIZE,
+        fetch_waterbodies_by_name,
+    )
+
+    total = _BY_NAME_PAGE_SIZE * 40 + 3
+
+    def get(_url, params=None, **_k):
+        params = params or {}
+        if params.get("returnCountOnly") == "true":
+            return MagicMock(json=lambda: {"count": total})
+        start = int(params["resultOffset"])
+        stop = min(start + _BY_NAME_PAGE_SIZE, total)
+        page = {
+            "features": [_feature(i) for i in range(start, stop)],
+            "exceededTransferLimit": stop < total,
+        }
+        return MagicMock(json=lambda: page)
+
+    with patch(_HTTP, side_effect=get), patch(_CACHE, cache_dir):
+        bodies = fetch_waterbodies_by_name("Test Lake")
+
+    assert len(bodies) == total
+
+
+def test_a_service_that_answers_no_count_falls_back_to_the_transfer_flag(cache_dir):
+    from src.ingest.jurisdictions.ca_on.waterbody import fetch_waterbodies_near
+
+    def get(_url, params=None, **_k):
+        params = params or {}
+        if params.get("returnCountOnly") == "true":
+            return MagicMock(json=lambda: {"features": []})  # no count key
+        return MagicMock(json=lambda: {"features": [_feature(0)], "exceededTransferLimit": False})
+
+    with patch(_HTTP, side_effect=get), patch(_CACHE, cache_dir):
+        bodies = fetch_waterbodies_near(-79.8, 43.3, 5000)
+
+    assert [b.ogf_id for b in bodies] == [1000]

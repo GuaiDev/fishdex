@@ -68,3 +68,23 @@ class CorridorFeature(BaseModel):
     # (lon, lat) vertices — set for roads only, which are lines the caller
     # intersects with the river rather than points.
     line: list[tuple[float, float]] | None = None
+
+
+class ShoreStructure(BaseModel):
+    """An OSM structure at a lake shore: a pier, a breakwater or a harbour.
+
+    Raw candidate for a lake's shoreline features. Whether it becomes a feature
+    — on the shore or within a buffer of it — is decided by the caller, which
+    holds the outline. `geometry` is GeoJSON: a Point (a mapped node), a
+    LineString (a pier or breakwater drawn as a line) or a Polygon (an area).
+    """
+
+    osm_id: str  # e.g. "way/12345"
+    kind: Literal["pier", "breakwater", "harbour"]
+    name: str | None
+    geometry: dict
+    lat: float
+    lng: float
+    jurisdiction: str
+    tags: dict
+    fetched_at: datetime = Field(default_factory=datetime.now)
