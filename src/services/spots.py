@@ -69,6 +69,7 @@ from src.services.bathymetry import (
 )
 from src.services.quiet_water import QuietWaterBuild, build_quiet_water
 from src.services.shoreline_features import derive_shoreline_features
+from src.services.spot_repeats import distinguish_titles, merge_repeats
 from src.services.stretch_anchors import DAM_MERGE_M, _coord_key
 from src.services.stretches import DEFAULT_CURATION_PATH, load_curation
 from src.services.water_bodies import LakeRef, WaterBodySet, derive_water_bodies, slugify
@@ -198,9 +199,11 @@ def classify(
             report.drop("duplicate_spot_id")
             continue
         by_id[spot.spot_id] = spot
-    final = sorted(by_id.values(), key=lambda s: (_KIND_ORDER[s.kind], s.tier, s.spot_id))
+    merged = merge_repeats(list(by_id.values()), report)
+    final = sorted(merged, key=lambda s: (_KIND_ORDER[s.kind], s.tier, s.spot_id))
 
     _attach_access(ctx, final, anchors)
+    distinguish_titles(final, report)
     water_bodies, features, contours = _link_water_bodies(
         ctx, final, outlines, watercourses or [], shore_structures or [], bathymetry
     )
@@ -437,6 +440,8 @@ def _junction_spot(ctx: _Context, group: list[StretchAnchor]) -> Spot:
             )
             ctx.report.fallback("creek_junction_unnamed_tributary")
         named = tributary is not None
+        if tributary:
+            attrs["tributary_name"] = tributary
     else:
         # The stretch is the creek and ends in a bigger water.
         km = float(main.attributes.get("stretch_upstream_km", 0.0))
