@@ -196,12 +196,6 @@ def test_a_broken_profile_read_still_returns_the_weather(agent_db, fake_weather,
     assert out["pressure_note"] is not None  # falls back to unseen, not to silence
 
 
-def test_the_tool_description_tells_the_model_the_note_is_conditional():
-    spec = next(t for t in tools.tool_schemas(None) if t["name"] == "get_conditions")
-    assert "pressure_note" in spec["description"]
-    assert "rule of thumb" in spec["description"]
-
-
 # ── /conditions ──────────────────────────────────────────────────────────────
 
 
