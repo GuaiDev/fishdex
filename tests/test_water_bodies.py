@@ -761,10 +761,16 @@ def test_the_survey_note_names_the_year_and_method_or_says_unknown():
         "bathymetry_contours",
         attributes={"survey_year": 1970, "survey_method": "Transect"},
     )
-    assert "From a 1970 survey, Transect" in note
+    assert note.endswith("From a 1970 survey (transect).")
 
     unknown = spot_labels.shoreline_feature_note("hump", "bathymetry_contours", attributes={})
+    assert unknown.endswith("From a survey of unknown date.")
     assert spot_labels.SURVEY_DATE_UNKNOWN in unknown
+
+    no_method = spot_labels.shoreline_feature_note(
+        "hump", "bathymetry_contours", attributes={"survey_year": 1982}
+    )
+    assert no_method.endswith("From a 1982 survey.")
 
 
 def bathymetry_feature(**over):
@@ -833,7 +839,31 @@ def test_features_geojson_exposes_the_survey_attributes_and_note(db):
     assert props["derivation"] == "bathymetry_contours"
     assert props["attributes"]["survey_year"] == 1970
     assert props["attributes"]["contour_ogf_ids"] == [1, 2]
-    assert "From a 1970 survey, Transect" in props["note"]
+    assert props["note"].endswith("From a 1970 survey (transect).")
+
+
+def test_a_drop_off_serves_its_depth_change_by_name_and_no_length(db):
+    from src.storage.spots import replace_spots
+
+    replace_spots(db, JURISDICTION, [], [lake_body()], [bathymetry_feature()])
+    (f,) = water_body_features_geojson(db, "great_lake:lake-ontario")["features"]
+    assert f["properties"]["depth_change_m"] == 4.0
+    assert f["properties"]["length_m"] is None
+
+
+def test_a_drop_off_built_under_the_old_floor_is_not_served(db):
+    from src.services.bathymetry import DROP_OFF_MIN_DEPTH_CHANGE_M
+    from src.storage.spots import replace_spots
+
+    tiny = bathymetry_feature(
+        feature_id="lake:rice-lake:drop_off:-78.2_44.2",
+        attributes={"depth_change_m": DROP_OFF_MIN_DEPTH_CHANGE_M - 1.0},
+        length_m=DROP_OFF_MIN_DEPTH_CHANGE_M - 1.0,
+    )
+    replace_spots(db, JURISDICTION, [], [lake_body()], [bathymetry_feature(), tiny])
+    body = water_body_features_geojson(db, "great_lake:lake-ontario")
+    assert [f["properties"]["depth_change_m"] for f in body["features"]] == [4.0]
+    assert body["meta"] == {"count": 1, "by_kind": {"drop_off": 1}}
 
 
 def test_a_rebuild_with_no_contours_clears_the_stored_ones(db):
@@ -881,7 +911,7 @@ def test_classify_reads_drop_offs_and_humps_from_a_supplied_survey():
         ),
         BathymetryContour(
             ogf_id=4,
-            depth_m=-5.0,
+            depth_m=-6.0,
             geometry={"type": "LineString", "coordinates": [[-78.25, 44.1505], [-78.15, 44.1505]]},
             source=LIO_BATHYMETRY_SOURCE,
         ),
