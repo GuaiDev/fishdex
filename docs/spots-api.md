@@ -297,7 +297,7 @@ GeoJSON `FeatureCollection` of points, light enough to load for a whole viewport
 | `kind` | One or more of `river_mouth`, `creek_junction`, `below_dam`, `public_fishing`, `quiet_water`, comma-separated. Omit for all. `quiet_water` is built from the explore score cache; see [Quiet water](#quiet-water). |
 | `tier` | The highest tier to include, **cumulative**: `1` headline spots only, `2` adds the normal ones (**default**), `3` everything, including junctions of small unnamed creeks that are hidden by default. A sensible mapping is tier 1 at province zoom, 2 at regional zoom, 3 at street zoom. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
-| `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. |
+| `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. The records are read around each spot in view, so pass a `bbox`: a province-wide request looks up every spot. |
 | `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, nearest first. Radius defaults to 50 km and is capped at 200 km. |
 | `new_to_me` | `true` keeps only spots with at least one species recorded within 2 km that **the caller** has not caught (see [New to you](#new-to-you)). Per-user, computed for this request, never cached; the response is `Cache-Control: private, no-store`. Combines with every other filter. It reads the records around each spot, so a `bbox` is required: without one the request is rejected with 422 (`new_to_me needs a bbox`). Default `false`. |
 
@@ -649,6 +649,10 @@ river quietly behind them, and let someone browse by water.
 | `bbox` | `min_lon,min_lat,max_lon,max_lat`. A river or creek is in view when its **line** crosses the box (not merely its overall box, which can cover a whole watershed). A lake is in view when the box of the river mouths that open onto it overlaps. Omit for everywhere. |
 | `type` | One or more of `river`, `creek`, `lake`, `pond`, `great_lake`, comma-separated. Omit for all. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
+| `fields` | Comma-separated `properties` to keep, from the table below (`water_body_id` is always kept, it is the feature's id). Omit for all. An unknown name is a 422 that lists the valid ones. |
+| `geometry` | `false` sends `geometry: null` on every feature and `meta.geometry: "none"`. Default `true`. Which waters are returned does not change. |
+| `simplify` | Thin each shape so no point of the answer is further than this many **metres** from the stored line. `0` or omitted sends the stored shape. |
+| `zoom` | The same thinning, given as a web-map zoom (0 to 22): the tolerance is what one screen pixel covers at that zoom and the water's latitude. Give `simplify` or `zoom`, not both, and neither with `geometry=false` (422). |
 
 `meta.type_counts` counts every type in view, ignoring the `type` filter, so a filter row can
 show what each would add. Features come in type order (rivers, creeks, lakes, ponds, Great
@@ -666,6 +670,29 @@ Each feature's `properties`:
 | `jurisdiction` | ISO 3166-2 code. |
 | `bbox` | `[min_lon, min_lat, max_lon, max_lat]`, or null. |
 | `spot_counts` | Spots on this water by kind, for the default view (tier 1 and 2). A badge, not a ranking. |
+
+### Sending less
+
+Almost all of this response is geometry: a matched lake outline is megabytes, and the whole
+province is tens of megabytes. A client should ask for what it draws.
+
+- **A list or a search box** (names, types, badges): `?fields=display_name,type&geometry=false`.
+  Without a `bbox` no outline is read from the database; with one, only the waters that straddle
+  the box's edge are read, to decide whether they are in view.
+- **A map layer**: `?zoom=<the map's zoom>`, or `?simplify=<metres>` for a fixed tolerance. Thinning
+  keeps polygons closed and valid and never changes which waters are returned; only their vertices.
+  Ask again at the new zoom when the map zooms in, since a thinned outline is not the stored one.
+- **Telling thinned from missing**: when `geometry` or `simplify`/`zoom` is used, `meta.geometry` is
+  `"none"` or `"simplified"` (with `meta.simplify_m` or `meta.zoom`). A lake with no outline on file
+  still has `geometry: null` and, on the detail, `geometry_source: "none"`; a `geometry=false`
+  answer says nothing about outlines, so read `geometry_source` on the detail if you need it.
+
+With none of these the response is what it always was, so existing clients are unaffected.
+`/map/water-bodies/{id}/features` is not thinned: its shapes are points and small islands.
+
+Measured on the Toronto box (a database holding the real Lake Ontario, Humber Bay and Rice
+Lake outlines, 10.7 MB of geometry): the plain list is 8.9 MB; `zoom=9` is 0.10 MB;
+`zoom=12` is 0.36 MB; `fields=…&geometry=false` is under 20 KB.
 
 `geometry` is a simplified `MultiLineString` for a river or creek. A **lake carries a
 `Polygon`** when its OHN Waterbody outline was matched at build time, or `geometry: null` when
@@ -808,6 +835,11 @@ Bad input is a `422` with a `detail` message: a `bbox` that is not four ordered 
 
 One water body in full: everything above plus its shape, the curated river sections it is
 made of, and every spot on it.
+
+`geometry=false` sends `geometry: null`; `simplify` (metres) or `zoom` thins the shape the same
+way as on the list (see [Sending less](#sending-less)). `geometry_source` is served either way. The
+same 422s apply: both options together, or either with `geometry=false`. A card that does not
+draw the outline should ask for `geometry=false`: Lake Ontario's is 6.3 MB.
 
 | Field | Meaning |
 |---|---|
