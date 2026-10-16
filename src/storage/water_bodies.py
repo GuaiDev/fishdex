@@ -14,6 +14,12 @@ from src.models.bathymetry import BathymetryContour
 from src.models.shoreline_feature import ShorelineFeature
 from src.models.water_body import WaterBody
 
+_COLUMNS_WITHOUT_GEOMETRY = (
+    "water_body_id, jurisdiction, name, name_source, type, NULL AS geometry_geojson, "
+    "geometry_source, bbox_min_lng, bbox_min_lat, bbox_max_lng, bbox_max_lat, "
+    "stretch_ids_json, attributes_json, built_at"
+)
+
 
 def write_water_bodies(
     conn: sqlite3.Connection, jurisdiction: str, bodies: list[WaterBody]
@@ -77,8 +83,14 @@ def list_water_bodies(
     bbox: tuple[float, float, float, float] | None = None,
     types: list[str] | None = None,
     jurisdiction: str | None = None,
+    include_geometry: bool = True,
 ) -> list[WaterBody]:
-    """Water bodies whose box overlaps (min_lon, min_lat, max_lon, max_lat), in id order."""
+    """Water bodies whose box overlaps (min_lon, min_lat, max_lon, max_lat), in id order.
+
+    `include_geometry=False` leaves the stored shapes unread: `geometry` is None on every
+    result. A lake outline is megabytes of JSON, so a caller that does not draw it should
+    not pay to load and parse it. Fetch one shape later with `get_water_body_geometry_text`.
+    """
     clauses: list[str] = []
     params: list = []
     if bbox is not None:
@@ -94,10 +106,23 @@ def list_water_bodies(
         clauses.append("jurisdiction = ?")
         params.append(jurisdiction)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    columns = "*" if include_geometry else _COLUMNS_WITHOUT_GEOMETRY
     rows = db.execute_returning_dicts(
-        f"SELECT * FROM water_bodies {where} ORDER BY water_body_id", params
+        f"SELECT {columns} FROM water_bodies {where} ORDER BY water_body_id", params
     )
-    return [_from_row(r) for r in rows]
+    return [_from_row(r, geometry_read=include_geometry) for r in rows]
+
+
+def get_water_body_geometry_text(db: Database, water_body_id: str) -> str | None:
+    """One water body's stored shape as GeoJSON text, unparsed; None when it has none.
+
+    For a caller that hands the text straight to a geometry library: parsing a lake
+    outline into Python dicts first costs about as much again as reading it.
+    """
+    row = db.execute(
+        "SELECT geometry_geojson FROM water_bodies WHERE water_body_id = ?", [water_body_id]
+    ).fetchone()
+    return row[0] if row and row[0] else None
 
 
 def get_water_body(db: Database, water_body_id: str) -> WaterBody | None:
@@ -179,9 +204,13 @@ def _row(b: WaterBody) -> dict:
     }
 
 
-def _from_row(r: dict) -> WaterBody:
+def _from_row(r: dict, geometry_read: bool = True) -> WaterBody:
     box = (r["bbox_min_lng"], r["bbox_min_lat"], r["bbox_max_lng"], r["bbox_max_lat"])
-    return WaterBody(
+    # A row read without its shape has `geometry_source` saying there is one and `geometry`
+    # None, which the model rightly refuses to validate. The values come straight from a
+    # row this module wrote through the model, so build it without re-validating.
+    build = WaterBody if geometry_read else WaterBody.model_construct
+    return build(
         water_body_id=r["water_body_id"],
         jurisdiction=r["jurisdiction"],
         name=r["name"],

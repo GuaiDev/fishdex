@@ -74,6 +74,16 @@ WATER_BODY_LISTS = [
         "/map/water-bodies?type=creek&bbox=-79.9,43.3,-79.5,43.6",
         "creeks only, in a box around Oakville",
     ),
+    (
+        "/map/water-bodies?bbox=-79.75,43.40,-79.60,43.50&fields=display_name,name_source,type,jurisdiction"
+        "&geometry=false",
+        "the light list: only the named properties and no shapes, for a client that draws "
+        "nothing from this call",
+    ),
+    (
+        "/map/water-bodies?type=great_lake,lake&zoom=6",
+        "shapes thinned to one pixel at zoom 6; `meta.geometry` says they are thinned",
+    ),
 ]
 LAYERS = [
     ("/map/layers/getting-there?bbox=-80.40,43.17,-80.30,43.25", "getting there features in box"),
@@ -83,6 +93,10 @@ WATER_BODY_DETAILS = [
     ("river:credit-river", "a river in full: its line, its river sections, the spots on it"),
     ("great_lake:lake-ontario", "a lake: its outline, its shoreline features, the mouths onto it"),
     ("creek:bronte-creek", "a creek"),
+    (
+        "great_lake:lake-ontario?simplify=2000",
+        "a lake with its outline thinned to 2 km; the same record otherwise",
+    ),
 ]
 # Shoreline features for a lake whose outline the build matched. Captured only
 # when the build actually has one, so the fixture never invents an empty set.
@@ -104,6 +118,8 @@ ERRORS = [
     ("/map/spots?kind=lake", "an unknown kind is a 422"),
     ("/map/spots/creek_junction:n0_0", "an unknown spot id is a 404"),
     ("/map/water-bodies?type=ocean", "an unknown water body type is a 422"),
+    ("/map/water-bodies?fields=colour", "an unknown field is a 422"),
+    ("/map/water-bodies?geometry=false&zoom=6", "thinning a shape that is not sent is a 422"),
     ("/map/water-bodies/river:no-such-river", "an unknown water body id is a 404"),
     ("/map/water-bodies/river:no-such-river/features", "an unknown water body id is a 404"),
 ]

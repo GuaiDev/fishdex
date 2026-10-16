@@ -24,6 +24,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+import shapely
 from shapely.geometry import box as shapely_box
 from shapely.geometry import shape
 from sqlite_utils.db import Database
@@ -35,8 +36,9 @@ from src.models.stretch import FishingStretch
 from src.models.water_body import NameSource, WaterBody, WaterBodyType
 from src.services import api_vocab
 from src.services import spot_labels as words
+from src.services.geometry_simplify import simplify_geometry
 from src.storage.spots import list_spots, list_spots_also_on
-from src.storage.water_bodies import get_water_body, list_water_bodies
+from src.storage.water_bodies import get_water_body, get_water_body_geometry_text, list_water_bodies
 
 # The Great Lakes as the map means them. Georgian Bay is the sixth by common usage but
 # is part of Lake Huron; Lake St. Clair, Lake Simcoe and the Bay of Quinte are not
@@ -267,11 +269,46 @@ def _spot_counts(db: Database, max_tier: int) -> dict[str, dict[str, int]]:
     return counts
 
 
+# The properties a water-body list feature carries, in the order they are served.
+LIST_FIELDS = (
+    "water_body_id",
+    "name",
+    "display_name",
+    "name_source",
+    "type",
+    "jurisdiction",
+    "bbox",
+    "spot_counts",
+)
+
+
+def _crosses_view(db: Database, wb: WaterBody, view) -> bool:
+    """Does this water's drawn shape really cross the view box?
+
+    The stored box is a coarse filter (a river's box can cover a whole watershed), so a
+    box that only partly overlaps the view needs the shape itself. A box wholly inside
+    the view cannot miss it, so that shape is never read. A water with no outline is
+    placed by its box alone.
+    """
+    if wb.geometry_source == "none" or wb.bbox is None:
+        return True
+    if view.contains(shapely_box(*wb.bbox)):
+        return True
+    if wb.geometry is not None:
+        return view.intersects(shape(wb.geometry))
+    text = get_water_body_geometry_text(db, wb.water_body_id)
+    return text is None or view.intersects(shapely.from_geojson(text))
+
+
 def water_bodies_geojson(
     db: Database,
     bbox: tuple[float, float, float, float] | None = None,
     types: list[str] | None = None,
     jurisdiction: str | None = None,
+    fields: list[str] | None = None,
+    geometry: bool = True,
+    simplify_m: float | None = None,
+    zoom: float | None = None,
 ) -> dict:
     """Water bodies as a GeoJSON FeatureCollection, light enough for a whole map.
 
@@ -280,40 +317,65 @@ def water_bodies_geojson(
     A drawn water is in view when its line crosses the box, not merely when its overall
     box does. `type_counts` in `meta` are taken before the type filter. `spot_counts` count
     the spots shown by default (tier 1 and 2).
+
+    The weight is mostly geometry (a lake outline is megabytes), so a client can trim it:
+
+    - `fields` keeps only those entries of `properties` (names from `LIST_FIELDS`;
+      `water_body_id` is always kept, it is the feature's identity).
+    - `geometry=False` serves `geometry: null` on every feature and never reads the shapes
+      it does not need to decide what is in view.
+    - `simplify_m` thins each shape to that many metres, or `zoom` to one screen pixel at
+      that web-map zoom. Which waters are returned does not change; only their shapes.
+
+    With none of these given the answer is exactly what it always was. When one is, `meta`
+    says so (`geometry`: "none" or "simplified", and the tolerance or zoom), so a client
+    can tell a thinned outline from an outline that was never on file.
     """
-    in_view = list_water_bodies(db, bbox=bbox, jurisdiction=jurisdiction)
+    wanted = [f for f in LIST_FIELDS if fields is None or f in fields or f == "water_body_id"]
+    in_view = list_water_bodies(
+        db, bbox=bbox, jurisdiction=jurisdiction, include_geometry=geometry
+    )
     if bbox is not None:
-        # The stored box is a coarse filter: a river's box can cover a whole watershed. Keep
-        # a drawn water only if its line really crosses the view; one with no outline stays
-        # on its box.
         view = shapely_box(*bbox)
-        in_view = [
-            wb for wb in in_view if wb.geometry is None or view.intersects(shape(wb.geometry))
-        ]
+        in_view = [wb for wb in in_view if _crosses_view(db, wb, view)]
     type_counts = {t: 0 for t in words.WATER_BODY_TYPE_ORDER}
     for wb in in_view:
         type_counts[wb.type] += 1
     shown = [wb for wb in in_view if not types or wb.type in types]
     shown.sort(key=lambda wb: (words.WATER_BODY_TYPE_ORDER.index(wb.type), wb.water_body_id))
-    counts = _spot_counts(db, max_tier=2)
+    counts = _spot_counts(db, max_tier=2) if "spot_counts" in wanted else {}
+
+    def properties(wb: WaterBody) -> dict:
+        everything = {
+            "water_body_id": wb.water_body_id,
+            "name": wb.name,
+            "display_name": _display_name(wb),
+            "name_source": wb.name_source,
+            "type": wb.type,
+            "jurisdiction": wb.jurisdiction,
+            "bbox": list(wb.bbox) if wb.bbox else None,
+            "spot_counts": counts.get(wb.water_body_id, {}),
+        }
+        return {k: everything[k] for k in wanted}
+
+    meta: dict = {"count": len(shown), "type_counts": type_counts}
+    if not geometry:
+        meta["geometry"] = "none"
+    elif simplify_m is not None or zoom is not None:
+        meta["geometry"] = "simplified"
+        if simplify_m is not None:
+            meta["simplify_m"] = simplify_m
+        else:
+            meta["zoom"] = zoom
     return {
         "type": "FeatureCollection",
-        "meta": {"count": len(shown), "type_counts": type_counts},
+        "meta": meta,
         "features": [
             {
                 "type": "Feature",
                 "id": wb.water_body_id,
-                "geometry": wb.geometry,
-                "properties": {
-                    "water_body_id": wb.water_body_id,
-                    "name": wb.name,
-                    "display_name": _display_name(wb),
-                    "name_source": wb.name_source,
-                    "type": wb.type,
-                    "jurisdiction": wb.jurisdiction,
-                    "bbox": list(wb.bbox) if wb.bbox else None,
-                    "spot_counts": counts.get(wb.water_body_id, {}),
-                },
+                "geometry": simplify_geometry(wb.geometry, simplify_m, zoom) if geometry else None,
+                "properties": properties(wb),
             }
             for wb in shown
         ],
@@ -331,8 +393,17 @@ def _spot_summary(s: Spot) -> dict:
     }
 
 
-def get_water_body_detail(db: Database, water_body_id: str) -> dict | None:
+def get_water_body_detail(
+    db: Database,
+    water_body_id: str,
+    geometry: bool = True,
+    simplify_m: float | None = None,
+    zoom: float | None = None,
+) -> dict | None:
     """One water body in full, with the spots on it. None for an unknown id.
+
+    `geometry=False` serves `geometry: null`; `simplify_m` or `zoom` thins the shape the
+    way the list does (see `water_bodies_geojson`). Neither changes anything else.
 
     `spots` are its children; `also_here_spots` belong to another water body but
     are also on this one (the river mouths that open onto a lake).
@@ -348,8 +419,10 @@ def get_water_body_detail(db: Database, water_body_id: str) -> dict | None:
 
     own = list_spots(db, max_tier=3, water_body_id=water_body_id)
     also = list_spots_also_on(db, water_body_id)
+    shown = api_vocab.water_body_for_api(wb.model_dump())
+    shown["geometry"] = simplify_geometry(wb.geometry, simplify_m, zoom) if geometry else None
     return {
-        **api_vocab.water_body_for_api(wb.model_dump()),
+        **shown,
         "display_name": _display_name(wb),
         "spots": ranked(own),
         "also_here_spots": ranked(also),

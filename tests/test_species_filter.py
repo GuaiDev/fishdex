@@ -171,3 +171,69 @@ def test_a_listed_species_query_ignores_what_else_is_recorded(db):
     inat(db, *DACE)
     assert ids("Redside Dace", db) == []
     assert ids("Creek Chub", db) == [JUNCTION]
+
+
+# ── speed work must not move the screen ──────────────────────────────────────
+
+
+def test_each_name_is_checked_against_the_species_file_once_per_request(db, monkeypatch):
+    """The speed-up: the same fish at many spots is one lookup, not one per spot."""
+    import src.services.context.species as species_mod
+
+    inat(db, *CHUB)
+    inat(db, *CHUB, near=ECKARDT)
+    real = species_mod.listing_check
+    seen = []
+
+    def counting(db_, scientific_name, common_name):
+        seen.append((scientific_name, common_name))
+        return real(db_, scientific_name=scientific_name, common_name=common_name)
+
+    monkeypatch.setattr(species_mod, "listing_check", counting)
+    assert sorted(ids("creek chub", db)) == sorted([JUNCTION, ECK])
+    assert seen.count(("Semotilus atromaculatus", "Creek Chub")) == 1
+
+
+def test_a_listed_record_at_one_spot_still_drops_only_that_spot_when_names_are_cached(db):
+    """A cached 'not listed' for a name must not clear a different, listed name nearby."""
+    inat(db, *CHUB)
+    inat(db, *CHUB, near=ECKARDT)
+    inat(db, *DACE, near=ECKARDT)
+    # "c" matches Creek Chub at both spots and Redside Dace (the 'c' in "Redside Dace") at one.
+    assert ids("c", db) == [JUNCTION]
+
+
+def test_a_species_not_in_the_file_still_never_passes_when_other_spots_cached_known_names(db):
+    inat(db, *CHUB)
+    inat(db, *HOG_SUCKER)
+    inat(db, *CHUB, near=ECKARDT)
+    assert ids("sucker", db) == []
+    assert sorted(ids("chub", db)) == sorted([JUNCTION, ECK])
+
+
+def test_the_records_lookup_can_leave_out_the_bird_signal(db, monkeypatch):
+    """`species=` runs the lookup once per spot and reads only `.species`."""
+    from src.models.context import Place
+    from src.services.context import slices
+
+    def boom(*a, **k):
+        raise AssertionError("the bird signal was read")
+
+    monkeypatch.setattr(slices, "_piscivore_field", boom)
+    inat(db, *CHUB)
+    place = Place(query="x", lat=43.5, lng=-79.6, radius_km=2.0)
+    lean = slices.build_records(db, place, with_piscivore=False)
+    assert [r.common_name for r in lean.species] == ["Creek Chub"]
+    empty = slices.build_records(
+        db, Place(query="y", lat=10, lng=10, radius_km=2.0), with_piscivore=False
+    )
+    assert empty.species == []
+
+
+def test_observation_positions_are_indexed(db):
+    names = {
+        r[1]
+        for t in ("observations", "gbif_observations")
+        for r in db.execute(f"PRAGMA index_list({t})")
+    }
+    assert {"idx_observations_position", "idx_gbif_observations_position"} <= names
