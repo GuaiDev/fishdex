@@ -126,6 +126,11 @@ def tool_schemas(profile: Any) -> list[dict]:
             "description": (
                 "Live and forecast conditions for a location: air temperature, "
                 "barometric pressure and its trend, wind, precipitation. "
+                "May include a `pressure_note`: an angler rule of thumb about "
+                "pressure, included only for someone still learning that idea. "
+                "It is not a measurement and not a prediction. If present, pass it "
+                "on as hedged common guidance with its caveat, never as what the "
+                "fish will do; if absent, say nothing about pressure and bites. "
                 "Separate from describe_place because this is the only thing that "
                 "must never be cached. Use it whenever the question involves now, "
                 "today, tomorrow or a named future day."
@@ -485,8 +490,9 @@ def _describe_place(inputs: dict, user_id: int) -> str:
     return render_place_context(ctx)
 
 
-def _get_conditions(inputs: dict, _user_id: int) -> str:
+def _get_conditions(inputs: dict, user_id: int) -> str:
     from src.services.weather import get_conditions_for_agent, get_pressure_trend_for_agent
+    from src.services.weather_notes import note_for_user
 
     conditions = get_conditions_for_agent(
         lat=inputs["lat"], lng=inputs["lng"], when=inputs.get("when", "now")
@@ -498,7 +504,23 @@ def _get_conditions(inputs: dict, _user_id: int) -> str:
     except Exception:  # noqa: BLE001
         logger.warning("pressure trend failed", exc_info=True)
         trend = None
-    return json.dumps({"conditions": _maybe_json(conditions), "pressure": _maybe_json(trend)})
+    conditions, trend = _maybe_json(conditions), _maybe_json(trend)
+    # The weather facts above go to everyone. The behaviour note goes only to
+    # someone still new to the pressure concept, and showing it counts as a
+    # sighting of that concept. A bad profile read must not cost the weather.
+    note = None
+    if isinstance(trend, dict):
+        try:
+            note = note_for_user(get_db(), user_id, trend.get("trend"), record_exposure=True)
+        except Exception:  # noqa: BLE001
+            logger.warning("weather note failed", exc_info=True)
+    return json.dumps(
+        {
+            "conditions": conditions,
+            "pressure": trend,
+            "pressure_note": note.as_dict() if note else None,
+        }
+    )
 
 
 def _maybe_json(text: str | None):
