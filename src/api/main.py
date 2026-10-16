@@ -36,6 +36,7 @@ from fastapi import (  # noqa: E402
     Form,
     Header,
     HTTPException,
+    Query,
     Response,
     UploadFile,
 )
@@ -51,6 +52,7 @@ from src.models.pin import (  # noqa: E402
     PinUpdate,
     RecalledVisitCreate,
     SessionUpdate,
+    TodaySort,
     TripPinRating,
 )
 from src.models.weed_report import WeedReportCreate, WeedReportUpdate  # noqa: E402
@@ -2038,6 +2040,28 @@ def get_pin_labels(user: dict = Depends(get_current_user)):
     return labels_payload()
 
 
+@app.get("/pins/today")
+def get_pins_today(
+    sort: TodaySort = "match",
+    lat: float | None = Query(None, ge=-90, le=90),
+    lng: float | None = Query(None, ge=-180, le=180),
+    user: dict = Depends(get_current_user),
+):
+    """The Today view: the caller's own pins in the order they chose, each with a reason.
+
+    sort is match, distance, last_visited or favourites. distance needs lat and
+    lng (where the angler is); for the other keys they only add distance_km.
+    Only sort=match looks up today's conditions, so only its rows carry a
+    match. Another angler's pins and trips can never change the result.
+    """
+    from src.services.pins.today import today_view
+
+    try:
+        return today_view(_pin_db(), user["id"], sort, lat, lng)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
 @app.get("/pins")
 def get_pins(user: dict = Depends(get_current_user)):
     """The Personal map: the user's pins, and their located stops not yet pinned."""
@@ -2095,6 +2119,22 @@ def get_pin_conditions(pin_id: int, user: dict = Depends(get_current_user)):
     if rows is None:
         raise HTTPException(status_code=404, detail="No such pin")
     return rows
+
+
+@app.get("/pins/{pin_id}/match")
+def get_pin_match(pin_id: int, user: dict = Depends(get_current_user)):
+    """How today's conditions compare with the caller's own best-rated trips at this pin.
+
+    Built only from the caller's rated trips here. With fewer than the minimum
+    (see GET /pins/labels) the answer has status "hidden" and shows nothing but
+    the counts: the UI shows the conditions panel alone.
+    """
+    from src.services.pins.match import pin_match
+
+    match = pin_match(_pin_db(), user["id"], pin_id)
+    if match is None:
+        raise HTTPException(status_code=404, detail="No such pin")
+    return match
 
 
 @app.patch("/pins/{pin_id}")

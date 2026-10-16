@@ -471,6 +471,44 @@ def pin_catches(db: Database, user_id: int, pin_id: int) -> list[dict]:
     )
 
 
+# Besides the readings the caller asks for, the match needs to know which gauge
+# a snapshot came from and when the water sample behind a trip was taken.
+_TRIP_SNAPSHOT_COLUMNS = ("gauge_station_id", "gauge_station_name", "pwqmn_sampled_at")
+
+
+def rated_trips(
+    db: Database, user_id: int, pin_id: int, condition_columns: tuple[str, ...]
+) -> list[dict]:
+    """The user's trips at this pin that they rated, one row per trip, with conditions.
+
+    A trip is rated at a pin when a stop of it links to the pin and that link
+    carries a rating, so recalled visits (a different table) can never appear.
+    A trip with several stops here is one row. Conditions are the trip's own
+    session_conditions row, read through the user's own session: that table's
+    user_id was not reliably written, so the join goes by session. Columns the
+    database does not have yet (an older schema) read as NULL, and a trip with
+    no conditions row has every reading NULL. Newest trip first.
+    """
+    have: set[str] = set()
+    if "session_conditions" in db.table_names():
+        have = {c.name for c in db["session_conditions"].columns}
+    wanted = [*condition_columns, *_TRIP_SNAPSHOT_COLUMNS]
+    select = ", ".join(f"sc.{c}" if c in have else f"NULL AS {c}" for c in wanted)
+    return _rows(
+        db,
+        f"""
+        SELECT pl.session_id, MAX(pl.rating) AS rating, s.date, {select}
+        FROM pin_links pl
+        JOIN sessions s ON s.id = pl.session_id AND s.user_id = pl.user_id
+        LEFT JOIN session_conditions sc ON sc.session_id = s.id
+        WHERE pl.pin_id = ? AND pl.user_id = ? AND pl.rating IS NOT NULL
+        GROUP BY pl.session_id
+        ORDER BY COALESCE(s.date, '') DESC, pl.session_id DESC
+        """,
+        [pin_id, user_id],
+    )
+
+
 def session_stop_counts(db: Database, user_id: int, session_ids: list[int]) -> dict[int, int]:
     if not session_ids:
         return {}

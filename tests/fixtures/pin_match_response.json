@@ -1,0 +1,98 @@
+{
+  "pin_id": 1,
+  "label": "Conditions match (placeholder)",
+  "shown": true,
+  "status": "similar",
+  "status_label": "Similar to your best trips",
+  "rated_trips": 3,
+  "min_rated_trips": 3,
+  "best_trips": 3,
+  "best_months": [
+    "April"
+  ],
+  "compared": 5,
+  "inside": 5,
+  "score": 1.0,
+  "comparisons": [
+    {
+      "field": "air_temp_c",
+      "label": "Air temperature",
+      "unit": "°C",
+      "current": 10.0,
+      "low": 8.0,
+      "high": 12.0,
+      "trips": 3,
+      "position": "inside",
+      "text": "Air temperature: 8–12°C on those trips, 10°C now (inside that range)."
+    },
+    {
+      "field": "wind_speed_kmh",
+      "label": "Wind",
+      "unit": "km/h",
+      "current": 14.0,
+      "low": 14.0,
+      "high": 14.0,
+      "trips": 3,
+      "position": "inside",
+      "text": "Wind: 14 km/h on those trips, 14 km/h now (inside that range)."
+    },
+    {
+      "field": "pressure_hpa",
+      "label": "Air pressure",
+      "unit": "hPa",
+      "current": 1011.0,
+      "low": 1011.0,
+      "high": 1011.0,
+      "trips": 3,
+      "position": "inside",
+      "text": "Air pressure: 1011 hPa on those trips, 1011 hPa now (inside that range)."
+    },
+    {
+      "field": "flow_cms",
+      "label": "River flow",
+      "unit": "m³/s",
+      "current": 18.3,
+      "low": 18.0,
+      "high": 18.0,
+      "trips": 3,
+      "position": "near",
+      "text": "River flow: 18 m³/s on those trips, 18.3 m³/s now (close to that range)."
+    },
+    {
+      "field": "level_m",
+      "label": "Water level",
+      "unit": "m",
+      "current": 0.52,
+      "low": 0.5,
+      "high": 0.5,
+      "trips": 3,
+      "position": "near",
+      "text": "Water level: 0.5 m on those trips, 0.52 m now (close to that range)."
+    }
+  ],
+  "left_out": [
+    {
+      "field": "water_temp_c",
+      "label": "Water temperature",
+      "reason": "unavailable",
+      "text": "no current reading",
+      "empty_reason": "no_live_source"
+    },
+    {
+      "field": "dissolved_oxygen_mgl",
+      "label": "Dissolved oxygen",
+      "reason": "unavailable",
+      "text": "no current reading",
+      "empty_reason": "no_records_in_radius"
+    },
+    {
+      "field": "ph",
+      "label": "pH",
+      "reason": "unavailable",
+      "text": "no current reading",
+      "empty_reason": "no_records_in_radius"
+    }
+  ],
+  "headline": "Today looks like your best trips here: 5 of 5 conditions compared are in their range.",
+  "reason": "Your 3 best trips here were in April. Air temperature: 8–12°C on those trips, 10°C now (inside that range). Wind: 14 km/h on those trips, 14 km/h now (inside that range). Air pressure: 1011 hPa on those trips, 1011 hPa now (inside that range). River flow: 18 m³/s on those trips, 18.3 m³/s now (close to that range). Water level: 0.5 m on those trips, 0.52 m now (close to that range). Today looks like your best trips here: 5 of 5 conditions compared are in their range. Not compared: Water temperature (no current reading), Dissolved oxygen (no current reading), pH (no current reading)."
+}

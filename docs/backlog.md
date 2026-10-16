@@ -117,7 +117,12 @@ Saved spots appear on the Personal map and as a "Saved by me" badge/filter in Ex
    Phase 2 built: `GET /pins/{id}/conditions` (docs/pin-conditions-api.md) shows weather,
    the nearest WSC gauge's flow and level as a trend, and the nearest dated PWQMN sample,
    each with source, station, distance and age, stale values marked. New trips snapshot the
-   gauge into `session_conditions`. The match indicator and Today sort are phase 3.
+   gauge into `session_conditions`.
+   Phase 3 built: `GET /pins/{id}/match` compares today's conditions with the user's own
+   best-rated trips at that pin (shown from 3 rated trips), and `GET /pins/today` sorts the
+   user's pins by match, distance, last visited or favourites, each row with its reason
+   (docs/pin-match-api.md). Indicator name and layout are still placeholders in `labels.py`.
+   The species filter for Today is not built; catches stay queryable by species.
 4. React/Lovable UI — two-level map with pin states
 
 ## Social layer (future, NOT on map) 💡
