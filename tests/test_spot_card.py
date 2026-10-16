@@ -304,7 +304,8 @@ def test_eckardt_creek_hook_is_a_care_message_and_the_species_is_never_named(db)
     assert card.meta.species_withheld_protected == 1
     blob = json.dumps(card.model_dump()).lower()
     assert "redside" not in blob and "clinostomus" not in blob
-    assert "1 fish records within 2 km" in blob  # only the Creek Chub, not the protected records
+    # only the Creek Chub counts, not the protected records
+    assert "1 fish record within 2 km, covering 1 species" in blob
 
 
 def test_a_protected_species_is_withheld_even_when_it_is_the_only_one(db):

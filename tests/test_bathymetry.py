@@ -185,7 +185,7 @@ def test_contours_that_do_not_nest_make_no_hump():
 
 def test_two_contours_falling_steeply_make_a_drop_off():
     shallow = _contour(1, -3.0, [[-0.02, 0.0], [0.02, 0.0]])
-    deep = _contour(2, -5.0, [[-0.02, 0.0005], [0.02, 0.0005]])
+    deep = _contour(2, -6.0, [[-0.02, 0.0005], [0.02, 0.0005]])
     result = _derive([shallow, deep])
     drops = [f for f in result.features if f.kind == "drop_off"]
     assert len(drops) == 1
@@ -193,9 +193,19 @@ def test_two_contours_falling_steeply_make_a_drop_off():
     assert drop.geometry["type"] == "Point"
     assert drop.provenance == "inference"
     assert drop.derivation == "bathymetry_contours"
-    assert drop.attributes["depth_change_m"] == 2.0
+    assert drop.attributes["depth_change_m"] == 3.0
     assert drop.attributes["gap_m"] < 100.0
-    assert drop.length_m == 2.0
+    # The depth change is not a length; it is only in the attributes.
+    assert drop.length_m is None
+
+
+def test_a_small_depth_change_is_not_a_drop_off():
+    from src.services.bathymetry import DROP_OFF_MIN_DEPTH_CHANGE_M
+
+    assert DROP_OFF_MIN_DEPTH_CHANGE_M == 3.0
+    shallow = _contour(1, -1.0, [[-0.02, 0.0], [0.02, 0.0]])
+    deep = _contour(2, -3.0, [[-0.02, 0.0005], [0.02, 0.0005]])  # a 2 m change
+    assert not [f for f in _derive([shallow, deep]).features if f.kind == "drop_off"]
 
 
 def test_contours_far_apart_make_no_drop_off():
