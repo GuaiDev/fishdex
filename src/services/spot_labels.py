@@ -250,6 +250,17 @@ TITLES = {
     "public_fishing": "{name}",
     "public_fishing_unnamed": "Public fishing spot on {river}",
 }
+# Spots of one kind that would share a title get a place phrase. {title} is the
+# shared title, {place} a named road, parking place or creek, and the last form
+# counts along the group when nothing near them has a name.
+DISTINGUISHED_TITLES = {
+    "road": "{title}, near {place}",
+    "access": "{title}, near {place}",
+    "junction": "{title}, near where {place} joins",
+    "order": "{title} ({n} of {total}, {direction})",
+}
+DIRECTION_WEST_TO_EAST = "west to east"
+DIRECTION_NORTH_TO_SOUTH = "north to south"
 # Words for an unnamed joining channel, by how much water drains into it.
 UNNAMED_TRIBUTARY = {
     "small": "a small creek",
@@ -348,6 +359,13 @@ def labels_payload() -> dict:
         },
         "filters": {"new_to_me": NEW_TO_ME_FILTER},
         "bathymetry_data_note": BATHYMETRY_DATA_NOTE,
+        "repeated_titles": {
+            "templates": DISTINGUISHED_TITLES,
+            "directions": {
+                "west_to_east": DIRECTION_WEST_TO_EAST,
+                "north_to_south": DIRECTION_NORTH_TO_SOUTH,
+            },
+        },
         "quiet_water": {
             "titles": QUIET_TITLES,
             "caveats": {
@@ -392,6 +410,8 @@ def all_strings() -> list[str]:
     ]
     out += list(TITLES.values()) + list(UNNAMED_TRIBUTARY.values()) + [UNNAMED_LARGER_RIVER]
     out += list(QUIET_TITLES.values())
+    out += list(DISTINGUISHED_TITLES.values())
+    out += [DIRECTION_WEST_TO_EAST, DIRECTION_NORTH_TO_SOUTH]
     out += [
         QUIET_RECORDS_CAVEAT,
         ACCESS_NOT_MEASURED,

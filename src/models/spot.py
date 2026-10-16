@@ -154,6 +154,9 @@ class SpotBuildReport(BaseModel):
     # Titles built from a fallback because the source had no name: a share that
     # grows run over run means the names are thinning, not the water.
     title_fallbacks: dict[str, int] = Field(default_factory=dict)
+    # Spots whose title was shared with another spot of the same kind and so got a
+    # place phrase, by what told them apart: road, access, junction or order.
+    titles_distinguished: dict[str, int] = Field(default_factory=dict)
     # Access anchors attached to spots, and spots with no access found nearby.
     access_anchors: int = 0
     spots_without_access: int = 0
@@ -195,6 +198,9 @@ class SpotBuildReport(BaseModel):
     def hold_back(self, reason: str, n: int = 1) -> None:
         if n > 0:  # a zero would read as a reason that fired
             self.held_back[reason] = self.held_back.get(reason, 0) + n
+
+    def distinguished(self, basis: str) -> None:
+        self.titles_distinguished[basis] = self.titles_distinguished.get(basis, 0) + 1
 
     def fallback(self, reason: str, n: int = 1) -> None:
         if n > 0:  # a zero would read as a reason that fired

@@ -1620,6 +1620,8 @@ def _print_spot_report(report) -> None:
         table.add_row(f"[dim]not kept: {reason}[/dim]", f"[dim]{n}[/dim]")
     for reason, n in sorted(report.title_fallbacks.items()):
         table.add_row(f"[yellow]generic title: {reason}[/yellow]", f"[yellow]{n}[/yellow]")
+    for basis, n in sorted(report.titles_distinguished.items()):
+        table.add_row(f"  repeated title told apart by {basis}", str(n))
     table.add_row("quiet water: areas read", str(report.quiet_water_areas))
     table.add_row("quiet water: reaches ranked", str(report.quiet_water_candidates))
     if report.quiet_water_cache_missing:
