@@ -112,7 +112,7 @@ All user-facing strings, in display order (Quiet water last).
   for a legend) and `one_liner` (what it is, in beginner words).
 - `shoreline_derivations` — a plain-words phrase for each `derivation`, for the caption under a
   shoreline feature: `shoreline_outline` (a shape read off the outline itself),
-  `watercourse_endpoint` (a mapped stream that ends at the shore) `bathymetry_contours`
+  `watercourse_endpoint` (a mapped stream that ends at the shore), `bathymetry_contours`
   (a shape read off a lake's surveyed depth contours) or `osm_feature` (a structure mapped by
   OpenStreetMap volunteers).
 - `bathymetry_data_note` — a data note for contour-derived features (a drop-off or a hump):
@@ -746,6 +746,7 @@ why). Never fill in a made-up outline.
       "type": "Feature",
       "id": "creek:bronte-creek",
       "geometry": {
+        "type": "Polygon",
         "coordinates": [
           [
             [
@@ -1096,6 +1097,7 @@ Each feature's `properties`:
       "type": "Feature",
       "id": "lake:rice-lake:inlet:1",
       "geometry": {
+        "type": "Point",
         "coordinates": [
           -78.32,
           44.2
@@ -1143,15 +1145,14 @@ Each feature's `properties`:
               44.2
             ]
           ]
-        ],
-        "type": "Polygon"
+        ]
       },
       "properties": {
         "feature_id": "lake:rice-lake:island:-78.195_44.205",
         "water_body_id": "lake:rice-lake",
         "kind": "island",
         "name": null,
-        "derivation": "osm_feature",
+        "derivation": "shoreline_outline",
         "provenance": "record",
         "source": "OHN Waterbody",
         "source_date": "2021-04-08",
