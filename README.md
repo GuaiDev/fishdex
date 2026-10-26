@@ -150,7 +150,6 @@ Optional keys unlock individual adapters and features:
 | Key | Used by |
 |---|---|
 | `EBIRD_API_KEY` | eBird piscivore observations |
-| `MAPBOX_TOKEN` | Satellite imagery links and map rendering |
 | `YOUTUBE_API_KEY` | YouTube transcript ingestion |
 | `DATASTREAM_API_KEY` | DataStream water quality |
 | `FISHBOT_API_KEY` | Web API authentication — **required** for admin endpoints (see below) |

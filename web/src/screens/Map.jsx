@@ -20,18 +20,6 @@ function stopColor(productive) {
   return productive ? colorMoss : colorTextAsh;
 }
 
-function accessCoverageLabel(segment) {
-  if (segment.access_is_measured === true) return 'Access measured here';
-  if (segment.access_is_measured === false) return 'Access not measured here';
-  return 'Access coverage unknown';
-}
-
-function accessCoverageTone(segment) {
-  if (segment.access_is_measured === true) return 'var(--fx-moss-light)';
-  if (segment.access_is_measured === false) return 'var(--fx-brass-light)';
-  return 'var(--fx-text-muted)';
-}
-
 function ExploreLayer({ mode, onSegmentClick }) {
   const [segments, setSegments] = useState([]);
   const fetchTimeout = useRef(null);
@@ -281,12 +269,9 @@ export default function Map() {
               Field map
             </div>
             <h1 style={{ fontFamily: 'var(--fx-font-serif)', fontWeight: 600, fontSize: 25, lineHeight: 1, color: 'var(--fx-text-primary-2)', margin: 0 }}>
-              Credit River watershed
+              Map
             </h1>
           </div>
-          <button aria-label="Search the map" style={{ width: 38, height: 38, borderRadius: 20, border: '1px solid var(--fx-hairline)', background: 'var(--fx-card-fill-dark)', color: 'var(--fx-text-muted)', fontSize: 18, cursor: 'pointer' }}>
-            ⌕
-          </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ flex: 1, display: 'flex', background: 'var(--fx-card-fill)', border: '1px solid var(--fx-hairline)', borderRadius: 10, padding: 3, gap: 3 }}>
@@ -536,11 +521,6 @@ export default function Map() {
                 <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 10, color: 'var(--fx-text-muted)', marginTop: 2 }}>
                   {((selected.score || 0) * 100).toFixed(0)} · based on pressure, structure, remoteness and access
                 </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 10px', background: 'var(--fx-card-fill-quiet)', borderRadius: 8, fontFamily: 'var(--fx-font-ui)', fontSize: 11, color: accessCoverageTone(selected) }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: accessCoverageTone(selected) }} />
-                {accessCoverageLabel(selected)}
               </div>
               <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 10, lineHeight: 1.45, color: 'var(--fx-text-muted)', marginTop: 8 }}>
                 This signal helps surface overlooked water. It does not say fish are present.
