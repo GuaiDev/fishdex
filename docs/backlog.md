@@ -45,9 +45,7 @@ first photo / geolocation fallback), repeatable catch entries (photo, species,
 count stepper, size with cm/in toggle persisted to localStorage, bait), add/remove
 entries. SpeciesConfirmCard and EXIF parsing kept unchanged.
 
-⚠️ web/dist/ (the built bundle Railway actually serves) has NOT been rebuilt since
-this change — the live app still shows the old single-photo/single-textarea screen.
-See Pending (session 7 handoff) below.
+(The web app, including `web/dist/`, has since been removed from the repository.)
 
 ## Lovable UI rebuild 📋
 Use docs/fishdex_lovable_prompt.md to build FishDex in Lovable.
@@ -140,9 +138,7 @@ Respects fishing gatekeep culture.
   push + PR/merge.
 
 ## Pending (session 7 handoff) 📋
-- **Frontend dist rebuild** — web/dist/ predates the LogTrip.jsx multi-catch rebuild.
-  Run `npm run build` in web/, then commit web/dist/ — until then, real users get the
-  old single-photo/single-textarea Log Trip screen regardless of what's in web/src/.
+- ~~**Frontend dist rebuild**~~ — moot. The `web/` app was removed from the repository.
 - ~~**Dev-only login bypass still in code**~~ — resolved. The web auto-login and
   POST /admin/bootstrap were removed in 5e9fe9b (2026-07-18). The remaining hole was
   `verify_api_key` allowing every request when FISHBOT_API_KEY was unset (including

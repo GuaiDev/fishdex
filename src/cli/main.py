@@ -1222,7 +1222,7 @@ def invite(note: str = typer.Option("", "--note", "-n", help="Note for this invi
     db = get_db()
     code = generate_invite_code(db, created_by=1, note=note)
     console.print(f"\n[green]Invite code: [bold]{code}[/bold][/green]")
-    console.print("Share this URL: http://localhost:8000/app (wherever `make serve` runs)")
+    console.print("Redeem it with POST /auth/signup on the API (wherever `make serve` runs)")
     console.print(f"They enter: [bold]{code}[/bold] + choose a username")
     if note:
         console.print(f"Note: {note}")

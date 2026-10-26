@@ -746,9 +746,8 @@ def get_sessions(user: dict = Depends(get_current_user)):
 
 
 # Regional fallback when a user has no GPS grant and no located trips yet —
-# mirrors the frontend map's own default center (web/src/screens/Map.jsx),
-# kept in sync deliberately so a brand-new user still sees real, plausible
-# conditions rather than an empty credibility panel on the Chat screen.
+# a plausible default centre so a brand-new user still sees real conditions
+# rather than an empty credibility panel on the Chat screen.
 _DEFAULT_REGION = {"lat": 43.5, "lng": -79.8, "name": "Southern Ontario"}
 
 
@@ -2219,8 +2218,3 @@ def put_trip_pin_rating(
         raise HTTPException(status_code=404, detail="That trip is not linked to that pin")
     return {"session_id": session_id, "pin_id": pin_id, "rating": body.rating}
 
-
-# Serve React web app from /app — mount last so API routes take priority
-_web_dist = os.path.join(os.path.dirname(__file__), "../../web/dist")
-if os.path.exists(_web_dist):
-    app.mount("/app", StaticFiles(directory=_web_dist, html=True), name="webapp")

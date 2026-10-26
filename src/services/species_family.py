@@ -1,9 +1,7 @@
 """Taxonomic family classification for species reference data.
 
-Backs the "My FishDex" collection screen's flat/grouped adaptive layout —
-see design_handoff_fishdex_collection/README.md's "Data Requirements" and
-"Family display-name mapping" sections. Keyed by scientific (binomial) name
-since common names vary across sources (species_mapping.py's COMMON_TO_SCIENTIFIC,
+Backs the "My FishDex" collection's flat/grouped adaptive layout. Keyed by
+scientific (binomial) name since common names vary across sources (species_mapping.py's COMMON_TO_SCIENTIFIC,
 the species_ranges table, and free-text NL-parsed catch descriptions).
 
 Family display names for Centrarchidae, Percidae, Ictaluridae, Catostomidae,
