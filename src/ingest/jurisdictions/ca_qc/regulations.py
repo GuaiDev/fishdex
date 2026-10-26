@@ -96,7 +96,7 @@ def fetch_regulations() -> list[dict]:
     guesses a zone mapping when the page is gone or renamed.
     """
     try:
-        import pdfplumber  # type: ignore
+        import pdfplumber  # noqa: F401 type: ignore
     except ImportError:
         logger.error("QC regulations: pdfplumber not installed. Install with: uv add pdfplumber")
         return []
@@ -104,9 +104,7 @@ def fetch_regulations() -> list[dict]:
     entries, candidates = _discover_zone_links()
     if not entries:
         check_resource_discovery("QC regulations", 0, candidates, "ExportGrillePdf?idZone= links")
-        logger.warning(
-            "QC regulations: no zone PDF links discovered from %s", _PAGE_URL
-        )
+        logger.warning("QC regulations: no zone PDF links discovered from %s", _PAGE_URL)
         return []
 
     chunks: list[dict] = []
@@ -134,12 +132,15 @@ def fetch_regulations() -> list[dict]:
     if failures:
         logger.warning(
             "QC regulations: %d of %d zones failed to extract — %d chunks written",
-            failures, len(entries), len(chunks),
+            failures,
+            len(entries),
+            len(chunks),
         )
     else:
         logger.info(
             "QC regulations: %d zone chunks extracted from %s",
-            len(chunks), _PAGE_URL,
+            len(chunks),
+            _PAGE_URL,
         )
     return chunks
 
@@ -225,7 +226,9 @@ def _download_pdf_if_stale(url: str, zone_id: int) -> Path | None:
             with path.open("wb") as fh:
                 for chunk in resp.iter_bytes(chunk_size=65536):
                     fh.write(chunk)
-        logger.info("QC regulations: downloaded zone %d PDF (%.1f KB)", zone_id, path.stat().st_size / 1024)
+        logger.info(
+            "QC regulations: downloaded zone %d PDF (%.1f KB)", zone_id, path.stat().st_size / 1024
+        )
         return path
     except Exception as exc:
         logger.error("QC regulations: zone %d PDF download failed: %s", zone_id, exc)
