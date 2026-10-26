@@ -43,6 +43,16 @@ async function errorDetail(res, fallback) {
   return fallback;
 }
 
+async function readJson(res) {
+  try {
+    return await res.json();
+  } catch {
+    throw new Error(
+      'Could not reach the FishDex API (the server did not answer with data). If this app is hosted separately from the API, set VITE_API_BASE at build time.',
+    );
+  }
+}
+
 export async function signup(code, username, displayName) {
   const res = await fetch(`${API_BASE}/auth/signup`, {
     method: 'POST',
@@ -50,7 +60,7 @@ export async function signup(code, username, displayName) {
     body: JSON.stringify({ code, username, display_name: displayName }),
   });
   if (!res.ok) throw new Error(await errorDetail(res, `Sign-up failed (${res.status})`));
-  const data = await res.json();
+  const data = await readJson(res);
   try {
     localStorage.setItem(TOKEN_KEY, data.token);
   } catch {
@@ -68,5 +78,5 @@ export async function getFishDex() {
     throw new AuthError('Your session has ended. Sign in again.');
   }
   if (!res.ok) throw new Error(await errorDetail(res, `Could not load your FishDex (${res.status})`));
-  return res.json();
+  return readJson(res);
 }

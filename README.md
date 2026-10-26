@@ -175,7 +175,7 @@ make app-test      # unit tests for the collection logic
 
 Locally the app calls its own origin and the dev server forwards `/auth`, `/fishdex`, `/static` and `/photos` to `make serve` (set `DEV_API_TARGET` if the API is elsewhere). The first visit asks for an invite code, the same sign-up the API already has.
 
-For a static host such as Vercel, set `VITE_API_BASE` at build time to the API's address (`app/.env.example`). `app/vercel.json` rewrites every path to `index.html`; set the project's root directory to `app`.
+For a static host such as Vercel, set `VITE_API_BASE` at build time to the API's address (`app/.env.example`). A hosted build without it calls its own origin, finds no API, and shows an error saying so. `app/vercel.json` rewrites every path except `/auth`, `/fishdex`, `/static` and `/photos` to `index.html`; set the project's root directory to `app`.
 
 ### Everything runs locally
 
