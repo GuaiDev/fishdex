@@ -126,9 +126,9 @@ def test_a_dropped_cache_table_changes_speed_not_answers(db):
     expected = user_layer(db, user_id=1)
 
     db["user_patterns"].drop()
-    assert user_layer(db, user_id=1).model_dump(
-        exclude={"computed_at"}
-    ) == expected.model_dump(exclude={"computed_at"})
+    # the profile carries its own computed_at stamp, so exclude it at both levels
+    skip = {"computed_at": True, "profile": {"computed_at": True}}
+    assert user_layer(db, user_id=1).model_dump(exclude=skip) == expected.model_dump(exclude=skip)
 
 
 def test_an_unwritable_cache_still_returns_the_right_answer(db, monkeypatch, caplog):
