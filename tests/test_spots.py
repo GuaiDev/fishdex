@@ -872,7 +872,7 @@ def test_the_api_fixture_still_matches_the_models_and_the_labels():
     entries = json.loads(path.read_text())["requests"]
     assert {e["status"] for e in entries} == {200, 404, 422}
     for e in entries:
-        route = e["request"].removeprefix("GET ")
+        route = e["request"].removeprefix("GET ").split("?")[0]
         if e["status"] != 200:
             assert set(e["response"]) == {"detail"}
         elif route == "/map/spots/labels":

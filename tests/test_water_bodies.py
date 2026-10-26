@@ -15,6 +15,7 @@ from src.models.water_body import WaterBody
 from src.services import spot_labels
 from src.services.spots import StretchHints, build_spots, classify, get_spot_detail
 from src.services.water_bodies import (
+    LIST_FIELDS,
     LakeRef,
     derive_water_bodies,
     get_water_body_detail,
@@ -1096,3 +1097,183 @@ def test_the_water_body_words_carry_no_jargon_or_unnamed_titles():
         assert not JARGON.search(text), text
     for entry in spot_labels.WATER_BODY_TYPES.values():
         assert not entry["unnamed"].lower().startswith("unnamed")
+
+
+# ── trimming the list: fields, geometry=false, simplify ───────────────────────
+
+
+def big_lake(db, n=2000):
+    """A lake with a many-vertex outline, stored as the build would store it."""
+    import math
+
+    from src.storage.water_bodies import write_water_bodies
+
+    ring = [
+        [-79.4 + 0.2 * math.cos(2 * math.pi * i / n), 43.6 + 0.1 * math.sin(2 * math.pi * i / n)]
+        for i in range(n)
+    ]
+    ring.append(ring[0])
+    body = WaterBody(
+        water_body_id="great_lake:lake-ontario",
+        jurisdiction="CA-ON",
+        name="Lake Ontario",
+        name_source="curated",
+        type="great_lake",
+        geometry={"type": "Polygon", "coordinates": [ring]},
+        geometry_source="ohn_waterbody",
+        bbox=(-79.6, 43.5, -79.2, 43.7),
+        built_at=BUILT,
+    )
+    db.conn.execute("DELETE FROM water_bodies WHERE water_body_id = ?", [body.water_body_id])
+    write_water_bodies(db.conn, "CA-ON", [body])
+    db.conn.commit()
+
+
+@pytest.fixture
+def lake_client(wb_client):
+    from src.storage.database import get_db
+
+    big_lake(get_db())
+    return wb_client
+
+
+def test_default_list_is_unchanged_by_the_new_options(lake_client):
+    body = lake_client.get("/map/water-bodies").json()
+    assert set(body["meta"]) == {"count", "type_counts"}
+    lake = next(f for f in body["features"] if f["id"] == "great_lake:lake-ontario")
+    assert len(lake["geometry"]["coordinates"][0]) == 2001
+    assert set(lake["properties"]) == set(LIST_FIELDS)
+
+
+def test_fields_keeps_only_the_named_properties_and_always_the_id(lake_client):
+    body = lake_client.get("/map/water-bodies?fields=display_name,type").json()
+    for f in body["features"]:
+        assert list(f["properties"]) == ["water_body_id", "display_name", "type"]
+        assert f["id"] == f["properties"]["water_body_id"]
+
+
+def test_fields_without_spot_counts_does_not_count_spots(lake_client, monkeypatch):
+    import src.services.water_bodies as service
+
+    def boom(*a, **k):
+        raise AssertionError("spots were counted")
+
+    monkeypatch.setattr(service, "_spot_counts", boom)
+    assert lake_client.get("/map/water-bodies?fields=name").status_code == 200
+
+
+def test_geometry_false_serves_null_shapes_and_says_so(lake_client):
+    body = lake_client.get("/map/water-bodies?geometry=false").json()
+    assert body["meta"]["geometry"] == "none"
+    assert all(f["geometry"] is None for f in body["features"])
+    assert {f["id"] for f in body["features"]} == {
+        f["id"] for f in lake_client.get("/map/water-bodies").json()["features"]
+    }
+
+
+@pytest.mark.parametrize(
+    "bbox",
+    [
+        "-80,43,-79,44",  # everything inside
+        "-79.45,43.55,-79.35,43.65",  # inside the lake's own box
+        "-79.9,43.0,-79.8,43.1",  # nothing
+        "-79.45,43.9,-79.35,44.1",  # in the lake's box? no: north of it
+    ],
+)
+def test_geometry_false_returns_the_same_waters_as_the_full_answer(lake_client, bbox):
+    full = lake_client.get(f"/map/water-bodies?bbox={bbox}").json()
+    lean = lake_client.get(f"/map/water-bodies?bbox={bbox}&geometry=false").json()
+    assert [f["id"] for f in lean["features"]] == [f["id"] for f in full["features"]]
+    assert lean["meta"]["count"] == full["meta"]["count"]
+    assert lean["meta"]["type_counts"] == full["meta"]["type_counts"]
+
+
+def test_bbox_still_uses_the_real_outline_when_geometry_is_not_sent(tmp_path, _template_db):
+    """A box that overlaps the stored box but misses the line is out, with or without shapes."""
+    import shutil
+
+    from src.storage.database import get_db
+    from src.storage.water_bodies import write_water_bodies
+
+    shutil.copy(_template_db, tmp_path / "l.db")
+    db = get_db(tmp_path / "l.db")
+    # An L-shaped river: its box covers the corner nobody can fish.
+    l_shape = {"type": "LineString", "coordinates": [[-80.0, 44.0], [-80.0, 43.0], [-79.0, 43.0]]}
+    write_water_bodies(
+        db.conn,
+        "CA-ON",
+        [
+            WaterBody(
+                **wb_kwargs(
+                    water_body_id="river:l-river",
+                    name="L River",
+                    geometry=l_shape,
+                    bbox=(-80.0, 43.0, -79.0, 44.0),
+                )
+            )
+        ],
+    )
+    db.conn.commit()
+    corner = (-79.6, 43.6, -79.4, 43.8)
+    for geometry in (True, False):
+        assert water_bodies_geojson(db, corner, geometry=geometry)["features"] == []
+    on_line = (-80.1, 43.4, -79.9, 43.6)
+    for geometry in (True, False):
+        assert len(water_bodies_geojson(db, on_line, geometry=geometry)["features"]) == 1
+
+
+def test_list_without_geometry_never_reads_the_stored_shapes(lake_client):
+    from src.storage.database import get_db
+
+    assert all(wb.geometry is None for wb in list_water_bodies(get_db(), include_geometry=False))
+    assert any(wb.geometry for wb in list_water_bodies(get_db()))
+
+
+def test_simplify_thins_the_outline_and_keeps_the_same_waters(lake_client):
+    full = lake_client.get("/map/water-bodies").json()
+    thin = lake_client.get("/map/water-bodies?simplify=500").json()
+    assert thin["meta"]["geometry"] == "simplified"
+    assert thin["meta"]["simplify_m"] == 500
+    assert [f["id"] for f in thin["features"]] == [f["id"] for f in full["features"]]
+    lake = next(f for f in thin["features"] if f["id"] == "great_lake:lake-ontario")
+    assert 4 <= len(lake["geometry"]["coordinates"][0]) < 200
+    assert lake["geometry"]["type"] == "Polygon"
+
+
+def test_zoom_thins_more_when_zoomed_out(lake_client):
+    def points(zoom):
+        body = lake_client.get(f"/map/water-bodies?zoom={zoom}").json()
+        lake = next(f for f in body["features"] if f["id"] == "great_lake:lake-ontario")
+        assert body["meta"]["zoom"] == zoom
+        return len(lake["geometry"]["coordinates"][0])
+
+    assert points(5) < points(12) <= 2001
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "fields=nope",
+        "simplify=-1",
+        "simplify=abc",
+        "zoom=40",
+        "zoom=-1",
+        "simplify=10&zoom=5",
+        "geometry=false&simplify=10",
+        "geometry=false&zoom=5",
+    ],
+)
+def test_bad_shape_options_are_rejected(lake_client, query):
+    assert lake_client.get(f"/map/water-bodies?{query}").status_code == 422
+
+
+def test_detail_geometry_options(lake_client):
+    path = "/map/water-bodies/great_lake:lake-ontario"
+    assert len(lake_client.get(path).json()["geometry"]["coordinates"][0]) == 2001
+    no_shape = lake_client.get(f"{path}?geometry=false").json()
+    assert no_shape["geometry"] is None
+    assert no_shape["name"] == "Lake Ontario"
+    assert "geometry_source" in no_shape
+    thin = lake_client.get(f"{path}?simplify=500").json()
+    assert len(thin["geometry"]["coordinates"][0]) < 200
+    assert lake_client.get(f"{path}?geometry=false&zoom=4").status_code == 422

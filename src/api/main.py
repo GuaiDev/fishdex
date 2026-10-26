@@ -1562,6 +1562,27 @@ def _parse_bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
     return parts
 
 
+def _parse_shape_options(
+    geometry: bool, simplify: float | None, zoom: float | None
+) -> tuple[float | None, float | None]:
+    """Validate `simplify` (metres) and `zoom`; at most one, and neither with geometry=false."""
+    from src.services.geometry_simplify import MAX_ZOOM
+
+    if simplify is not None and (not math.isfinite(simplify) or simplify < 0):
+        raise HTTPException(
+            status_code=422, detail="simplify must be a distance in metres, 0 or more"
+        )
+    if zoom is not None and not (0 <= zoom <= MAX_ZOOM):
+        raise HTTPException(status_code=422, detail=f"zoom must be between 0 and {MAX_ZOOM}")
+    if simplify is not None and zoom is not None:
+        raise HTTPException(status_code=422, detail="give simplify or zoom, not both")
+    if not geometry and (simplify is not None or zoom is not None):
+        raise HTTPException(
+            status_code=422, detail="simplify and zoom thin a shape; geometry=false sends none"
+        )
+    return simplify, zoom
+
+
 def _parse_spot_filters(
     bbox: str | None,
     kind: str | None,
@@ -1779,6 +1800,10 @@ def get_map_water_bodies(
     bbox: str | None = None,
     type: str | None = None,
     jurisdiction: str | None = None,
+    fields: str | None = None,
+    geometry: bool = True,
+    simplify: float | None = None,
+    zoom: float | None = None,
     user: dict = Depends(get_current_user),
 ):
     """The rivers, creeks and lakes spots sit on, as GeoJSON.
@@ -1787,9 +1812,14 @@ def get_map_water_bodies(
     overlaps it. `type` is one or more comma-separated types (river, creek, lake, pond,
     great_lake). A river's geometry is its simplified line; a lake with no outline on
     file has `geometry: null`. Built with the spots by `make build-spots`.
+
+    To send less: `fields` keeps only the named `properties` (comma-separated;
+    `water_body_id` is always kept), `geometry=false` leaves every shape out, and
+    `simplify` (metres) or `zoom` (a web-map zoom, one pixel of tolerance) thins the shapes.
+    Which water bodies come back never depends on these.
     """
     from src.models.water_body import WaterBodyType
-    from src.services.water_bodies import water_bodies_geojson
+    from src.services.water_bodies import LIST_FIELDS, water_bodies_geojson
     from src.storage.database import get_db
 
     box = _parse_bbox(bbox)
@@ -1802,17 +1832,48 @@ def get_map_water_bodies(
             raise HTTPException(
                 status_code=422, detail=f"unknown type {bad[0]!r}; one of {sorted(valid)}"
             )
-    return water_bodies_geojson(get_db(), box, types, jurisdiction)
+    field_list = None
+    if fields:
+        field_list = [f.strip() for f in fields.split(",") if f.strip()]
+        bad = [f for f in field_list if f not in LIST_FIELDS]
+        if bad:
+            raise HTTPException(
+                status_code=422, detail=f"unknown field {bad[0]!r}; one of {list(LIST_FIELDS)}"
+            )
+    simplify_m, zoom_f = _parse_shape_options(geometry, simplify, zoom)
+    return water_bodies_geojson(
+        get_db(),
+        box,
+        types,
+        jurisdiction,
+        fields=field_list,
+        geometry=geometry,
+        simplify_m=simplify_m,
+        zoom=zoom_f,
+    )
 
 
 @app.get("/map/water-bodies/{water_body_id}")
-def get_map_water_body(water_body_id: str, user: dict = Depends(get_current_user)):
+def get_map_water_body(
+    water_body_id: str,
+    geometry: bool = True,
+    simplify: float | None = None,
+    zoom: float | None = None,
+    user: dict = Depends(get_current_user),
+):
     """One water body in full: name and where the name came from, its shape, the
-    curated stretches it is made of, and every spot on it. 404 for an unknown id."""
+    curated stretches it is made of, and every spot on it. 404 for an unknown id.
+
+    `geometry=false` leaves the shape out; `simplify` (metres) or `zoom` thins it, as on
+    the list. A lake outline can be megabytes, so a card that does not draw it should say so.
+    """
     from src.services.water_bodies import get_water_body_detail
     from src.storage.database import get_db
 
-    detail = get_water_body_detail(get_db(), water_body_id)
+    simplify_m, zoom_f = _parse_shape_options(geometry, simplify, zoom)
+    detail = get_water_body_detail(
+        get_db(), water_body_id, geometry=geometry, simplify_m=simplify_m, zoom=zoom_f
+    )
     if detail is None:
         raise HTTPException(status_code=404, detail=f"No water body with id {water_body_id!r}")
     return detail

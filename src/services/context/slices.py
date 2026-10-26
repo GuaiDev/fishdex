@@ -49,12 +49,17 @@ def build_records(
     days_back: int = 3650,
     user_id: int = 1,
     escalate: bool = False,
+    with_piscivore: bool = True,
 ) -> RecordsSlice:
     """Species recorded at this place, from every grounded source we hold.
 
     The only slice that escalates. `escalate` is off by default and switched on
     per caller bundle: a map tap must not fire a paid live search on every pan
     of the map, while a coaching question is worth one.
+
+    `with_piscivore=False` leaves the bird signal out. A caller that only reads
+    `.species` (the map's `species=` filter runs this once per spot) should not pay
+    for it: it opens its own database connection and re-checks the schema each time.
     """
     found: dict[str, SpeciesRecord] = {}
 
@@ -78,7 +83,8 @@ def build_records(
             slice_ = _escalate(place, species_filter, local_reason)
         else:
             slice_ = RecordsSlice(radius_km=place.radius_km, empty_reason=local_reason)
-        slice_.piscivore_activity = _piscivore_field(db, place)
+        if with_piscivore:
+            slice_.piscivore_activity = _piscivore_field(db, place)
         return slice_
 
     ordered = sorted(found.values(), key=lambda r: (-r.count, r.species))
@@ -86,7 +92,7 @@ def build_records(
         species=ordered,
         total_count=sum(r.count for r in ordered),
         radius_km=place.radius_km,
-        piscivore_activity=_piscivore_field(db, place),
+        **({"piscivore_activity": _piscivore_field(db, place)} if with_piscivore else {}),
     )
 
 

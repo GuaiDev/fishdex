@@ -1212,6 +1212,16 @@ def _spots_with_species(db: Database, spots: list[Spot], species_l: str) -> list
     if listing_check(db, scientific_name=species_l, common_name=species_l) is True:
         return []
 
+    # The same few fish are recorded at most spots, so each name is checked against the
+    # species file once per request, not once per spot. The answer is the same call.
+    listed: dict[tuple[str | None, str | None], bool | None] = {}
+
+    def not_cleared(r) -> bool:
+        key = (r.species, r.common_name)
+        if key not in listed:
+            listed[key] = listing_check(db, scientific_name=r.species, common_name=r.common_name)
+        return listed[key] is not False
+
     found: list[Spot] = []
     for spot in spots:
         place = Place(query=spot.spot_id, lat=spot.lat, lng=spot.lng, radius_km=2.0)
@@ -1220,7 +1230,12 @@ def _spots_with_species(db: Database, spots: list[Spot], species_l: str) -> list
             # alone does not contain the common name the angler typed, and is only
             # given its common name by the cleaning that runs after the query.
             records = slices.build_records(
-                db, place, species_filter=None, user_id=NO_USER, escalate=False
+                db,
+                place,
+                species_filter=None,
+                user_id=NO_USER,
+                escalate=False,
+                with_piscivore=False,
             ).species
         except Exception:  # noqa: BLE001 - one spot's lookup must not fail the map
             logger.warning("species filter lookup failed at %s", spot.spot_id, exc_info=True)
@@ -1229,10 +1244,7 @@ def _spots_with_species(db: Database, spots: list[Spot], species_l: str) -> list
         if not matched:
             continue
         # True = listed, None = the species file does not know it: neither may pass.
-        if any(
-            listing_check(db, scientific_name=r.species, common_name=r.common_name) is not False
-            for r in matched
-        ):
+        if any(not_cleared(r) for r in matched):
             continue
         found.append(spot)
     return found
