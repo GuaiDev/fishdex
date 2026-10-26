@@ -110,7 +110,7 @@ def test_season_year_fails_loudly_without_header():
 
 
 def test_download_skips_when_fresh(tmp_path, monkeypatch):
-    fresh = tmp_path / "zone_1.pdf"
+    fresh = tmp_path / "zone_idzone_15.pdf"
     fresh.write_bytes(b"%PDF-1.4 placeholder")
     monkeypatch.setattr(reg_mod, "_CACHE_DIR", tmp_path)
 
@@ -118,7 +118,20 @@ def test_download_skips_when_fresh(tmp_path, monkeypatch):
         raise AssertionError("should not download a fresh cache file")
 
     monkeypatch.setattr(httpx, "stream", boom)
-    assert reg_mod._download_pdf_if_stale("https://example.invalid/z1.pdf", 1) == fresh
+    assert reg_mod._download_pdf_if_stale("https://example.invalid/x?idZone=15&a=1", 1) == fresh
+
+
+def test_download_cache_follows_idzone_not_page_position(tmp_path, monkeypatch):
+    cached = tmp_path / "zone_idzone_15.pdf"
+    cached.write_bytes(b"%PDF-1.4 placeholder")
+    monkeypatch.setattr(reg_mod, "_CACHE_DIR", tmp_path)
+
+    def fake_stream(*a, **k):
+        raise RuntimeError("network")
+
+    monkeypatch.setattr(httpx, "stream", fake_stream)
+    other = reg_mod._download_pdf_if_stale("https://example.invalid/x?idZone=22", 1)
+    assert other != cached
 
 
 # ── end-to-end with the network mocked ───────────────────────────────────────

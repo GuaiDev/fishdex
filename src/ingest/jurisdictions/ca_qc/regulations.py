@@ -209,7 +209,9 @@ def _extract_zone_pdf(url: str, zone_id: int) -> str:
 
 def _download_pdf_if_stale(url: str, zone_id: int) -> Path | None:
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    path = _CACHE_DIR / f"zone_{zone_id}.pdf"
+    idzone_m = _IDZONE_RE.search(url)
+    key = f"idzone_{idzone_m.group(1)}" if idzone_m else f"url_{abs(hash(url))}"
+    path = _CACHE_DIR / f"zone_{key}.pdf"
     if path.exists():
         age = time.time() - path.stat().st_mtime
         if age < _CACHE_TTL_SECONDS:
