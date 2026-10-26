@@ -43,9 +43,148 @@ LINK_KIND_LABELS: dict[str, str] = {
 # Shown on every recalled record and on a pin whose only history is recalled.
 RECALLED_MARKER = "recalled"
 
-# Placeholder name for the phase-3 match indicator. Its final name and UI
-# structure are an open decision; nothing renders it yet.
+# Placeholder name for the match indicator. Its final name and UI structure
+# are an open decision; every word it uses lives in this module.
 MATCH_INDICATOR_LABEL = "Conditions match (placeholder)"
+
+
+# -- the match indicator (GET /pins/{id}/match, and the Today view's match sort) --
+#
+# The match compares today's readings with the conditions on the trips the user
+# rated best at this pin. It is arithmetic over the user's own trips: no model,
+# no other angler's data, no prediction. These numbers are judgements, not
+# measurements, and are meant to be changed here.
+
+# The user's best trips here are the BEST_TRIP_COUNT highest-rated ones. Trips
+# tied at the cut-off rating are all kept, so the choice never depends on row
+# order. A trip below MIN_BEST_RATING is never a "best" trip, however few others
+# there are: a pin where every trip was slow has no good day to match against.
+BEST_TRIP_COUNT = 3
+MIN_BEST_RATING = 3
+
+# A condition is compared only when at least this many of the best trips
+# recorded it (a range from one trip is a single point), and the match speaks
+# only when at least MIN_COMPARED_CONDITIONS of today's readings could be
+# compared. The same number of best trips is needed before there is anything
+# to compare against.
+MIN_TRIPS_TO_COMPARE = 2
+MIN_COMPARED_CONDITIONS = 2
+
+# A reading just outside the best trips' range, by no more than the margin,
+# counts as close to it. Absolute margins are in the condition's own unit; a
+# relative margin is a fraction of the nearer end of the range (flow spans
+# orders of magnitude, so a fixed number would mean nothing across rivers).
+#
+# `column` is the session_conditions column that holds the same reading as it
+# stood on the trip. `source` says which staleness rule and which extra check
+# the history needs:
+#   weather       taken for the trip's own time; nothing more to check
+#   gauge         only trips whose snapshot came from the gauge reading today
+#                 are comparable: a flow from another station is another river
+#   water_sample  a dated grab sample; only trips with a sample taken within
+#                 WATER_QUALITY_STALE_S of the trip count
+MATCH_VARIABLES: tuple[dict, ...] = (
+    {"field": "air_temp_c", "column": "air_temp_c", "source": "weather", "margin": 2.0},
+    {"field": "wind_speed_kmh", "column": "wind_speed_kmh", "source": "weather", "margin": 5.0},
+    {"field": "pressure_hpa", "column": "pressure_hpa", "source": "weather", "margin": 3.0},
+    {"field": "flow_cms", "column": "flow_cms", "source": "gauge", "relative_margin": 0.25},
+    {"field": "level_m", "column": "level_m", "source": "gauge", "margin": 0.05},
+    {"field": "water_temp_c", "column": "water_temp_c", "source": "water_sample", "margin": 1.5},
+    {"field": "dissolved_oxygen_mgl", "column": "do_mgl", "source": "water_sample", "margin": 1.0},
+    {"field": "ph", "column": "ph", "source": "water_sample", "margin": 0.3},
+)
+
+# Share of the compared conditions that must be inside (or close to) the best
+# trips' range for each wording.
+MATCH_SIMILAR_FRACTION = 1.0
+MATCH_PARTLY_FRACTION = 0.5
+
+# What the match says, by status. Neutral on purpose: it describes how today
+# compares with the user's own good days, and does not promise a bite.
+MATCH_STATUS_LABELS: dict[str, str] = {
+    "similar": "Similar to your best trips",
+    "partly": "Partly similar to your best trips",
+    "different": "Unlike your best trips",
+    "not_enough_readings": "Not enough readings to compare",
+    "few_good_trips": "Too few good trips to compare",
+}
+
+# One sentence per status. {inside} of {compared} counts conditions inside or
+# close to the range of the best trips.
+MATCH_HEADLINES: dict[str, str] = {
+    "similar": "Today looks like your best trips here: {inside} of {compared} conditions "
+    "compared are in their range.",
+    "partly": "Today partly looks like your best trips here: {inside} of {compared} "
+    "conditions compared are in their range.",
+    "different": "Today is unlike your best trips here: {inside} of {compared} conditions "
+    "compared are in their range.",
+    "not_enough_readings": "Too few of today's readings can be compared with your best "
+    "trips here to say.",
+    "few_good_trips": "Only {good} of your {rated} rated trips here were rated {rating} or "
+    "better, which is too few to compare against.",
+}
+
+# The pin has fewer rated trips than MIN_RATED_TRIPS_FOR_MATCH: no match, only
+# the conditions panel. {needed} is how many more rated trips would show it.
+MATCH_HIDDEN_HEADLINE = "No match yet: {needed} more rated {trips} here would show one."
+
+MATCH_BEST_TRIPS_SUMMARY = "Your {n} best trips here were in {months}."
+MATCH_BEST_TRIPS_SUMMARY_NO_MONTHS = "Your {n} best trips here."
+MATCH_BEST_TRIP_SUMMARY = "Your best trip here was in {months}."
+MATCH_BEST_TRIP_SUMMARY_NO_MONTHS = "Your best trip here."
+
+# {range} is "8–12°C", or a single value when the best trips agree.
+MATCH_COMPARISON_LINE = "{label}: {range} on those trips, {current} now ({position})."
+
+MATCH_POSITION_LABELS: dict[str, str] = {
+    "inside": "inside that range",
+    "near": "close to that range",
+    "below": "below that range",
+    "above": "above that range",
+}
+
+# Why a condition was left out of the comparison.
+MATCH_LEFT_OUT_REASONS: dict[str, str] = {
+    "stale": "today's reading is out of date",
+    "unavailable": "no current reading",
+    "too_few_trips": "too few of your best trips recorded it",
+    "other_gauge": "your best trips used a different gauge",
+    "old_samples": "no water sample was taken near the time of your best trips",
+}
+MATCH_LEFT_OUT_LINE = "Not compared: {items}."
+
+MONTH_NAMES: tuple[str, ...] = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+
+
+# -- the Today view (GET /pins/today) -------------------------------------------
+
+# The keys the user can sort their pins by. The label names the key in the
+# picker; every row also states, in words, why it sits where it does.
+TODAY_SORT_LABELS: dict[str, str] = {
+    "match": "Conditions match",
+    "distance": "Distance",
+    "last_visited": "Last visited",
+    "favourites": "Favourites first",
+}
+
+TODAY_DISTANCE_REASON = "{distance} from here"
+TODAY_LAST_VISITED_REASON = "Last fished {when}"
+TODAY_NEVER_VISITED_REASON = "No logged trips here yet"
+TODAY_FAVOURITE_REASON = "Marked as a favourite"
+TODAY_NOT_FAVOURITE_REASON = "Not a favourite"
 
 
 # -- the conditions panel (GET /pins/{id}/conditions) ---------------------------
@@ -152,6 +291,17 @@ def labels_payload() -> dict:
         "link_kind_labels": LINK_KIND_LABELS,
         "recalled_marker": RECALLED_MARKER,
         "match_indicator_label": MATCH_INDICATOR_LABEL,
+        "match": {
+            "best_trip_count": BEST_TRIP_COUNT,
+            "min_best_rating": MIN_BEST_RATING,
+            "min_trips_to_compare": MIN_TRIPS_TO_COMPARE,
+            "min_compared_conditions": MIN_COMPARED_CONDITIONS,
+            "status_labels": MATCH_STATUS_LABELS,
+            "position_labels": MATCH_POSITION_LABELS,
+            "left_out_reasons": MATCH_LEFT_OUT_REASONS,
+            "fields": [v["field"] for v in MATCH_VARIABLES],
+        },
+        "today_sort_labels": TODAY_SORT_LABELS,
         "condition_fields": list(CONDITION_FIELDS),
         "gauge_water_labels": GAUGE_WATER_LABELS,
         "gauge_distance_suffix": GAUGE_DISTANCE_SUFFIX,
