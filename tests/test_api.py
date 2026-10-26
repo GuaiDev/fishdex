@@ -437,10 +437,3 @@ def test_log_trip_malformed_catches_json_degrades_gracefully(monkeypatch):
         )
     assert response.status_code == 200
     assert response.json()["status"] == "logged"
-
-
-def test_log_page_served():
-    """GET /log returns the mobile trip logging page."""
-    response = client.get("/log")
-    assert response.status_code == 200
-    assert "FishBot" in response.text

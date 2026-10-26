@@ -6,7 +6,7 @@ product
 
 ## Platform
 
-web
+API backend only. The client UI is being rebuilt separately and is not in this repository.
 
 ## Users
 
