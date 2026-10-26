@@ -422,7 +422,7 @@ def _profile_lines(profile: AnglerProfile | None) -> list[str]:
     ]
     by_state: dict[str, list[str]] = {"familiar": [], "introduced": []}
     for c in profile.concepts.values():
-        if c.state in by_state:
+        if c.state in by_state and terms.TERMS[c.term_id]["mapped_from"] is not None:
             by_state[c.state].append(terms.TERMS[c.term_id]["technical"].lower())
     if by_state["familiar"]:
         lines.append(f"- map words they know (say plainly): {', '.join(by_state['familiar'])}")
