@@ -2180,4 +2180,3 @@ def put_trip_pin_rating(
     if not set_trip_pin_rating(_pin_db(), user["id"], session_id, pin_id, body.rating):
         raise HTTPException(status_code=404, detail="That trip is not linked to that pin")
     return {"session_id": session_id, "pin_id": pin_id, "rating": body.rating}
-
