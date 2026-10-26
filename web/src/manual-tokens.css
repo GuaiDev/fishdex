@@ -1,7 +1,7 @@
 /*
  * Design tokens for the "Field Manual" redesign — a high-contrast,
  * printed-spec-sheet register that replaces the naturalist's field-journal
- * system (--fx-*/fishdex-tokens.css).
+ * system (the --fx-* tokens in fishdex-tokens.css).
  *
  * Decisions encoded here (the inverse of the prior journal system):
  *  - Light, warm-paper background; ink text at genuine contrast. No dark,
