@@ -178,12 +178,40 @@
             "term_ids": [
               "hump"
             ]
+          },
+          {
+            "kind": "pier",
+            "label": "Pier",
+            "chip": "Piers",
+            "one_liner": "A pier reaches out from the shore.",
+            "term_ids": [
+              "pier"
+            ]
+          },
+          {
+            "kind": "breakwater",
+            "label": "Breakwater",
+            "chip": "Breakwaters",
+            "one_liner": "A breakwater stands offshore here.",
+            "term_ids": [
+              "breakwater"
+            ]
+          },
+          {
+            "kind": "harbour",
+            "label": "Harbour",
+            "chip": "Harbours",
+            "one_liner": "A harbour is mapped here.",
+            "term_ids": [
+              "harbour"
+            ]
           }
         ],
         "shoreline_derivations": {
           "shoreline_outline": "from the shoreline outline",
           "watercourse_endpoint": "where a mapped stream meets the shore",
-          "bathymetry_contours": "from a lake survey"
+          "bathymetry_contours": "from a lake survey",
+          "osm_feature": "mapped by OpenStreetMap volunteers"
         },
         "new_to_you": {
           "title": "New to you",
@@ -408,11 +436,39 @@
             "mapped_from": "Ontario government lake depth surveys (depth contours)"
           },
           {
+            "term_id": "pier",
+            "plain": "A walkway built out over the water",
+            "technical": "Pier",
+            "definition": "A pier is a structure built out from the shore over the water.",
+            "mapped_from": "OpenStreetMap volunteers (piers, breakwaters and harbours)"
+          },
+          {
+            "term_id": "breakwater",
+            "plain": "A wall of rock or concrete built to block waves",
+            "technical": "Breakwater",
+            "definition": "A breakwater is a wall of rock or concrete built in the water to shelter a shore or harbour from waves.",
+            "mapped_from": "OpenStreetMap volunteers (piers, breakwaters and harbours)"
+          },
+          {
+            "term_id": "harbour",
+            "plain": "Sheltered water where boats are kept",
+            "technical": "Harbour",
+            "definition": "A harbour is a sheltered area of water where boats are moored or launched.",
+            "mapped_from": "OpenStreetMap volunteers (piers, breakwaters and harbours)"
+          },
+          {
             "term_id": "weed_edge",
             "plain": "The edge of a weed bed",
             "technical": "Weed edge",
             "definition": "A weed edge is the boundary between a bed of underwater plants and open water.",
             "mapped_from": "Your own weed reports"
+          },
+          {
+            "term_id": "barometric_pressure",
+            "plain": "How heavy the air is",
+            "technical": "Barometric pressure",
+            "definition": "Barometric pressure is the weight of the air above a place, measured in hectopascals (hPa). It rises and falls as weather systems pass, so the direction it is moving says which way the weather is heading.",
+            "mapped_from": null
           }
         ]
       }
@@ -13061,6 +13117,230 @@
             "tier": 1,
             "lat": 43.37634,
             "lng": -79.6854
+          }
+        ]
+      }
+    },
+    {
+      "request": "GET /map/water-bodies/great_lake:lake-ontario/features",
+      "note": "a lake's shoreline features: inlets, outlets, islands, points, peninsulas, piers, breakwaters, harbours (fixture only: features trimmed to 4 of 1357, one per kind)",
+      "status": 200,
+      "response": {
+        "type": "FeatureCollection",
+        "water_body_id": "great_lake:lake-ontario",
+        "water_body_name": "Lake Ontario",
+        "meta": {
+          "count": 1357,
+          "by_kind": {
+            "breakwater": 145,
+            "harbour": 67,
+            "inlet": 26,
+            "island": 25,
+            "outlet": 24,
+            "peninsula": 1,
+            "pier": 1069
+          }
+        },
+        "features": [
+          {
+            "type": "Feature",
+            "id": "great_lake:lake-ontario:breakwater:way/1017236151",
+            "geometry": {
+              "coordinates": [
+                [
+                  [
+                    -79.3102363,
+                    43.6554463
+                  ],
+                  [
+                    -79.3102489,
+                    43.6554754
+                  ],
+                  [
+                    -79.3102891,
+                    43.6554505
+                  ],
+                  [
+                    -79.310347,
+                    43.6553622
+                  ],
+                  [
+                    -79.3103851,
+                    43.6552744
+                  ],
+                  [
+                    -79.3104878,
+                    43.6552476
+                  ],
+                  [
+                    -79.3105953,
+                    43.6552476
+                  ],
+                  [
+                    -79.3107331,
+                    43.6552558
+                  ],
+                  [
+                    -79.3108606,
+                    43.655293
+                  ],
+                  [
+                    -79.3109199,
+                    43.6553288
+                  ],
+                  [
+                    -79.3109549,
+                    43.6553452
+                  ],
+                  [
+                    -79.311003,
+                    43.6553753
+                  ],
+                  [
+                    -79.3110688,
+                    43.6554121
+                  ],
+                  [
+                    -79.311166,
+                    43.6554265
+                  ],
+                  [
+                    -79.3111521,
+                    43.6553917
+                  ],
+                  [
+                    -79.3110438,
+                    43.655303
+                  ],
+                  [
+                    -79.3108513,
+                    43.6552348
+                  ],
+                  [
+                    -79.3106739,
+                    43.6551719
+                  ],
+                  [
+                    -79.3105723,
+                    43.6551601
+                  ],
+                  [
+                    -79.3104688,
+                    43.6551575
+                  ],
+                  [
+                    -79.3103859,
+                    43.6551805
+                  ],
+                  [
+                    -79.3103183,
+                    43.6552253
+                  ],
+                  [
+                    -79.3102893,
+                    43.6552843
+                  ],
+                  [
+                    -79.3102789,
+                    43.6553434
+                  ],
+                  [
+                    -79.3102652,
+                    43.6553949
+                  ],
+                  [
+                    -79.3102363,
+                    43.6554463
+                  ]
+                ]
+              ],
+              "type": "Polygon"
+            },
+            "properties": {
+              "feature_id": "great_lake:lake-ontario:breakwater:way/1017236151",
+              "water_body_id": "great_lake:lake-ontario",
+              "kind": "breakwater",
+              "name": null,
+              "derivation": "osm_feature",
+              "provenance": "record",
+              "source": "OpenStreetMap",
+              "source_date": null,
+              "note": "A breakwater stands offshore here. Mapped by OpenStreetMap volunteers (OpenStreetMap, ODbL).",
+              "area_m2": 693.5,
+              "length_m": null
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "great_lake:lake-ontario:harbour:node/10834324881",
+            "geometry": {
+              "coordinates": [
+                -79.3581003,
+                43.6274709
+              ],
+              "type": "Point"
+            },
+            "properties": {
+              "feature_id": "great_lake:lake-ontario:harbour:node/10834324881",
+              "water_body_id": "great_lake:lake-ontario",
+              "kind": "harbour",
+              "name": "Sunfish Cut Boat Club",
+              "derivation": "osm_feature",
+              "provenance": "record",
+              "source": "OpenStreetMap",
+              "source_date": null,
+              "note": "A harbour is mapped here. Sunfish Cut Boat Club is mapped here. Mapped by OpenStreetMap volunteers (OpenStreetMap, ODbL).",
+              "area_m2": null,
+              "length_m": null
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "great_lake:lake-ontario:inlet:127939850",
+            "geometry": {
+              "coordinates": [
+                -79.4886,
+                43.19426
+              ],
+              "type": "Point"
+            },
+            "properties": {
+              "feature_id": "great_lake:lake-ontario:inlet:127939850",
+              "water_body_id": "great_lake:lake-ontario",
+              "kind": "inlet",
+              "name": null,
+              "derivation": "watercourse_endpoint",
+              "provenance": "record",
+              "source": "OHN Watercourse",
+              "source_date": "2026-06-19",
+              "note": "A mapped stream flows in here. Read from the Ontario government water map.",
+              "area_m2": null,
+              "length_m": null
+            }
+          },
+          {
+            "type": "Feature",
+            "id": "great_lake:lake-ontario:pier:node/4689714279",
+            "geometry": {
+              "coordinates": [
+                -79.0469876,
+                43.8148958
+              ],
+              "type": "Point"
+            },
+            "properties": {
+              "feature_id": "great_lake:lake-ontario:pier:node/4689714279",
+              "water_body_id": "great_lake:lake-ontario",
+              "kind": "pier",
+              "name": "Wildlife Refuge Observation Point",
+              "derivation": "osm_feature",
+              "provenance": "record",
+              "source": "OpenStreetMap",
+              "source_date": null,
+              "note": "A pier reaches out from the shore. Wildlife Refuge Observation Point is mapped here. Mapped by OpenStreetMap volunteers (OpenStreetMap, ODbL).",
+              "area_m2": null,
+              "length_m": null
+            }
           }
         ]
       }

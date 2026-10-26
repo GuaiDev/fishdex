@@ -1,0 +1,1062 @@
+{
+ "elements": [
+  {
+   "type": "way",
+   "id": 33656131,
+   "bounds": {
+    "minlat": 43.3933552,
+    "minlon": -79.7062356,
+    "maxlat": 43.3959066,
+    "maxlon": -79.7025198
+   },
+   "geometry": [
+    {
+     "lat": 43.3933552,
+     "lon": -79.7057407
+    },
+    {
+     "lat": 43.3936623,
+     "lon": -79.7062356
+    },
+    {
+     "lat": 43.394063,
+     "lon": -79.7057827
+    },
+    {
+     "lat": 43.3941491,
+     "lon": -79.7057031
+    },
+    {
+     "lat": 43.3944218,
+     "lon": -79.7053929
+    },
+    {
+     "lat": 43.3947418,
+     "lon": -79.7050455
+    },
+    {
+     "lat": 43.3946107,
+     "lon": -79.7048241
+    },
+    {
+     "lat": 43.3948027,
+     "lon": -79.70461
+    },
+    {
+     "lat": 43.3949016,
+     "lon": -79.7045084
+    },
+    {
+     "lat": 43.395167,
+     "lon": -79.7042179
+    },
+    {
+     "lat": 43.3952827,
+     "lon": -79.7041058
+    },
+    {
+     "lat": 43.3954043,
+     "lon": -79.7040791
+    },
+    {
+     "lat": 43.3954635,
+     "lon": -79.7039906
+    },
+    {
+     "lat": 43.3956956,
+     "lon": -79.7037209
+    },
+    {
+     "lat": 43.3959066,
+     "lon": -79.7034924
+    },
+    {
+     "lat": 43.3953712,
+     "lon": -79.7025198
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "name": "Bronte Outer Harbour Marina"
+   }
+  },
+  {
+   "type": "way",
+   "id": 33656132,
+   "bounds": {
+    "minlat": 43.3951384,
+    "minlon": -79.7037209,
+    "maxlat": 43.3956956,
+    "maxlon": -79.7027062
+   },
+   "geometry": [
+    {
+     "lat": 43.3951384,
+     "lon": -79.7027062
+    },
+    {
+     "lat": 43.3956956,
+     "lon": -79.7037209
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "name": "Bronte Outer Harbour Marina"
+   }
+  },
+  {
+   "type": "way",
+   "id": 33656133,
+   "bounds": {
+    "minlat": 43.3947369,
+    "minlon": -79.7039906,
+    "maxlat": 43.3954635,
+    "maxlon": -79.7027095
+   },
+   "geometry": [
+    {
+     "lat": 43.3947369,
+     "lon": -79.7027095
+    },
+    {
+     "lat": 43.3954635,
+     "lon": -79.7039906
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "name": "Bronte Outer Harbour Marina"
+   }
+  },
+  {
+   "type": "way",
+   "id": 33656134,
+   "bounds": {
+    "minlat": 43.3944718,
+    "minlon": -79.704342,
+    "maxlat": 43.395243,
+    "maxlon": -79.7029949
+   },
+   "geometry": [
+    {
+     "lat": 43.3944718,
+     "lon": -79.7029949
+    },
+    {
+     "lat": 43.395167,
+     "lon": -79.7042179
+    },
+    {
+     "lat": 43.395243,
+     "lon": -79.704342
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "name": "Bronte Outer Harbour Marina"
+   }
+  },
+  {
+   "type": "way",
+   "id": 33656135,
+   "bounds": {
+    "minlat": 43.3938332,
+    "minlon": -79.7045084,
+    "maxlat": 43.3949016,
+    "maxlon": -79.7028587
+   },
+   "geometry": [
+    {
+     "lat": 43.3938332,
+     "lon": -79.7028587
+    },
+    {
+     "lat": 43.3939109,
+     "lon": -79.7028789
+    },
+    {
+     "lat": 43.3941253,
+     "lon": -79.7032678
+    },
+    {
+     "lat": 43.394175,
+     "lon": -79.7032129
+    },
+    {
+     "lat": 43.3942659,
+     "lon": -79.7033863
+    },
+    {
+     "lat": 43.3949016,
+     "lon": -79.7045084
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "name": "Bronte Outer Harbour Marina"
+   }
+  },
+  {
+   "type": "way",
+   "id": 33656136,
+   "bounds": {
+    "minlat": 43.3940223,
+    "minlon": -79.7048241,
+    "maxlat": 43.3946107,
+    "maxlon": -79.7037077
+   },
+   "geometry": [
+    {
+     "lat": 43.3940223,
+     "lon": -79.7037077
+    },
+    {
+     "lat": 43.3941714,
+     "lon": -79.7039598
+    },
+    {
+     "lat": 43.3941272,
+     "lon": -79.7040081
+    },
+    {
+     "lat": 43.3942359,
+     "lon": -79.7041834
+    },
+    {
+     "lat": 43.3946107,
+     "lon": -79.7048241
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "name": "Bronte Outer Harbour Marina"
+   }
+  },
+  {
+   "type": "way",
+   "id": 33656137,
+   "bounds": {
+    "minlat": 43.3937995,
+    "minlon": -79.7053929,
+    "maxlat": 43.3944218,
+    "maxlon": -79.7043024
+   },
+   "geometry": [
+    {
+     "lat": 43.3937995,
+     "lon": -79.7043024
+    },
+    {
+     "lat": 43.3944218,
+     "lon": -79.7053929
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "name": "Bronte Outer Harbour Marina"
+   }
+  },
+  {
+   "type": "way",
+   "id": 33656138,
+   "bounds": {
+    "minlat": 43.3936613,
+    "minlon": -79.705934,
+    "maxlat": 43.3941564,
+    "maxlon": -79.7051065
+   },
+   "geometry": [
+    {
+     "lat": 43.3936613,
+     "lon": -79.7051065
+    },
+    {
+     "lat": 43.394063,
+     "lon": -79.7057827
+    },
+    {
+     "lat": 43.3941564,
+     "lon": -79.705934
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "name": "Bronte Outer Harbour Marina"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937902,
+   "bounds": {
+    "minlat": 43.3917475,
+    "minlon": -79.7123369,
+    "maxlat": 43.3919299,
+    "maxlon": -79.7118915
+   },
+   "geometry": [
+    {
+     "lat": 43.3917475,
+     "lon": -79.7123369
+    },
+    {
+     "lat": 43.3919146,
+     "lon": -79.7120082
+    },
+    {
+     "lat": 43.3919299,
+     "lon": -79.7118915
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450081",
+    "canvec:UUID": "7a4085f93a964353a78cb36df56dc225",
+    "man_made": "pier",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937904,
+   "bounds": {
+    "minlat": 43.3918587,
+    "minlon": -79.7117645,
+    "maxlat": 43.3928042,
+    "maxlon": -79.710817
+   },
+   "geometry": [
+    {
+     "lat": 43.3928042,
+     "lon": -79.710817
+    },
+    {
+     "lat": 43.3924519,
+     "lon": -79.7111213
+    },
+    {
+     "lat": 43.3921783,
+     "lon": -79.7117245
+    },
+    {
+     "lat": 43.3921602,
+     "lon": -79.7117645
+    },
+    {
+     "lat": 43.3921477,
+     "lon": -79.7117553
+    },
+    {
+     "lat": 43.3918587,
+     "lon": -79.7115437
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450081",
+    "canvec:UUID": "161fd91359a7455c82ecc0ffca878e77",
+    "man_made": "pier",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937906,
+   "bounds": {
+    "minlat": 43.3928042,
+    "minlon": -79.710817,
+    "maxlat": 43.392975,
+    "maxlon": -79.7106605
+   },
+   "geometry": [
+    {
+     "lat": 43.3928042,
+     "lon": -79.710817
+    },
+    {
+     "lat": 43.392975,
+     "lon": -79.7106605
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450081",
+    "canvec:UUID": "36dce456ff4f429b9d8e15d2faaf7cb6",
+    "man_made": "pier",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937912,
+   "bounds": {
+    "minlat": 43.3927431,
+    "minlon": -79.710817,
+    "maxlat": 43.3928042,
+    "maxlon": -79.7106269
+   },
+   "geometry": [
+    {
+     "lat": 43.3928042,
+     "lon": -79.710817
+    },
+    {
+     "lat": 43.3927431,
+     "lon": -79.7106269
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450081",
+    "canvec:UUID": "a2c3cd81d74f47dd9cab6e4b354c2be0",
+    "man_made": "pier",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937924,
+   "bounds": {
+    "minlat": 43.4393639,
+    "minlon": -79.6660764,
+    "maxlat": 43.4412027,
+    "maxlon": -79.6653263
+   },
+   "geometry": [
+    {
+     "lat": 43.4411879,
+     "lon": -79.6660764
+    },
+    {
+     "lat": 43.4394796,
+     "lon": -79.6655595
+    },
+    {
+     "lat": 43.4393639,
+     "lon": -79.6654294
+    },
+    {
+     "lat": 43.4394059,
+     "lon": -79.6653263
+    },
+    {
+     "lat": 43.4394565,
+     "lon": -79.6653647
+    },
+    {
+     "lat": 43.4394905,
+     "lon": -79.6654619
+    },
+    {
+     "lat": 43.4412027,
+     "lon": -79.6659927
+    },
+    {
+     "lat": 43.4411879,
+     "lon": -79.6660764
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450091",
+    "canvec:UUID": "070aff7bdd864c3ab4c92a65241266c2",
+    "man_made": "breakwater",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937925,
+   "bounds": {
+    "minlat": 43.4407337,
+    "minlon": -79.6690063,
+    "maxlat": 43.4409746,
+    "maxlon": -79.6686713
+   },
+   "geometry": [
+    {
+     "lat": 43.4409746,
+     "lon": -79.6690063
+    },
+    {
+     "lat": 43.4408528,
+     "lon": -79.6688108
+    },
+    {
+     "lat": 43.4407701,
+     "lon": -79.6686889
+    },
+    {
+     "lat": 43.4407337,
+     "lon": -79.6686713
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450081",
+    "canvec:UUID": "e4dd657e53234944ae85eab1364e2a74",
+    "man_made": "pier",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937926,
+   "bounds": {
+    "minlat": 43.4411031,
+    "minlon": -79.6690988,
+    "maxlat": 43.4412834,
+    "maxlon": -79.6687577
+   },
+   "geometry": [
+    {
+     "lat": 43.4412834,
+     "lon": -79.6690988
+    },
+    {
+     "lat": 43.4411031,
+     "lon": -79.6687577
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450081",
+    "canvec:UUID": "f74befcc2732412bb9f263aea54c9abf",
+    "man_made": "pier",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937927,
+   "bounds": {
+    "minlat": 43.4393626,
+    "minlon": -79.6669046,
+    "maxlat": 43.4402559,
+    "maxlon": -79.666017
+   },
+   "geometry": [
+    {
+     "lat": 43.4402559,
+     "lon": -79.6668285
+    },
+    {
+     "lat": 43.4400649,
+     "lon": -79.66662
+    },
+    {
+     "lat": 43.4395963,
+     "lon": -79.6661631
+    },
+    {
+     "lat": 43.4394663,
+     "lon": -79.6660658
+    },
+    {
+     "lat": 43.439373,
+     "lon": -79.666017
+    },
+    {
+     "lat": 43.4393626,
+     "lon": -79.666102
+    },
+    {
+     "lat": 43.4394763,
+     "lon": -79.6661727
+    },
+    {
+     "lat": 43.4395593,
+     "lon": -79.6662398
+    },
+    {
+     "lat": 43.4400792,
+     "lon": -79.6667487
+    },
+    {
+     "lat": 43.4402253,
+     "lon": -79.6669046
+    },
+    {
+     "lat": 43.4402559,
+     "lon": -79.6668285
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450101",
+    "canvec:UUID": "2318db3888484836a9a5157fa5c4b9f0",
+    "man_made": "breakwater",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937929,
+   "bounds": {
+    "minlat": 43.4405369,
+    "minlon": -79.6685173,
+    "maxlat": 43.4409918,
+    "maxlon": -79.6676293
+   },
+   "geometry": [
+    {
+     "lat": 43.4409918,
+     "lon": -79.6685173
+    },
+    {
+     "lat": 43.4408098,
+     "lon": -79.6681345
+    },
+    {
+     "lat": 43.4405898,
+     "lon": -79.6677332
+    },
+    {
+     "lat": 43.4405369,
+     "lon": -79.6676293
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450081",
+    "canvec:UUID": "c348c9129f19434cb97f3936f0d82297",
+    "man_made": "pier",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937930,
+   "bounds": {
+    "minlat": 43.4405984,
+    "minlon": -79.6680141,
+    "maxlat": 43.4411023,
+    "maxlon": -79.6672768
+   },
+   "geometry": [
+    {
+     "lat": 43.4411023,
+     "lon": -79.6680141
+    },
+    {
+     "lat": 43.4406604,
+     "lon": -79.6673426
+    },
+    {
+     "lat": 43.4406399,
+     "lon": -79.6673069
+    },
+    {
+     "lat": 43.4405984,
+     "lon": -79.6672768
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450081",
+    "canvec:UUID": "b72be24426604af18a4a864feb2aa8a6",
+    "man_made": "pier",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937931,
+   "bounds": {
+    "minlat": 43.4412026,
+    "minlon": -79.6688812,
+    "maxlat": 43.4414892,
+    "maxlon": -79.6682312
+   },
+   "geometry": [
+    {
+     "lat": 43.4414856,
+     "lon": -79.6688812
+    },
+    {
+     "lat": 43.4414892,
+     "lon": -79.6688225
+    },
+    {
+     "lat": 43.4412026,
+     "lon": -79.6682312
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450081",
+    "canvec:UUID": "b075b75f6fa14f87a805411f49cf935d",
+    "man_made": "pier",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 43937932,
+   "bounds": {
+    "minlat": 43.4656737,
+    "minlon": -79.6431423,
+    "maxlat": 43.4658937,
+    "maxlon": -79.6429588
+   },
+   "geometry": [
+    {
+     "lat": 43.4658937,
+     "lon": -79.6431423
+    },
+    {
+     "lat": 43.4658444,
+     "lon": -79.6430708
+    },
+    {
+     "lat": 43.4657976,
+     "lon": -79.6429838
+    },
+    {
+     "lat": 43.4657406,
+     "lon": -79.6429588
+    },
+    {
+     "lat": 43.4656737,
+     "lon": -79.6429724
+    }
+   ],
+   "tags": {
+    "attribution": "Natural Resources Canada",
+    "canvec:CODE": "1450091",
+    "canvec:UUID": "f71b0b85d44148db8ea83abd33ed9d81",
+    "man_made": "breakwater",
+    "source": "CanVec_Import_2009"
+   }
+  },
+  {
+   "type": "way",
+   "id": 190793937,
+   "bounds": {
+    "minlat": 43.445691,
+    "minlon": -79.6745268,
+    "maxlat": 43.4460483,
+    "maxlon": -79.6723408
+   },
+   "geometry": [
+    {
+     "lat": 43.445691,
+     "lon": -79.6745268
+    },
+    {
+     "lat": 43.4457557,
+     "lon": -79.6742653
+    },
+    {
+     "lat": 43.4458156,
+     "lon": -79.673993
+    },
+    {
+     "lat": 43.4458803,
+     "lon": -79.6736739
+    },
+    {
+     "lat": 43.4459371,
+     "lon": -79.6733499
+    },
+    {
+     "lat": 43.4460055,
+     "lon": -79.6729107
+    },
+    {
+     "lat": 43.4460325,
+     "lon": -79.6726838
+    },
+    {
+     "lat": 43.4460483,
+     "lon": -79.6723408
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "source": "Bing"
+   }
+  },
+  {
+   "type": "way",
+   "id": 190793938,
+   "bounds": {
+    "minlat": 43.4460775,
+    "minlon": -79.6744342,
+    "maxlat": 43.4462285,
+    "maxlon": -79.6741741
+   },
+   "geometry": [
+    {
+     "lat": 43.4462285,
+     "lon": -79.6744342
+    },
+    {
+     "lat": 43.4460775,
+     "lon": -79.6741741
+    }
+   ],
+   "tags": {
+    "man_made": "pier"
+   }
+  },
+  {
+   "type": "way",
+   "id": 190793939,
+   "bounds": {
+    "minlat": 43.4440484,
+    "minlon": -79.6734859,
+    "maxlat": 43.4442799,
+    "maxlon": -79.6731588
+   },
+   "geometry": [
+    {
+     "lat": 43.4440484,
+     "lon": -79.6731588
+    },
+    {
+     "lat": 43.4442799,
+     "lon": -79.6734859
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "source": "Bing"
+   }
+  },
+  {
+   "type": "way",
+   "id": 190793940,
+   "bounds": {
+    "minlat": 43.4457134,
+    "minlon": -79.6733499,
+    "maxlat": 43.4459371,
+    "maxlon": -79.6732983
+   },
+   "geometry": [
+    {
+     "lat": 43.4457134,
+     "lon": -79.6732983
+    },
+    {
+     "lat": 43.4459371,
+     "lon": -79.6733499
+    }
+   ],
+   "tags": {
+    "man_made": "pier",
+    "source": "Bing"
+   }
+  },
+  {
+   "type": "way",
+   "id": 190795468,
+   "bounds": {
+    "minlat": 43.4166229,
+    "minlon": -79.686671,
+    "maxlat": 43.4166248,
+    "maxlon": -79.6864722
+   },
+   "geometry": [
+    {
+     "lat": 43.4166229,
+     "lon": -79.686671
+    },
+    {
+     "lat": 43.4166248,
+     "lon": -79.6864722
+    }
+   ],
+   "tags": {
+    "man_made": "pier"
+   }
+  },
+  {
+   "type": "way",
+   "id": 190796657,
+   "bounds": {
+    "minlat": 43.3959066,
+    "minlon": -79.7034924,
+    "maxlat": 43.396135,
+    "maxlon": -79.7032566
+   },
+   "geometry": [
+    {
+     "lat": 43.396135,
+     "lon": -79.7032566
+    },
+    {
+     "lat": 43.3959066,
+     "lon": -79.7034924
+    }
+   ],
+   "tags": {
+    "man_made": "pier"
+   }
+  },
+  {
+   "type": "way",
+   "id": 190796660,
+   "bounds": {
+    "minlat": 43.3936127,
+    "minlon": -79.7051628,
+    "maxlat": 43.3937169,
+    "maxlon": -79.7050488
+   },
+   "geometry": [
+    {
+     "lat": 43.3937169,
+     "lon": -79.7050488
+    },
+    {
+     "lat": 43.3936127,
+     "lon": -79.7051628
+    }
+   ],
+   "tags": {
+    "man_made": "pier"
+   }
+  },
+  {
+   "type": "way",
+   "id": 190796661,
+   "bounds": {
+    "minlat": 43.3946632,
+    "minlon": -79.7019656,
+    "maxlat": 43.3951456,
+    "maxlon": -79.7017524
+   },
+   "geometry": [
+    {
+     "lat": 43.3946632,
+     "lon": -79.7019656
+    },
+    {
+     "lat": 43.3951456,
+     "lon": -79.7017524
+    }
+   ],
+   "tags": {
+    "man_made": "pier"
+   }
+  },
+  {
+   "type": "way",
+   "id": 190796664,
+   "bounds": {
+    "minlat": 43.3949789,
+    "minlon": -79.7021145,
+    "maxlat": 43.3952099,
+    "maxlon": -79.7018624
+   },
+   "geometry": [
+    {
+     "lat": 43.3949789,
+     "lon": -79.7021145
+    },
+    {
+     "lat": 43.3952099,
+     "lon": -79.7018624
+    }
+   ],
+   "tags": {
+    "man_made": "pier"
+   }
+  },
+  {
+   "type": "way",
+   "id": 1274501366,
+   "bounds": {
+    "minlat": 43.4600985,
+    "minlon": -79.6475341,
+    "maxlat": 43.4603837,
+    "maxlon": -79.6468715
+   },
+   "geometry": [
+    {
+     "lat": 43.4601666,
+     "lon": -79.6475341
+    },
+    {
+     "lat": 43.460224,
+     "lon": -79.6474657
+    },
+    {
+     "lat": 43.4603068,
+     "lon": -79.6473758
+    },
+    {
+     "lat": 43.4603512,
+     "lon": -79.6472914
+    },
+    {
+     "lat": 43.4603837,
+     "lon": -79.6471746
+    },
+    {
+     "lat": 43.4603827,
+     "lon": -79.6470606
+    },
+    {
+     "lat": 43.4603632,
+     "lon": -79.6469547
+    },
+    {
+     "lat": 43.4603496,
+     "lon": -79.6469145
+    },
+    {
+     "lat": 43.4603107,
+     "lon": -79.6468715
+    },
+    {
+     "lat": 43.4603438,
+     "lon": -79.6470003
+    },
+    {
+     "lat": 43.4603467,
+     "lon": -79.647058
+    },
+    {
+     "lat": 43.4603,
+     "lon": -79.647172
+    },
+    {
+     "lat": 43.4602503,
+     "lon": -79.6472645
+    },
+    {
+     "lat": 43.4602036,
+     "lon": -79.6473061
+    },
+    {
+     "lat": 43.4601588,
+     "lon": -79.6473543
+    },
+    {
+     "lat": 43.4601111,
+     "lon": -79.6474066
+    },
+    {
+     "lat": 43.4600985,
+     "lon": -79.6474268
+    },
+    {
+     "lat": 43.4601004,
+     "lon": -79.6474536
+    },
+    {
+     "lat": 43.4601189,
+     "lon": -79.6474911
+    },
+    {
+     "lat": 43.4601666,
+     "lon": -79.6475341
+    }
+   ],
+   "tags": {
+    "area": "yes",
+    "man_made": "pier"
+   }
+  }
+ ]
+}

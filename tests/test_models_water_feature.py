@@ -1,9 +1,9 @@
-"""Tests for WaterFeature and AccessPoint pydantic models."""
+"""Tests for WaterFeature, AccessPoint and ShoreStructure pydantic models."""
 
 import pytest
 from pydantic import ValidationError
 
-from src.models.water_feature import AccessPoint, WaterFeature
+from src.models.water_feature import AccessPoint, ShoreStructure, WaterFeature
 
 _BASE_FEATURE = dict(
     osm_id="node/123",
@@ -112,3 +112,47 @@ class TestAccessPoint:
         tags = {"amenity": "boat_ramp", "access": "public", "fee": "no"}
         p = AccessPoint(**{**_BASE_POINT, "tags": tags})
         assert p.tags == tags
+
+
+_BASE_STRUCTURE = dict(
+    osm_id="way/33656131",
+    kind="pier",
+    name="Bronte Outer Harbour Marina",
+    geometry={"type": "LineString", "coordinates": [[-79.7057, 43.3934], [-79.7062, 43.3937]]},
+    lat=43.3948,
+    lng=-79.7046,
+    jurisdiction="CA-ON",
+    tags={"man_made": "pier", "name": "Bronte Outer Harbour Marina"},
+)
+
+
+class TestShoreStructure:
+    def test_minimal_valid(self):
+        s = ShoreStructure(**_BASE_STRUCTURE)
+        assert s.osm_id == "way/33656131"
+        assert s.kind == "pier"
+        assert s.geometry["type"] == "LineString"
+        assert s.fetched_at is not None
+
+    def test_all_kinds_valid(self):
+        for kind in ("pier", "breakwater", "harbour"):
+            s = ShoreStructure(**{**_BASE_STRUCTURE, "kind": kind})
+            assert s.kind == kind
+
+    def test_invalid_kind_rejected(self):
+        with pytest.raises(ValidationError):
+            ShoreStructure(**{**_BASE_STRUCTURE, "kind": "marina"})
+
+    def test_unnamed_is_allowed(self):
+        s = ShoreStructure(**{**_BASE_STRUCTURE, "name": None})
+        assert s.name is None
+
+    def test_a_point_geometry_is_allowed(self):
+        s = ShoreStructure(
+            **{
+                **_BASE_STRUCTURE,
+                "kind": "harbour",
+                "geometry": {"type": "Point", "coordinates": [0, 0]},
+            }
+        )
+        assert s.geometry["type"] == "Point"

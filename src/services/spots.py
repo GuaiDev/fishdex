@@ -29,6 +29,7 @@ The words are in services/spot_labels.py and nowhere else.
 Read side: `spots_geojson()` and `get_spot_detail()` serve the API.
 """
 
+import importlib
 import logging
 import math
 import re
@@ -36,6 +37,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 
 from sqlite_utils.db import Database
@@ -57,6 +59,7 @@ from src.models.spot import (
 )
 from src.models.stretch import FishingStretch
 from src.models.stretch_anchor import StretchAnchor
+from src.models.water_feature import ShoreStructure
 from src.services import api_vocab
 from src.services import spot_labels as words
 from src.services.bathymetry import (
@@ -151,18 +154,20 @@ def classify(
     outlines: dict[str, LakeOutline] | None = None,
     watercourses: list[StreamSegment] | None = None,
     bathymetry: dict[str, LakeBathymetry] | None = None,
+    shore_structures: list[ShoreStructure] | None = None,
 ) -> SpotClassification:
     """Spots from anchors: merged, deduped, titled, gated and tiered. Pure.
 
     Returns the spots and a report counting what was dropped, what was held
     back at tier 3, and which titles had to fall back to a generic word.
 
-    `outlines` maps a curated lake name to its resolved OHN outline and
-    `watercourses` is the OHN watercourse layer, both supplied by the caller
-    (build_spots does the network) so this function stays pure. With them, the
-    lakes get their shore geometry and their shoreline features. `bathymetry`
-    maps a lake name to its surveyed contours, likewise fetched by the caller,
-    for the drop-offs and humps read off the bottom.
+    `outlines` maps a curated lake name to its resolved OHN outline,
+    `watercourses` is the OHN watercourse layer and `shore_structures` the OSM
+    piers, breakwaters and harbours at the lakes' shores, all supplied by the
+    caller (build_spots does the network) so this function stays pure. With
+    them, the lakes get their shore geometry and their shoreline features.
+    `bathymetry` maps a lake name to its surveyed contours, likewise fetched by
+    the caller, for the drop-offs and humps read off the bottom.
     """
     built_at = built_at or datetime.now(UTC).isoformat(timespec="seconds")
     hints = hints or {}
@@ -197,7 +202,7 @@ def classify(
 
     _attach_access(ctx, final, anchors)
     water_bodies, features, contours = _link_water_bodies(
-        ctx, final, outlines, watercourses or [], bathymetry
+        ctx, final, outlines, watercourses or [], shore_structures or [], bathymetry
     )
 
     for spot in final:
@@ -691,6 +696,7 @@ def _link_water_bodies(
     spots: list[Spot],
     outlines: dict[str, LakeOutline],
     watercourses: list[StreamSegment],
+    shore_structures: list[ShoreStructure],
     bathymetry: dict[str, LakeBathymetry] | None = None,
 ) -> tuple[WaterBodySet, list[ShorelineFeature], list[BathymetryContour]]:
     """Derive the water bodies and hang each spot off its river, creek or lake.
@@ -701,7 +707,8 @@ def _link_water_bodies(
 
     The lakes' outlines (`outlines`) give the lake bodies their geometry, and the
     shoreline features are derived from those outlines next (`watercourses` names
-    the inlets and outlets). `bathymetry` holds each lake's surveyed contours, and
+    the inlets and outlets; `shore_structures` are the OSM piers, breakwaters and
+    harbours on the shore). `bathymetry` holds each lake's surveyed contours, and
     the drop-offs and humps are read off them; the raw contours are returned so
     the build stores the evidence with the features.
     """
@@ -742,6 +749,7 @@ def _link_water_bodies(
 
     features: list[ShorelineFeature] = []
     contours: list[BathymetryContour] = []
+    report.shore_structures_fetched = len(shore_structures)
     if outlines:
         lake_to_wb_id = {slug: bodies.lake_id(slug) for slug in outlines}
         shoreline_set = derive_shoreline_features(
@@ -750,6 +758,7 @@ def _link_water_bodies(
             ctx.jurisdiction,
             ctx.built_at,
             watercourses,
+            shore_structures,
         )
         features = shoreline_set.features
         report.lakes_with_outline = shoreline_set.lakes_with_outline
@@ -798,6 +807,10 @@ def build_spots(
     | None = None,
     watercourse_fetcher: Callable[[float, float, float, float], list[StreamSegment]] | None = None,
     bathymetry_fetcher: Callable[[LakeOutline], LakeBathymetry] | None = None,
+    structure_fetcher: Callable[
+        [list[tuple[float, float, float, float]]], tuple[list[ShoreStructure], int]
+    ]
+    | None = None,
     quiet_water_areas: list[IngestArea] | None = None,
 ) -> SpotBuildReport:
     """Rebuild every spot for the curation file's jurisdiction from the stored anchors.
@@ -808,10 +821,11 @@ def build_spots(
     Ids come from coordinates, so rebuilding twice gives the same spots.
 
     The network work — matching each lake's outline from OHN Waterbody, reading
-    the watercourses that name its inlets and outlets, and fetching the
-    bathymetry that names its drop-offs and humps — happens here, through the
-    cached adapters, so a second build is offline. Tests inject `outline_resolver`,
-    `watercourse_fetcher` and `bathymetry_fetcher` so they never touch the network.
+    the watercourses that name its inlets and outlets, the OSM piers, breakwaters
+    and harbours on its shore, and the bathymetry that names its drop-offs and
+    humps — happens here, through the cached adapters, so a second build is
+    offline. Tests inject `outline_resolver`, `watercourse_fetcher`,
+    `structure_fetcher` and `bathymetry_fetcher` so they never touch the network.
 
     Quiet water is the one kind not derived from the anchors: it wraps the
     `explore()` ranking for each ingest area of the jurisdiction
@@ -824,8 +838,8 @@ def build_spots(
     anchors = list_anchors(db, jurisdiction=jurisdiction)
     stretches = list_stretches(db, jurisdiction)
     failures: dict[str, int] = {}
-    outlines, watercourses = _lake_outline_inputs(
-        anchors, outline_resolver, watercourse_fetcher, failures
+    outlines, watercourses, shore_structures = _lake_outline_inputs(
+        anchors, jurisdiction, outline_resolver, watercourse_fetcher, structure_fetcher, failures
     )
     bathymetry = _bathymetry_inputs(outlines, bathymetry_fetcher, failures)
     built_at = datetime.now(UTC).isoformat(timespec="seconds")
@@ -837,6 +851,7 @@ def build_spots(
         built_at=built_at,
         outlines=outlines,
         watercourses=watercourses,
+        shore_structures=shore_structures,
         bathymetry=bathymetry,
     )
     quiet = build_quiet_water(db, jurisdiction, built_at, quiet_water_areas)
@@ -890,21 +905,29 @@ def build_spots(
 
 def _lake_outline_inputs(
     anchors: list[StretchAnchor],
+    jurisdiction: JurisdictionCode,
     outline_resolver: Callable[[dict[str, list[tuple[float, float]]]], dict[str, LakeOutline]]
     | None = None,
     watercourse_fetcher: Callable[[float, float, float, float], list[StreamSegment]] | None = None,
+    structure_fetcher: Callable[
+        [list[tuple[float, float, float, float]]], tuple[list[ShoreStructure], int]
+    ]
+    | None = None,
     failures: dict[str, int] | None = None,
-) -> tuple[dict[str, LakeOutline], list[StreamSegment]]:
-    """Named lake mouths in the anchors → outlines plus the watercourses for their inlets.
+) -> tuple[dict[str, LakeOutline], list[StreamSegment], list[ShoreStructure]]:
+    """Named lake mouths in the anchors → outlines plus the features read off them.
 
-    Every call in here goes through a cache, so this stays cheap offline after
-    the first build. A lake with no curated name gets no outline (an unnamed
-    mouth is not enough to match a polygon). The resolver and fetcher are
-    injected in tests; the defaults are the cached OHN adapters.
+    Returns the matched outlines, the watercourses that name their inlets and
+    outlets, and the OSM piers, breakwaters and harbours on their shores. Every
+    call in here goes through a cache, so this stays cheap offline after the
+    first build. A lake with no curated name gets no outline (an unnamed mouth
+    is not enough to match a polygon). The resolver and fetchers are injected in
+    tests; the defaults are the cached OHN and OSM adapters.
 
     One failed fetch costs that lake (or that shore cell) its piece and is counted
-    into `failures`; it never stops the build. The default resolver isolates each
-    lake itself and flags it `lookup_failed`; a resolver that raises is caught here.
+    into `failures` (the OSM fetcher returns its skipped-cell count with its
+    structures); it never stops the build. The default resolver isolates each lake
+    itself and flags it `lookup_failed`; a resolver that raises is caught here.
     """
     from shapely.geometry import shape as _shape
 
@@ -916,7 +939,7 @@ def _lake_outline_inputs(
             lake = next((n for n in mouths_by_lake if slugify(n) == slugify(a.name)), a.name)
             mouths_by_lake.setdefault(lake, []).append((a.lat, a.lon))
     if not mouths_by_lake:
-        return {}, []
+        return {}, [], []
 
     if outline_resolver is None:
         from src.services.lake_outlines import resolve_lake_outlines
@@ -926,39 +949,55 @@ def _lake_outline_inputs(
         from src.ingest.jurisdictions.ca_on.hydro_network import fetch_watercourses_bbox
 
         watercourse_fetcher = fetch_watercourses_bbox
+    if structure_fetcher is None:
+        osm = importlib.import_module("src.ingest.global.osm")
+
+        structure_fetcher = partial(osm.fetch_shore_structures, jurisdiction=jurisdiction)
     try:
         outlines = outline_resolver(mouths_by_lake)
     except Exception:  # noqa: BLE001 - a flaky upstream must not stop the build
         logger.warning("lake outline resolver failed; no lake outlines this run", exc_info=True)
         failures["lake_outline"] = failures.get("lake_outline", 0) + len(mouths_by_lake)
-        return {}, []
+        return {}, [], []
     for outline in outlines.values():
         if outline.lookup_failed:
             step = "lake_outline_widen" if outline.matched else "lake_outline"
             failures[step] = failures.get(step, 0) + 1
 
-    watercourses: list[StreamSegment] = []
-    seen_ogf: set[int] = set()
+    cells: list[tuple[float, float, float, float]] = []
+    seen_cells: set[tuple[float, float, float, float]] = set()
     for outline in outlines.values():
         if not outline.matched or not outline.geometry:
             continue
         for cell in _shore_cells(_shape(outline.geometry).boundary):
-            try:
-                segments = watercourse_fetcher(*cell)
-            except Exception:  # noqa: BLE001 - one flaky tile must not stop the build
-                logger.warning(
-                    "shore watercourse fetch failed for %r cell %s",
-                    outline.curated_name,
-                    cell,
-                    exc_info=True,
-                )
-                failures["shore_watercourses"] = failures.get("shore_watercourses", 0) + 1
-                continue
-            for seg in segments:
-                if seg.ogf_id not in seen_ogf:
-                    seen_ogf.add(seg.ogf_id)
-                    watercourses.append(seg)
-    return outlines, watercourses
+            if cell not in seen_cells:
+                seen_cells.add(cell)
+                cells.append(cell)
+
+    watercourses: list[StreamSegment] = []
+    seen_ogf: set[int] = set()
+    for cell in cells:
+        try:
+            segments = watercourse_fetcher(*cell)
+        except Exception:  # noqa: BLE001 - one flaky tile must not stop the build
+            logger.warning("shore watercourse fetch failed for cell %s", cell, exc_info=True)
+            failures["shore_watercourses"] = failures.get("shore_watercourses", 0) + 1
+            continue
+        for seg in segments:
+            if seg.ogf_id not in seen_ogf:
+                seen_ogf.add(seg.ogf_id)
+                watercourses.append(seg)
+
+    shore_structures: list[ShoreStructure] = []
+    if cells:
+        try:
+            shore_structures, cells_failed = structure_fetcher(cells)
+            if cells_failed:
+                failures["shore_structures"] = failures.get("shore_structures", 0) + cells_failed
+        except Exception:  # noqa: BLE001 - a flaky OSM query must not stop the build
+            logger.warning("shore structure fetch failed; no piers this run", exc_info=True)
+            failures["shore_structures"] = failures.get("shore_structures", 0) + 1
+    return outlines, watercourses, shore_structures
 
 
 def _bathymetry_inputs(
@@ -1004,7 +1043,11 @@ def _shore_cells(boundary, cell_deg: float = 0.5) -> list[tuple[float, float, fl
     from shapely.prepared import prep
 
     min_lon, min_lat, max_lon, max_lat = boundary.bounds
-    shore = prep(boundary.buffer(0.001))
+    # Test each cell, widened by the same hair, against the raw shoreline. Buffering
+    # a Great Lake's whole coastline instead builds a polygon of millions of
+    # vertices and takes gigabytes; a prepared intersect keeps memory flat.
+    shore = prep(boundary)
+    pad = 0.001
     eps = 1e-6
     cells: list[tuple[float, float, float, float]] = []
     lat = math.floor(min_lat / cell_deg) * cell_deg
@@ -1012,7 +1055,7 @@ def _shore_cells(boundary, cell_deg: float = 0.5) -> list[tuple[float, float, fl
         lon = math.floor(min_lon / cell_deg) * cell_deg
         while lon <= max_lon:
             cell = (lon + eps, lat + eps, lon + cell_deg - eps, lat + cell_deg - eps)
-            if shore.intersects(box(*cell)):
+            if shore.intersects(box(cell[0] - pad, cell[1] - pad, cell[2] + pad, cell[3] + pad)):
                 cells.append(cell)
             lon += cell_deg
         lat += cell_deg

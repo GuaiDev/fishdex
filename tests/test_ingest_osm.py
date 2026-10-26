@@ -1,5 +1,6 @@
 """Tests for OSM Overpass ingest module."""
 
+import importlib
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -7,6 +8,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+# Captured before any test runs. The autouse `_no_live_ohn` fixture (conftest)
+# replaces this attribute to keep builds offline, so the shore-structure tests
+# put the real function back for the duration of the call.
+_REAL_FETCH_SHORE = importlib.import_module("src.ingest.global.osm").fetch_shore_structures
 
 
 def _load_fixture(name: str) -> dict:
@@ -419,6 +425,138 @@ def test_corridor_with_no_line_makes_no_request(tmp_path):
     post.assert_not_called()
 
 
+# ── shore structures (piers, breakwaters, harbours) ───────────────────────────
+
+SHORE_CELL = [(-79.74, 43.37, -79.63, 43.47)]
+
+
+def _shore(osm, tmp_path, response, cells=None):
+    with (
+        patch("httpx.post", return_value=_make_mock_response(response)) as post,
+        patch("time.sleep"),
+        patch.object(osm, "_CACHE_DIR", tmp_path),
+        patch.object(osm, "fetch_shore_structures", _REAL_FETCH_SHORE),
+    ):
+        structures, _failed = osm.fetch_shore_structures(cells or SHORE_CELL, "CA-ON")
+        return structures, post
+
+
+def test_shore_structures_parse_every_kind_from_a_recorded_response(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    structures, _ = _shore(osm, tmp_path, _load_fixture("osm_shore_structures.json"))
+
+    assert {"pier", "breakwater"} <= {s.kind for s in structures}
+    assert all(s.jurisdiction == "CA-ON" for s in structures)
+    assert len({s.osm_id for s in structures}) == len(structures)
+
+
+def test_shore_structure_geometry_is_point_line_or_polygon(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    structures, _ = _shore(osm, tmp_path, _load_fixture("osm_shore_structures.json"))
+
+    types = {s.geometry["type"] for s in structures}
+    assert types <= {"Point", "LineString", "Polygon"}
+    piers = [s for s in structures if s.kind == "pier"]
+    assert piers
+    # a pier is drawn as a line, or as a closed way (a ring) when it is an area
+    assert {s.geometry["type"] for s in piers} <= {"LineString", "Polygon"}
+    assert any(s.geometry["type"] == "LineString" for s in piers)
+
+
+def test_shore_structure_kinds_from_tags():
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    kind = osm._shore_structure_kind
+    assert kind({"man_made": "pier"}) == "pier"
+    assert kind({"man_made": "breakwater"}) == "breakwater"
+    assert kind({"harbour": "yes"}) == "harbour"
+    assert kind({"landuse": "harbour"}) is None
+    assert kind({"leisure": "marina"}) is None
+    assert kind({"man_made": "bridge"}) is None
+
+
+def test_shore_query_names_the_tags_and_the_bbox(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    _, post = _shore(osm, tmp_path, {"elements": []})
+
+    query = post.call_args.kwargs["data"]["data"]
+    assert "43.37000,-79.74000,43.47000,-79.63000" in query
+    assert '["man_made"="pier"]' in query
+    assert '["man_made"="breakwater"]' in query
+    assert '["harbour"="yes"]' in query
+    assert "landuse" not in query
+    assert "marina" not in query
+
+
+def test_shore_structures_query_each_cell_once_and_dedupe_by_id(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    element = {
+        "type": "way",
+        "id": 42,
+        "geometry": [{"lat": 43.4, "lon": -79.7}, {"lat": 43.4, "lon": -79.69}],
+        "tags": {"man_made": "pier"},
+    }
+    cells = [(-79.74, 43.37, -79.63, 43.47), (-79.6, 43.3, -79.5, 43.4)]
+    structures, post = _shore(osm, tmp_path, {"elements": [element]}, cells=cells)
+
+    assert post.call_count == 2
+    assert len(structures) == 1  # the same way in both cells counted once
+
+
+def test_shore_structure_node_is_a_point(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    node = {"type": "node", "id": 9, "lat": 43.4, "lon": -79.7, "tags": {"harbour": "yes"}}
+    structures, _ = _shore(osm, tmp_path, {"elements": [node]})
+
+    (s,) = structures
+    assert s.kind == "harbour"
+    assert s.geometry == {"type": "Point", "coordinates": [-79.7, 43.4]}
+
+
+def test_shore_structure_without_geometry_is_skipped(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    structures, _ = _shore(
+        osm, tmp_path, {"elements": [{"type": "way", "id": 1, "tags": {"man_made": "pier"}}]}
+    )
+    assert structures == []
+
+
+def test_shore_structures_cache_and_an_empty_answer_is_not_an_error(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    first, post = _shore(osm, tmp_path, {"elements": []})
+    assert first == [] and post.call_count == 1
+    again, post2 = _shore(osm, tmp_path, {"elements": [{"surprise": True}]})
+    assert again == [] and post2.call_count == 0  # served from cache
+
+
+def test_shore_structures_with_no_cells_makes_no_request(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    with (
+        patch("httpx.post") as post,
+        patch.object(osm, "_CACHE_DIR", tmp_path),
+        patch.object(osm, "fetch_shore_structures", _REAL_FETCH_SHORE),
+    ):
+        assert osm.fetch_shore_structures([]) == ([], 0)
+    post.assert_not_called()
+
+
 def test_overpass_runtime_error_is_retried_and_never_cached(tmp_path):
     """Overpass reports a timed-out query as HTTP 200 with a remark, and an
     overloaded server as an HTML page. Neither may sit in the cache for 30 days."""
@@ -448,3 +586,38 @@ def test_overpass_runtime_error_is_retried_and_never_cached(tmp_path):
     ):
         osm.fetch_stream_corridor(CORRIDOR_LINE)
     assert not list((tmp_path / "other").glob("*.json"))
+
+
+def test_shore_structures_report_how_many_cells_were_skipped(tmp_path):
+    import importlib
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    good = _make_mock_response(
+        {
+            "elements": [
+                {
+                    "type": "way",
+                    "id": 42,
+                    "geometry": [{"lat": 43.4, "lon": -79.7}, {"lat": 43.4, "lon": -79.69}],
+                    "tags": {"man_made": "pier"},
+                }
+            ]
+        }
+    )
+
+    def post(_url, data=None, **_k):
+        if "(43.30000,-79.60000," in data["data"]:
+            raise RuntimeError("overpass down")
+        return good
+
+    cells = [(-79.74, 43.37, -79.63, 43.47), (-79.6, 43.3, -79.5, 43.4)]
+    with (
+        patch("httpx.post", side_effect=post),
+        patch("time.sleep"),
+        patch.object(osm, "_CACHE_DIR", tmp_path),
+        patch.object(osm, "_RETRY_DELAYS", ()),
+    ):
+        structures, failed = _REAL_FETCH_SHORE(cells, "CA-ON")
+
+    assert len(structures) == 1
+    assert failed == 1  # one quarter of the second cell never answered

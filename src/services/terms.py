@@ -43,6 +43,7 @@ class Term(TypedDict):
 _OHN = "Ontario government water map (stream lines)"
 _OHN_OUTLINE = "Ontario government water map (lake outlines)"
 _LIO_BATHYMETRY = "Ontario government lake depth surveys (depth contours)"
+_OSM_SHORE = "OpenStreetMap volunteers (piers, breakwaters and harbours)"
 _OSM_DAMS = "OpenStreetMap volunteers (dams and weirs)"
 
 TERMS: dict[str, Term] = {
@@ -157,6 +158,30 @@ TERMS: dict[str, Term] = {
             mapped_from=_LIO_BATHYMETRY,
         ),
         Term(
+            term_id="pier",
+            plain="A walkway built out over the water",
+            technical="Pier",
+            definition="A pier is a structure built out from the shore over the water.",
+            mapped_from=_OSM_SHORE,
+        ),
+        Term(
+            term_id="breakwater",
+            plain="A wall of rock or concrete built to block waves",
+            technical="Breakwater",
+            definition=(
+                "A breakwater is a wall of rock or concrete built in the water to "
+                "shelter a shore or harbour from waves."
+            ),
+            mapped_from=_OSM_SHORE,
+        ),
+        Term(
+            term_id="harbour",
+            plain="Sheltered water where boats are kept",
+            technical="Harbour",
+            definition="A harbour is a sheltered area of water where boats are moored or launched.",
+            mapped_from=_OSM_SHORE,
+        ),
+        Term(
             term_id="weed_edge",
             plain="The edge of a weed bed",
             technical="Weed edge",
@@ -194,7 +219,19 @@ SPOT_KIND_TERMS: dict[str, tuple[str, ...]] = {
     "quiet_water": (),
 }
 SHORELINE_KIND_TERMS: dict[str, tuple[str, ...]] = {
-    k: (k,) for k in ("inlet", "outlet", "island", "point", "peninsula", "drop_off", "hump")
+    k: (k,)
+    for k in (
+        "inlet",
+        "outlet",
+        "island",
+        "point",
+        "peninsula",
+        "drop_off",
+        "hump",
+        "pier",
+        "breakwater",
+        "harbour",
+    )
 }
 
 
