@@ -152,6 +152,7 @@ Optional keys unlock individual adapters and features:
 | `EBIRD_API_KEY` | eBird piscivore observations |
 | `YOUTUBE_API_KEY` | YouTube transcript ingestion |
 | `DATASTREAM_API_KEY` | DataStream water quality |
+| `MAPBOX_TOKEN` | Vision screening satellite tiles only (the map itself no longer uses it) |
 | `FISHBOT_API_KEY` | Web API authentication — **required** for admin endpoints (see below) |
 
 Note that `.env.example` currently documents only `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`, `LOG_LEVEL` and `DATASTREAM_API_KEY` — the rest are read by code but undocumented there.
