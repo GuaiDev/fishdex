@@ -179,3 +179,25 @@ def test_fetch_regulations_empty_page_returns_empty(monkeypatch):
     monkeypatch.setattr(reg_mod, "_fetch_page", lambda: "<html></html>")
     monkeypatch.setattr(reg_mod, "check_resource_discovery", lambda *a, **k: None)
     assert reg_mod.fetch_regulations() == []
+
+
+def test_failed_download_leaves_no_cache_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(reg_mod, "_CACHE_DIR", tmp_path)
+
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def iter_bytes(self, chunk_size):
+            yield b"%PDF-partial"
+            raise RuntimeError("connection reset")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(httpx, "stream", lambda *a, **k: _Resp())
+    assert reg_mod._download_pdf_if_stale("https://example.invalid/x?idZone=7", 1) is None
+    assert list(tmp_path.iterdir()) == []

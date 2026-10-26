@@ -216,6 +216,7 @@ def _download_pdf_if_stale(url: str, zone_id: int) -> Path | None:
         age = time.time() - path.stat().st_mtime
         if age < _CACHE_TTL_SECONDS:
             return path
+    tmp = path.with_suffix(".pdf.part")
     try:
         with httpx.stream(
             "GET",
@@ -225,14 +226,16 @@ def _download_pdf_if_stale(url: str, zone_id: int) -> Path | None:
             timeout=120,
         ) as resp:
             resp.raise_for_status()
-            with path.open("wb") as fh:
+            with tmp.open("wb") as fh:
                 for chunk in resp.iter_bytes(chunk_size=65536):
                     fh.write(chunk)
+        tmp.replace(path)
         logger.info(
             "QC regulations: downloaded zone %d PDF (%.1f KB)", zone_id, path.stat().st_size / 1024
         )
         return path
     except Exception as exc:
+        tmp.unlink(missing_ok=True)
         logger.error("QC regulations: zone %d PDF download failed: %s", zone_id, exc)
         return None
 
