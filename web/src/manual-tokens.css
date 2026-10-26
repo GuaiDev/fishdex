@@ -1,0 +1,116 @@
+/*
+ * Design tokens for the "Field Manual" redesign — a high-contrast,
+ * printed-spec-sheet register that replaces the naturalist's field-journal
+ * system (--fx-*/fishdex-tokens.css).
+ *
+ * Decisions encoded here (the inverse of the prior journal system):
+ *  - Light, warm-paper background; ink text at genuine contrast. No dark,
+ *    muddy render, no gradients-as-layout, no grain, no blur/glass, no
+ *    shadows. Flat surfaces everywhere.
+ *  - One type family (IBM Plex Sans) plus a mono face used only for
+ *    figures, counts, units, and scientific names. No serif
+ *    italic-accent words, no decorative display pairing.
+ *  - One flat accent (chart navy) for actions/active/progress; one alarm
+ *    (red-orange). Earned moments (personal best, new find) are carried by
+ *    structure and typography (solid vs dashed tags, mono figures), not by
+ *    a gold hue.
+ *  - Uniform 4px spacing grid; single 16px page gutter; hairline borders;
+ *    no shadows.
+ *
+ * Scoped to screens mounting this file (FishDex first). Other screens still
+ * consume fishdex-tokens.css until they are migrated.
+ */
+:root {
+  /* Surfaces */
+  --fm-paper: #F6F5F0;        /* page background */
+  --fm-panel: #FFFFFF;        /* raised panel / card */
+  --fm-quiet: #ECEAE2;        /* inset track, quiet fill */
+  --fm-filled: #E2DFD4;       /* pressed / selected fill on paper */
+
+  /* Hairlines */
+  --fm-hairline: #D9D7CB;
+  --fm-hairline-strong: #B8B5A6;
+
+  /* Ink — all pass >= 4.5:1 on paper/panel */
+  --fm-ink: #191B1F;          /* primary text */
+  --fm-ink-2: #43464E;        /* secondary text */
+  --fm-ink-3: #676A74;        /* captions / footnotes */
+
+  /* Single accent (chart blue) + single alarm (red-orange) */
+  --fm-chart: #1C4E6B;
+  --fm-chart-pressed: #062C42;
+  --fm-on-chart: #F6F5F0;
+  --fm-alarm: #C4452A;
+
+  /* Typography */
+  --fm-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --fm-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Radii — small enough to read printed, round only where a control needs it */
+  --fm-r-xs: 4px;
+  --fm-r-sm: 6px;
+  --fm-r-md: 10px;
+  --fm-r-pill: 999px;
+
+  /* Spacing grid (multiples of 4) */
+  --fm-s-1: 4px;
+  --fm-s-2: 8px;
+  --fm-s-3: 12px;
+  --fm-s-4: 16px;
+  --fm-s-5: 20px;
+  --fm-s-6: 24px;
+
+  /* Shared focus ring — replaced for this system (index.css still points at
+     the legacy --color-moss for un-migrated screens). */
+  --fm-focus: var(--fm-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--fm-focus);
+  outline-offset: 2px;
+}
+
+/* Flat primary button: solid chart, instant invert on hover/press. No
+   opacity fades anywhere in the system. */
+.fm-btn {
+  font-family: var(--fm-sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fm-on-chart);
+  background: var(--fm-chart);
+  border: 1px solid var(--fm-chart);
+  border-radius: var(--fm-r-pill);
+  padding: 10px 20px;
+  cursor: pointer;
+}
+.fm-btn:hover {
+  background: var(--fm-ink);
+  color: var(--fm-paper);
+}
+.fm-btn:active {
+  background: var(--fm-chart-pressed);
+  color: var(--fm-paper);
+}
+
+/* Flat tag: solid = earned item, dashed = pending item. Same register, no
+   hue change. */
+.fm-tag {
+  font-family: var(--fm-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fm-ink);
+  border: 1px solid var(--fm-ink);
+  border-radius: var(--fm-r-xs);
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.fm-tag--earned {
+  background: var(--fm-ink);
+  color: var(--fm-paper);
+}
+.fm-tag--pending {
+  border-style: dashed;
+  color: var(--fm-ink-2);
+}

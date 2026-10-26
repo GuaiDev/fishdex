@@ -20,6 +20,18 @@ function stopColor(productive) {
   return productive ? colorMoss : colorTextAsh;
 }
 
+function accessCoverageLabel(segment) {
+  if (segment.access_is_measured === true) return 'Access measured here';
+  if (segment.access_is_measured === false) return 'Access not measured here';
+  return 'Access coverage unknown';
+}
+
+function accessCoverageTone(segment) {
+  if (segment.access_is_measured === true) return 'var(--fx-moss-light)';
+  if (segment.access_is_measured === false) return 'var(--fx-brass-light)';
+  return 'var(--fx-text-muted)';
+}
+
 function ExploreLayer({ mode, onSegmentClick }) {
   const [segments, setSegments] = useState([]);
   const fetchTimeout = useRef(null);
@@ -257,84 +269,59 @@ export default function Map() {
 
       {/* Header */}
       <div style={{
-        padding: '12px 16px',
+        padding: '14px 18px 12px',
         background: 'var(--fx-canvas)',
         borderBottom: '1px solid var(--fx-hairline)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
         zIndex: 1000,
         flexShrink: 0,
       }}>
-        <h1 style={{ fontFamily: 'var(--fx-font-serif)', fontWeight: 600, fontSize: 17, color: 'var(--fx-text-primary-2)', margin: 0 }}>Map</h1>
-
-        <div style={{
-          display: 'flex',
-          background: 'var(--fx-card-fill)',
-          border: '1px solid var(--fx-hairline)',
-          borderRadius: 8,
-          padding: 2,
-          gap: 2,
-        }}>
-          {['personal', 'explore'].map(m => (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 }}>
+          <div>
+            <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 10, fontWeight: 600, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--fx-moss-light)', marginBottom: 4 }}>
+              Field map
+            </div>
+            <h1 style={{ fontFamily: 'var(--fx-font-serif)', fontWeight: 600, fontSize: 25, lineHeight: 1, color: 'var(--fx-text-primary-2)', margin: 0 }}>
+              Credit River watershed
+            </h1>
+          </div>
+          <button aria-label="Search the map" style={{ width: 38, height: 38, borderRadius: 20, border: '1px solid var(--fx-hairline)', background: 'var(--fx-card-fill-dark)', color: 'var(--fx-text-muted)', fontSize: 18, cursor: 'pointer' }}>
+            ⌕
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, display: 'flex', background: 'var(--fx-card-fill)', border: '1px solid var(--fx-hairline)', borderRadius: 10, padding: 3, gap: 3 }}>
+            {[['personal', 'My water'], ['explore', 'Find water']].map(([m, label]) => (
+              <button key={m} onClick={() => { setMapMode(m); closeSheet(); setPlacing(false); }} style={{ flex: 1, padding: '7px 9px', borderRadius: 7, border: 'none', background: mapMode === m ? 'var(--fx-moss-light)' : 'transparent', color: mapMode === m ? 'var(--fx-on-accent)' : 'var(--fx-text-muted)', fontFamily: 'var(--fx-font-ui)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {mapMode === 'personal' && (
             <button
-              key={m}
-              onClick={() => setMapMode(m)}
+              type="button"
+              onClick={() => { closeSheet(); setPlacing(p => !p); }}
+              aria-pressed={placing}
               style={{
-                padding: '5px 12px',
-                borderRadius: 6,
-                border: 'none',
-                background: mapMode === m ? 'var(--fx-moss-light)' : 'transparent',
-                color: mapMode === m ? 'var(--fx-on-accent)' : 'var(--fx-text-muted)',
-                fontFamily: 'var(--fx-font-ui)',
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-                textTransform: 'capitalize',
+                ...pinUi.button,
+                padding: '8px 12px',
+                borderRadius: 9,
+                fontSize: 11,
+                fontWeight: 600,
+                borderColor: placing ? 'var(--fx-moss-light)' : 'var(--fx-hairline)',
+                color: placing ? 'var(--fx-moss-lightest)' : 'var(--fx-text-primary)',
               }}
             >
-              {m}
+              {placing ? 'Cancel' : '+ Pin'}
             </button>
-          ))}
+          )}
+          {mapMode === 'explore' && (
+            <select value={exploreMode} onChange={e => setExploreMode(e.target.value)} aria-label="Discovery mode" style={{ width: 116, background: 'var(--fx-card-fill)', border: '1px solid var(--fx-hairline)', borderRadius: 9, color: 'var(--fx-text-primary)', fontFamily: 'var(--fx-font-ui)', fontSize: 11, padding: '8px 7px', cursor: 'pointer' }}>
+              <option value="balanced">Balanced</option>
+              <option value="easy">Easy access</option>
+              <option value="adventure">Adventure</option>
+            </select>
+          )}
         </div>
-
-        {mapMode === 'personal' && (
-          <button
-            type="button"
-            onClick={() => { closeSheet(); setPlacing(p => !p); }}
-            aria-pressed={placing}
-            style={{
-              ...pinUi.button,
-              padding: '5px 10px',
-              borderColor: placing ? 'var(--fx-moss-light)' : 'var(--fx-hairline)',
-              color: placing ? 'var(--fx-moss-lightest)' : 'var(--fx-text-primary)',
-            }}
-          >
-            {placing ? 'Cancel' : '+ Pin'}
-          </button>
-        )}
-
-        {mapMode === 'explore' && (
-          <select
-            value={exploreMode}
-            onChange={e => setExploreMode(e.target.value)}
-            style={{
-              background: 'var(--fx-card-fill)',
-              border: '1px solid var(--fx-hairline)',
-              borderRadius: 6,
-              color: 'var(--fx-text-primary)',
-              fontFamily: 'var(--fx-font-ui)',
-              fontSize: 11,
-              padding: '4px 8px',
-              cursor: 'pointer',
-            }}
-          >
-            <option value="balanced">Balanced</option>
-            <option value="easy">Easy access</option>
-            <option value="adventure">Adventure</option>
-          </select>
-        )}
       </div>
 
       {/* Map */}
@@ -380,23 +367,29 @@ export default function Map() {
 
         {mapMode === 'personal' && !loadingStops && myStops.length === 0 && pins.length === 0 && !placing && (
           <div style={{
-            position: 'absolute', top: '50%', left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: 'var(--fx-card-fill)',
+            position: 'absolute', bottom: 76, left: 16, right: 16,
+            background: 'color-mix(in srgb, var(--fx-card-fill) 94%, transparent)',
             border: '1px solid var(--fx-hairline)',
-            borderRadius: 14,
-            padding: '20px 24px',
-            textAlign: 'center',
+            borderRadius: 13,
+            padding: '12px 14px',
+            textAlign: 'left',
             zIndex: 1000,
-            maxWidth: 240,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 11,
           }}>
-            <div aria-hidden="true" style={{ fontSize: 28, marginBottom: 8 }}>🎣</div>
-            <div style={{ fontFamily: 'var(--fx-font-serif)', fontSize: 16, fontWeight: 600, color: 'var(--fx-text-primary-2)', marginBottom: 6 }}>
-              Your map is empty
+            <div aria-hidden="true" style={{ width: 30, height: 30, borderRadius: 9, background: 'var(--fx-moss-fill-dim)', color: 'var(--fx-moss-light)', display: 'grid', placeItems: 'center', fontSize: 17 }}>⌖</div>
+            <div>
+              <div style={{ fontFamily: 'var(--fx-font-serif)', fontSize: 15, fontWeight: 600, color: 'var(--fx-text-primary-2)', marginBottom: 2 }}>Your water will appear here</div>
+              <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 11, color: 'var(--fx-text-muted)', lineHeight: 1.4 }}>Log a trip with GPS, tap + Pin to save a spot, or switch to Find water.</div>
             </div>
-            <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 12, color: 'var(--fx-text-muted)', lineHeight: 1.5 }}>
-              Log trips with GPS, or tap + Pin to save a spot.
-              Switch to Explore to find new water.
+          </div>
+        )}
+
+        {mapMode === 'explore' && (
+          <div style={{ position: 'absolute', top: 14, left: 14, zIndex: 1000, pointerEvents: 'none' }}>
+            <div style={{ padding: '7px 10px', background: 'color-mix(in srgb, var(--fx-card-fill) 90%, transparent)', border: '1px solid var(--fx-hairline)', borderRadius: 10, boxShadow: '0 5px 16px rgba(0,0,0,.2)', fontFamily: 'var(--fx-font-ui)', fontSize: 10, color: 'var(--fx-text-muted)' }}>
+              <span style={{ color: 'var(--fx-moss-light)', fontWeight: 600 }}>Discovery signals</span> · not a fish prediction
             </div>
           </div>
         )}
@@ -404,20 +397,23 @@ export default function Map() {
         {mapMode === 'explore' && (
           <div style={{
             position: 'absolute',
-            bottom: 80, left: '50%',
-            transform: 'translateX(-50%)',
+            bottom: 82, left: 16,
+            transform: 'none',
             background: 'color-mix(in srgb, var(--fx-card-fill) 90%, transparent)',
             border: '1px solid var(--fx-hairline)',
-            borderRadius: 20,
-            padding: '6px 14px',
+            borderRadius: 13,
+            padding: '9px 11px',
             fontFamily: 'var(--fx-font-ui)',
             fontSize: 11,
             color: 'var(--fx-text-muted)',
             zIndex: 1000,
             pointerEvents: 'none',
-            whiteSpace: 'nowrap',
+            whiteSpace: 'normal',
           }}>
-            Zoom in to see spots
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 7 }}>
+              {[['var(--color-heat-high)', 'high'], ['var(--color-heat-mid)', 'mid'], ['var(--color-heat-low)', 'low']].map(([color, label]) => <span key={label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><i style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'block' }} />{label}</span>)}
+            </div>
+            <span>Zoom in to inspect individual reaches</span>
           </div>
         )}
       </div>
@@ -515,14 +511,14 @@ export default function Map() {
                 {selected.watercourse_name || selected.nearest_named_stream || 'Unnamed stream'}
               </div>
               <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 12, color: 'var(--fx-text-muted)', marginBottom: 10 }}>
-                Stream order {selected.stream_order}
+                {selected.stream_order ? `Stream order ${selected.stream_order}` : 'Stream order not recorded'}
                 {selected.is_confluence ? ' · Confluence' : ''}
                 {selected.connected_to_waterbody ? ' · Connected to lake/river' : ''}
               </div>
 
               <div style={{ marginBottom: 10 }}>
                 <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 11, color: 'var(--fx-text-muted)', marginBottom: 4 }}>
-                  Exploration score
+                  Discovery signal
                 </div>
                 <div style={{
                   height: 6, background: 'var(--fx-hairline)', borderRadius: 3, overflow: 'hidden',
@@ -538,8 +534,16 @@ export default function Map() {
                   }} />
                 </div>
                 <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 10, color: 'var(--fx-text-muted)', marginTop: 2 }}>
-                  {((selected.score || 0) * 100).toFixed(0)}/100
+                  {((selected.score || 0) * 100).toFixed(0)} · based on pressure, structure, remoteness and access
                 </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 10px', background: 'var(--fx-card-fill-quiet)', borderRadius: 8, fontFamily: 'var(--fx-font-ui)', fontSize: 11, color: accessCoverageTone(selected) }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: accessCoverageTone(selected) }} />
+                {accessCoverageLabel(selected)}
+              </div>
+              <div style={{ fontFamily: 'var(--fx-font-ui)', fontSize: 10, lineHeight: 1.45, color: 'var(--fx-text-muted)', marginTop: 8 }}>
+                This signal helps surface overlooked water. It does not say fish are present.
               </div>
 
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>

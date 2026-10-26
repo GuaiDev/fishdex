@@ -37,6 +37,9 @@ __pycache__/
 .github/hooks/
 .github/skills/
 
+# Lavish review artifacts (local design-review surfaces, not project code)
+.lavish/
+
 # Generated discovery output. The registry it reads (data/registry/ca_portals.json)
 # IS committed — that is config. This is the report, which is a fact about one
 # moment and regenerated for free by `make harvest-ca`.

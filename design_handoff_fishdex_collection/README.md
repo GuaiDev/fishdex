@@ -135,6 +135,7 @@ Also required per species: scientific (binomial) name, and typical/known regiona
 
 ## Files
 - `Log a Catch v2.dc.html` — the full prototype. Both views live on one canvas: option **`3a`** (flat) and **`3b`** (grouped). (This file also contains the earlier session-logging flow — turn "2", options 1a/1b/1c — which is upstream context, not part of this collection-screen handoff.)
+- `Map v2.dc.html` — the updated map canvas: option **`4a`** (My water), **`4b`** (Find water), and **`4c`** (reach detail with the map still visible).
 - `screens/3a-my-fishdex-flat.png` — screenshot of the flat view.
 - `screens/3b-my-fishdex-grouped.png` — screenshot of the grouped view.
 
