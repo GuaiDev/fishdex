@@ -3,9 +3,9 @@
 run:
 	uv run python -m src.cli.main run
 
-# Web app + API on this machine, against the local database (data/fishing.db).
-# Open http://localhost:8000/app. Bound to localhost only; pass SERVE_HOST=0.0.0.0 to
-# reach it from a phone on the same network.
+# API on this machine, against the local database (data/fishing.db).
+# Bound to localhost only; pass SERVE_HOST=0.0.0.0 to reach it from a phone on the
+# same network.
 SERVE_HOST ?= 127.0.0.1
 SERVE_PORT ?= 8000
 serve:

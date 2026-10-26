@@ -4,7 +4,7 @@ A personal fishing exploration AI assistant. Built for anglers who want to find 
 
 ## What it does
 
-Fishdex answers fishing questions from a local corpus of integrated public datasets, using Claude to reason over retrieved records. It runs as a CLI chat bot and as a web app — chat, map, trip log and a species collection — backed by a FastAPI service.
+Fishdex answers fishing questions from a local corpus of integrated public datasets, using Claude to reason over retrieved records. It runs as a CLI chat bot and as a FastAPI service.
 
 (The repository, Python package and CLI command are still named `fishbot`.)
 
@@ -99,7 +99,7 @@ Documented honestly rather than papered over — see `CLAUDE.md` for the full li
 - **[Anthropic Claude API](https://www.anthropic.com)** — `claude-sonnet-4-6` default, with a router that sends classification and extraction to cheaper models
 - **SQLite** via `sqlite-utils` for local storage
 - **Pydantic v2** for all data models
-- **FastAPI** + **React/Vite** for the web app
+- **FastAPI** for the API
 - **Typer** for the CLI
 - **pytest** + **ruff** — 1,018 tests
 
@@ -112,7 +112,7 @@ uv sync
 # Start the chat bot
 make run
 
-# Serve the web app + API locally — open http://localhost:8000/app
+# Serve the API locally on http://localhost:8000
 make serve
 
 # Run all ingestion adapters around home
@@ -159,11 +159,11 @@ Note that `.env.example` currently documents only `ANTHROPIC_API_KEY`, `CLAUDE_M
 
 ### Setting `FISHBOT_API_KEY` locally
 
-The API's admin endpoints (`POST /admin/token`, `/admin/dashboard`, `/ingest/data*`, and so on) are protected by `FISHBOT_API_KEY`. If it is unset or empty they refuse every request with HTTP 503 rather than letting anyone in; a wrong or missing `X-Api-Key` header gets 401. So set it before `make serve`: add a line such as `FISHBOT_API_KEY=pick-any-long-random-string` to `.env` (generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`), or export it in your shell. Then visit `/admin-login` and paste the same key to log in.
+The API's admin endpoints (`POST /admin/token`, `/admin/dashboard`, `/ingest/data*`, and so on) are protected by `FISHBOT_API_KEY`. If it is unset or empty they refuse every request with HTTP 503 rather than letting anyone in; a wrong or missing `X-Api-Key` header gets 401. So set it before `make serve`: add a line such as `FISHBOT_API_KEY=pick-any-long-random-string` to `.env` (generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`), or export it in your shell.
 
 ### Everything runs locally
 
-There is no hosted deployment. `make serve` runs the FastAPI backend (which also serves the built web app at `/app`) on `127.0.0.1:8000` against the local database at `data/fishing.db`; set `DATA_DIR` to keep the database and catch photos somewhere else. `SERVE_HOST=0.0.0.0 make serve` makes it reachable from a phone on the same network.
+There is no hosted deployment. `make serve` runs the FastAPI backend on `127.0.0.1:8000` against the local database at `data/fishing.db`; set `DATA_DIR` to keep the database and catch photos somewhere else. `SERVE_HOST=0.0.0.0 make serve` makes it reachable from a phone on the same network.
 
 The weekly data refresh is `make weekly-ingest`. It reads the list of areas (label, jurisdiction, lat, lng, radius and which source bundles to run) from `data/ingest_areas.json` and runs each one through the same service code as the `/ingest/data*` endpoints, one after another, then prints what each dataset stored and what failed. Edit that file to add or drop an area. To preview without fetching anything:
 

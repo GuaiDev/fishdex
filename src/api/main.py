@@ -41,7 +41,7 @@ from fastapi import (  # noqa: E402
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
@@ -94,7 +94,7 @@ def get_current_user_or_apikey(
     authorization: str = Header(None),
     x_api_key: str = Header(None),
 ) -> dict:
-    """Accept either Bearer token (users) or X-Api-Key (admin fallback for log.html)."""
+    """Accept either Bearer token (users) or X-Api-Key (admin fallback)."""
     from src.auth.auth import get_user_from_token
     from src.storage.database import get_db
 
@@ -586,7 +586,7 @@ def log_trip(body: dict, user: dict = Depends(get_current_user_or_apikey)):
             "Start fishing" timer's two ends)
     }
     JSON-only — does not accept an actual photo file. Kept for backward
-    compatibility with callers (e.g. /log log.html) that only send EXIF-derived
+    compatibility with callers that only send EXIF-derived
     metadata. Use POST /log-trip/photo to upload the photo file itself.
     """
     try:
@@ -748,9 +748,8 @@ def get_sessions(user: dict = Depends(get_current_user)):
 
 
 # Regional fallback when a user has no GPS grant and no located trips yet —
-# mirrors the frontend map's own default center (web/src/screens/Map.jsx),
-# kept in sync deliberately so a brand-new user still sees real, plausible
-# conditions rather than an empty credibility panel on the Chat screen.
+# a plausible default centre so a brand-new user still sees real conditions
+# rather than an empty credibility panel on the Chat screen.
 _DEFAULT_REGION = {"lat": 43.5, "lng": -79.8, "name": "Southern Ontario"}
 
 
@@ -918,43 +917,6 @@ def confirm_catch_species_endpoint(
         # only becomes knowable here, not at initial log-trip time.
         "is_new_pb": result["is_new_pb"],
     }
-
-
-@app.get("/log")
-def log_page():
-    """Serve the mobile trip logging page."""
-    return FileResponse(os.path.join(_static_dir, "log.html"))
-
-
-# Local-dev-only convenience login page — deliberately registered as a
-# route only when NOT running on Railway, not just "logically blocked"
-# inside the handler. Railway injects RAILWAY_ENVIRONMENT into every
-# deployment automatically (confirmed present in this project's Railway
-# variables), so this needs zero local config to resolve correctly: unset
-# locally -> route exists, set on Railway -> route is never added to the
-# app's route table at all. Hitting /admin-login on the deployed app 404s
-# exactly like any other undefined path — there is no code path there to
-# audit or accidentally re-enable, since app.get() was simply never called
-# for it in that process. The underlying POST /admin/token this page wraps
-# is unaffected either way; it stays reachable (and properly gated by
-# FISHBOT_API_KEY, see verify_api_key) on both Railway and local, since
-# that endpoint already existed before this page and other legitimate
-# callers (e.g. re-generating an admin token from a script) may need it in
-# production too. Only the convenience *page* is scoped down.
-if not os.environ.get("RAILWAY_ENVIRONMENT"):
-
-    @app.get("/admin-login")
-    def admin_login_page():
-        """Serve the personal admin-login shortcut page (local dev only).
-
-        Convenience only, not a new auth path: it just wraps the existing
-        POST /admin/token in a form instead of a manual curl + devtools
-        localStorage paste, and optionally remembers the API key on this
-        device so a repeat visit re-logs-in with zero typing. Whoever holds
-        the API key still gets full admin access — this page doesn't change
-        that, it just makes using it less tedious locally.
-        """
-        return FileResponse(os.path.join(_static_dir, "admin-login.html"))
 
 
 @app.post("/admin/token")
@@ -2397,9 +2359,3 @@ def put_trip_pin_rating(
     if not set_trip_pin_rating(_pin_db(), user["id"], session_id, pin_id, body.rating):
         raise HTTPException(status_code=404, detail="That trip is not linked to that pin")
     return {"session_id": session_id, "pin_id": pin_id, "rating": body.rating}
-
-
-# Serve React web app from /app — mount last so API routes take priority
-_web_dist = os.path.join(os.path.dirname(__file__), "../../web/dist")
-if os.path.exists(_web_dist):
-    app.mount("/app", StaticFiles(directory=_web_dist, html=True), name="webapp")

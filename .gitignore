@@ -16,7 +16,6 @@ data/photos/
 data/weekly_ingest.log
 
 # Node
-web/node_modules/
 
 # Python
 __pycache__/
