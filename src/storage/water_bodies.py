@@ -131,6 +131,21 @@ def list_shoreline_features(
     return [_feature_from_row(r) for r in rows]
 
 
+def count_shoreline_features_by_kind(
+    db: Database, jurisdiction: str | None = None
+) -> dict[str, dict[str, int]]:
+    """Shoreline and depth features per water body per kind: the counts on a lake."""
+    where, params = ("WHERE jurisdiction = ?", [jurisdiction]) if jurisdiction else ("", [])
+    out: dict[str, dict[str, int]] = {}
+    for wb_id, kind, n in db.execute(
+        f"SELECT water_body_id, kind, COUNT(*) FROM shoreline_features {where} "
+        "GROUP BY water_body_id, kind",
+        params,
+    ).fetchall():
+        out.setdefault(wb_id, {})[kind] = n
+    return out
+
+
 def count_bathymetry_contours(db: Database, jurisdiction: str | None = None) -> int:
     if jurisdiction is None:
         return db.execute("SELECT COUNT(*) FROM bathymetry_contours").fetchone()[0]

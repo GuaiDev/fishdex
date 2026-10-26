@@ -1122,11 +1122,11 @@ def spots_geojson(
     return {
         "type": "FeatureCollection",
         "meta": meta,
-        "features": [_feature(s, new_counts.get(s.spot_id)) for s in shown],
+        "features": [spot_feature(s, new_counts.get(s.spot_id)) for s in shown],
     }
 
 
-def _feature(s: Spot, new_to_you_count: int | None = None) -> dict:
+def spot_feature(s: Spot, new_to_you_count: int | None = None) -> dict:
     properties = {
         "spot_id": s.spot_id,
         "kind": s.kind,
