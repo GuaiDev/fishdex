@@ -12,7 +12,6 @@ with observation_density_25km > 500 (dense urban core only) are excluded.
 import json
 import logging
 import math
-import os
 from pathlib import Path
 
 import numpy as np
@@ -349,21 +348,12 @@ def export_map_data(
     json_mb = output_path.stat().st_size / 1_048_576
     logger.info("Wrote %d features to %s (%.1f MB)", len(geojson_features), output_path, json_mb)
 
-    # Read Mapbox token
-    mapbox_token = os.environ.get("MAPBOX_TOKEN", "")
-    if not mapbox_token and Path(".env").exists():
-        for line in Path(".env").read_text(encoding="utf-8").splitlines():
-            if line.startswith("MAPBOX_TOKEN="):
-                mapbox_token = line.split("=", 1)[1].strip()
-                break
-
-    # Build self-contained HTML: embed GeoJSON + token directly
+    # Build self-contained HTML: embed GeoJSON directly
     html_out: Path | None = None
     if _HTML_TEMPLATE.exists():
         # Explicit UTF-8 both ways: the template contains non-ASCII, and the
         # platform default codec (cp1252 on Windows) cannot decode it.
         html_content = _HTML_TEMPLATE.read_text(encoding="utf-8")
-        html_content = html_content.replace("%%MAPBOX_TOKEN%%", mapbox_token)
         html_content = html_content.replace("%%MAP_DATA%%", geojson_json)
         html_output_path.parent.mkdir(parents=True, exist_ok=True)
         html_output_path.write_text(html_content, encoding="utf-8")
@@ -372,9 +362,6 @@ def export_map_data(
         logger.info("Self-contained HTML at %s (%.1f MB)", html_output_path, html_mb)
     else:
         logger.warning("HTML template not found at %s", _HTML_TEMPLATE)
-
-    if not mapbox_token:
-        logger.warning("No MAPBOX_TOKEN in .env — satellite tiles will not load.")
 
     return {
         "segments": len(geojson_features),

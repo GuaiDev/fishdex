@@ -168,7 +168,6 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
-const MAPBOX_TOKEN = '%%MAPBOX_TOKEN%%';
 const HOME = [43.4675, -79.6877];
 const DOTS_ZOOM = 11;
 
@@ -176,20 +175,42 @@ const DOTS_ZOOM = 11;
 const map = L.map('map', { preferCanvas: true }).setView(HOME, 10);
 
 let currentTileLayer = null;
+let currentLabelLayer = null;
+
+const BASE_TILES = {
+  osm: {
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    opts: { maxZoom: 19, subdomains: 'abc', attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' },
+  },
+  'streets-v12': {
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    opts: { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap © <a href="https://carto.com/attributions">CARTO</a>' },
+  },
+  'satellite-v9': {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    opts: { maxZoom: 19, attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community' },
+  },
+  'satellite-streets-v12': {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    opts: { maxZoom: 19, attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community' },
+    labels: 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png',
+  },
+};
+
 function setBasemap(style) {
   if (currentTileLayer) map.removeLayer(currentTileLayer);
-  if (style === 'osm') {
-    currentTileLayer = L.tileLayer(
-      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }
-    );
-  } else {
-    currentTileLayer = L.tileLayer(
-      `https://api.mapbox.com/styles/v1/mapbox/${style}/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`,
-      { tileSize: 512, zoomOffset: -1, attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> © OpenStreetMap' }
-    );
-  }
+  if (currentLabelLayer) map.removeLayer(currentLabelLayer);
+  const cfg = BASE_TILES[style] || BASE_TILES.osm;
+  currentTileLayer = L.tileLayer(cfg.url, cfg.opts);
   currentTileLayer.addTo(map);
+  if (cfg.labels) {
+    currentLabelLayer = L.tileLayer(cfg.labels, {
+      maxZoom: 19,
+      subdomains: 'abcd',
+      attribution: 'Labels © OpenStreetMap contributors © <a href="https://carto.com/attributions">CARTO</a>',
+    });
+    currentLabelLayer.addTo(map);
+  }
 }
 setBasemap('satellite-streets-v12');
 
