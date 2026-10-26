@@ -36,6 +36,7 @@ from fastapi import (  # noqa: E402
     Form,
     Header,
     HTTPException,
+    Query,
     Response,
     UploadFile,
 )
@@ -51,6 +52,7 @@ from src.models.pin import (  # noqa: E402
     PinUpdate,
     RecalledVisitCreate,
     SessionUpdate,
+    TodaySort,
     TripPinRating,
 )
 from src.models.weed_report import WeedReportCreate, WeedReportUpdate  # noqa: E402
@@ -780,7 +782,7 @@ def get_conditions(
     # service itself reaches it via importlib. Reuse that exact module so this
     # endpoint reads through the identical code path the coach's tools use.
     _weather = importlib.import_module("src.ingest.global.weather")
-    from src.services.weather import _FISHING_NOTES
+    from src.services.weather_notes import note_for_user
     from src.storage.database import get_db
 
     if lat is not None and lng is not None:
@@ -814,6 +816,11 @@ def get_conditions(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Conditions unavailable: {e}")
 
+    # Literacy-gated, and a panel refresh is not proof it was read, so showing
+    # it here records no exposure; the client reports a sighting via
+    # POST /profile/concept-events using `pressure_note_term_id`.
+    note = note_for_user(get_db(), user["id"], trend.trend)
+
     return {
         "location": {
             "name": loc["name"],
@@ -830,7 +837,10 @@ def get_conditions(
         "pressure_hpa": conditions.pressure_hpa,
         "pressure_trend": trend.trend,
         "pressure_delta_24h_hpa": trend.delta_24h_hpa,
-        "pressure_note": _FISHING_NOTES[trend.trend],
+        "pressure_note": note.text if note else None,
+        "pressure_note_term_id": note.term_id if note else None,
+        "pressure_note_basis": note.basis if note else None,
+        "pressure_note_source": note.source if note else None,
     }
 
 
@@ -1554,6 +1564,27 @@ def _parse_bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
     return parts
 
 
+def _parse_shape_options(
+    geometry: bool, simplify: float | None, zoom: float | None
+) -> tuple[float | None, float | None]:
+    """Validate `simplify` (metres) and `zoom`; at most one, and neither with geometry=false."""
+    from src.services.geometry_simplify import MAX_ZOOM
+
+    if simplify is not None and (not math.isfinite(simplify) or simplify < 0):
+        raise HTTPException(
+            status_code=422, detail="simplify must be a distance in metres, 0 or more"
+        )
+    if zoom is not None and not (0 <= zoom <= MAX_ZOOM):
+        raise HTTPException(status_code=422, detail=f"zoom must be between 0 and {MAX_ZOOM}")
+    if simplify is not None and zoom is not None:
+        raise HTTPException(status_code=422, detail="give simplify or zoom, not both")
+    if not geometry and (simplify is not None or zoom is not None):
+        raise HTTPException(
+            status_code=422, detail="simplify and zoom thin a shape; geometry=false sends none"
+        )
+    return simplify, zoom
+
+
 def _parse_spot_filters(
     bbox: str | None,
     kind: str | None,
@@ -1771,6 +1802,10 @@ def get_map_water_bodies(
     bbox: str | None = None,
     type: str | None = None,
     jurisdiction: str | None = None,
+    fields: str | None = None,
+    geometry: bool = True,
+    simplify: float | None = None,
+    zoom: float | None = None,
     user: dict = Depends(get_current_user),
 ):
     """The rivers, creeks and lakes spots sit on, as GeoJSON.
@@ -1779,9 +1814,14 @@ def get_map_water_bodies(
     overlaps it. `type` is one or more comma-separated types (river, creek, lake, pond,
     great_lake). A river's geometry is its simplified line; a lake with no outline on
     file has `geometry: null`. Built with the spots by `make build-spots`.
+
+    To send less: `fields` keeps only the named `properties` (comma-separated;
+    `water_body_id` is always kept), `geometry=false` leaves every shape out, and
+    `simplify` (metres) or `zoom` (a web-map zoom, one pixel of tolerance) thins the shapes.
+    Which water bodies come back never depends on these.
     """
     from src.models.water_body import WaterBodyType
-    from src.services.water_bodies import water_bodies_geojson
+    from src.services.water_bodies import LIST_FIELDS, water_bodies_geojson
     from src.storage.database import get_db
 
     box = _parse_bbox(bbox)
@@ -1794,19 +1834,119 @@ def get_map_water_bodies(
             raise HTTPException(
                 status_code=422, detail=f"unknown type {bad[0]!r}; one of {sorted(valid)}"
             )
-    return water_bodies_geojson(get_db(), box, types, jurisdiction)
+    field_list = None
+    if fields:
+        field_list = [f.strip() for f in fields.split(",") if f.strip()]
+        bad = [f for f in field_list if f not in LIST_FIELDS]
+        if bad:
+            raise HTTPException(
+                status_code=422, detail=f"unknown field {bad[0]!r}; one of {list(LIST_FIELDS)}"
+            )
+    simplify_m, zoom_f = _parse_shape_options(geometry, simplify, zoom)
+    return water_bodies_geojson(
+        get_db(),
+        box,
+        types,
+        jurisdiction,
+        fields=field_list,
+        geometry=geometry,
+        simplify_m=simplify_m,
+        zoom=zoom_f,
+    )
 
 
 @app.get("/map/water-bodies/{water_body_id}")
-def get_map_water_body(water_body_id: str, user: dict = Depends(get_current_user)):
+def get_map_water_body(
+    water_body_id: str,
+    geometry: bool = True,
+    simplify: float | None = None,
+    zoom: float | None = None,
+    user: dict = Depends(get_current_user),
+):
     """One water body in full: name and where the name came from, its shape, the
-    curated stretches it is made of, and every spot on it. 404 for an unknown id."""
+    curated stretches it is made of, and every spot on it. 404 for an unknown id.
+
+    `geometry=false` leaves the shape out; `simplify` (metres) or `zoom` thins it, as on
+    the list. A lake outline can be megabytes, so a card that does not draw it should say so.
+    """
     from src.services.water_bodies import get_water_body_detail
     from src.storage.database import get_db
 
-    detail = get_water_body_detail(get_db(), water_body_id)
+    simplify_m, zoom_f = _parse_shape_options(geometry, simplify, zoom)
+    detail = get_water_body_detail(
+        get_db(), water_body_id, geometry=geometry, simplify_m=simplify_m, zoom=zoom_f
+    )
     if detail is None:
         raise HTTPException(status_code=404, detail=f"No water body with id {water_body_id!r}")
+    return detail
+
+
+@app.get("/map/sections")
+def get_map_sections(
+    bbox: str | None = None,
+    type: str | None = None,
+    tier: int = 2,
+    jurisdiction: str | None = None,
+    response: Response = None,
+    user: dict = Depends(get_current_user),
+):
+    """The overview map's layer: one shape per river section and per lake with an outline.
+
+    `bbox` is min_lon,min_lat,max_lon,max_lat. `type` is one or more comma-separated
+    water types (river, creek, lake, pond, great_lake). Each feature carries its name,
+    `kind`, `type` and `counts` of what is inside (spots by kind, shoreline and depth
+    features by kind, and the caller's own weed reports). `labels` holds the lakes and
+    bays with no outline: a name and a place, no shape. `tier` is the highest spot tier
+    counted, as on /map/spots. Open one with GET /map/sections/{section_id}.
+    """
+    from src.models.water_body import WaterBodyType
+    from src.services.sections import sections_geojson
+    from src.storage.database import get_db
+
+    box = _parse_bbox(bbox)
+    types = None
+    if type:
+        types = [t.strip() for t in type.split(",") if t.strip()]
+        valid = set(WaterBodyType.__args__)
+        bad = [t for t in types if t not in valid]
+        if bad:
+            raise HTTPException(
+                status_code=422, detail=f"unknown type {bad[0]!r}; one of {sorted(valid)}"
+            )
+    if tier not in (1, 2, 3):
+        raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
+    # The weed counts are the caller's own: never let a browser or proxy keep them for anyone else.
+    response.headers["Cache-Control"] = "private, no-store"
+    return sections_geojson(
+        get_db(), user["id"], bbox=box, types=types, jurisdiction=jurisdiction, max_tier=tier
+    )
+
+
+@app.get("/map/sections/{section_id}")
+def get_map_section(
+    section_id: str,
+    response: Response,
+    tier: int = 2,
+    user: dict = Depends(get_current_user),
+):
+    """One section and every point of interest in it, as pins.
+
+    Dams and weirs (below-dam spots), places where creeks join, river mouths, public
+    fishing spots, a lake's shoreline and depth features, parking, trailheads and boat
+    launches near them, and the caller's own weed reports. Each pin keeps the id of the
+    spot or feature it stands for. 404 for an unknown section id, and for a lake with
+    no outline, which is not a section.
+    """
+    from src.services.sections import section_detail
+    from src.storage.database import get_db
+
+    if tier not in (1, 2, 3):
+        raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
+    detail = section_detail(get_db(), section_id, user["id"], max_tier=tier)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"No section with id {section_id!r}")
+    # The weed reports are the caller's own, so nothing here may be kept for the next person.
+    response.headers["Cache-Control"] = "private, no-store"
     return detail
 
 
@@ -2039,6 +2179,28 @@ def get_pin_labels(user: dict = Depends(get_current_user)):
     return labels_payload()
 
 
+@app.get("/pins/today")
+def get_pins_today(
+    sort: TodaySort = "match",
+    lat: float | None = Query(None, ge=-90, le=90),
+    lng: float | None = Query(None, ge=-180, le=180),
+    user: dict = Depends(get_current_user),
+):
+    """The Today view: the caller's own pins in the order they chose, each with a reason.
+
+    sort is match, distance, last_visited or favourites. distance needs lat and
+    lng (where the angler is); for the other keys they only add distance_km.
+    Only sort=match looks up today's conditions, so only its rows carry a
+    match. Another angler's pins and trips can never change the result.
+    """
+    from src.services.pins.today import today_view
+
+    try:
+        return today_view(_pin_db(), user["id"], sort, lat, lng)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
 @app.get("/pins")
 def get_pins(user: dict = Depends(get_current_user)):
     """The Personal map: the user's pins, and their located stops not yet pinned."""
@@ -2096,6 +2258,22 @@ def get_pin_conditions(pin_id: int, user: dict = Depends(get_current_user)):
     if rows is None:
         raise HTTPException(status_code=404, detail="No such pin")
     return rows
+
+
+@app.get("/pins/{pin_id}/match")
+def get_pin_match(pin_id: int, user: dict = Depends(get_current_user)):
+    """How today's conditions compare with the caller's own best-rated trips at this pin.
+
+    Built only from the caller's rated trips here. With fewer than the minimum
+    (see GET /pins/labels) the answer has status "hidden" and shows nothing but
+    the counts: the UI shows the conditions panel alone.
+    """
+    from src.services.pins.match import pin_match
+
+    match = pin_match(_pin_db(), user["id"], pin_id)
+    if match is None:
+        raise HTTPException(status_code=404, detail="No such pin")
+    return match
 
 
 @app.patch("/pins/{pin_id}")

@@ -1,25 +1,13 @@
-"""Weather service — bridges the ingest module to the agent."""
+"""Weather service — bridges the ingest module to the agent.
+
+Facts only. The behaviour note ("what this might mean for the bite") is
+literacy-gated and lives in `weather_notes.py`."""
 
 import importlib
 import json
 from datetime import date, timedelta
 
 _weather = importlib.import_module("src.ingest.global.weather")
-
-_FISHING_NOTES = {
-    "falling": (
-        "Pressure is falling — fish are often actively feeding ahead of a weather system. "
-        "Good time to be on the water."
-    ),
-    "rising": (
-        "Pressure is rising post-front — fish activity may be suppressed. "
-        "Expect slower fishing until pressure stabilizes."
-    ),
-    "steady": (
-        "Pressure is steady — expect baseline feeding activity. "
-        "No strong pressure-based advantage or disadvantage."
-    ),
-}
 
 
 def get_conditions_for_agent(lat: float, lng: float, when: str = "now") -> str:
@@ -39,7 +27,6 @@ def get_conditions_for_agent(lat: float, lng: float, when: str = "now") -> str:
                 "cloud_cover_pct": conditions.cloud_cover_pct,
                 "weather_code": conditions.weather_code,
                 "pressure_trend": trend.trend,
-                "pressure_note": _FISHING_NOTES[trend.trend],
             }
         )
 
@@ -90,7 +77,6 @@ def get_pressure_trend_for_agent(lat: float, lng: float) -> str:
             "delta_24h_hpa": trend.delta_24h_hpa,
             "delta_48h_hpa": trend.delta_48h_hpa,
             "jurisdiction": trend.jurisdiction,
-            "fishing_note": _FISHING_NOTES[trend.trend],
         }
     )
 

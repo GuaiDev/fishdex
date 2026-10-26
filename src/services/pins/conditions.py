@@ -19,8 +19,25 @@ from src.models.context import ContextField
 from src.models.freshness import age_seconds
 from src.models.pin import PinConditionRow
 from src.services.context import describe
-from src.services.pins.labels import CONDITION_FIELDS, age_label
+from src.services.pins.labels import (
+    CONDITION_FIELDS,
+    GAUGE_DISTANCE_SUFFIX,
+    GAUGE_WATER_LABELS,
+    age_label,
+)
 from src.storage import pins as store
+
+
+def _label(spec: dict, field: ContextField) -> str:
+    """The row's label; a gauge row names the water the gauge is on."""
+    template = GAUGE_WATER_LABELS.get(spec["field"])
+    prov = field.provenance
+    if template is None or prov is None or not prov.water or field.is_empty:
+        return spec["label"]
+    label = template.format(water=prov.water)
+    if prov.same_water is not True and prov.distance_km is not None:
+        label += GAUGE_DISTANCE_SUFFIX.format(km=prov.distance_km)
+    return label
 
 
 def _row(spec: dict, field: ContextField, now: datetime) -> PinConditionRow:
@@ -29,7 +46,7 @@ def _row(spec: dict, field: ContextField, now: datetime) -> PinConditionRow:
     age = age_seconds(observed_at, now)
     return PinConditionRow(
         field=spec["field"],
-        label=spec["label"],
+        label=_label(spec, field),
         group=spec["group"],
         value=field.value,
         unit=spec["unit"] if not field.is_empty else None,
@@ -37,6 +54,8 @@ def _row(spec: dict, field: ContextField, now: datetime) -> PinConditionRow:
         source=prov.source if prov else None,
         station=prov.station if prov else None,
         distance_km=prov.distance_km if prov else None,
+        station_water=prov.water if prov else None,
+        on_pin_water=prov.same_water if prov else None,
         observed_at=observed_at,
         age_s=age,
         age_label=age_label(age),

@@ -14,8 +14,11 @@ it is a good place to fish; a test enforces it.
 
 `mapped_from` names where features of this type come from on the map, so a
 label can carry its source. A term with `mapped_from=None` has no map layer
-yet: it is in the registry so literacy can be tracked against it the day a
-layer arrives.
+(yet): it is in the registry so literacy can be tracked against it.
+`barometric_pressure` is one that never will — it is a weather concept, and
+`services/weather_notes.py` reads its literacy to decide who gets the
+weather-behaviour note. It is not a map layer, so it does not count toward the
+map's default layer density.
 
 This replaced `translate.GLOSSARY`, which held three of these definitions as
 bare strings with no id.
@@ -186,6 +189,18 @@ TERMS: dict[str, Term] = {
                 "A weed edge is the boundary between a bed of underwater plants and open water."
             ),
             mapped_from="Your own weed reports",
+        ),
+        Term(
+            term_id="barometric_pressure",
+            plain="How heavy the air is",
+            technical="Barometric pressure",
+            definition=(
+                "Barometric pressure is the weight of the air above a place, "
+                "measured in hectopascals (hPa). It rises and falls as weather "
+                "systems pass, so the direction it is moving says which way the "
+                "weather is heading."
+            ),
+            mapped_from=None,
         ),
     )
 }

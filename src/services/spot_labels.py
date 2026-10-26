@@ -267,6 +267,76 @@ def _survey_phrase(attributes: dict) -> str:
     return f"From a survey, {SURVEY_DATE_UNKNOWN}"
 
 
+# ── sections ──────────────────────────────────────────────────────────────────
+# The overview map draws water as sections: one shape per curated river section and
+# one per lake with an outline. A tap opens the section's pins. `kind` says what the
+# shape is; the water's own type word ("River", "Lake") comes from WATER_BODY_TYPES.
+
+SECTION_KINDS: dict[str, dict[str, str]] = {
+    "river_section": {
+        "label": "River section",
+        "one_liner": "One named run of a river or creek. Tap it to see what is along it.",
+    },
+    "lake": {
+        "label": "Lake",
+        "one_liner": "A lake drawn from its outline. Tap it to see what is on it.",
+    },
+}
+# The kinds of thing a section holds, as `pin_type`. Spots, shoreline features and
+# access points are named by their own kind's label; the weed edge by the weed
+# report's own words.
+PIN_TYPES: dict[str, str] = {
+    "spot": "Spot",
+    "feature": "Shoreline or depth feature",
+    "getting_there": "Getting there",
+    "weed_report": "Weed edge you reported",
+}
+# `meta.notes` on the sections list when no river section is built.
+SECTIONS_NOT_BUILT = (
+    "No river sections are built yet, so there are no sections to draw. "
+    "The sections are made when the explore map's rivers are built."
+)
+# A water with no outline gets a label and no shape; this is the line under it.
+SECTION_LABEL_ONLY_NOTE = "No outline is on file for this water, so it is a name on the map only."
+# The weed edges counted on a section are the caller's own, said where they are counted.
+SECTION_WEED_COUNT_NOTE = "Weed edges you reported. Only you see them."
+
+# How a count reads in a section's one-line `summary`: (one, many). Spot kinds in
+# KIND_ORDER first, then shoreline and depth features, then the caller's weed edges.
+SECTION_COUNT_PHRASES: dict[str, tuple[str, str]] = {
+    "river_mouth": ("river mouth", "river mouths"),
+    "creek_junction": ("place where creeks join", "places where creeks join"),
+    "below_dam": ("spot below a dam", "spots below dams"),
+    "public_fishing": ("public fishing spot", "public fishing spots"),
+    "quiet_water": ("quiet-water spot", "quiet-water spots"),
+    "inlet": ("inlet", "inlets"),
+    "outlet": ("outlet", "outlets"),
+    "island": ("island", "islands"),
+    "point": ("point", "points"),
+    "peninsula": ("peninsula", "peninsulas"),
+    "drop_off": ("drop-off", "drop-offs"),
+    "hump": ("hump", "humps"),
+    "weed_report": ("weed edge you reported", "weed edges you reported"),
+}
+# Shown when a section has nothing counted in it.
+SECTION_EMPTY_SUMMARY = "Nothing mapped here yet"
+
+
+def section_summary(
+    spot_counts: dict[str, int], feature_counts: dict[str, int], weed_reports: int
+) -> str:
+    """A section's counts in words: '9 spots below dams, 4 places where creeks join'."""
+    parts: list[str] = []
+    ordered = [(k, spot_counts.get(k, 0)) for k in KIND_ORDER]
+    ordered += [(k, feature_counts.get(k, 0)) for k in FEATURE_KIND_ORDER]
+    ordered.append(("weed_report", weed_reports))
+    for key, n in ordered:
+        if n:
+            one, many = SECTION_COUNT_PHRASES[key]
+            parts.append(f"{n} {one if n == 1 else many}")
+    return ", ".join(parts) if parts else SECTION_EMPTY_SUMMARY
+
+
 # ── titles ────────────────────────────────────────────────────────────────────
 # Filled in by services/spots.py. {river} and {tributary} already carry their
 # article ("the Credit River", "Sheldon Creek"). A title is never built from a
@@ -381,6 +451,17 @@ def labels_payload() -> dict:
             "note": NEW_TO_YOU_NOTE,
         },
         "filters": {"new_to_me": NEW_TO_ME_FILTER},
+        "sections": {
+            "kinds": [{"kind": k, **v} for k, v in SECTION_KINDS.items()],
+            "pin_types": PIN_TYPES,
+            "count_phrases": {
+                k: {"one": one, "many": many} for k, (one, many) in SECTION_COUNT_PHRASES.items()
+            },
+            "empty_summary": SECTION_EMPTY_SUMMARY,
+            "label_only_note": SECTION_LABEL_ONLY_NOTE,
+            "weed_count_note": SECTION_WEED_COUNT_NOTE,
+            "not_built": SECTIONS_NOT_BUILT,
+        },
         "bathymetry_data_note": BATHYMETRY_DATA_NOTE,
         "quiet_water": {
             "titles": QUIET_TITLES,
@@ -431,6 +512,17 @@ def all_strings() -> list[str]:
     ]
     out += list(TITLES.values()) + list(UNNAMED_TRIBUTARY.values()) + [UNNAMED_LARGER_RIVER]
     out += list(QUIET_TITLES.values())
+    for entry in SECTION_KINDS.values():
+        out += list(entry.values())
+    out += list(PIN_TYPES.values())
+    out += [
+        SECTIONS_NOT_BUILT,
+        SECTION_LABEL_ONLY_NOTE,
+        SECTION_WEED_COUNT_NOTE,
+        SECTION_EMPTY_SUMMARY,
+    ]
+    for one, many in SECTION_COUNT_PHRASES.values():
+        out += [one, many]
     out += [
         QUIET_RECORDS_CAVEAT,
         ACCESS_NOT_MEASURED,

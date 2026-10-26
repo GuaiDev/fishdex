@@ -81,7 +81,10 @@ def presentation(profile: AnglerProfile) -> dict:
             "label_mode": LABEL_MODE[state],
             "prominence": CONCEPT_PROMINENCE[state],
         }
-    familiar_share = sum(1 for v in labels.values() if v["state"] == "familiar") / len(labels)
+    # Density is the share of *map layers* whose concept is familiar; concepts
+    # with no map layer (barometric pressure) say nothing about it.
+    layer_ids = [t for t in terms.TERM_ORDER if terms.TERMS[t]["mapped_from"] is not None]
+    familiar_share = sum(1 for t in layer_ids if labels[t]["state"] == "familiar") / len(layer_ids)
 
     log_details = {
         field: {

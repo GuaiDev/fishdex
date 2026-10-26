@@ -31,7 +31,7 @@ def fetch_nearby_stations(
     """Return active WSC stations within radius_km of lat/lng. Cached 24hr.
 
     Returns a list of normalised dicts with keys:
-    STATION_NUMBER, STATION_NAME, PROV_TERR_STATE_LOC, LATITUDE, LONGITUDE.
+    STATION_NUMBER, STATION_NAME, RIVER_NAME, PROV_TERR_STATE_LOC, LATITUDE, LONGITUDE.
     """
     deg = radius_km / _KM_PER_DEGREE
     params = {
@@ -55,6 +55,7 @@ def fetch_nearby_stations(
             {
                 "STATION_NUMBER": props.get("STATION_NUMBER") or props.get("IDENTIFIER", ""),
                 "STATION_NAME": props.get("STATION_NAME", ""),
+                "RIVER_NAME": _extract_river_name(props.get("STATION_NAME", "")),
                 "PROV_TERR_STATE_LOC": props.get("PROV_TERR_STATE_LOC", ""),
                 "LATITUDE": coords[1],
                 "LONGITUDE": coords[0],

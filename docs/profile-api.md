@@ -92,3 +92,22 @@ non-finite weight or one above `MAX_DECLARED_WEIGHT` (`src/storage/angler_profil
 - A future questionnaire writes `override: false` starting values that fade.
 - A settings override writes `override: true`. It holds exactly and applies on the next read.
   `DELETE` hands the value back to behaviour (`404` if there was nothing to clear).
+
+## Weather-behaviour notes (`barometric_pressure`)
+
+`barometric_pressure` is a concept with no map layer. It gates the one line of angler
+lore that comes with the weather: the weather facts (pressure, trend, deltas) go to
+everyone, and the note about how fish are said to behave goes only to someone whose state
+for this concept is `unseen` or `introduced`. `familiar` drops the note and keeps the facts.
+It does not move `map.default_layer_density`.
+
+- **Agent tool `get_conditions`** returns `pressure_note: {term_id, text, basis, source}` or
+  `null`. Showing it records one `seen_on_map` event for `barometric_pressure`, so the
+  profile's existing rule (5 sightings introduce, 50 make familiar) advances it. No new rule.
+- **`GET /conditions`** returns `pressure_note` (the text, or `null`) with
+  `pressure_note_term_id`, `pressure_note_basis` and `pressure_note_source`. It records
+  nothing, since a panel refresh is not proof it was read: when you render the note, send
+  `POST /profile/concept-events` with `kind: "seen_on_map"` yourself.
+- Every note is worded as a rule of thumb that studies do not settle, never a promise of
+  catch odds. `source` is `null` because no citable source was found for the pressure
+  claims; it is never filled with an unchecked link. A steady trend has no note.

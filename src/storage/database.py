@@ -330,6 +330,7 @@ def _apply_migrations(db: Database) -> None:
     migrate_observations_licensing(db)
     migrate_gbif_licensing(db)
     migrate_gbif_survey_provenance(db)
+    migrate_observation_position_indexes(db)
     _ensure_fish_surveys(db)
     _ensure_fishing_stretches(db)
     migrate_species_status_provenance(db)
@@ -1605,6 +1606,18 @@ def migrate_gbif_licensing(db: Database) -> None:
                 db.execute(f"ALTER TABLE gbif_observations ADD COLUMN {name} {coltype}")
             except Exception:
                 pass
+    db.conn.commit()
+
+
+def migrate_observation_position_indexes(db: Database) -> None:
+    """Index the position of observations and GBIF occurrences. Idempotent.
+
+    Every "records near here" lookup is a lat/lng box. Without an index each one
+    reads the whole table, and the map's `species=` filter makes one per spot.
+    """
+    for table in ("observations", "gbif_observations"):
+        if table in db.table_names():
+            db.execute(f"CREATE INDEX IF NOT EXISTS idx_{table}_position ON {table}(lat, lng)")
     db.conn.commit()
 
 

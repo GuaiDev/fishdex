@@ -117,7 +117,12 @@ Saved spots appear on the Personal map and as a "Saved by me" badge/filter in Ex
    Phase 2 built: `GET /pins/{id}/conditions` (docs/pin-conditions-api.md) shows weather,
    the nearest WSC gauge's flow and level as a trend, and the nearest dated PWQMN sample,
    each with source, station, distance and age, stale values marked. New trips snapshot the
-   gauge into `session_conditions`. The match indicator and Today sort are phase 3.
+   gauge into `session_conditions`.
+   Phase 3 built: `GET /pins/{id}/match` compares today's conditions with the user's own
+   best-rated trips at that pin (shown from 3 rated trips), and `GET /pins/today` sorts the
+   user's pins by match, distance, last visited or favourites, each row with its reason
+   (docs/pin-match-api.md). Indicator name and layout are still placeholders in `labels.py`.
+   The species filter for Today is not built; catches stay queryable by species.
 4. React/Lovable UI — two-level map with pin states
 
 ## Social layer (future, NOT on map) 💡
@@ -321,7 +326,9 @@ download as a recurring ingest (hosting is being moved separately).
   (`suivi-physicochimique-des-rivieres-et-du-fleuve`): station CSV + per-watershed XLSX
   chiffriers; pH, temperature, conductivity (no DO, no turbidity). Latest 3-year chiffrier per
   station. The earlier "PDF-only" note was wrong. Wired for all four QC areas.
-- `regulations.py` — stub (deferred to separate Regpec work)
+- `regulations.py` ✅ MELCCFP Regpec: one "Fishing periods, limits and exceptions" PDF per fishing
+  zone, discovered from the live printable-versions page (idZone is not the printed zone
+  number); full PDF text stored as one `regulation_chunks` row per zone. See module docstring.
 
 **Province stubs** (MB, SK, NS, NB, PE `__init__.py`):
 - Documents which federal/global sources cover each province
@@ -512,7 +519,7 @@ Species ranges (MELCCFP GeoJSON, 118 spp) live — was silently returning 0 reco
 before July 17 2026 (see Bug fixes — session 6); no COSEWIC status field actually
 exists in the source, contrary to what this note used to say.
 Water quality: MELCCFP Réseau-rivières live (see Quebec adapters above).
-Regulations: still a stub, deferred to separate Regpec work.
+Regulations: per-zone Regpec PDFs live (see Quebec adapters above).
 
 ### Manitoba 🔨 (province adapters added Oct 2026)
 3 cron areas (Red River/Winnipeg, Lake Winnipeg South, Assiniboine).

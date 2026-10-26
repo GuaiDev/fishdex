@@ -101,7 +101,6 @@ def test_translation_refuses_values_with_no_so_what():
     """If you can't write the 'so what', don't show the number."""
     assert translate.conductivity(340.0) is None
     assert translate.turbidity_fnu(12.0) is None
-    assert translate.pressure_trend("steady") is None
     assert translate.ph(7.2) is None  # mid-range pH tells an angler nothing
     assert translate.thermal_regime("unknown") is None
 

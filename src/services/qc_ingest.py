@@ -2,7 +2,7 @@
 
 Orchestrates CA-QC adapters:
   - QC species ranges (MELCCFP GeoJSON)
-  - QC regulations (stub — see ca_qc/regulations.py)
+  - QC regulations (Regpec per-zone PDFs discovered from the printable-versions page)
   - QC water quality (MELCCFP Réseau-rivières, via Données Québec)
 
 Global sources (iNat, GBIF, WSC, OSM) are handled by the standard pipeline.
@@ -37,7 +37,7 @@ def ingest_qc_species_ranges() -> int:
 
 
 def ingest_qc_regulations() -> int:
-    """Fetch Quebec fishing regulations. Returns chunk count (currently 0 — stub)."""
+    """Fetch Quebec fishing regulations. Returns chunk count."""
     _mod = importlib.import_module("src.ingest.jurisdictions.ca_qc.regulations")
     db = get_db()
     logger.info("QC regulations: fetching regulation chunks …")

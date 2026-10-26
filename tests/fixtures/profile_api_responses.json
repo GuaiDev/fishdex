@@ -128,8 +128,20 @@
             "source": "inferred",
             "evidence": []
           },
+          "hump": {
+            "term_id": "hump",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
           "weed_edge": {
             "term_id": "weed_edge",
+            "state": "unseen",
+            "source": "inferred",
+            "evidence": []
+          },
+          "barometric_pressure": {
+            "term_id": "barometric_pressure",
             "state": "unseen",
             "source": "inferred",
             "evidence": []
@@ -407,13 +419,23 @@
               "label_mode": "plain",
               "prominence": 0.35
             },
+            "hump": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
             "weed_edge": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "barometric_pressure": {
               "state": "unseen",
               "label_mode": "plain",
               "prominence": 0.35
             }
           },
-          "default_layer_density": 0.4462,
+          "default_layer_density": 0.4429,
           "more_detail_toggle": true,
           "water_body_mix": {
             "lake": 0.3333333333333333,
