@@ -59,7 +59,7 @@ CONDITION_FIELDS: tuple[dict, ...] = (
     {"field": "precipitation_mm", "label": "Precipitation", "unit": "mm", "group": "weather"},
     {"field": "pressure_hpa", "label": "Air pressure", "unit": "hPa", "group": "weather"},
     {"field": "pressure_trend", "label": "Pressure trend", "unit": None, "group": "weather"},
-    {"field": "flow_cms", "label": "River flow", "unit": "m³/s", "group": "water_flow"},
+    {"field": "flow_cms", "label": "Flow", "unit": "m³/s", "group": "water_flow"},
     {"field": "flow_trend", "label": "Flow trend", "unit": None, "group": "water_flow"},
     {"field": "level_m", "label": "Water level", "unit": "m", "group": "water_flow"},
     {"field": "level_trend", "label": "Level trend", "unit": None, "group": "water_flow"},
@@ -77,6 +77,19 @@ CONDITION_FIELDS: tuple[dict, ...] = (
     },
     {"field": "ph", "label": "pH", "unit": None, "group": "water_quality"},
 )
+
+# A gauge row is named for the water the gauge is on, never for the pin's.
+# `{water}` is the station's own river or creek. When that is not the pin's
+# water the distance joins the label, so the row cannot be read as the pin's
+# river: "Flow on Cooksville Creek, 6.4 km away". Without a water name the
+# plain label above stays and the station name carries the identification.
+GAUGE_WATER_LABELS: dict[str, str] = {
+    "flow_cms": "Flow on {water}",
+    "flow_trend": "Flow trend on {water}",
+    "level_m": "Water level on {water}",
+    "level_trend": "Level trend on {water}",
+}
+GAUGE_DISTANCE_SUFFIX = ", {km:g} km away"
 
 CONDITION_GROUP_LABELS: dict[str, str] = {
     "weather": "Weather",
@@ -140,6 +153,8 @@ def labels_payload() -> dict:
         "recalled_marker": RECALLED_MARKER,
         "match_indicator_label": MATCH_INDICATOR_LABEL,
         "condition_fields": list(CONDITION_FIELDS),
+        "gauge_water_labels": GAUGE_WATER_LABELS,
+        "gauge_distance_suffix": GAUGE_DISTANCE_SUFFIX,
         "condition_group_labels": CONDITION_GROUP_LABELS,
         "empty_reason_labels": EMPTY_REASON_LABELS,
         "trend_labels": TREND_LABELS,

@@ -7,8 +7,10 @@ without changing the agent tool signature.
 import importlib
 import json
 import math
+from collections.abc import Callable, Sequence
 
 from src.models.stream_gauge import NearestGauge, StreamGaugeSummary
+from src.services.water_names import same_water
 from src.storage.database import cleanup_old_gauge_readings, get_db
 
 _wsc = importlib.import_module("src.ingest.global.wsc")
@@ -96,19 +98,42 @@ def get_stream_conditions_for_agent(
     )
 
 
+# A gauge on the pin's own river is worth preferring over a nearer one on a
+# neighbouring creek, but only up to a point: past this, the river has changed
+# enough that its gauge no longer says what the water at the pin is doing.
+OWN_WATER_MAX_KM = 25.0
+
+
 def nearest_gauge(
     lat: float,
     lng: float,
     radius_km: float = 50,
     max_stations: int = 3,
     timeout: float = 30,
+    own_water: Sequence[str] = (),
+    own_water_max_km: float = OWN_WATER_MAX_KM,
+    water_lookup: Callable[[list[str]], Sequence[str] | None] | None = None,
 ) -> NearestGauge | None:
-    """The nearest active station that has a current reading, with its distance.
+    """The best active station that has a current reading, with its distance.
 
-    Tries the closest `max_stations` in order and takes the first that reports,
-    because the closest gauge is sometimes offline. Returns None when no
-    station in range reports anything; raises (httpx errors) when WSC cannot be
-    reached, so callers can tell "nothing here" from "try again".
+    `own_water` is the name(s) of the watercourse the place is on. When given,
+    a station on that same water (matched by name, see `src.services.water_names`) within
+    `own_water_max_km` wins even if a gauge on another creek is closer, and the
+    result says `same_water=True`. When none reports, the nearest station that
+    does is returned with `same_water=False`: the caller must say it is on
+    another water. With no `own_water`, `same_water` is None.
+
+    `water_lookup` names the place's water lazily: it is handed the river names
+    of the candidate stations within `own_water_max_km` and returns those that
+    pass the place (an empty list when none does), or None when the network
+    cannot say. The network is only read for rivers a gauge is on.
+
+    Tries the closest `max_stations` candidates in order and takes the first
+    that reports, because the closest gauge is sometimes offline. Returns None
+    when no station in range reports anything; raises (httpx errors) when the
+    network cannot be reached, so callers can tell "nothing here" from "try
+    again". Stations are dicts from a gauge adapter: STATION_NUMBER, LATITUDE,
+    LONGITUDE and, for river matching, RIVER_NAME.
     """
     stations = _wsc.fetch_nearby_stations(lat, lng, radius_km, timeout=timeout)
     ranked = []
@@ -121,7 +146,44 @@ def nearest_gauge(
         ranked.append((_haversine_km(lat, lng, float(s_lat), float(s_lng)), station_id, s))
     ranked.sort(key=lambda r: r[0])
 
-    for dist_km, station_id, s in ranked[:max_stations]:
+    if water_lookup is not None and not own_water:
+        candidates = sorted(
+            {
+                r[2]["RIVER_NAME"]
+                for r in ranked
+                if r[0] <= own_water_max_km and r[2].get("RIVER_NAME")
+            }
+        )
+        looked_up = water_lookup(candidates) if candidates else None
+        water_known = looked_up is not None
+        own_water = looked_up or ()
+    else:
+        water_known = bool(own_water)
+    wanted = [n for n in own_water if n]
+    if wanted:
+        on_own = [
+            r
+            for r in ranked
+            if r[0] <= own_water_max_km
+            and any(same_water(r[2].get("RIVER_NAME"), name) for name in wanted)
+        ]
+        found = _first_reporting(on_own[:max_stations], timeout)
+        if found is not None:
+            return found.model_copy(update={"same_water": True})
+
+    found = _first_reporting(ranked[:max_stations], timeout)
+    if found is not None and water_known and not wanted:
+        return found.model_copy(update={"same_water": False})
+    if found is not None and wanted:
+        # Still checked by name: the nearest reporting gauge can be on the
+        # pin's river beyond the own-water cap.
+        on_it = any(same_water(found.reading.river_name, name) for name in wanted)
+        return found.model_copy(update={"same_water": on_it})
+    return found
+
+
+def _first_reporting(candidates: list, timeout: float) -> NearestGauge | None:
+    for dist_km, station_id, s in candidates:
         s_lat = float(s.get("LATITUDE") or s.get("latitude"))
         s_lng = float(s.get("LONGITUDE") or s.get("longitude"))
         reading = _wsc.fetch_station_reading(station_id, s_lat, s_lng, timeout=timeout)
