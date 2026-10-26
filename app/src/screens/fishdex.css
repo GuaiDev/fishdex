@@ -1,0 +1,442 @@
+/* My FishDex — the collection screen. Values follow the Apple mockup. */
+
+/* Segmented control */
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  margin: 0 var(--edge) var(--sp-base);
+  padding: 2px;
+  background: var(--fill-3);
+  border-radius: 9px;
+}
+
+.segmented button {
+  position: relative;
+  min-height: 32px;
+  padding: 6px 0;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  font-size: var(--fs-subhead);
+  font-weight: 500;
+}
+
+/* The control is 32pt tall like Apple's; this stretches the tap area to 44pt. */
+.segmented button::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+
+.segmented button.on {
+  background: var(--bg-3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+/* Stats card (grouped inset) */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0 var(--edge) var(--edge);
+  background: var(--bg-2);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  padding: var(--sp-base) var(--sp-md);
+  text-align: center;
+  border-right: 1px solid var(--separator);
+}
+
+.stat:last-child {
+  border-right: 0;
+}
+
+.stat dd {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.stat dd small {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--label-2);
+}
+
+.stat dt {
+  margin-top: 6px;
+  font-size: var(--fs-caption);
+  color: var(--label-2);
+}
+
+/* Section headers */
+.sec-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  margin: 0 var(--edge) 10px;
+}
+
+.sec-h h2 {
+  margin: 0;
+  font-size: var(--fs-title);
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+
+.sec-h span {
+  font-size: var(--fs-footnote);
+  color: var(--label-2);
+}
+
+.sec-h-spaced {
+  margin-top: 22px;
+}
+
+/* Species cards */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--sp-md);
+  margin: 0;
+  padding: 0 var(--edge);
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column; /* a <button> centres its content vertically otherwise */
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  color: inherit;
+  text-align: left;
+}
+
+button.card:active {
+  background: var(--fill-3);
+}
+
+.thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  background: var(--thumb-bg);
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* species illustrations are cut-outs; never crop a fish */
+}
+
+.thumb .ini {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--label-3);
+}
+
+.thumb .dot {
+  position: absolute;
+  top: var(--sp-sm);
+  right: var(--sp-sm);
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--blue);
+}
+
+.thumb.miss {
+  background: transparent;
+  border-bottom: 1px dashed var(--separator);
+}
+
+.card-body {
+  padding: 10px var(--sp-md) var(--sp-md);
+}
+
+.card-name {
+  font-size: var(--fs-callout);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.card-sci {
+  margin-top: 1px;
+  font-size: var(--fs-caption);
+  font-style: italic;
+  color: var(--label-2);
+}
+
+.card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 9px;
+}
+
+.chip {
+  padding: 3px var(--sp-sm);
+  background: var(--fill-3);
+  border-radius: 12px; /* long family names wrap, so not a full pill */
+  font-size: var(--fs-caption-2);
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--label-2);
+}
+
+.cnt {
+  margin-left: auto;
+  font-size: var(--fs-footnote);
+  color: var(--label-2);
+}
+
+.tag-new {
+  padding: 3px var(--sp-sm);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-caption-2);
+  font-weight: 600;
+  color: var(--blue);
+}
+
+/* Family completion (grouped list) */
+.group {
+  margin: 0 var(--edge) var(--sp-sm);
+  padding: 0;
+  background: var(--bg-2);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  list-style: none;
+}
+
+.row {
+  padding: var(--sp-md) var(--sp-base);
+  border-bottom: 1px solid var(--separator);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row .top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-sm);
+}
+
+.row .fname {
+  font-size: var(--fs-callout);
+  font-weight: 500;
+}
+
+.row .frac {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--label-2);
+}
+
+.bar {
+  height: 6px;
+  background: var(--fill);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.bar > i {
+  display: block;
+  height: 100%;
+  background: var(--blue);
+  border-radius: var(--radius-pill);
+}
+
+/* Empty / loading / error */
+.empty {
+  margin: 0 var(--edge);
+  padding: var(--sp-lg) var(--sp-base);
+  background: var(--bg-2);
+  border-radius: var(--radius-card);
+  color: var(--label-2);
+  font-size: var(--fs-subhead);
+  text-align: center;
+}
+
+.notice {
+  display: grid;
+  justify-items: center;
+  gap: var(--sp-sm);
+  margin: var(--sp-lg) var(--edge) 0;
+  padding: var(--sp-lg) var(--sp-base);
+  background: var(--bg-2);
+  border-radius: var(--radius-card);
+  text-align: center;
+}
+
+.notice h2 {
+  margin: 0;
+  font-size: var(--fs-title);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.notice p {
+  margin: 0 0 var(--sp-sm);
+  color: var(--label-2);
+  font-size: var(--fs-subhead);
+}
+
+.skeleton {
+  background: var(--fill-3);
+  border-radius: var(--radius-card);
+}
+
+.stats-skeleton {
+  height: 84px;
+  margin: 0 var(--edge) var(--edge);
+}
+
+.card-skeleton {
+  aspect-ratio: 4 / 4.4;
+}
+
+/* Catch-detail sheet: the one purposeful dark moment. */
+.sheet {
+  width: 100%;
+  max-width: var(--content-max);
+  max-height: 88dvh;
+  margin: auto auto 0;
+  padding: 10px 0 max(var(--sp-lg), env(safe-area-inset-bottom));
+  background: var(--bg);
+  color: var(--label);
+  border: 0;
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  box-shadow: var(--shadow-sheet);
+  overflow-y: auto;
+}
+
+.sheet[open] {
+  animation: sheet-up 280ms var(--ease);
+}
+
+.sheet::backdrop {
+  background: var(--backdrop);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+.grabber {
+  width: 40px;
+  height: 5px;
+  margin: 0 auto 14px;
+  background: var(--fill);
+  border-radius: var(--radius-pill);
+}
+
+.sheet-photo {
+  display: grid;
+  place-items: center;
+  height: 190px;
+  margin: 0 var(--sp-base);
+  background: var(--bg-2);
+  border-radius: var(--sp-base);
+  overflow: hidden;
+}
+
+.sheet-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.sheet-photo img.own-photo {
+  object-fit: cover; /* your own photo is a photograph, not a cut-out */
+}
+
+.sheet-photo .ini {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--label-3);
+}
+
+.sheet-title {
+  padding: var(--sp-base) var(--edge) 0;
+}
+
+.sheet-title h2 {
+  margin: 0;
+  outline: none; /* focused on open so a screen reader starts at the name */
+  font-size: 28px;
+  letter-spacing: -0.014em;
+  font-weight: 700;
+}
+
+.sheet-title p {
+  margin: 2px 0 0;
+  font-size: var(--fs-subhead);
+  font-style: italic;
+  color: var(--label-2);
+}
+
+.kv {
+  margin: var(--sp-base) var(--edge) 0;
+  background: var(--bg-2);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.kv .r {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-base);
+  padding: var(--sp-md) var(--sp-base);
+  border-bottom: 1px solid var(--separator);
+  font-size: var(--fs-subhead);
+}
+
+.kv .r:last-child {
+  border-bottom: 0;
+}
+
+.kv dt {
+  margin: 0;
+}
+
+.kv dd {
+  margin: 0;
+  color: var(--label-2);
+  text-align: right;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: var(--sp-md);
+  padding: 18px var(--edge) 0;
+}
+
+.sheet-actions .btn {
+  flex: 1;
+}

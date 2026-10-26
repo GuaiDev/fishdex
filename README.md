@@ -161,6 +161,22 @@ Note that `.env.example` currently documents only `ANTHROPIC_API_KEY`, `CLAUDE_M
 
 The API's admin endpoints (`POST /admin/token`, `/admin/dashboard`, `/ingest/data*`, and so on) are protected by `FISHBOT_API_KEY`. If it is unset or empty they refuse every request with HTTP 503 rather than letting anyone in; a wrong or missing `X-Api-Key` header gets 401. So set it before `make serve`: add a line such as `FISHBOT_API_KEY=pick-any-long-random-string` to `.env` (generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`), or export it in your shell. Then visit `/admin-login` and paste the same key to log in.
 
+### The app (`app/`)
+
+`app/` is the Apple-style web app: a Vite + React single page with a tab-bar shell (light by default, dark from the same design tokens in `app/src/tokens.css`) and the My FishDex collection screen, wired to `GET /fishdex`. The other tabs are placeholders. It needs Node 20+.
+
+```bash
+make app-install   # once
+make serve         # the API, in one terminal (127.0.0.1:8000)
+make app-dev       # the app, in another: http://localhost:5173
+make app-build     # static build into app/dist
+make app-test      # unit tests for the collection logic
+```
+
+Locally the app calls its own origin and the dev server forwards `/auth`, `/fishdex`, `/static` and `/photos` to `make serve` (set `DEV_API_TARGET` if the API is elsewhere). The first visit asks for an invite code, the same sign-up the API already has.
+
+For a static host such as Vercel, set `VITE_API_BASE` at build time to the API's address (`app/.env.example`). `app/vercel.json` rewrites every path to `index.html`; set the project's root directory to `app`.
+
 ### Everything runs locally
 
 There is no hosted deployment. `make serve` runs the FastAPI backend (which also serves the built web app at `/app`) on `127.0.0.1:8000` against the local database at `data/fishing.db`; set `DATA_DIR` to keep the database and catch photos somewhere else. `SERVE_HOST=0.0.0.0 make serve` makes it reachable from a phone on the same network.

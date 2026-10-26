@@ -43,3 +43,5 @@ __pycache__/
 data/processed/ca_harvest_report.json
 fishing.db
 data/species_images/originals/
+app/node_modules/
+app/dist/

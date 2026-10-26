@@ -1,0 +1,108 @@
+.shell-main {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--sp-base));
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Large-title navigation header shared by every screen. */
+.nav {
+  padding: 6px var(--edge) 0;
+}
+
+.nav-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--tap);
+}
+
+.nav-meta {
+  font-size: var(--fs-footnote);
+  color: var(--label-2);
+}
+
+.nav-btn {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  margin-right: -5px; /* the 34px circle, not the 44px target, sits on the edge margin */
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--blue);
+}
+
+.nav-btn > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  background: var(--fill-3);
+}
+
+.large-title {
+  margin: 10px 0 2px;
+  font-size: var(--fs-large-title);
+  line-height: var(--lh-large-title);
+  letter-spacing: -0.016em;
+  font-weight: 700;
+}
+
+.subhead {
+  margin: 0 0 var(--sp-base);
+  font-size: var(--fs-subhead);
+  color: var(--label-2);
+}
+
+/* Screens not built yet. */
+.placeholder {
+  display: grid;
+  place-items: center;
+  gap: var(--sp-sm);
+  padding: 96px var(--edge) 0;
+  text-align: center;
+}
+
+.placeholder h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.014em;
+  font-weight: 700;
+}
+
+.placeholder p {
+  margin: 0;
+  max-width: 28ch;
+  color: var(--label-2);
+  font-size: var(--fs-subhead);
+}
+
+/* Buttons */
+.btn {
+  min-height: var(--tap);
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 12px;
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.btn-primary {
+  background: var(--blue);
+  color: var(--on-accent);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-secondary {
+  background: var(--fill-3);
+  color: var(--blue);
+}

@@ -1,0 +1,66 @@
+.signin {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 72px) var(--edge) var(--sp-xl);
+}
+
+.signin .subhead {
+  margin-bottom: var(--sp-lg);
+}
+
+.field-group {
+  background: var(--bg-2);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  min-height: var(--tap);
+  padding: 0 var(--sp-base);
+  border-bottom: 1px solid var(--separator);
+}
+
+.field:last-child {
+  border-bottom: 0;
+}
+
+.field span {
+  flex: 0 0 96px;
+  font-size: var(--fs-body);
+}
+
+.field input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-size: var(--fs-body); /* 16px or more keeps iOS from zooming on focus */
+}
+
+.field input::placeholder {
+  color: var(--label-3);
+}
+
+.field input:focus-visible {
+  outline: none;
+}
+
+.field:focus-within {
+  box-shadow: inset 0 0 0 2px var(--blue);
+}
+
+.form-error {
+  margin: var(--sp-md) var(--sp-xs) 0;
+  font-size: var(--fs-footnote);
+  color: var(--red);
+}
+
+.signin-submit {
+  width: 100%;
+  margin-top: var(--sp-lg);
+}

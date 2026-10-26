@@ -1,4 +1,4 @@
-.PHONY: run serve test lint format ingest weekly-ingest ingest-hydat ingest-trca harvest-ca recent build-features train-sdm compute-access compute-untapped build-stretches build-anchors build-spots export-map
+.PHONY: run serve app-install app-dev app-build app-test test lint format ingest weekly-ingest ingest-hydat ingest-trca harvest-ca recent build-features train-sdm compute-access compute-untapped build-stretches build-anchors build-spots export-map
 
 run:
 	uv run python -m src.cli.main run
@@ -10,6 +10,25 @@ SERVE_HOST ?= 127.0.0.1
 SERVE_PORT ?= 8000
 serve:
 	uv run python -m src.cli.main serve --host $(SERVE_HOST) --port $(SERVE_PORT)
+
+# The Apple-style web app in app/ (Vite + React). Needs Node 20+ and npm.
+#   make app-install   once, fetch the JavaScript dependencies
+#   make app-dev       dev server on http://localhost:5173, talking to `make serve`
+#   make app-build     static build into app/dist, ready for any static host
+#   make app-test      the app's unit tests
+# Set VITE_API_BASE at build time to point the build at a separately hosted API
+# (see app/.env.example); leave it unset to call the page's own origin.
+app-install:
+	cd app && npm install
+
+app-dev:
+	cd app && npm run dev
+
+app-build:
+	cd app && npm run build
+
+app-test:
+	cd app && npm test
 
 test:
 	uv run pytest tests/
