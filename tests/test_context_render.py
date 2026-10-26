@@ -364,7 +364,7 @@ def test_the_user_layer_never_prints_a_skill_level():
     )
     out = render.render_user_layer(layer)
     assert "0.40" in out and "confidence 0.30" in out
-    assert "say plainly): confluence" in out
+    assert "say plainly): stream junction" in out
     assert "define briefly): dam" in out
     for word in ("expertise", "novice", "beginner", "advanced", "expert"):
         assert word not in out.lower()
