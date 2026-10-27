@@ -126,7 +126,7 @@ def render_records(records: RecordsSlice, today_year: int | None = None) -> str:
             head.append(proxy)
         return "\n".join(head)
 
-    lines = [f"### Species recorded ({records.total_count} records)"]
+    lines = [f"### Species recorded ({spot_labels.count_phrase(records.total_count, 'record')})"]
     for rec in records.species:
         parts = [rec.species]
         if rec.common_name and rec.common_name.lower() != rec.species.lower():
@@ -377,7 +377,8 @@ def render_user_layer(layer: UserLayer) -> str:
 
     lines = [
         "### This angler",
-        f"- {layer.total_sessions} session(s), {layer.total_stops} stop(s)",
+        f"- {spot_labels.count_phrase(layer.total_sessions, 'session')}, "
+        f"{spot_labels.count_phrase(layer.total_stops, 'stop')}",
     ]
     if layer.blank_rate is not None:
         lines.append(f"- blank rate: {layer.blank_rate:.0%}")
@@ -446,7 +447,7 @@ def render_species_history(history: SpeciesHistory) -> str:
 
     lines = [f"### Your record with {history.species}"]
     if history.caught_stops:
-        lines.append(f"- caught on {history.caught_stops} stop(s)")
+        lines.append(f"- caught on {spot_labels.count_phrase(history.caught_stops, 'stop')}")
         if history.last_caught:
             lines.append(f"- last caught: {history.last_caught}")
         if history.locations:
@@ -458,7 +459,8 @@ def render_species_history(history: SpeciesHistory) -> str:
         lines.append("- never logged a catch of this species")
 
     lines.append(
-        f"- {history.blank_stops} blank stop(s) in the log overall — targeting is "
+        f"- {spot_labels.count_phrase(history.blank_stops, 'blank stop')} in the log overall — "
+        f"targeting is "
         f"not always recorded, so this is an upper bound on 'tried and failed', "
         f"not a count of it"
     )
@@ -857,13 +859,7 @@ def _might_find(c: _CardInputs) -> MightFindBlock:
     return MightFindBlock(
         title=CARD_TITLES["might_find"],
         species=top,
-        more_text=(
-            f"and {left} more species recorded nearby"
-            if left > 1
-            else "and 1 more species recorded nearby"
-            if left == 1
-            else None
-        ),
+        more_text=(f"and {left} more species recorded nearby" if left >= 1 else None),
         caveat=MIGHT_FIND_CAVEAT,
         empty_text=empty,
         note=" ".join(notes) or None,
@@ -930,8 +926,9 @@ def _spot_facts(c: _CardInputs) -> list[CardFact]:
         facts.append(
             CardFact(
                 text=(
-                    f"{c.shown_records} fish records within {c.radius} km, "
-                    f"covering {len(c.shown)} species."
+                    f"{spot_labels.count_phrase(c.shown_records, 'fish record')} "
+                    f"within {c.radius} km, "
+                    f"covering {spot_labels.count_phrase(len(c.shown), 'species', 'species')}."
                 ),
                 source=", ".join(sources),
             )

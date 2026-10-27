@@ -26,6 +26,10 @@ from pydantic import BaseModel, Field, field_validator
 from src.models.context import ProvenanceKind
 from src.models.jurisdiction import JurisdictionCode
 
+# A 1 m to 3 m change is a gentle slope, not a place the bottom "falls away quickly",
+# so it is not a drop-off. Applied at build time and again when rows are read.
+DROP_OFF_MIN_DEPTH_CHANGE_M = 3.0
+
 FeatureKind = Literal[
     "inlet",
     "outlet",

@@ -43,7 +43,7 @@ from src.models.bathymetry import BathymetryContour, BathymetryIndex
 from src.models.context import ProvenanceKind
 from src.models.jurisdiction import JurisdictionCode
 from src.models.lake_outline import LakeOutline
-from src.models.shoreline_feature import ShorelineFeature
+from src.models.shoreline_feature import DROP_OFF_MIN_DEPTH_CHANGE_M, ShorelineFeature
 from src.services.geometry_utils import M_PER_DEG, approx_area_m2
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,8 @@ logger = logging.getLogger(__name__)
 MIN_HUMP_AREA_M2 = 20_000.0
 MAX_HUMPS = 25
 # A drop-off needs the bottom to fall at least this far between two contours ...
-DROP_OFF_MIN_DEPTH_CHANGE_M = 2.0
+# (DROP_OFF_MIN_DEPTH_CHANGE_M lives in models.shoreline_feature: storage applies it
+# on read, so a build made under a lower floor needs no rebuild.)
 # ... that run at most this far apart. Two drop-offs found within
 # DROP_OFF_DEDUPE_M of each other are the same slope, kept once (the steepest).
 DROP_OFF_MAX_GAP_M = 100.0
@@ -404,7 +405,9 @@ def _drop_offs(
                 derivation="bathymetry_contours",
                 note=None,
                 attributes=attrs,
-                length_m=round(depth_change, 2),
+                # The depth change lives in attributes["depth_change_m"]; a point
+                # has no length.
+                length_m=None,
                 built_at=built_at,
             )
         )

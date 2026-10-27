@@ -91,6 +91,36 @@ NEW_TO_ME_FILTER = {
 }
 
 
+def count_phrase(n: int, singular: str, plural: str | None = None) -> str:
+    """'1 fish record', '2 fish records': the number with the noun that agrees with it.
+
+    Every count a person reads is built here, so "1 fish records" cannot come back.
+    `plural` defaults to the singular plus 's'; pass it for a noun that does not
+    (species, or any irregular one).
+    """
+    return f"{n} {singular if n == 1 else (plural or singular + 's')}"
+
+
+# One separator between the parts of a subtitle ("Credit River · Lower Credit"),
+# wherever the parts came from. Source names carry their own " — "; those are
+# folded into this one so a subtitle never mixes the two.
+SUBTITLE_SEPARATOR = " · "
+_SUBTITLE_DASH = " — "
+
+
+def subtitle_join(*parts: str | None) -> str | None:
+    """The non-empty parts of a subtitle joined by SUBTITLE_SEPARATOR, or None if none."""
+    text = SUBTITLE_SEPARATOR.join(p for p in parts if p)
+    return normalise_subtitle(text) if text else None
+
+
+def normalise_subtitle(text: str | None) -> str | None:
+    """A subtitle with the one separator, whatever an older build stored."""
+    if text is None:
+        return None
+    return text.replace(_SUBTITLE_DASH, SUBTITLE_SEPARATOR)
+
+
 def new_to_you_hook(n: int) -> str:
     return NEW_TO_YOU_HOOK_ONE if n == 1 else NEW_TO_YOU_HOOK_MANY.format(n=n)
 
@@ -102,6 +132,16 @@ ACCESS_LABELS: dict[str, str] = {
     "boat_launch": "Boat launch",
     "road_crossing": "Road crossing",
 }
+# An access point OSM gave no name is called by its kind and the water it is near.
+ACCESS_FALLBACK_NEAR = "{label} near {water}"
+
+
+def access_fallback_name(kind: str, water: str | None) -> str:
+    """'Parking near the Credit River', or just 'Parking' when no water is known."""
+    label = ACCESS_LABELS[kind]
+    return ACCESS_FALLBACK_NEAR.format(label=label, water=water) if water else label
+
+
 LAYERS: dict[str, dict] = {
     "getting_there": {
         "label": "Getting there",
@@ -225,8 +265,9 @@ FEATURE_DERIVATION_LABELS: dict[str, str] = {
 FEATURE_READ_FROM_OUTLINE = "Read from the shoreline outline"
 FEATURE_READ_FROM_MAP = "Read from the Ontario government water map"
 FEATURE_READ_FROM_OSM = "Mapped by OpenStreetMap volunteers (OpenStreetMap, ODbL)"
-# Shown when a survey's own date is missing on the contour and its index.
-SURVEY_DATE_UNKNOWN = "survey date unknown"
+# Shown ("From a survey of unknown date") when a survey's own date is missing on
+# the contour and its index.
+SURVEY_DATE_UNKNOWN = "of unknown date"
 # Depth is recorded relative to the level the lake was at on survey day, not
 # today, and the source states no unit. This is a data note, never a card line.
 BATHYMETRY_DATA_NOTE = (
@@ -241,7 +282,8 @@ def shoreline_feature_note(
     """The sentence shown under a shoreline feature, assembled from the vocabulary.
 
     A contour-derived feature names its survey ("from a 1970 survey, transect"),
-    or says the date is unknown, using the facts carried in `attributes`.
+    or says the date is unknown, using the facts carried in `attributes`. The
+    method sits in brackets so the sentence never trails off after a comma.
     """
     base = FEATURE_KINDS[kind]["one_liner"]
     if derivation == "bathymetry_contours":
@@ -258,13 +300,13 @@ def shoreline_feature_note(
 
 
 def _survey_phrase(attributes: dict) -> str:
-    """'From a 1970 survey, transect' or 'From a survey, survey date unknown'."""
+    """'From a 1970 survey (transect)' or 'From a survey of unknown date'."""
     year = attributes.get("survey_year")
     method = attributes.get("survey_method")
+    tail = f" ({method.strip().lower()})" if method and method.strip() else ""
     if year:
-        tail = f", {method}" if method else ""
         return f"From a {year} survey{tail}"
-    return f"From a survey, {SURVEY_DATE_UNKNOWN}"
+    return f"From a survey {SURVEY_DATE_UNKNOWN}{tail}"
 
 
 # ── sections ──────────────────────────────────────────────────────────────────

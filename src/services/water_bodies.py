@@ -442,7 +442,9 @@ def shoreline_feature_properties(f: ShorelineFeature) -> dict:
         "note": words.shoreline_feature_note(f.kind, f.derivation, f.name, f.attributes),
         "attributes": f.attributes,
         "area_m2": f.area_m2,
-        "length_m": f.length_m,
+        # How far a point or peninsula reaches; never a drop-off's depth change.
+        "length_m": None if f.kind == "drop_off" else f.length_m,
+        "depth_change_m": f.attributes.get("depth_change_m") if f.kind == "drop_off" else None,
     }
 
 
