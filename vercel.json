@@ -1,0 +1,7 @@
+{
+  "buildCommand": "",
+  "outputDirectory": "design/lavish",
+  "redirects": [
+    { "source": "/", "destination": "/fishdex-map-revision.html", "permanent": false }
+  ]
+}
