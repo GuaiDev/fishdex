@@ -8,14 +8,12 @@ Static design mockups for FishDex, kept exactly as designed. No build step, no b
 |---|---|
 | `fishdex-field-guide.html` | Species as a nature field guide |
 | `fishdex-anglers.html` | Layout sized to the angler |
-| `fishdex-binder.html` | Collector's binder |
 | `index.html` | Clickable prototype: one shell, persistent navigation across every screen below |
 | `fishdex-map.html` | First explore map (filters, layers, shorelines, weeds, conditions) |
 | `fishdex-map-interactive.html` | Interactive version of the explore map |
 | `fishdex-map-revision.html` | Latest explore map, all landed layers |
 | `theme-rebuild.html` | Theme rebuild |
-| `fishdex-apple.html` | Apple-grade theme rebuild |
-| `exports/` | Standalone exports of the field guide, anglers, binder, map, theme and Apple pages |
+| `exports/` | Standalone exports of the field guide, anglers, map and theme pages |
 
 `map-assets/` holds the vendored Leaflet, the Fraunces font and the map tiles (zoom 7-13). The pages load them by relative path, so keep the folder layout as is.
 
