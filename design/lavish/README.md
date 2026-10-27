@@ -9,6 +9,7 @@ Static design mockups for FishDex, kept exactly as designed. No build step, no b
 | `fishdex-field-guide.html` | Species as a nature field guide |
 | `fishdex-anglers.html` | Layout sized to the angler |
 | `fishdex-binder.html` | Collector's binder |
+| `index.html` | Clickable prototype: one shell, persistent navigation across every screen below |
 | `fishdex-map.html` | First explore map (filters, layers, shorelines, weeds, conditions) |
 | `fishdex-map-interactive.html` | Interactive version of the explore map |
 | `fishdex-map-revision.html` | Latest explore map, all landed layers |
