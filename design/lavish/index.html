@@ -114,14 +114,6 @@
     { id: 'theme',   label: 'Theme',       src: 'theme-rebuild.html',        icon: 'M12 3a9 9 0 1 0 0 18c1.7 0 2-1.2 1.3-2.2-.8-1.2-.1-2.8 1.4-2.8H17a4 4 0 0 0 4-4c0-5-4-9-9-9zM7.5 11h.01M10 7.5h.01M14.5 7.5h.01' }
   ];
 
-  // Sample copy in the mockups is tied to one place. Swap it for neutral wording
-  // after load (same-origin) so the files themselves stay exactly as designed.
-  var NEUTRAL = [
-    [/Ontario · 2026 season/g, 'Your region · 2026 season'],
-    [/My collection \(Ontario, CA-ON\)/g, 'My collection (your region)'],
-    [/From your home in Oakville\./g, 'From your home.']
-  ];
-
   var seg = document.getElementById('seg'), tabs = document.getElementById('tabs'),
       sub = document.getElementById('sub'), stage = document.getElementById('stage');
   var frames = {};
@@ -133,21 +125,13 @@
     tabs.appendChild(link(href, '', '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + s.icon + '"/></svg>' + s.label)).dataset.id = s.id;
   });
 
-  function neutralise(doc) {
-    var w = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT), n;
-    while ((n = w.nextNode())) NEUTRAL.forEach(function (r) { n.nodeValue = n.nodeValue.replace(r[0], r[1]); });
-  }
-
   function frameFor(key, src, title) {
     if (frames[key]) return frames[key];
     var f = document.createElement('iframe'), wrap = document.createElement('div');
     f.title = title; f.src = src;
     var ld = document.createElement('div'); ld.className = 'loading';
     ld.innerHTML = '<div><div class="spin"></div>Loading ' + title + '…</div>';
-    f.addEventListener('load', function () {
-      ld.classList.add('done');
-      try { neutralise(f.contentDocument); } catch (e) { /* cross-origin: leave as designed */ }
-    });
+    f.addEventListener('load', function () { ld.classList.add('done'); });
     stage.appendChild(f); stage.appendChild(ld);
     return (frames[key] = f);
   }
