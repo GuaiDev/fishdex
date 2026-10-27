@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>FishDex — Apple-grade theme rebuild (Lavish review)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  /* ─────────────────────────────────────────────────────────────────────────
+     Apple semantic tokens (light / dark), from apple-design-foundations
+     ───────────────────────────────────────────────────────────────────────── */
+  :root, [data-theme="light"] {
+    color-scheme: light;
+    --label: #000000;
+    --label-2: rgba(60,60,67,.60);
+    --label-3: rgba(60,60,67,.30);
+    --fill: rgba(120,120,128,.20);
+    --fill-2: rgba(120,120,128,.16);
+    --fill-3: rgba(118,118,128,.12);
+    --separator: rgba(60,60,67,.29);
+    --sep-opaque: #C6C6C8;
+    --bg: #FFFFFF;
+    --bg-2: #F2F2F7;
+    --bg-3: #FFFFFF;
+    --gray: #8E8E93; --gray-2: #AEAEB2; --gray-3: #C7C7CC; --gray-4: #D1D1D6; --gray-5: #E5E5EA; --gray-6: #F2F2F7;
+    --blue: #007AFF; --green: #34C759; --red: #FF3B30; --orange: #FF9500; --teal: #5AC8FA;
+    --page: #F5F5F7;         /* apple.com light section bg */
+    --ink: #1D1D1F;          /* apple.com primary text */
+    --ink-2: #6E6E73;        /* apple.com secondary text */
+    --radius-card: 18px; --radius-ctrl: 10px; --radius-sheet: 24px;
+    --sp-xs: 4px; --sp-sm: 8px; --sp-md: 12px; --sp-base: 16px; --sp-lg: 24px; --sp-xl: 32px;
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --label: #FFFFFF; --label-2: rgba(235,235,245,.60); --label-3: rgba(235,235,245,.30);
+    --fill: rgba(120,120,128,.36); --fill-2: rgba(120,120,128,.32); --fill-3: rgba(118,118,128,.24);
+    --separator: rgba(84,84,88,.60); --sep-opaque: #38383A;
+    --bg: #000000; --bg-2: #1C1C1E; --bg-3: #2C2C2E;
+    --gray: #8E8E93; --gray-2: #636366; --gray-3: #48484A; --gray-4: #3A3A3C; --gray-5: #2C2C2E; --gray-6: #1C1C1E;
+    --blue: #0A84FF; --green: #30D158; --red: #FF453A; --orange: #FF9F0A; --teal: #64D2FF;
+    --page: #000000; --ink: #F5F5F7; --ink-2: #A1A1A6;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 17px; line-height: 1.47; letter-spacing: 0;
+    -webkit-font-smoothing: antialiased;
+    font-optical-sizing: auto;
+  }
+  .sf-num { font-variant-numeric: tabular-nums; }
+  .page { max-width: 1068px; margin: 0 auto; padding: 56px 24px 120px; }
+
+  /* ── Masthead ── */
+  .kicker { color: var(--blue); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 10px; }
+  h1.hd { font-size: clamp(34px, 5vw, 64px); line-height: 1.06; letter-spacing: -0.03em; font-weight: 700; color: var(--ink); margin: 0 0 14px; max-width: 18ch; }
+  .deck { font-size: 19px; line-height: 1.5; color: var(--ink-2); max-width: 62ch; margin: 0; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 20px; font-size: 13px; color: var(--ink-2); }
+  .facts b { color: var(--ink); font-weight: 600; }
+
+  .label-row { display: flex; align-items: baseline; gap: 12px; margin: 56px 0 18px; }
+  .label-row h2 { font-size: 22px; letter-spacing: -0.01em; margin: 0; font-weight: 600; }
+  .label-row span { font-size: 14px; color: var(--ink-2); }
+
+  /* ── Devices row ── */
+  .devices { display: flex; flex-wrap: wrap; gap: 40px; align-items: flex-start; justify-content: center; }
+  .device-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .device-cap { font-size: 14px; color: var(--ink-2); text-align: center; max-width: 320px; }
+  .device-cap b { color: var(--ink); font-weight: 600; display: block; margin-bottom: 3px; }
+
+  /* iPhone 16 Pro-class frame */
+  .phone {
+    width: 390px; max-width: 100%; aspect-ratio: 402 / 874;
+    background: #1c1c1e; border-radius: 54px; padding: 11px;
+    box-shadow: 0 40px 80px -30px rgba(0,0,0,.28), 0 0 0 2px rgba(0,0,0,.06);
+    position: relative;
+  }
+  .phone::after { content:""; position:absolute; inset:11px; border-radius:43px; pointer-events:none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+  .screen {
+    width: 100%; height: 100%; border-radius: 43px; overflow: hidden;
+    background: var(--bg); color: var(--label); display: flex; flex-direction: column; position: relative;
+  }
+  .screen.dark-mode { background: var(--bg); }
+  .statusbar { height: 54px; flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 14px 30px 0; font-size: 15px; font-weight: 600; letter-spacing: 0; }
+  .island { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 116px; height: 34px; background: #000; border-radius: 20px; z-index: 5; }
+  .sb-icons { display: flex; align-items: center; gap: 6px; }
+  .sb-icons svg { display: block; }
+
+  /* Nav (large title) */
+  .nav { padding: 6px 20px 0; }
+  .nav-top { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+  .nav-meta { font-size: 13px; color: var(--label-2); }
+  .nav-btn { width: 34px; height: 34px; border-radius: 999px; background: var(--fill-3); display: grid; place-items: center; color: var(--blue); }
+  .large-title { font-size: 34px; line-height: 41px; letter-spacing: -0.016em; font-weight: 700; margin: 10px 0 2px; }
+  .subhead { font-size: 15px; color: var(--label-2); margin: 0 0 16px; }
+
+  /* Segmented control */
+  .segmented { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--fill-3); border-radius: 9px; padding: 2px; margin: 0 20px 16px; }
+  .segmented button { border: 0; background: transparent; font: inherit; font-size: 15px; font-weight: 500; color: var(--label); padding: 6px 0; border-radius: 7px; cursor: default; }
+  .segmented button.on { background: var(--bg-3); box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04); }
+
+  .scroll { flex: 1 1 auto; overflow-y: auto; padding-bottom: 84px; }
+  .scroll::-webkit-scrollbar { width: 0; }
+
+  /* Stats card (grouped inset) */
+  .stats { margin: 0 20px 20px; background: var(--bg-2); border-radius: var(--radius-card); display: grid; grid-template-columns: repeat(3,1fr); overflow: hidden; }
+  .screen.dark-mode .stats { background: var(--bg-2); }
+  .stat { padding: 16px 12px; text-align: center; border-right: 1px solid var(--separator); }
+  .stat:last-child { border-right: 0; }
+  .stat .num { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+  .stat .num small { font-size: 14px; font-weight: 500; color: var(--label-3); }
+  .stat .cap { font-size: 12px; color: var(--label-2); margin-top: 6px; }
+
+  /* Species cards */
+  .sec-h { display: flex; align-items: baseline; justify-content: space-between; margin: 0 20px 10px; }
+  .sec-h h3 { font-size: 20px; letter-spacing: -0.01em; font-weight: 600; margin: 0; }
+  .sec-h span { font-size: 13px; color: var(--label-2); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 20px; }
+  .card { background: var(--bg-3); border-radius: var(--radius-card); border: 1px solid var(--separator); overflow: hidden; }
+  .screen.dark-mode .card { border-color: transparent; background: var(--bg-2); }
+  .thumb { aspect-ratio: 4/3; background: var(--bg-2); display: grid; place-items: center; position: relative; }
+  .screen.dark-mode .thumb { background: var(--bg-3); }
+  .thumb .ini { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; color: var(--label-3); }
+  .thumb .dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border-radius: 999px; background: var(--blue); }
+  .thumb.miss { background: transparent; border-bottom: 1px dashed var(--separator); }
+  .card-body { padding: 10px 12px 12px; }
+  .card-name { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+  .card-sci { font-size: 12px; font-style: italic; color: var(--label-2); margin-top: 1px; }
+  .card-foot { display: flex; align-items: center; gap: 6px; margin-top: 9px; }
+  .chip { font-size: 11px; font-weight: 500; color: var(--label-2); background: var(--fill-3); padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+  .cnt { margin-left: auto; font-size: 13px; color: var(--label-2); }
+  .tag-new { font-size: 11px; font-weight: 600; color: var(--blue); background: color-mix(in srgb, var(--blue) 12%, transparent); padding: 3px 8px; border-radius: 999px; }
+
+  /* Family completion (grouped list) */
+  .group { margin: 22px 20px 8px; background: var(--bg-2); border-radius: var(--radius-card); overflow: hidden; }
+  .screen.dark-mode .group { background: var(--bg-2); }
+  .row { padding: 12px 16px; border-bottom: 1px solid var(--separator); }
+  .row:last-child { border-bottom: 0; }
+  .row .top { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .row .fname { font-size: 16px; font-weight: 500; }
+  .row .frac { margin-left: auto; font-size: 14px; color: var(--label-2); }
+  .bar { height: 6px; border-radius: 999px; background: var(--fill); overflow: hidden; }
+  .bar > i { display: block; height: 100%; border-radius: 999px; background: var(--blue); }
+
+  /* Glass tab bar (chrome only) */
+  .tabbar { position: absolute; left: 0; right: 0; bottom: 0; height: 83px; display: flex; align-items: flex-start; padding: 10px 8px 0; gap: 2px;
+    background: color-mix(in srgb, var(--bg) 72%, transparent); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border-top: .5px solid var(--separator); }
+  .screen.dark-mode .tabbar { background: color-mix(in srgb, var(--bg-2) 72%, transparent); }
+  .tab { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--label-3); font-size: 10px; font-weight: 500; padding-top: 2px; }
+  .tab.on { color: var(--blue); }
+  .tab svg { display: block; }
+  .home-ind { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 140px; height: 5px; border-radius: 999px; background: var(--label); opacity: .85; }
+
+  /* Catch-detail dark sheet (the one purposeful dark moment) */
+  .sheet-scrim { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 78%; background: var(--bg); border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; padding: 10px 0 0; box-shadow: 0 -20px 40px -20px rgba(0,0,0,.5); }
+  .grabber { width: 40px; height: 5px; border-radius: 999px; background: var(--fill); margin: 0 auto 14px; }
+  .sheet-photo { margin: 0 16px; height: 190px; border-radius: 16px; background: var(--bg-2); display: grid; place-items: center; }
+  .sheet-photo .ini { font-size: 40px; font-weight: 700; color: var(--label-3); letter-spacing: -0.02em; }
+  .sheet-title { padding: 16px 20px 0; }
+  .sheet-title h3 { font-size: 28px; letter-spacing: -0.014em; font-weight: 700; margin: 0; }
+  .sheet-title p { font-size: 15px; font-style: italic; color: var(--label-2); margin: 2px 0 0; }
+  .kv { margin: 16px 20px 0; background: var(--bg-2); border-radius: 14px; overflow: hidden; }
+  .kv .r { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--separator); font-size: 15px; }
+  .kv .r:last-child { border-bottom: 0; }
+  .kv .r span:last-child { color: var(--label-2); }
+  .sheet-actions { display: flex; gap: 12px; padding: 18px 20px 0; }
+  .btn { flex: 1; border: 0; font: inherit; font-size: 17px; font-weight: 600; padding: 12px; border-radius: 12px; cursor: default; }
+  .btn.pri { background: var(--blue); color: #fff; }
+  .btn.sec { background: var(--fill-3); color: var(--blue); }
+
+  /* ── Panels below the fold ── */
+  .panel { background: #fff; border-radius: var(--radius-card); padding: 28px; border: 1px solid rgba(0,0,0,.05); }
+  [data-theme="dark"] .panel { background: #1C1C1E; border-color: #2C2C2E; }
+  .panel h3 { font-size: 20px; letter-spacing: -0.01em; margin: 0 0 14px; font-weight: 600; }
+  .tokens { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 18px; }
+  .tok h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); margin: 0 0 8px; font-weight: 600; }
+  .tok .sw { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--ink-2); margin-bottom: 6px; }
+  .tok .sw i { width: 22px; height: 22px; border-radius: 6px; display: block; border: 1px solid rgba(0,0,0,.1); flex: 0 0 auto; }
+  .typerow { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .typerow .demo { color: var(--ink); }
+  .typerow .meta { margin-left: auto; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+
+  .changed { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px,1fr)); gap: 18px; }
+  .col h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; margin: 0 0 10px; font-weight: 600; }
+  .col.before h4 { color: #A1A1A6; }
+  .col.after h4 { color: var(--blue); }
+  .col ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--ink-2); line-height: 1.6; }
+  .col.after ul { color: var(--ink); }
+  .chipsrow { display: flex; gap: 6px; margin-bottom: 12px; }
+  .chipsrow i { width: 26px; height: 26px; border-radius: 7px; border: 1px solid rgba(0,0,0,.12); }
+
+  /* Decision */
+  .decide { border: 1px solid color-mix(in srgb, var(--blue) 40%, transparent); background: color-mix(in srgb, var(--blue) 6%, #fff); border-radius: var(--radius-card); padding: 28px; margin-top: 40px; }
+  [data-theme="dark"] .decide { background: color-mix(in srgb, var(--blue) 14%, #1C1C1E); }
+  .decide h2 { margin: 0 0 6px; font-size: 24px; letter-spacing: -0.01em; font-weight: 600; }
+  .decide .sub { margin: 0 0 20px; font-size: 15px; color: var(--ink-2); }
+  .choices { display: grid; gap: 8px; margin-bottom: 16px; }
+  .choice { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid rgba(0,0,0,.12); border-radius: 12px; cursor: pointer; background: #fff; }
+  [data-theme="dark"] .choice { background: #2C2C2E; border-color: #3A3A3C; color: var(--label); }
+  .choice:hover { border-color: var(--blue); }
+  .choice input { margin-top: 3px; accent-color: var(--blue); }
+  .choice b { font-weight: 600; }
+  .choice small { display: block; color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+  textarea.notes { width: 100%; border-radius: 12px; border: 1px solid rgba(0,0,0,.14); background: #fff; color: var(--ink); padding: 12px 14px; font: inherit; font-size: 15px; resize: vertical; }
+  [data-theme="dark"] textarea.notes { background: #2C2C2E; border-color: #3A3A3C; }
+  textarea.notes:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .act { display: flex; align-items: center; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+  .qbtn { background: var(--blue); color: #fff; border: 0; font: inherit; font-size: 16px; font-weight: 600; padding: 11px 20px; border-radius: 12px; cursor: pointer; }
+  .qbtn.ghost { background: transparent; color: var(--blue); }
+  #qstatus { font-size: 13px; color: var(--blue); }
+  .foot { margin-top: 36px; font-size: 13px; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <p class="kicker">FishDex · Apple-grade rebuild</p>
+    <h1 class="hd">The same screen, the way Apple would build it.</h1>
+    <p class="deck">Rebuilt with the <b>apple-design</b> skill: light-first, one accent (systemBlue), the SF system stack doing the hierarchy, and the real product shown in a real device frame — not swatches. Dark is now a single purposeful moment, not the default.</p>
+    <div class="facts">
+      <span><b>Design source:</b> apple-design skill (named) — not the reset defaults</span>
+      <span><b>Surface:</b> utility app → restrained motion, no cinematic effects</span>
+      <span><b>Replaces:</b> the gold / teal / lime directions</span>
+    </div>
+  </header>
+
+  <div class="label-row"><h2>My FishDex — light default</h2><span>Real iOS controls, 8pt spacing, 44pt targets, glass on the tab bar only.</span></div>
+
+  <div class="devices">
+    <div class="device-wrap">
+      <div class="phone">
+        <div class="screen light-mode" data-theme="light">
+          <div class="statusbar">
+            <span class="sf-num">9:41</span>
+            <span class="sb-icons">
+              <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1" /><rect x="4.5" y="5.5" width="3" height="6.5" rx="1" /><rect x="9" y="3" width="3" height="9" rx="1" /><rect x="13.5" y="0" width="3" height="12" rx="1" /></svg>
+              <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 11.5 5.4 8.8a3.7 3.7 0 0 1 5.2 0L8 11.5Zm-3.6-4.4a6.4 6.4 0 0 1 7.2 0l1.4-1.5a8.4 8.4 0 0 0-10 0l1.4 1.5ZM8 0C5 0 2.3 1.1.3 3l1.4 1.5A9.9 9.9 0 0 1 8 2.1c2.4 0 4.7.9 6.3 2.4L15.7 3A11.6 11.6 0 0 0 8 0Z" /></svg>
+              <svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x=".5" y=".5" width="21" height="12" rx="3.5" stroke="currentColor" opacity=".4" /><rect x="2" y="2" width="16" height="9" rx="2.2" fill="currentColor" /><path d="M23.5 4.2v4.6c1-.4 1.6-1.2 1.6-2.3s-.6-1.9-1.6-2.3Z" fill="currentColor" opacity=".5" /></svg>
+            </span>
+          </div>
+          <div class="island"></div>
+
+          <div class="scroll">
+            <div class="nav">
+              <div class="nav-top">
+                <span class="nav-meta">Ontario · 2026 season</span>
+                <span class="nav-btn" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 3v12M3 9h12" /></svg></span>
+              </div>
+              <h2 class="large-title">FishDex</h2>
+              <p class="subhead">Twelve species across four rivers this season.</p>
+            </div>
+
+            <div class="segmented" role="tablist">
+              <button class="on">All</button><button>Caught</button><button>Missing</button>
+            </div>
+
+            <div class="stats">
+              <div class="stat"><div class="num sf-num">12</div><div class="cap">Species caught</div></div>
+              <div class="stat"><div class="num sf-num">7<small>/56</small></div><div class="cap">Regional pool</div></div>
+              <div class="stat"><div class="num sf-num">3<small>/9</small></div><div class="cap">Families complete</div></div>
+            </div>
+
+            <div class="sec-h"><h3>Species</h3><span>7 of 8 caught</span></div>
+            <div class="grid" id="dex-grid"></div>
+
+            <div class="sec-h" style="margin-top:22px"><h3>Families</h3></div>
+            <div class="group" id="dex-fams"></div>
+          </div>
+
+          <div class="tabbar">
+            <div class="tab"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.2L4 20l1-3.2A8 8 0 1 1 21 12Z" /></svg><span>Chat</span></div>
+            <div class="tab"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z" /><circle cx="12" cy="10" r="2.5" /></svg><span>Map</span></div>
+            <div class="tab"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg><span></span></div>
+            <div class="tab"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10" /></svg><span>Log</span></div>
+            <div class="tab on"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c3-5 9-5 12 0-3 5-9 5-12 0Z" /><circle cx="7.5" cy="12" r="1" fill="currentColor" /><path d="M15 12l6-3v6l-6-3Z" /></svg><span>FishDex</span></div>
+          </div>
+          <div class="home-ind"></div>
+        </div>
+      </div>
+      <div class="device-cap"><b>Default — the utility screen</b>Grouped light backgrounds, one blue accent, type + space carrying the hierarchy.</div>
+    </div>
+
+    <div class="device-wrap">
+      <div class="phone">
+        <div class="screen dark-mode" data-theme="dark">
+          <div class="statusbar"><span class="sf-num">9:41</span>
+            <span class="sb-icons">
+              <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1" /><rect x="4.5" y="5.5" width="3" height="6.5" rx="1" /><rect x="9" y="3" width="3" height="9" rx="1" /><rect x="13.5" y="0" width="3" height="12" rx="1" /></svg>
+              <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><path d="M8 11.5 5.4 8.8a3.7 3.7 0 0 1 5.2 0L8 11.5Zm-3.6-4.4a6.4 6.4 0 0 1 7.2 0l1.4-1.5a8.4 8.4 0 0 0-10 0l1.4 1.5ZM8 0C5 0 2.3 1.1.3 3l1.4 1.5A9.9 9.9 0 0 1 8 2.1c2.4 0 4.7.9 6.3 2.4L15.7 3A11.6 11.6 0 0 0 8 0Z" /></svg>
+              <svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x=".5" y=".5" width="21" height="12" rx="3.5" stroke="currentColor" opacity=".4" /><rect x="2" y="2" width="16" height="9" rx="2.2" fill="currentColor" /><path d="M23.5 4.2v4.6c1-.4 1.6-1.2 1.6-2.3s-.6-1.9-1.6-2.3Z" fill="currentColor" opacity=".5" /></svg>
+            </span>
+          </div>
+          <div class="island"></div>
+
+          <div class="scroll">
+            <div class="nav"><div class="nav-top"><span class="nav-meta">Catch detail</span></div></div>
+            <div class="sheet-scrim" style="position:static;background:transparent"></div>
+            <div class="sheet" style="position:static;height:auto;box-shadow:none;border-radius:24px;margin:12px 0 0">
+              <div class="grabber"></div>
+              <div class="sheet-photo"><span class="ini">SB</span></div>
+              <div class="sheet-title"><h3>Smallmouth Bass</h3><p>Micropterus dolomieu</p></div>
+              <div class="kv">
+                <div class="r"><span>Length</span><span class="sf-num">19.5 in · PB</span></div>
+                <div class="r"><span>Date</span><span class="sf-num">Jun 14, 2026</span></div>
+                <div class="r"><span>Water</span><span>Grand River</span></div>
+                <div class="r"><span>Family</span><span>Sunfishes · 4 logged</span></div>
+              </div>
+              <div class="sheet-actions"><button class="btn sec">Edit</button><button class="btn pri">Share</button></div>
+            </div>
+          </div>
+          <div class="home-ind"></div>
+        </div>
+      </div>
+      <div class="device-cap"><b>One purposeful dark moment</b>The catch detail goes OLED-black. Dark is reserved for this, not the baseline.</div>
+    </div>
+  </div>
+
+  <div class="label-row"><h2>Tokens</h2><span>Semantic colors, SF type scale, 8pt grid — the foundation the whole app inherits.</span></div>
+  <div class="panel">
+    <div class="tokens">
+      <div class="tok">
+        <h4>Color (semantic)</h4>
+        <div class="sw"><i style="background:#007AFF"></i>systemBlue — the one accent</div>
+        <div class="sw"><i style="background:#F2F2F7"></i>secondarySystemBackground</div>
+        <div class="sw"><i style="background:#FFFFFF"></i>systemBackground</div>
+        <div class="sw"><i style="background:#1C1C1E"></i>dark · elevated</div>
+        <div class="sw"><i style="background:rgba(60,60,67,.29)"></i>separator</div>
+      </div>
+      <div class="tok">
+        <h4>Type — SF system stack</h4>
+        <div class="typerow"><span class="demo" style="font-size:28px;font-weight:700;letter-spacing:-.016em">Large Title</span><span class="meta">34 / −.016em</span></div>
+        <div class="typerow"><span class="demo" style="font-size:20px;font-weight:600;letter-spacing:-.008em">Title</span><span class="meta">20 / −.008em</span></div>
+        <div class="typerow"><span class="demo" style="font-size:17px">Body</span><span class="meta">17 / 0</span></div>
+        <div class="typerow"><span class="demo" style="font-size:13px;letter-spacing:.025em">Footnote</span><span class="meta">13 / +.025em</span></div>
+      </div>
+      <div class="tok">
+        <h4>Spacing — 8pt grid</h4>
+        <div class="sw">4 · icon↔label</div>
+        <div class="sw">8 · inline siblings</div>
+        <div class="sw">16 · phone edge margin</div>
+        <div class="sw">24 · card padding</div>
+        <div class="sw">44pt min touch target</div>
+      </div>
+      <div class="tok">
+        <h4>Materials</h4>
+        <div class="sw">Glass = chrome only (tab bar, nav)</div>
+        <div class="sw">Content cards stay solid</div>
+        <div class="sw">Text always on a solid backing</div>
+        <div class="sw">Radius 18 cards / 24 sheets</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="label-row"><h2>What changed</h2><span>The apple-design restraint pass, applied to the earlier rebuild.</span></div>
+  <div class="panel">
+    <div class="changed">
+      <div class="col before">
+        <h4>Before (my first draft)</h4>
+        <div class="chipsrow"><i style="background:#16140F"></i><i style="background:#C8A45C"></i><i style="background:#0E7490"></i><i style="background:#F26A4B"></i><i style="background:#B6F24A"></i></div>
+        <ul>
+          <li>Dark-by-default page — generic dark-SaaS feel</li>
+          <li>Three competing directions, several accents</li>
+          <li>Decorative gold / lime / cyan doing the work</li>
+          <li>Theme shown as swatches, not the product</li>
+        </ul>
+      </div>
+      <div class="col after">
+        <h4>After (apple-design)</h4>
+        <div class="chipsrow"><i style="background:#FFFFFF"></i><i style="background:#F2F2F7"></i><i style="background:#007AFF"></i><i style="background:#1C1C1E"></i><i style="background:#000000"></i></div>
+        <ul>
+          <li>Light-first; dark reserved for one moment</li>
+          <li>One accent — systemBlue — pointing at what matters</li>
+          <li>Hierarchy from type scale + whitespace, not color</li>
+          <li>Real product in a device frame; semantic tokens</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <section class="decide" data-lavish-question="apple-direction" id="decide">
+    <h2>Adopt this as the FishDex theme?</h2>
+    <p class="sub">Native controls register directly; pick one to queue it, or annotate the phone screens above and comment.</p>
+    <form id="apple-form" onsubmit="queueChoice(event)">
+      <div class="choices">
+        <label class="choice"><input type="radio" name="direction" value="LIGHT" data-label="Adopt Apple-grade light default"><span><b>Adopt the light default</b><small>systemBlue accent, SF stack, semantic tokens, glass on chrome only. Recommended.</small></span></label>
+        <label class="choice"><input type="radio" name="direction" value="BOTH" data-label="Adopt with paired dark mode"><span><b>Adopt, with a paired dark mode</b><small>Same discipline, dark as an equal appearance — more work, still restrained.</small></span></label>
+        <label class="choice"><input type="radio" name="direction" value="TWEAK" data-label="Adopt but I want tweaks"><span><b>Adopt, but I want changes</b><small>Tell me below what to adjust (accent, density, the dark moment).</small></span></label>
+        <label class="choice"><input type="radio" name="direction" value="NONE" data-label="Not this — go another way"><span><b>Not this direction</b><small>I'll rebuild again from what you describe.</small></span></label>
+      </div>
+      <textarea class="notes" name="notes" rows="3" placeholder="Tweaks, or the feeling you actually want:"></textarea>
+      <div class="act">
+        <button type="submit" class="qbtn">Queue this answer</button>
+        <span id="qstatus" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+    <div style="margin-top:16px">
+      <button type="button" class="qbtn ghost" onclick="(async (btn) => {
+        const copyRun = btn._lavishCopyRun = (btn._lavishCopyRun || 0) + 1;
+        const qs = [...document.querySelectorAll('[data-lavish-question]')];
+        const status = btn.parentElement.querySelector('[data-lavish-copy-all-status]');
+        btn.parentElement.querySelector('[data-lavish-copy-all-manual]')?.remove();
+        const out = [];
+        for (const q of qs) {
+          const key = q.getAttribute('data-lavish-question')?.trim() || 'Question';
+          const lines = [];
+          for (const el of q.querySelectorAll('input, select, textarea')) {
+            if (el.matches(':disabled')) continue;
+            if (el.closest('[data-lavish-question]') !== q) continue;
+            const isChoice = el.matches('input[type=checkbox], input[type=radio]');
+            if (isChoice && !el.checked) continue;
+            if (el.matches('input[type=button], input[type=submit], input[type=reset], input[type=image], input[type=hidden], input[type=file], input[type=range], input[type=color]')) continue;
+            let vals;
+            if (el instanceof HTMLSelectElement) {
+              vals = [...el.selectedOptions].filter((o) => !o.disabled && !o.closest('optgroup[disabled]')).map((o) => o.value.trim()).filter(Boolean);
+            } else {
+              const v = isChoice && (!el.hasAttribute('value') || !el.value.trim())
+                ? el.labels?.[0]?.textContent?.trim() || el.getAttribute('aria-label')?.trim() || el.name || ''
+                : el.value.trim();
+              vals = v ? [v] : [];
+            }
+            const label = el.name || el.labels?.[0]?.textContent?.trim() || el.getAttribute('aria-label')?.trim() || el.getAttribute('placeholder')?.trim() || el.tagName.toLowerCase();
+            for (const v of vals) lines.push('  ' + label + ': ' + v.split('\n').join('\n    '));
+          }
+          if (lines.length) out.push(key + ':\n' + lines.join('\n'));
+        }
+        const text = out.join('\n\n');
+        if (!text) { status.textContent = qs.length ? 'No answers to copy yet.' : 'No questions or answers to copy.'; return; }
+        status.textContent = '';
+        try {
+          if (typeof navigator.clipboard?.writeText !== 'function') throw new Error('Clipboard API unavailable');
+          await navigator.clipboard.writeText(text);
+          if (copyRun !== btn._lavishCopyRun) return;
+          status.textContent = 'Answers copied.'; return;
+        } catch {}
+        if (copyRun !== btn._lavishCopyRun) return;
+        const tmp = document.createElement('textarea'); tmp.value = text; tmp.readOnly = true; tmp.setAttribute('aria-hidden','true');
+        tmp.style.position='fixed'; tmp.style.left='-10000px'; document.body.append(tmp); tmp.focus(); tmp.select();
+        let ok=false; try { ok = document.execCommand('copy'); } catch {}
+        tmp.remove();
+        if (ok) { status.textContent = 'Answers copied.'; return; }
+        btn.parentElement.querySelector('[data-lavish-copy-all-manual]')?.remove();
+        const man = document.createElement('textarea'); man.value = text; man.readOnly = true;
+        man.rows = Math.min(12, Math.max(3, text.split('\n').length)); man.setAttribute('aria-label','Answers to copy manually');
+        man.dataset.lavishCopyAllManual = ''; btn.insertAdjacentElement('afterend', man); man.focus(); man.select();
+        status.textContent = 'Clipboard unavailable. Copy the answers below manually.';
+      })(this)">Copy all answers</button>
+      <span data-lavish-copy-all-status role="status" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <p class="foot">Built with the apple-design skill (HIG · Liquid Glass era · restraint pass). SF renders via the system stack; text sits on solid backing, never on glass. For review only — no app code changed yet.</p>
+</div>
+
+<script>
+  const SPECIES = [
+    { n: 'Smallmouth Bass', s: 'Micropterus dolomieu', f: 'Sunfishes', c: 4, pb: true },
+    { n: 'Northern Pike', s: 'Esox lucius', f: 'Pikes', c: 2, nw: true },
+    { n: 'Walleye', s: 'Sander vitreus', f: 'Perches', c: 7, pb: true },
+    { n: 'Yellow Perch', s: 'Perca flavescens', f: 'Perches', c: 9 },
+    { n: 'Rainbow Trout', s: 'Oncorhynchus mykiss', f: 'Trouts & Salmon', c: 3 },
+    { n: 'Chinook Salmon', s: 'Oncorhynchus tshawytscha', f: 'Trouts & Salmon', c: 1, nw: true },
+    { n: 'Largemouth Bass', s: 'Micropterus salmoides', f: 'Sunfishes', miss: true },
+    { n: 'Muskellunge', s: 'Esox masquinongy', f: 'Pikes', miss: true },
+  ];
+  const FAMILIES = [
+    { name: 'Sunfishes', have: 2, total: 6 },
+    { name: 'Perches', have: 2, total: 5 },
+    { name: 'Trouts & Salmon', have: 2, total: 8 },
+    { name: 'Pikes', have: 1, total: 3 },
+    { name: 'Catfishes', have: 0, total: 5 },
+  ];
+  const ini = (n) => n.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+
+  function card(s) {
+    if (s.miss) {
+      return '<article class="card"><div class="thumb miss"><span class="ini">' + ini(s.n) + '</span></div>' +
+        '<div class="card-body"><div class="card-name">' + s.n + '</div><div class="card-sci">' + s.s + '</div>' +
+        '<div class="card-foot"><span class="chip">' + s.f + '</span><span class="cnt">not logged</span></div></div></article>';
+    }
+    return '<article class="card"><div class="thumb"><span class="ini">' + ini(s.n) + '</span>' + (s.nw ? '<span class="dot"></span>' : '') + '</div>' +
+      '<div class="card-body"><div class="card-name">' + s.n + '</div><div class="card-sci">' + s.s + '</div>' +
+      '<div class="card-foot"><span class="chip">' + s.f + '</span>' +
+      '<span class="cnt">&times;' + s.c + (s.pb ? ' · PB' : '') + '</span>' +
+      (s.nw ? '<span class="tag-new">New</span>' : '') +
+      '</div></div></article>';
+  }
+  function famRow(f) {
+    const pct = Math.round((f.have / f.total) * 100);
+    return '<div class="row"><div class="top"><span class="fname">' + f.name + '</span><span class="frac sf-num">' + f.have + ' of ' + f.total + '</span></div>' +
+      '<div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+  }
+  document.getElementById('dex-grid').innerHTML = SPECIES.map(card).join('');
+  document.getElementById('dex-fams').innerHTML = FAMILIES.map(famRow).join('');
+
+  function queueChoice(e) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const choice = (new FormData(form).get('direction') || '').toString();
+    const notes = (form.notes.value || '').trim();
+    const status = document.getElementById('qstatus');
+    if (!choice) { status.textContent = 'Pick an option first, or just annotate above.'; return; }
+    const input = form.querySelector('input[name="direction"][value="' + choice + '"]');
+    const label = input ? input.dataset.label : choice;
+    const text = 'Apple-grade theme: ' + choice + ' — ' + label + (notes ? ' | ' + notes : '');
+    const payload = { tag: 'choice', text: text, element: form, data: { question: 'apple-direction', answer: choice, label: label, notes: notes } };
+    const msg = 'Adopt the FishDex theme direction ' + choice + ' (' + label + ').' + (notes ? ' Notes: ' + notes : '');
+    if (window.lavish && typeof window.lavish.queuePrompt === 'function') {
+      window.lavish.queuePrompt(msg, payload);
+      status.textContent = 'Queued — press Send to agent when ready.';
+    } else {
+      status.textContent = 'Copy the answer below and paste it to the agent.';
+    }
+  }
+</script>
+</body>
+</html>

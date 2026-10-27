@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FishDex — theme rebuild (Lavish review)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;700&family=Outfit:wght@300;400;600&family=Sora:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.fd-grid, .fd-stats, .opt-specs, .row) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, span, dd, figcaption, td, th, .badge, .label) { overflow-wrap: anywhere; }
+  :where(img, svg, video, canvas) { max-width: 100%; height: auto; }
+
+  html, body { margin: 0; }
+  body {
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  .page { max-width: 1220px; margin: 0 auto; padding: 40px 28px 140px; }
+
+  .masthead { border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 14%, transparent); padding-bottom: 22px; margin-bottom: 30px; }
+  .kicker { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--color-primary); margin: 0 0 10px; }
+  .masthead h1 { font-size: clamp(26px, 4vw, 40px); line-height: 1.08; margin: 0 0 10px; font-weight: 600; }
+  .masthead .lede { max-width: 74ch; color: color-mix(in oklab, var(--color-base-content) 74%, transparent); margin: 0; font-size: 15px; }
+  .masthead .facts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 16px; font-size: 12.5px; color: color-mix(in oklab, var(--color-base-content) 62%, transparent); }
+  .masthead .facts b { color: var(--color-base-content); font-weight: 600; }
+
+  .section-label { display: flex; align-items: baseline; gap: 12px; margin: 44px 0 16px; }
+  .section-label h2 { font-size: 18px; margin: 0; font-weight: 600; }
+  .section-label span { font-size: 12.5px; color: color-mix(in oklab, var(--color-base-content) 58%, transparent); }
+
+  /* ---- direction scoping: each option redefines DaisyUI's color vars ---- */
+  .dir { font-family: var(--dir-body); }
+  .dir-display { font-family: var(--dir-display); }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  .dir-a {
+    --color-base-100:#16140F; --color-base-200:#1E1B15; --color-base-300:#29251D;
+    --color-base-content:#F2EBDD; --color-primary:#C8A45C; --color-primary-content:#1A1509;
+    --color-secondary:#8B9B84; --color-secondary-content:#0E120D; --color-accent:#E4C98A;
+    --color-accent-content:#231C10; --color-neutral:#2E2A22; --color-neutral-content:#EFE7D8;
+    --radius-box:10px; --radius-field:8px; --radius-selector:6px;
+    --dir-display:'Fraunces', Georgia, serif; --dir-body:'Outfit', system-ui, sans-serif;
+  }
+  .dir-b {
+    --color-base-100:#F4F7F8; --color-base-200:#E8EEF1; --color-base-300:#D7E1E6;
+    --color-base-content:#0B2029; --color-primary:#0E7490; --color-primary-content:#F0FBFC;
+    --color-secondary:#F26A4B; --color-secondary-content:#2A0D07; --color-accent:#1E6F8C;
+    --color-accent-content:#EAF7FA; --color-neutral:#14313C; --color-neutral-content:#E9F2F4;
+    --radius-box:14px; --radius-field:10px; --radius-selector:8px;
+    --dir-display:'Bricolage Grotesque', system-ui, sans-serif; --dir-body:'Manrope', system-ui, sans-serif;
+  }
+  .dir-c {
+    --color-base-100:#0B0E13; --color-base-200:#121722; --color-base-300:#1B2231;
+    --color-base-content:#E6EDF5; --color-primary:#B6F24A; --color-primary-content:#0A1400;
+    --color-secondary:#43D9E8; --color-secondary-content:#04222A; --color-accent:#43D9E8;
+    --color-accent-content:#04222A; --color-neutral:#1E2634; --color-neutral-content:#DCE6F0;
+    --radius-box:6px; --radius-field:6px; --radius-selector:4px;
+    --dir-display:'Sora', system-ui, sans-serif; --dir-body:'Archivo', system-ui, sans-serif;
+  }
+
+  /* ---- option card ---- */
+  .opt {
+    background: var(--color-base-100); color: var(--color-base-content);
+    border: 1px solid color-mix(in oklab, var(--color-base-content) 14%, transparent);
+    border-radius: 16px; padding: 22px; margin-bottom: 26px;
+  }
+  .opt-head { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 18px; }
+  .opt-rank { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--color-primary); }
+  .opt-rank.rec { display: inline-block; background: var(--color-primary); color: var(--color-primary-content); padding: 3px 8px; border-radius: 999px; }
+  .opt-title { font-size: 27px; margin: 6px 0 4px; font-weight: 600; }
+  .opt-voice { margin: 0; max-width: 58ch; font-size: 13.5px; color: color-mix(in oklab, var(--color-base-content) 72%, transparent); }
+  .opt-swatches { display: flex; gap: 6px; align-items: center; }
+  .opt-swatches i { width: 26px; height: 26px; border-radius: 6px; display: block; border: 1px solid color-mix(in oklab, var(--color-base-content) 18%, transparent); }
+
+  .opt-specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px 26px; margin-top: 18px; }
+  .spec h4 { margin: 0 0 4px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); font-family: 'JetBrains Mono', monospace; font-weight: 400; }
+  .spec p { margin: 0; font-size: 13px; color: color-mix(in oklab, var(--color-base-content) 84%, transparent); }
+  .spec.tradeoff p { padding-left: 12px; border-left: 2px solid color-mix(in oklab, var(--color-primary) 60%, transparent); }
+
+  /* ---- the FishDex mockup itself ---- */
+  .fd-window {
+    border-radius: var(--radius-box); overflow: hidden; border: 1px solid color-mix(in oklab, var(--color-base-content) 14%, transparent);
+    background: var(--color-base-100); box-shadow: 0 30px 60px -40px rgba(0,0,0,.6);
+  }
+  .fd-topbar { display: flex; justify-content: space-between; align-items: center; padding: 11px 18px; background: var(--color-base-200); font-size: 12px; }
+  .fd-brand { font-weight: 600; letter-spacing: .02em; color: var(--color-primary); }
+  .fd-topbar-meta { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .fd-head { padding: 26px 24px 20px; }
+  .fd-eyebrow { margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; letter-spacing: .24em; text-transform: uppercase; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
+  .fd-title { margin: 6px 0 0; font-size: 42px; line-height: 1; font-weight: 600; letter-spacing: -.01em; }
+  .fd-lede { margin: 10px 0 0; max-width: 46ch; font-size: 13.5px; color: color-mix(in oklab, var(--color-base-content) 72%, transparent); }
+  .fd-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 20px; }
+  .fd-stat { padding: 14px 14px 12px; border-radius: var(--radius-field); background: var(--color-base-200); border: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent); }
+  .fd-stat-num { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 600; line-height: 1; letter-spacing: -.02em; }
+  .fd-slash { font-size: 14px; color: color-mix(in oklab, var(--color-base-content) 45%, transparent); }
+  .fd-stat-lab { margin-top: 7px; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: color-mix(in oklab, var(--color-base-content) 58%, transparent); }
+  .fd-tabs { display: flex; gap: 6px; padding: 4px 24px 0; }
+  .fd-tab { font-size: 12.5px; padding: 5px 12px; border-radius: 999px; color: color-mix(in oklab, var(--color-base-content) 66%, transparent); }
+  .fd-tab-on { background: var(--color-primary); color: var(--color-primary-content); font-weight: 600; }
+  .fd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; padding: 16px 24px 8px; }
+  .fd-card { border: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent); border-radius: var(--radius-field); overflow: hidden; background: var(--color-base-100); }
+  .fd-photo { aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--color-base-300); }
+  .fd-photo span { font-family: var(--dir-display); font-size: 26px; font-weight: 700; color: color-mix(in oklab, var(--color-primary) 78%, var(--color-base-content)); opacity: .8; }
+  .fd-photo-miss { background: transparent; border-bottom: 1px dashed color-mix(in oklab, var(--color-base-content) 22%, transparent); }
+  .fd-photo-miss span { color: color-mix(in oklab, var(--color-base-content) 32%, transparent); }
+  .fd-card-body { padding: 10px 11px 11px; }
+  .fd-card-name { font-size: 13.5px; font-weight: 600; line-height: 1.2; }
+  .fd-card-sci { font-style: italic; font-size: 11px; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); margin-top: 2px; }
+  .fd-card-foot { display: flex; align-items: center; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+  .fd-fam { background: color-mix(in oklab, var(--color-secondary) 22%, var(--color-base-100)); color: color-mix(in oklab, var(--color-secondary) 78%, var(--color-base-content)); border: none; font-size: 10px; }
+  .fd-count { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: color-mix(in oklab, var(--color-base-content) 78%, transparent); }
+  .fd-count-miss { color: color-mix(in oklab, var(--color-base-content) 40%, transparent); font-size: 10.5px; }
+  .fd-card .fd-pb, .fd-card .fd-new { font-size: 9.5px; border: none; }
+  .fd-pb { background: var(--color-primary); color: var(--color-primary-content); }
+  .fd-new { background: var(--color-accent); color: var(--color-accent-content); }
+  .fd-missing { border-style: dashed; opacity: .72; }
+  .fd-fams { padding: 6px 24px 22px; display: grid; gap: 9px; }
+  .fd-fam-row { display: grid; grid-template-columns: 130px 1fr 46px; align-items: center; gap: 12px; font-size: 12.5px; }
+  .fd-fam-name { color: color-mix(in oklab, var(--color-base-content) 82%, transparent); }
+  .fd-fam-frac { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; text-align: right; color: color-mix(in oklab, var(--color-base-content) 62%, transparent); }
+  .fd-bar { width: 100%; height: 7px; }
+
+  /* ---- decision form ---- */
+  .decide { border: 1px solid color-mix(in oklab, var(--color-primary) 45%, transparent); border-radius: 16px; padding: 26px; background: color-mix(in oklab, var(--color-primary) 6%, var(--color-base-100)); }
+  .decide h2 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+  .decide .sub { margin: 0 0 20px; font-size: 13.5px; color: color-mix(in oklab, var(--color-base-content) 70%, transparent); }
+  .choices { display: grid; gap: 8px; margin-bottom: 16px; }
+  .choice { display: flex; gap: 12px; align-items: flex-start; padding: 13px 15px; border: 1px solid color-mix(in oklab, var(--color-base-content) 16%, transparent); border-radius: 10px; cursor: pointer; background: var(--color-base-100); }
+  .choice:hover { border-color: color-mix(in oklab, var(--color-primary) 60%, transparent); }
+  .choice input { margin-top: 3px; accent-color: var(--color-primary); }
+  .choice b { font-weight: 600; }
+  .choice small { display: block; color: color-mix(in oklab, var(--color-base-content) 62%, transparent); font-size: 12.5px; margin-top: 2px; }
+  .decide textarea { width: 100%; border-radius: 10px; border: 1px solid color-mix(in oklab, var(--color-base-content) 18%, transparent); background: var(--color-base-100); color: var(--color-base-content); padding: 11px 13px; font-family: inherit; font-size: 13.5px; resize: vertical; }
+  .decide textarea:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+  .decide-actions { display: flex; align-items: center; gap: 14px; margin-top: 14px; flex-wrap: wrap; }
+  #qstatus { font-size: 12.5px; color: var(--color-primary); }
+
+  .notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 18px; }
+  .note { padding: 15px 16px; border-radius: 12px; background: var(--color-base-200); border: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent); font-size: 13px; color: color-mix(in oklab, var(--color-base-content) 84%, transparent); }
+  .note b { display: block; margin-bottom: 5px; color: var(--color-base-content); font-size: 13px; }
+  .foot { margin-top: 34px; font-size: 12px; color: color-mix(in oklab, var(--color-base-content) 50%, transparent); font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <p class="kicker">FishDex · theme rebuild · review surface</p>
+    <h1>Pick the direction I rebuild the theme around.</h1>
+    <p class="lede">Everything here is drawn from scratch — none of the previous UI builds were reused. The same real FishDex screen (my collection, with personal bests, new finds, family completion and the caught/missing states) is rendered three ways below, so you can compare the actual product surface rather than abstract swatches. Choose one, or tell me what to change; every element is annotatable.</p>
+    <div class="facts">
+      <span><b>Product:</b> FishDex — My collection (Ontario, CA-ON)</span>
+      <span><b>Baseline:</b> field-journal build, discarded</span>
+      <span><b>Stack:</b> Tailwind v4 + DaisyUI 5 tokens (custom, not presets)</span>
+      <span><b>DataSource:</b> Lavish CDN fallback, step 3</span>
+    </div>
+  </header>
+
+  <div class="section-label"><h2>Three directions</h2><span>A is my recommendation — B and C are there to argue with.</span></div>
+
+  <article class="opt dir dir-a" id="opt-a">
+    <div class="opt-head">
+      <div>
+        <span class="opt-rank rec">A · Recommended</span>
+        <h3 class="opt-title dir-display">Deep Current</h3>
+        <p class="opt-voice">A hushed, high-end tackle catalogue. Warm near-black paper, brushed gold, an optical serif for the collection title, monospaced numbers for the catch data. Quiet and premium — reads as expensive without shouting.</p>
+      </div>
+      <div class="opt-swatches">
+        <i style="background:#16140F"></i><i style="background:#29251D"></i><i style="background:#C8A45C"></i><i style="background:#8B9B84"></i><i style="background:#F2EBDD"></i>
+      </div>
+    </div>
+    <div class="fd-slot" data-mock></div>
+    <div class="opt-specs">
+      <div class="spec"><h4>Display</h4><p class="dir-display" style="font-size:20px">Fraunces</p></div>
+      <div class="spec"><h4>Body / Numerals</h4><p>Outfit · JetBrains Mono</p></div>
+      <div class="spec"><h4>Shape</h4><p>Soft-crisp · 10px radius · hairline gold borders · generous space</p></div>
+      <div class="spec"><h4>Engine</h4><p>DaisyUI <span class="mono">luxury</span> base, retuned vars</p></div>
+      <div class="spec tradeoff"><h4>Wins</h4><p>Most distinct from what you have; strong on photos and trophy moments; numbers stay legible.</p></div>
+      <div class="spec tradeoff"><h4>Risks</h4><p>Dark-only; gold is easy to overuse — needs restraint to avoid looking like a wine label.</p></div>
+    </div>
+  </article>
+
+  <article class="opt dir dir-b" id="opt-b">
+    <div class="opt-head">
+      <div>
+        <span class="opt-rank">B · Light editorial</span>
+        <h3 class="opt-title dir-display">Tidepool</h3>
+        <p class="opt-voice">Bright, cool, and clinical. Off-white paper, deep teal ink, a coral accent for new finds, an expressive grotesque for headings. Reads like a well-made field guide or a modern museum label.</p>
+      </div>
+      <div class="opt-swatches">
+        <i style="background:#F4F7F8"></i><i style="background:#D7E1E6"></i><i style="background:#0E7490"></i><i style="background:#F26A4B"></i><i style="background:#0B2029"></i>
+      </div>
+    </div>
+    <div class="fd-slot" data-mock></div>
+    <div class="opt-specs">
+      <div class="spec"><h4>Display</h4><p class="dir-display" style="font-size:20px">Bricolage Grotesque</p></div>
+      <div class="spec"><h4>Body / Numerals</h4><p>Manrope · JetBrains Mono</p></div>
+      <div class="spec"><h4>Shape</h4><p>Rounded · 14px radius · soft borders · airy space</p></div>
+      <div class="spec"><h4>Engine</h4><p>DaisyUI <span class="mono">silk</span> base, retuned vars</p></div>
+      <div class="spec tradeoff"><h4>Wins</h4><p>Great in daylight and on the water; approachable; photography pops on light ground.</p></div>
+      <div class="spec tradeoff"><h4>Risks</h4><p>Light mode only; risk of feeling generic unless the type and teal are held tightly.</p></div>
+    </div>
+  </article>
+
+  <article class="opt dir dir-c" id="opt-c">
+    <div class="opt-head">
+      <div>
+        <span class="opt-rank">C · Dark telemetry</span>
+        <h3 class="opt-title dir-display">Nocturne</h3>
+        <p class="opt-voice">Instrument, not catalogue. Near-black slate, electric lime for caught, cool cyan for new, tight crisp corners, monospaced telemetry. Reads like a sonar screen or a cockpit readout.</p>
+      </div>
+      <div class="opt-swatches">
+        <i style="background:#0B0E13"></i><i style="background:#1B2231"></i><i style="background:#B6F24A"></i><i style="background:#43D9E8"></i><i style="background:#E6EDF5"></i>
+      </div>
+    </div>
+    <div class="fd-slot" data-mock></div>
+    <div class="opt-specs">
+      <div class="spec"><h4>Display</h4><p class="dir-display" style="font-size:20px">Sora</p></div>
+      <div class="spec"><h4>Body / Numerals</h4><p>Archivo · JetBrains Mono</p></div>
+      <div class="spec"><h4>Shape</h4><p>Technical · 6px radius · crisp edges · dense stats</p></div>
+      <div class="spec"><h4>Engine</h4><p>DaisyUI <span class="mono">abyss</span> base, retuned vars</p></div>
+      <div class="spec tradeoff"><h4>Wins</h4><p>Fast to scan; lime/cyan make PB and new reads instant; feels like a fishing tool, not a brochure.</p></div>
+      <div class="spec tradeoff"><h4>Risks</h4><p>Can feel cold / "gamer" if the accent pair isn't disciplined; dark-only.</p></div>
+    </div>
+  </article>
+
+  <section class="decide" data-lavish-question="theme-direction" id="decide">
+    <h2>Which direction should I rebuild the theme around?</h2>
+    <p class="sub">Pick one to queue it, or leave the choice blank and just annotate/comment on the options above. Native radios and text fields register directly; nothing is sent until you queue it.</p>
+    <form id="theme-form" onsubmit="queueTheme(event)">
+      <div class="choices">
+        <label class="choice"><input type="radio" name="direction" value="A" data-label="Deep Current — luxe dark, warm gold, Fraunces"><span><b>A · Deep Current</b><small>Warm near-black + brushed gold, optical serif display. Recommended.</small></span></label>
+        <label class="choice"><input type="radio" name="direction" value="B" data-label="Tidepool — light editorial, cool teal, Bricolage"><span><b>B · Tidepool</b><small>Bright off-white + teal ink + coral accent, expressive grotesque.</small></span></label>
+        <label class="choice"><input type="radio" name="direction" value="C" data-label="Nocturne — dark telemetry, lime/cyan, Sora"><span><b>C · Nocturne</b><small>Near-black slate + electric lime & cyan, monospaced telemetry.</small></span></label>
+        <label class="choice"><input type="radio" name="direction" value="NONE" data-label="None of these — start over"><span><b>None of these</b><small>Wrong track — tell me the feeling you want and I'll rebuild.</small></span></label>
+      </div>
+      <textarea name="notes" rows="3" placeholder="Any tweaks, or the mood you actually want (I'll fold it in):"></textarea>
+      <div class="decide-actions">
+        <button type="submit" class="btn btn-primary">Queue this answer</button>
+        <span id="qstatus" role="status" aria-live="polite"></span>
+        <span style="margin-left:auto"></span>
+      </div>
+    </form>
+    <div style="margin-top:16px;">
+      <button type="button" class="btn btn-sm btn-ghost" onclick="(async (btn) => {
+        const copyRun = btn._lavishCopyRun = (btn._lavishCopyRun || 0) + 1;
+        const qs = [...document.querySelectorAll('[data-lavish-question]')];
+        const status = btn.parentElement.querySelector('[data-lavish-copy-all-status]');
+        btn.parentElement.querySelector('[data-lavish-copy-all-manual]')?.remove();
+        const out = [];
+        for (const q of qs) {
+          const key = q.getAttribute('data-lavish-question')?.trim() || 'Question';
+          const lines = [];
+          for (const el of q.querySelectorAll('input, select, textarea')) {
+            if (el.matches(':disabled')) continue;
+            if (el.closest('[data-lavish-question]') !== q) continue;
+            const isChoice = el.matches('input[type=checkbox], input[type=radio]');
+            if (isChoice && !el.checked) continue;
+            if (el.matches('input[type=button], input[type=submit], input[type=reset], input[type=image], input[type=hidden], input[type=file], input[type=range], input[type=color]')) continue;
+            let vals;
+            if (el instanceof HTMLSelectElement) {
+              vals = [...el.selectedOptions].filter((o) => !o.disabled && !o.closest('optgroup[disabled]')).map((o) => o.value.trim()).filter(Boolean);
+            } else {
+              const v = isChoice && (!el.hasAttribute('value') || !el.value.trim())
+                ? el.labels?.[0]?.textContent?.trim() || el.getAttribute('aria-label')?.trim() || el.name || ''
+                : el.value.trim();
+              vals = v ? [v] : [];
+            }
+            const label = el.name || el.labels?.[0]?.textContent?.trim() || el.getAttribute('aria-label')?.trim() || el.getAttribute('placeholder')?.trim() || el.tagName.toLowerCase();
+            for (const v of vals) lines.push('  ' + label + ': ' + v.split('\n').join('\n    '));
+          }
+          if (lines.length) out.push(key + ':\n' + lines.join('\n'));
+        }
+        const text = out.join('\n\n');
+        if (!text) { status.textContent = qs.length ? 'No answers to copy yet.' : 'No questions or answers to copy.'; return; }
+        status.textContent = '';
+        try {
+          if (typeof navigator.clipboard?.writeText !== 'function') throw new Error('Clipboard API unavailable');
+          await navigator.clipboard.writeText(text);
+          if (copyRun !== btn._lavishCopyRun) return;
+          status.textContent = 'Answers copied.'; return;
+        } catch {}
+        if (copyRun !== btn._lavishCopyRun) return;
+        const tmp = document.createElement('textarea'); tmp.value = text; tmp.readOnly = true; tmp.setAttribute('aria-hidden','true');
+        tmp.style.position='fixed'; tmp.style.left='-10000px'; document.body.append(tmp); tmp.focus(); tmp.select();
+        let ok=false; try { ok = document.execCommand('copy'); } catch {}
+        tmp.remove();
+        if (ok) { status.textContent = 'Answers copied.'; return; }
+        btn.parentElement.querySelector('[data-lavish-copy-all-manual]')?.remove();
+        const man = document.createElement('textarea'); man.value = text; man.readOnly = true;
+        man.rows = Math.min(12, Math.max(3, text.split('\n').length)); man.setAttribute('aria-label','Answers to copy manually');
+        man.dataset.lavishCopyAllManual = ''; btn.insertAdjacentElement('afterend', man); man.focus(); man.select();
+        status.textContent = 'Clipboard unavailable. Copy the answers below manually.';
+      })(this)">Copy all answers</button>
+      <span data-lavish-copy-all-status role="status" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <div class="section-label"><h2>What I'm assuming / what I'd settle next</h2></div>
+  <div class="notes">
+    <div class="note"><b>Scope</b>Token foundation + the one FishDex screen first, exactly as agreed. Chat, Trips, Map, Log a Catch get the same tokens once you lock a direction.</div>
+    <div class="note"><b>Light &amp; dark</b>Each direction is shown in its natural mode. Tell me if you need both modes and I'll pair them, but each is designed to be complete on its own.</div>
+    <div class="note"><b>Migration cost</b>The app currently imports one shared token file in every screen plus a nav bar on legacy variables. Picking a direction is cheap; the nav bar is the one real seam to rework.</div>
+    <div class="note"><b>Open question</b>Real photos are the biggest variable — A and C assume great catch photos on dark ground, B assumes they're shot in daylight. Worth a glance at the actual photo set.</div>
+  </div>
+
+  <p class="foot">Rendered with Tailwind v4 + DaisyUI 5 · custom theme variables (not stock presets) · fonts left as CDN links. Feedback queues back through Lavish; annotate any card, badge or number.</p>
+</div>
+
+<script>
+  const SPECIES = [
+    { n: 'Smallmouth Bass', s: 'Micropterus dolomieu', f: 'Sunfishes', c: 4, pb: true },
+    { n: 'Northern Pike', s: 'Esox lucius', f: 'Pikes', c: 2, nw: true },
+    { n: 'Walleye', s: 'Sander vitreus', f: 'Perches', c: 7, pb: true },
+    { n: 'Yellow Perch', s: 'Perca flavescens', f: 'Perches', c: 9 },
+    { n: 'Rainbow Trout', s: 'Oncorhynchus mykiss', f: 'Trouts & Salmon', c: 3 },
+    { n: 'Chinook Salmon', s: 'Oncorhynchus tshawytscha', f: 'Trouts & Salmon', c: 1, nw: true },
+    { n: 'Largemouth Bass', s: 'Micropterus salmoides', f: 'Sunfishes', miss: true },
+    { n: 'Muskellunge', s: 'Esox masquinongy', f: 'Pikes', miss: true },
+  ];
+  const FAMILIES = [
+    { name: 'Sunfishes', have: 2, total: 6 },
+    { name: 'Perches', have: 2, total: 5 },
+    { name: 'Trouts & Salmon', have: 2, total: 8 },
+    { name: 'Pikes', have: 1, total: 3 },
+    { name: 'Catfishes', have: 0, total: 5 },
+  ];
+  const initials = (n) => n.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+
+  function card(s) {
+    if (s.miss) {
+      return '<article class="fd-card fd-missing"><div class="fd-photo fd-photo-miss" aria-hidden="true"><span>' + initials(s.n) + '</span></div>' +
+        '<div class="fd-card-body"><div class="fd-card-name">' + s.n + '</div><div class="fd-card-sci">' + s.s + '</div>' +
+        '<div class="fd-card-foot"><span class="badge badge-sm fd-fam">' + s.f + '</span><span class="fd-count fd-count-miss">not logged</span></div></div></article>';
+    }
+    return '<article class="fd-card"><div class="fd-photo" aria-hidden="true"><span>' + initials(s.n) + '</span></div>' +
+      '<div class="fd-card-body"><div class="fd-card-name">' + s.n + '</div><div class="fd-card-sci">' + s.s + '</div>' +
+      '<div class="fd-card-foot"><span class="badge badge-sm fd-fam">' + s.f + '</span>' +
+      '<span class="fd-count">&times;' + s.c + '</span>' +
+      (s.pb ? '<span class="badge badge-sm fd-pb">PB</span>' : '') +
+      (s.nw ? '<span class="badge badge-sm fd-new">NEW</span>' : '') +
+      '</div></div></article>';
+  }
+
+  function famRow(f) {
+    return '<div class="fd-fam-row"><span class="fd-fam-name">' + f.name + '</span>' +
+      '<progress class="fd-bar progress progress-primary" value="' + f.have + '" max="' + f.total + '"></progress>' +
+      '<span class="fd-fam-frac">' + f.have + '/' + f.total + '</span></div>';
+  }
+
+  function mock() {
+    return '<div class="fd-window">' +
+      '<div class="fd-topbar"><span class="fd-brand">◆ FishDex</span><span class="fd-topbar-meta">Ontario · 2026 season</span></div>' +
+      '<div class="fd-head">' +
+        '<p class="fd-eyebrow">My collection</p>' +
+        '<h3 class="fd-title dir-display">My FishDex</h3>' +
+        '<p class="fd-lede">Twelve species logged across four rivers this season.</p>' +
+        '<div class="fd-stats">' +
+          '<div class="fd-stat"><div class="fd-stat-num">12</div><div class="fd-stat-lab">Species caught</div></div>' +
+          '<div class="fd-stat"><div class="fd-stat-num">7<span class="fd-slash">/56</span></div><div class="fd-stat-lab">Regional pool</div></div>' +
+          '<div class="fd-stat"><div class="fd-stat-num">3<span class="fd-slash">/9</span></div><div class="fd-stat-lab">Families complete</div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="fd-tabs"><span class="fd-tab fd-tab-on">All</span><span class="fd-tab">Caught</span><span class="fd-tab">Missing</span></div>' +
+      '<div class="fd-grid">' + SPECIES.map(card).join('') + '</div>' +
+      '<div class="fd-fams">' + FAMILIES.map(famRow).join('') + '</div>' +
+    '</div>';
+  }
+
+  document.querySelectorAll('[data-mock]').forEach((el) => { el.innerHTML = mock(); });
+
+  function queueTheme(e) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const choice = (new FormData(form).get('direction') || '').toString();
+    const notes = (form.notes.value || '').trim();
+    const status = document.getElementById('qstatus');
+    if (!choice) { status.textContent = 'Pick a direction first, or just annotate above.'; return; }
+    const input = form.querySelector('input[name="direction"][value="' + choice + '"]');
+    const label = input ? input.dataset.label : choice;
+    const text = 'Theme direction: ' + choice + ' — ' + label + (notes ? ' | ' + notes : '');
+    const payload = { tag: 'choice', text: text, element: form, data: { question: 'theme-direction', answer: choice, label: label, notes: notes } };
+    const msg = 'Rebuild the fishdex theme around direction ' + choice + ' (' + label + ').' + (notes ? ' Notes: ' + notes : '');
+    if (window.lavish && typeof window.lavish.queuePrompt === 'function') {
+      window.lavish.queuePrompt(msg, payload);
+      status.textContent = 'Queued — press Send to agent when ready.';
+    } else {
+      status.textContent = 'Copy the answer below and paste it to the agent.';
+    }
+  }
+</script>
+</body>
+</html>

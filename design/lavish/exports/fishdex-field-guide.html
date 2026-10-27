@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>FishDex — Species (nature field guide) · Lavish review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+  /* ── Palette ───────────────────────────────────────────────────────────── */
+  :root{
+    --paper:#F1EFE9; --sheet:#FBFAF7; --ink:#1E2A27; --ink2:#5E6A64; --ink3:#97A19B;
+    --line:#E2DED3; --line2:#D5D0C3;
+    --accent:#2E6B60; --accent-2:#245A50; --sand:#C9A96A;
+    --shadow:0 30px 70px -40px rgba(20,40,34,.55);
+    --r-card:20px; --r-phone:54px;
+  }
+  @property --h{ syntax:"<number>"; inherits:true; initial-value:180; }
+  *,*::before,*::after{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:17px; line-height:1.5; -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(rgba(60,80,70,.05) 1px, transparent 1px); background-size:24px 24px;
+  }
+  .serif{ font-family:"Fraunces",Georgia,serif; font-optical-sizing:auto; }
+  .num{ font-variant-numeric:tabular-nums; }
+  .page{ max-width:1080px; margin:0 auto; padding:56px 24px 120px; }
+
+  /* ── Masthead ──────────────────────────────────────────────────────────── */
+  .kicker{ font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600; margin:0 0 14px; }
+  .hd{ font-family:"Fraunces",serif; font-weight:500; font-size:clamp(34px,5.2vw,60px); line-height:1.05; letter-spacing:-.015em; margin:0 0 16px; max-width:19ch; }
+  .hd em{ font-style:italic; color:var(--accent); }
+  .deck{ font-size:19px; line-height:1.55; color:var(--ink2); max-width:62ch; margin:0; }
+  .facts{ display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:20px; font-size:13px; color:var(--ink2); }
+  .facts b{ color:var(--ink); font-weight:600; }
+
+  .label-row{ display:flex; align-items:baseline; gap:12px; margin:54px 0 18px; }
+  .label-row h2{ font-family:"Fraunces",serif; font-weight:500; font-size:24px; letter-spacing:-.01em; margin:0; }
+  .label-row span{ font-size:14px; color:var(--ink2); }
+
+  /* ── Devices ───────────────────────────────────────────────────────────── */
+  .devices{ display:flex; flex-wrap:wrap; gap:44px; align-items:flex-start; justify-content:center; }
+  .device-wrap{ display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .device-cap{ font-size:14px; color:var(--ink2); text-align:center; max-width:340px; }
+  .device-cap b{ color:var(--ink); font-weight:600; display:block; margin-bottom:3px; }
+  .phone{ width:392px; max-width:100%; aspect-ratio:402/874; background:#12100e; border-radius:var(--r-phone); padding:11px; position:relative; box-shadow:var(--shadow),0 0 0 2px rgba(0,0,0,.05); }
+  .phone::after{ content:""; position:absolute; inset:11px; border-radius:43px; pointer-events:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.16); }
+  .screen{ position:relative; width:100%; height:100%; border-radius:43px; overflow:hidden; background:var(--paper); display:flex; flex-direction:column; }
+  .statusbar{ height:52px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:14px 30px 0; font-size:15px; font-weight:600; color:var(--ink); z-index:20; }
+  .island{ position:absolute; top:12px; left:50%; transform:translateX(-50%); width:116px; height:34px; background:#000; border-radius:20px; z-index:40; }
+  .sb-icons{ display:flex; align-items:center; gap:6px; } .sb-icons svg{ display:block; }
+
+  /* ── Species screen: chrome ────────────────────────────────────────────── */
+  .topbar{ flex:0 0 auto; display:flex; align-items:center; gap:12px; padding:2px 20px 8px; z-index:20; }
+  .icon-btn{ width:38px; height:38px; border-radius:999px; display:grid; place-items:center; color:var(--ink); background:rgba(255,255,255,.55); border:1px solid var(--line); }
+  .topbar .tb-title{ font-size:15px; font-weight:600; }
+  .topbar .tb-sub{ font-size:12px; color:var(--ink2); }
+  .topbar .spacer{ margin-left:auto; }
+
+  .stage{ position:relative; flex:1 1 auto; overflow:hidden; }
+  .biome{ position:absolute; inset:0; z-index:0;
+    background:
+      radial-gradient(120% 70% at 50% -6%, rgba(255,255,255,.55), rgba(255,255,255,0) 58%),
+      linear-gradient(180deg, hsl(var(--h,190) 34% 60%), hsl(var(--h,190) 42% 36%) 66%, hsl(var(--h,190) 48% 20%));
+    transition:--h .55s ease; }
+  .biome::before{ content:""; position:absolute; inset:0; opacity:.55; mix-blend-mode:screen;
+    background:repeating-linear-gradient(80deg, rgba(255,255,255,.12) 0 2px, rgba(255,255,255,0) 2px 30px); }
+  .biome::after{ content:""; position:absolute; inset:0;
+    background:radial-gradient(130% 90% at 50% 8%, rgba(0,0,0,0) 42%, rgba(4,16,12,.5)); }
+
+  .track{ position:absolute; inset:0; z-index:2; }
+  .slide{ position:absolute; top:50%; left:50%; width:70%; height:74%; transform:translate(-50%,-50%); cursor:pointer;
+    transition:transform .42s cubic-bezier(.22,1,.36,1), opacity .42s, filter .42s; will-change:transform,opacity; }
+  .fish-box{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); height:66%; }
+  .fish{ width:100%; height:100%; object-fit:cover; display:block;
+    -webkit-mask-image:radial-gradient(74% 80% at 50% 50%, #000 58%, rgba(0,0,0,0) 92%);
+    mask-image:radial-gradient(74% 80% at 50% 50%, #000 58%, rgba(0,0,0,0) 92%);
+    filter:drop-shadow(0 26px 34px rgba(0,0,0,.4)) saturate(1.05) contrast(1.02); }
+  .slide.undiscovered .fish{ filter:brightness(0) drop-shadow(0 22px 30px rgba(0,0,0,.45)); opacity:.5; }
+  .slide .qm{ position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); text-align:center; font-family:"Fraunces",serif;
+    font-size:62px; color:rgba(255,255,255,.5); display:none; }
+  .slide.undiscovered .qm{ display:block; }
+  .nav-arrow{ position:absolute; top:50%; transform:translateY(-50%); z-index:8; width:40px; height:40px; border-radius:999px; border:0;
+    background:rgba(255,255,255,.75); color:var(--ink); display:grid; place-items:center; box-shadow:0 6px 16px -6px rgba(0,0,0,.4); cursor:pointer; }
+  .nav-arrow.l{ left:12px; } .nav-arrow.r{ right:12px; }
+  .nav-arrow:disabled{ opacity:0; pointer-events:none; }
+
+  .info{ position:relative; flex:0 0 auto; padding:0 24px 26px; z-index:20;
+    background:linear-gradient(180deg, rgba(241,239,233,0), var(--paper) 34%); }
+  .hab{ font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); font-weight:600; }
+  .name{ font-family:"Fraunces",serif; font-weight:500; font-size:30px; line-height:1.08; letter-spacing:-.01em; margin:6px 0 2px; }
+  .sci{ font-size:13.5px; font-style:italic; color:var(--ink2); }
+  .statline{ margin-top:12px; display:flex; align-items:center; gap:10px; }
+  .statline .sicon{ width:30px; height:30px; border-radius:9px; background:rgba(46,107,96,.12); color:var(--accent); display:grid; place-items:center; flex:0 0 auto; }
+  .statline .stxt{ font-size:14px; color:var(--ink2); }
+  .statline .stxt b{ color:var(--ink); font-weight:600; }
+  .dots{ display:flex; gap:7px; margin-top:18px; }
+  .dots i{ width:7px; height:7px; border-radius:999px; background:var(--line2); transition:all .25s; }
+  .dots i.on{ background:var(--accent); width:20px; }
+
+  /* ── Binder screen ─────────────────────────────────────────────────────── */
+  .binder-head{ flex:0 0 auto; padding:2px 20px 0; }
+  .bh-title{ font-family:"Fraunces",serif; font-weight:500; font-size:27px; letter-spacing:-.01em; }
+  .bh-sub{ font-size:12.5px; color:var(--ink2); margin-top:2px; }
+  .search{ margin:14px 0 0; display:flex; align-items:center; gap:9px; background:#fff; border:1px solid var(--line); border-radius:999px; padding:10px 15px; box-shadow:0 2px 8px -6px rgba(0,0,0,.3); }
+  .search svg{ color:var(--ink3); flex:0 0 auto; }
+  .search .ph{ color:var(--ink3); font-size:14.5px; }
+  .chips{ display:flex; gap:8px; margin:14px 0 0; }
+  .chip{ font-size:13px; font-weight:500; color:var(--ink2); background:rgba(255,255,255,.6); border:1px solid var(--line); padding:6px 13px; border-radius:999px; }
+  .chip.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  .binder-grid{ flex:1 1 auto; overflow-y:auto; padding:16px 16px 26px; display:grid; grid-template-columns:1fr 1fr; gap:14px; align-content:start; }
+  .binder-grid::-webkit-scrollbar{ width:0; }
+  .tile{ }
+  .tmini{ position:relative; aspect-ratio:16/11; border-radius:15px; overflow:hidden;
+    background:
+      radial-gradient(120% 70% at 50% -6%, rgba(255,255,255,.5), rgba(255,255,255,0) 60%),
+      linear-gradient(180deg, hsl(var(--h) 34% 58%), hsl(var(--h) 44% 30%)); }
+  .tmini img{ width:100%; height:100%; object-fit:cover; display:block;
+    -webkit-mask-image:radial-gradient(76% 82% at 50% 52%, #000 58%, transparent 94%);
+    mask-image:radial-gradient(76% 82% at 50% 52%, #000 58%, transparent 94%);
+    filter:drop-shadow(0 10px 14px rgba(0,0,0,.4)) saturate(1.04); }
+  .tile.undiscovered .tmini img{ filter:brightness(0); opacity:.5; }
+  .tile.undiscovered .tmini::after{ content:"?"; position:absolute; inset:0; display:grid; place-items:center; font-family:"Fraunces",serif; font-size:34px; color:rgba(255,255,255,.55); }
+  .tname{ font-family:"Fraunces",serif; font-weight:500; font-size:15px; margin-top:8px; letter-spacing:-.01em; }
+  .tile.undiscovered .tname{ color:var(--ink3); }
+  .tstat{ font-size:12px; color:var(--ink2); margin-top:1px; }
+  .tstat b{ color:var(--ink); }
+
+  /* ── Panels ────────────────────────────────────────────────────────────── */
+  .panel{ background:var(--sheet); border-radius:var(--r-card); padding:30px; border:1px solid var(--line); box-shadow:0 24px 60px -50px rgba(20,40,34,.6); }
+  .panel h3{ font-family:"Fraunces",serif; font-weight:500; font-size:21px; margin:0 0 16px; }
+  .cards3{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:22px; }
+  .fcard h4{ font-family:"Fraunces",serif; font-weight:500; font-size:17px; margin:0 0 6px; }
+  .fcard p{ margin:0; font-size:14px; color:var(--ink2); line-height:1.6; }
+  .fcard .ic{ width:38px; height:38px; border-radius:11px; background:rgba(46,107,96,.1); color:var(--accent); display:grid; place-items:center; margin-bottom:12px; }
+  .changed{ display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:20px; }
+  .col h4{ font-size:13px; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin:0 0 10px; }
+  .col.before h4{ color:var(--ink3); } .col.after h4{ color:var(--accent); }
+  .col ul{ margin:0; padding-left:18px; font-size:14px; color:var(--ink2); line-height:1.7; }
+  .col.after ul{ color:var(--ink); }
+
+  /* ── Decision ──────────────────────────────────────────────────────────── */
+  .decide{ border:1px solid var(--line2); border-left:4px solid var(--accent); border-radius:var(--r-card); padding:30px; margin-top:40px; background:var(--sheet); box-shadow:0 30px 70px -55px rgba(20,40,34,.7); }
+  .decide h2{ font-family:"Fraunces",serif; font-weight:500; font-size:25px; margin:0 0 6px; }
+  .decide .sub{ margin:0 0 20px; font-size:15px; color:var(--ink2); }
+  .choices{ display:grid; gap:8px; margin-bottom:16px; }
+  .choice{ display:flex; gap:12px; align-items:flex-start; padding:14px 16px; border:1px solid var(--line); border-radius:13px; cursor:pointer; background:#fff; }
+  .choice:hover{ border-color:var(--accent); }
+  .choice input{ margin-top:3px; accent-color:var(--accent); }
+  .choice b{ font-weight:600; }
+  .choice small{ display:block; color:var(--ink2); font-size:13px; margin-top:2px; }
+  textarea.notes{ width:100%; border-radius:13px; border:1px solid var(--line2); background:#fff; color:var(--ink); padding:12px 14px; font:inherit; font-size:15px; resize:vertical; }
+  textarea.notes:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .act{ display:flex; align-items:center; gap:14px; margin-top:14px; flex-wrap:wrap; }
+  .qbtn{ background:var(--accent); color:#fff; border:0; font:inherit; font-weight:600; font-size:16px; padding:11px 22px; border-radius:13px; cursor:pointer; }
+  .qbtn.ghost{ background:transparent; color:var(--accent); box-shadow:none; }
+  #qstatus{ font-size:13px; color:var(--accent); }
+  .foot{ margin-top:36px; font-size:13px; color:var(--ink2); }
+  .foot a{ color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <p class="kicker">Field guide · revised direction</p>
+    <h1 class="hd">A quiet field guide for your <em>waters</em>.</h1>
+    <p class="deck">You were right, the card-collecting take was too gamey. This keeps the binder idea but makes it a naturalist's guide: a swipeable carousel where each species sits in the water it lives in, undiscovered fish stay as silhouettes, and the only number on screen is the one that matters — your best of that fish.</p>
+    <div class="facts">
+      <span><b>Removed:</b> dex numbers, rarity, holo, "card" language</span>
+      <span><b>Added:</b> real fish photos, water biomes, swipe</span>
+      <span><b>Stat:</b> one, chosen automatically per species</span>
+      <span><b>Binder:</b> now with search</span>
+    </div>
+  </header>
+
+  <div class="label-row"><h2>Species</h2><span>Swipe or use the arrows. The fish you're viewing sits in its home water; the next ones wait at the edges.</span></div>
+
+  <div class="devices">
+    <!-- SPECIES CAROUSEL -->
+    <div class="device-wrap">
+      <div class="phone">
+        <div class="screen">
+          <div class="island"></div>
+          <div class="statusbar"><span class="num">9:41</span>
+            <span class="sb-icons">
+              <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1" /><rect x="4.5" y="5.5" width="3" height="6.5" rx="1" /><rect x="9" y="3" width="3" height="9" rx="1" /><rect x="13.5" y="0" width="3" height="12" rx="1" /></svg>
+              <svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x=".5" y=".5" width="21" height="12" rx="3.5" stroke="currentColor" opacity=".45" /><rect x="2" y="2" width="16" height="9" rx="2.2" fill="currentColor" /><path d="M23.5 4.2v4.6c1-.4 1.6-1.2 1.6-2.3s-.6-1.9-1.6-2.3Z" fill="currentColor" opacity=".5" /></svg>
+            </span>
+          </div>
+
+          <div class="topbar">
+            <span class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6" /></svg></span>
+            <div><div class="tb-title">Species</div><div class="tb-sub">Grand River · this season</div></div>
+            <span class="spacer"></span>
+            <span class="icon-btn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg></span>
+          </div>
+
+          <div class="stage" id="stage">
+            <div class="biome" id="biome"></div>
+            <div class="track" id="track"></div>
+            <button class="nav-arrow l" id="prev" aria-label="Previous species"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6" /></svg></button>
+            <button class="nav-arrow r" id="next" aria-label="Next species"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg></button>
+          </div>
+
+          <div class="info">
+            <div class="hab" id="hab">Rocky river</div>
+            <h2 class="name" id="name">Smallmouth Bass</h2>
+            <div class="sci" id="sci">Micropterus dolomieu</div>
+            <div class="statline" id="statline"></div>
+            <div class="dots" id="dots"></div>
+          </div>
+        </div>
+      </div>
+      <div class="device-cap"><b>Species</b>One fish in its water at a time. The neighbours peek at the edges so you know what's next; the text sits underneath.</div>
+    </div>
+
+    <!-- BINDER / COLLECTION -->
+    <div class="device-wrap">
+      <div class="phone">
+        <div class="screen">
+          <div class="island"></div>
+          <div class="statusbar"><span class="num">9:41</span>
+            <span class="sb-icons">
+              <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1" /><rect x="4.5" y="5.5" width="3" height="6.5" rx="1" /><rect x="9" y="3" width="3" height="9" rx="1" /><rect x="13.5" y="0" width="3" height="12" rx="1" /></svg>
+              <svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x=".5" y=".5" width="21" height="12" rx="3.5" stroke="currentColor" opacity=".45" /><rect x="2" y="2" width="16" height="9" rx="2.2" fill="currentColor" /><path d="M23.5 4.2v4.6c1-.4 1.6-1.2 1.6-2.3s-.6-1.9-1.6-2.3Z" fill="currentColor" opacity=".5" /></svg>
+            </span>
+          </div>
+
+          <div class="binder-head">
+            <div class="bh-title">My FishDex</div>
+            <div class="bh-sub">Grand River · 12 of 56 species logged</div>
+            <div class="search">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.2-3.2" /></svg>
+              <span class="ph">Search species or water</span>
+            </div>
+            <div class="chips"><span class="chip on">All</span><span class="chip">Caught</span><span class="chip">Not yet</span></div>
+          </div>
+
+          <div class="binder-grid" id="binderGrid"></div>
+        </div>
+      </div>
+      <div class="device-cap"><b>Binder</b>The collection view, now with search. Discovered fish show their photo; the rest stay silhouettes.</div>
+    </div>
+  </div>
+
+  <div class="label-row"><h2>The idea</h2><span>Four quiet decisions that keep it a field guide, not a game.</span></div>
+  <div class="panel">
+    <div class="cards3">
+      <div class="fcard"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c3-5 9-5 12 0-3 5-9 5-12 0Z" /><circle cx="7.5" cy="12" r="1" fill="currentColor" /><path d="M15 12l6-3v6l-6-3Z" /></svg></div><h4>One fish at a time</h4><p>The species fills the frame, with the next ones waiting half-seen at the edges. Swipe to move through them; nothing competes for attention.</p></div>
+      <div class="fcard"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16c3-1 5-5 8-5s5 4 8 5" /><path d="M4 20h16" /></svg></div><h4>Its own water</h4><p>Behind every fish is the water it lives in. For now one treatment (a soft underwater column, tinted by habitat); we can branch into distinct biomes later.</p></div>
+      <div class="fcard"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 10l7-7 7 7" /></svg></div><h4>One honest number</h4><p>No point values. The card shows the single most relevant fact, chosen for you: your biggest of that fish, or how many you've logged, or nothing but a silhouette.</p></div>
+      <div class="fcard"><div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 14s1 1.5 3 1.5S15 14 15 14M9 9h.01M15 9h.01" /></svg></div><h4>Undiscovered stay hidden</h4><p>Fish you haven't caught appear only as a silhouette in the water, so the guide grows with your season instead of spoiling the list.</p></div>
+    </div>
+  </div>
+
+  <div class="label-row"><h2>What changed</h2><span>From the card-game take to the field guide.</span></div>
+  <div class="panel">
+    <div class="changed">
+      <div class="col before">
+        <h4>Before (too gamey)</h4>
+        <ul>
+          <li>Rarity gems and "Holo" labels</li>
+          <li>Dex numbers and set symbols</li>
+          <li>Cards in plastic pockets, foils, stickers</li>
+          <li>Read as a collectible toy, not a fishing tool</li>
+        </ul>
+      </div>
+      <div class="col after">
+        <h4>After (field guide)</h4>
+        <ul>
+          <li>Real photography of the actual fish</li>
+          <li>Each species in its home water</li>
+          <li>Swipe carousel, one species centred</li>
+          <li>One earned stat, no points or rarities</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <section class="decide" data-lavish-question="fieldguide-direction">
+    <h2>Is this the balance?</h2>
+    <p class="sub">Native controls register directly; pick one to queue it, or annotate the phone screens and comment.</p>
+    <form id="fg-form" onsubmit="queueChoice(event)">
+      <div class="choices">
+        <label class="choice"><input type="radio" name="direction" value="YES" data-label="Yes, this is the balance"><span><b>Yes, this is the balance</b><small>Nature and intellect, still a pleasure to collect.</small></span></label>
+        <label class="choice"><input type="radio" name="direction" value="TUNE" data-label="Close, tune it"><span><b>Close, tune it</b><small>Right idea. Tell me below what to push or pull.</small></span></label>
+        <label class="choice"><input type="radio" name="direction" value="BIOMES" data-label="Explore distinct biomes next"><span><b>Explore distinct biomes next</b><small>Keep this, but make each water a real different scene.</small></span></label>
+        <label class="choice"><input type="radio" name="direction" value="NONE" data-label="Not this direction"><span><b>Not this direction</b><small>I'll rebuild again from what you describe.</small></span></label>
+      </div>
+      <textarea class="notes" name="notes" rows="3" placeholder="What feels right or off? (the water, the swipe, the stat, the tone)"></textarea>
+      <div class="act"><button type="submit" class="qbtn">Queue this answer</button><span id="qstatus" role="status" aria-live="polite"></span></div>
+    </form>
+    <div style="margin-top:16px">
+      <button type="button" class="qbtn ghost" onclick="(async (btn) => {
+        const copyRun = btn._lavishCopyRun = (btn._lavishCopyRun || 0) + 1;
+        const qs = [...document.querySelectorAll('[data-lavish-question]')];
+        const status = btn.parentElement.querySelector('[data-lavish-copy-all-status]');
+        btn.parentElement.querySelector('[data-lavish-copy-all-manual]')?.remove();
+        const out = [];
+        for (const q of qs) {
+          const key = q.getAttribute('data-lavish-question')?.trim() || 'Question';
+          const lines = [];
+          for (const el of q.querySelectorAll('input, select, textarea')) {
+            if (el.matches(':disabled')) continue;
+            if (el.closest('[data-lavish-question]') !== q) continue;
+            const isChoice = el.matches('input[type=checkbox], input[type=radio]');
+            if (isChoice && !el.checked) continue;
+            if (el.matches('input[type=button], input[type=submit], input[type=reset], input[type=image], input[type=hidden], input[type=file], input[type=range], input[type=color]')) continue;
+            let vals;
+            if (el instanceof HTMLSelectElement) {
+              vals = [...el.selectedOptions].filter((o) => !o.disabled && !o.closest('optgroup[disabled]')).map((o) => o.value.trim()).filter(Boolean);
+            } else {
+              const v = isChoice && (!el.hasAttribute('value') || !el.value.trim())
+                ? el.labels?.[0]?.textContent?.trim() || el.getAttribute('aria-label')?.trim() || el.name || ''
+                : el.value.trim();
+              vals = v ? [v] : [];
+            }
+            const label = el.name || el.labels?.[0]?.textContent?.trim() || el.getAttribute('aria-label')?.trim() || el.getAttribute('placeholder')?.trim() || el.tagName.toLowerCase();
+            for (const v of vals) lines.push('  ' + label + ': ' + v.split('\n').join('\n    '));
+          }
+          if (lines.length) out.push(key + ':\n' + lines.join('\n'));
+        }
+        const text = out.join('\n\n');
+        if (!text) { status.textContent = qs.length ? 'No answers to copy yet.' : 'No questions or answers to copy.'; return; }
+        status.textContent = '';
+        try {
+          if (typeof navigator.clipboard?.writeText !== 'function') throw new Error('Clipboard API unavailable');
+          await navigator.clipboard.writeText(text);
+          if (copyRun !== btn._lavishCopyRun) return;
+          status.textContent = 'Answers copied.'; return;
+        } catch {}
+        if (copyRun !== btn._lavishCopyRun) return;
+        const tmp = document.createElement('textarea'); tmp.value = text; tmp.readOnly = true; tmp.setAttribute('aria-hidden','true');
+        tmp.style.position='fixed'; tmp.style.left='-10000px'; document.body.append(tmp); tmp.focus(); tmp.select();
+        let ok=false; try { ok = document.execCommand('copy'); } catch {}
+        tmp.remove();
+        if (ok) { status.textContent = 'Answers copied.'; return; }
+        btn.parentElement.querySelector('[data-lavish-copy-all-manual]')?.remove();
+        const man = document.createElement('textarea'); man.value = text; man.readOnly = true;
+        man.rows = Math.min(12, Math.max(3, text.split('\n').length)); man.setAttribute('aria-label','Answers to copy manually');
+        man.dataset.lavishCopyAllManual = ''; btn.insertAdjacentElement('afterend', man); man.focus(); man.select();
+        status.textContent = 'Clipboard unavailable. Copy the answers below manually.';
+      })(this)">Copy all answers</button>
+      <span data-lavish-copy-all-status role="status" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <p class="foot">Review artifact, no app code changed. Fish photography from Wikimedia Commons, loaded here for demonstration only. Biome is a single style for now; habitats are tinted variations.</p>
+</div>
+
+<script>
+  const WM = 'https://upload.wikimedia.org/wikipedia/commons/thumb/';
+  const ph = (dir, file, w) => WM + dir + '/' + file + '/' + w + 'px-' + file;
+
+  const SPECIES = [
+    { name:'Smallmouth Bass', sci:'Micropterus dolomieu',     hab:'Rocky river',    h:174, dir:'f/f3', file:'Smallmouth_Bass_%2849561724026%29.jpg',                       caught:true, biggest:'19.5' },
+    { name:'Walleye',         sci:'Sander vitreus',           hab:'Deep lake',      h:205, dir:'4/41', file:'Walleye_%28Sander_vitreus%29_%281%29.jpg',                     caught:true, biggest:'24.0' },
+    { name:'Northern Pike',   sci:'Esox lucius',              hab:'Weedy shallows', h:95,  dir:'9/93', file:'Esox_lucius_ZOO_1.jpg',                                        caught:true, biggest:'31.2' },
+    { name:'Yellow Perch',    sci:'Perca flavescens',         hab:'Warm shallows',  h:55,  dir:'c/c7', file:'Yellow_Perch_%28Perca_flavescens%29_%28cropped%29.jpg',        caught:true, cnt:9 },
+    { name:'Rainbow Trout',   sci:'Oncorhynchus mykiss',      hab:'Cold stream',    h:200, dir:'c/c1', file:'Close_up_of_rainbow_trout_fish_underwater_oncorhynchus_mykiss.jpg', caught:true, biggest:'14.3' },
+    { name:'Chinook Salmon',  sci:'Oncorhynchus tshawytscha', hab:'Coastal river',  h:215, dir:'d/d8', file:'Chinook_Salmon_Adult_Male.jpg',                                caught:true, biggest:'27.8' },
+    { name:'Muskellunge',     sci:'Esox masquinongy',         hab:'Dark lake',      h:160, dir:'d/d2', file:'Esox_masquinongyeditcrop.jpg',                                 caught:false },
+    { name:'Largemouth Bass', sci:'Micropterus salmoides',    hab:'Lily-pad bay',   h:120, dir:'f/fb', file:'Largemouth_Bass_%28Micropterus_salmoides%29_June_2023_%28cropped%29.jpg', caught:true, cnt:6 },
+    { name:'Brown Trout',     sci:'Salmo trutta',             hab:'Spring creek',   h:80,  dir:'2/27', file:'Brown_Trout_%28Salmo_trutta%29_%2853678765394%29.jpg',         caught:false },
+    { name:'Bluegill',        sci:'Lepomis macrochirus',      hab:'Pond',           h:130, dir:'d/d4', file:'Bluegill_%28cropped%29.jpg',                                   caught:true, cnt:12 },
+  ];
+
+  // Auto-chosen single stat.
+  function statOf(s){
+    if (!s.caught) return null;
+    if (s.biggest) return { label:'Personal best', value:s.biggest + ' in', icon:'ruler' };
+    if (s.cnt)     return { label:'Logged',        value:s.cnt + ' times',    icon:'count' };
+    return { label:'Logged', value:'once', icon:'count' };
+  }
+  const STAT_ICON = {
+    ruler:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l6-6 12 12-6 6z"/><path d="M7 7l2 2M10 4l2 2M13 13l2 2M16 10l2 2"/></svg>',
+    count:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  };
+  const src = (s, w) => ph(s.dir, s.file, w);
+
+  // ── Carousel ────────────────────────────────────────────────────────────
+  const track = document.getElementById('track');
+  const biome = document.getElementById('biome');
+  const dots  = document.getElementById('dots');
+  let active = 0;
+
+  SPECIES.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'slide' + (s.caught ? '' : ' undiscovered');
+    el.dataset.i = i;
+    el.innerHTML = '<div class="fish-box"><img class="fish" loading="lazy" alt="" src="' + src(s, 960) + '"></div><div class="qm">?</div>';
+    el.addEventListener('click', () => { if (i !== active) setActive(i); });
+    track.appendChild(el);
+  });
+  SPECIES.forEach((_, i) => dots.insertAdjacentHTML('beforeend', '<i></i>'));
+
+  const slides = [...track.children];
+  const dotEls = [...dots.children];
+
+  function layout(){
+    slides.forEach((el, i) => {
+      const off = i - active;
+      const c = Math.max(-2, Math.min(2, off));
+      const x = c * 52;
+      const sc = 1 - Math.abs(c) * 0.15;
+      const op = Math.abs(off) > 1 ? 0 : (off === 0 ? 1 : 0.92);
+      el.style.transform = 'translate(calc(-50% + ' + x + '%), -50%) scale(' + sc + ')';
+      el.style.zIndex = String(20 - Math.abs(c));
+      el.style.opacity = op;
+      el.style.filter = off === 0 ? 'none' : 'blur(1.4px) brightness(.9)';
+      el.style.pointerEvents = Math.abs(off) <= 1 ? 'auto' : 'none';
+    });
+    const s = SPECIES[active];
+    biome.style.setProperty('--h', s.h);
+    document.getElementById('hab').textContent = s.hab;
+    document.getElementById('name').textContent = s.caught ? s.name : 'Undiscovered';
+    document.getElementById('sci').textContent = s.caught ? s.sci : 'Not yet logged in this water';
+    const st = statOf(s);
+    const sl = document.getElementById('statline');
+    sl.innerHTML = st
+      ? '<span class="sicon">' + (STAT_ICON[st.icon] || '') + '</span><span class="stxt">' + st.label + ' · <b>' + st.value + '</b></span>'
+      : '<span class="sicon">' + STAT_ICON.count + '</span><span class="stxt">No records yet — <b>catch one to begin</b></span>';
+    dotEls.forEach((d, i) => d.classList.toggle('on', i === active));
+    document.getElementById('prev').disabled = active === 0;
+    document.getElementById('next').disabled = active === SPECIES.length - 1;
+  }
+  function setActive(i){ active = Math.max(0, Math.min(SPECIES.length - 1, i)); layout(); }
+
+  document.getElementById('prev').addEventListener('click', () => setActive(active - 1));
+  document.getElementById('next').addEventListener('click', () => setActive(active + 1));
+
+  // swipe
+  const stage = document.getElementById('stage');
+  let dx0 = null;
+  stage.addEventListener('pointerdown', e => { dx0 = e.clientX; });
+  stage.addEventListener('pointerup', e => {
+    if (dx0 === null) return;
+    const dx = e.clientX - dx0; dx0 = null;
+    if (Math.abs(dx) > 42) setActive(active + (dx < 0 ? 1 : -1));
+  });
+  window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight') setActive(active + 1);
+    if (e.key === 'ArrowLeft') setActive(active - 1);
+  });
+
+  layout();
+
+  // ── Binder grid ─────────────────────────────────────────────────────────
+  const grid = document.getElementById('binderGrid');
+  grid.innerHTML = SPECIES.map(s => {
+    const st = statOf(s);
+    const statTxt = st ? st.label + ' · <b>' + st.value + '</b>' : 'Not yet logged';
+    return '<div class="tile' + (s.caught ? '' : ' undiscovered') + '">' +
+      '<div class="tmini" style="--h:' + s.h + '"><img loading="lazy" alt="" src="' + src(s, 500) + '"></div>' +
+      '<div class="tname">' + (s.caught ? s.name : 'Undiscovered') + '</div>' +
+      '<div class="tstat">' + statTxt + '</div></div>';
+  }).join('');
+
+  function queueChoice(e){
+    e.preventDefault();
+    const form = e.currentTarget;
+    const choice = (new FormData(form).get('direction') || '').toString();
+    const notes = (form.notes.value || '').trim();
+    const status = document.getElementById('qstatus');
+    if (!choice){ status.textContent = 'Pick an option first, or just annotate above.'; return; }
+    const input = form.querySelector('input[name="direction"][value="' + choice + '"]');
+    const label = input ? input.dataset.label : choice;
+    const msg = 'FishDex species direction: ' + choice + ' (' + label + ').' + (notes ? ' Notes: ' + notes : '');
+    const payload = { tag:'choice', text:msg, element:form, data:{ question:'fieldguide-direction', answer:choice, label:label, notes:notes } };
+    if (window.lavish && typeof window.lavish.queuePrompt === 'function'){
+      window.lavish.queuePrompt(msg, payload);
+      status.textContent = 'Queued. Press Send to agent when ready.';
+    } else {
+      status.textContent = 'Copy the answer below and paste it to the agent.';
+    }
+  }
+</script>
+</body>
+</html>
