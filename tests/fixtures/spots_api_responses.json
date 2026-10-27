@@ -305,6 +305,18 @@
           "not_built": "No river sections are built yet, so there are no sections to draw. The sections are made when the explore map's rivers are built."
         },
         "bathymetry_data_note": "Depth is measured at the survey's own water level, not today's. The source does not state the unit; metres is taken from the values.",
+        "repeated_titles": {
+          "templates": {
+            "road": "{title}, near {place}",
+            "access": "{title}, near {place}",
+            "junction": "{title}, near where {place} joins",
+            "order": "{title} ({n} of {total}, {direction})"
+          },
+          "directions": {
+            "west_to_east": "west to east",
+            "north_to_south": "north to south"
+          }
+        },
         "quiet_water": {
           "titles": {
             "named": "A quiet part of {name}",
@@ -895,7 +907,7 @@
             "properties": {
               "spot_id": "below_dam:n8037795_4370422",
               "kind": "below_dam",
-              "title": "Below the dam on the Grand River",
+              "title": "Below the dam on the Grand River, near Tower Street North",
               "subtitle": "Grand River · Upper Grand — Shand Dam to West Montrose",
               "tier": 2,
               "jurisdiction": "CA-ON",
@@ -922,7 +934,7 @@
             "properties": {
               "spot_id": "below_dam:n8045086_4366205",
               "kind": "below_dam",
-              "title": "Below the dam on the Grand River",
+              "title": "Below the dam on the Grand River, near where Carroll Creek joins",
               "subtitle": "Grand River · Upper Grand — Shand Dam to West Montrose",
               "tier": 2,
               "jurisdiction": "CA-ON",
@@ -1603,7 +1615,8 @@
           "joining_upstream_km": 1377.5,
           "river_flows_on": true,
           "river_upstream_km": 4298.4,
-          "tributary_name_from_water_id": "nith-ayr-paris"
+          "tributary_name_from_water_id": "nith-ayr-paris",
+          "tributary_name": "Nith River"
         },
         "signals": {
           "named": true,
@@ -2093,7 +2106,8 @@
           "joining_upstream_km": 100.8,
           "name_from_ogf_id": 121770066,
           "river_flows_on": true,
-          "river_upstream_km": 0.0
+          "river_upstream_km": 0.0,
+          "tributary_name": "Palliser Creek"
         },
         "signals": {
           "named": true,
@@ -2130,13 +2144,13 @@
           {
             "spot_id": "creek_junction:n7738520_4421457",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Moira River",
+            "title": "Where a small creek joins the Moira River (2 of 2, west to east)",
             "tier": 3
           },
           {
             "spot_id": "creek_junction:n7741878_4422916",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Moira River",
+            "title": "Where a small creek joins the Moira River, near where Palliser Creek joins",
             "tier": 3
           }
         ],
@@ -2856,7 +2870,8 @@
           "joining_upstream_km": 46.0,
           "name_from_ogf_id": 67870681,
           "river_flows_on": true,
-          "river_upstream_km": 1238.2
+          "river_upstream_km": 1238.2,
+          "tributary_name": "Mullet Creek"
         },
         "signals": {
           "named": true,
@@ -3058,7 +3073,7 @@
         "water_name": "Otonabee River — Lakefield to Rice Lake",
         "water_body_id": "river:otonabee-river",
         "also_on_water_body_ids": [],
-        "title": "Where a small creek joins the Otonabee River",
+        "title": "Where a small creek joins the Otonabee River, near where Otonabee River joins",
         "subtitle": "Otonabee River — Lakefield to Rice Lake",
         "tier": 3,
         "structure_type": "junction",
@@ -3068,7 +3083,8 @@
           ],
           "joining_upstream_km": 11.0,
           "river_flows_on": true,
-          "river_upstream_km": 12560.8
+          "river_upstream_km": 12560.8,
+          "title_distinguished_by": "junction"
         },
         "signals": {
           "named": false,
@@ -3135,7 +3151,7 @@
           {
             "spot_id": "creek_junction:n7828572_4420842",
             "kind": "creek_junction",
-            "title": "Where a creek joins the Otonabee River",
+            "title": "Where a creek joins the Otonabee River (3 of 3, west to east)",
             "tier": 2
           },
           {
@@ -3147,7 +3163,7 @@
           {
             "spot_id": "creek_junction:n7830472_4419964",
             "kind": "creek_junction",
-            "title": "Where a creek joins the Otonabee River",
+            "title": "Where a creek joins the Otonabee River (2 of 3, west to east)",
             "tier": 2
           },
           {
@@ -3165,31 +3181,31 @@
           {
             "spot_id": "creek_junction:n7834572_4422733",
             "kind": "creek_junction",
-            "title": "Where a creek joins the Otonabee River",
+            "title": "Where a creek joins the Otonabee River, near where Cavan Creek joins",
             "tier": 2
           },
           {
             "spot_id": "creek_junction:n7824098_4419233",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Otonabee River",
+            "title": "Where a small creek joins the Otonabee River (5 of 5, north to south)",
             "tier": 3
           },
           {
             "spot_id": "creek_junction:n7832371_4427216",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Otonabee River",
+            "title": "Where a small creek joins the Otonabee River (2 of 5, north to south)",
             "tier": 3
           },
           {
             "spot_id": "creek_junction:n7833759_4424392",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Otonabee River",
+            "title": "Where a small creek joins the Otonabee River (3 of 5, north to south)",
             "tier": 3
           },
           {
             "spot_id": "creek_junction:n7834313_4423505",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Otonabee River",
+            "title": "Where a small creek joins the Otonabee River, near where Cavan Creek joins",
             "tier": 3
           }
         ],
@@ -12872,7 +12888,7 @@
           {
             "spot_id": "creek_junction:n7986378_4364837",
             "kind": "creek_junction",
-            "title": "Where Black Creek joins the Credit River",
+            "title": "Where Black Creek joins the Credit River (2 of 2, north to south)",
             "tier": 1,
             "lat": 43.64837,
             "lng": -79.86378
@@ -12928,7 +12944,7 @@
           {
             "spot_id": "creek_junction:n7994036_4381068",
             "kind": "creek_junction",
-            "title": "Where Black Creek joins the Credit River",
+            "title": "Where Black Creek joins the Credit River, near where Little Credit River joins",
             "tier": 2,
             "lat": 43.81068,
             "lng": -79.94036
@@ -12936,7 +12952,7 @@
           {
             "spot_id": "creek_junction:n7976707_4364057",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Credit River",
+            "title": "Where a small creek joins the Credit River (6 of 6, west to east)",
             "tier": 3,
             "lat": 43.64057,
             "lng": -79.76707
@@ -12944,7 +12960,7 @@
           {
             "spot_id": "creek_junction:n7977626_4364444",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Credit River",
+            "title": "Where a small creek joins the Credit River (5 of 6, west to east)",
             "tier": 3,
             "lat": 43.64444,
             "lng": -79.77626
@@ -12952,7 +12968,7 @@
           {
             "spot_id": "creek_junction:n7984665_4364705",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Credit River",
+            "title": "Where a small creek joins the Credit River, near where Black Creek joins",
             "tier": 3,
             "lat": 43.64705,
             "lng": -79.84665
@@ -12960,7 +12976,7 @@
           {
             "spot_id": "creek_junction:n7991364_4366331",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Credit River",
+            "title": "Where a small creek joins the Credit River (3 of 6, west to east)",
             "tier": 3,
             "lat": 43.66331,
             "lng": -79.91364
@@ -12968,7 +12984,7 @@
           {
             "spot_id": "creek_junction:n7992716_4373248",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Credit River",
+            "title": "Where a small creek joins the Credit River (2 of 6, west to east)",
             "tier": 3,
             "lat": 43.73248,
             "lng": -79.92716
@@ -12976,7 +12992,7 @@
           {
             "spot_id": "creek_junction:n7993604_4371405",
             "kind": "creek_junction",
-            "title": "Where a small creek joins the Credit River",
+            "title": "Where a small creek joins the Credit River, near where Rogers Creek joins",
             "tier": 3,
             "lat": 43.71405,
             "lng": -79.93604
