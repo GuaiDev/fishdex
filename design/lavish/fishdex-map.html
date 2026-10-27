@@ -1,0 +1,1227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>FishDex — Explore map (filters, layers, shorelines, weeds, conditions) · Lavish review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{
+    --paper:#F1EFE9; --sheet:#FBFAF7; --ink:#1E2A27; --ink2:#5E6A64; --ink3:#97A19B;
+    --line:#E2DED3; --line2:#D5D0C3; --accent:#2E6B60; --accent-2:#245A50; --sand:#C9A96A;
+    --shadow:0 30px 70px -40px rgba(20,40,34,.55); --r-card:20px; --r-phone:54px;
+    /* spot-kind hues — a restrained naturalist chart palette */
+    --k-mouth:#2E6B60; --k-junction:#6B7A3A; --k-dam:#A8543A; --k-public:#B08A3E; --k-quiet:#5E7A86;
+    --map-paper:#EDE7DA;
+  }
+  *,*::before,*::after{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{ background:var(--paper); color:var(--ink);
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:16px; line-height:1.55; -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(rgba(60,80,70,.05) 1px, transparent 1px); background-size:24px 24px; }
+  .serif,.hd,h1,h2,h3,h4{ font-family:"Fraunces",Georgia,serif; }
+  .num{ font-variant-numeric:tabular-nums; }
+  .page{ max-width:1160px; margin:0 auto; padding:52px 24px 110px; }
+  a{ color:var(--accent); text-underline-offset:3px; }
+  code{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85em; background:#eae6dc; border:1px solid var(--line); border-radius:5px; padding:1px 5px; color:#3a4a43; }
+
+  .kicker{ font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600; margin:0 0 14px; }
+  h1{ font-weight:500; font-size:clamp(34px,5vw,56px); line-height:1.05; letter-spacing:-.015em; margin:0 0 16px; max-width:20ch; }
+  h1 em{ font-style:italic; color:var(--accent); }
+  .deck{ font-size:18px; line-height:1.55; color:var(--ink2); max-width:66ch; margin:0; }
+  .deck b{ color:var(--ink); font-weight:600; }
+  .metachips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+  .mchip{ font-size:12.5px; color:var(--ink2); background:rgba(255,255,255,.65); border:1px solid var(--line); padding:5px 11px; border-radius:999px; }
+  .mchip b{ color:var(--ink); font-weight:600; }
+
+  section{ margin-top:60px; scroll-margin-top:20px; }
+  .label-row{ display:flex; align-items:baseline; gap:12px; margin:0 0 8px; flex-wrap:wrap; }
+  .label-row h2{ font-weight:500; font-size:24px; letter-spacing:-.01em; margin:0; }
+  .label-row span{ font-size:14px; color:var(--ink2); }
+  .role{ margin:0 0 20px; font-size:15px; color:var(--ink2); max-width:72ch; }
+  .role b{ color:var(--ink); }
+  .prose{ max-width:70ch; color:var(--ink2); }
+
+  /* ---------- phone ---------- */
+  .devices{ display:flex; flex-wrap:wrap; gap:40px; align-items:flex-start; }
+  .device-wrap{ display:flex; flex-direction:column; align-items:center; gap:14px; flex:0 0 auto; }
+  .device-cap{ font-size:14px; color:var(--ink2); text-align:center; max-width:392px; }
+  .device-cap b{ color:var(--ink); font-weight:600; display:block; margin-bottom:3px; }
+  .tag{ display:inline-block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#fff; background:var(--accent); padding:4px 10px; border-radius:999px; }
+  .phone{ width:392px; max-width:100%; aspect-ratio:402/874; background:#12100e; border-radius:var(--r-phone); padding:11px; position:relative; box-shadow:var(--shadow),0 0 0 2px rgba(0,0,0,.05); }
+  .phone::after{ content:""; position:absolute; inset:11px; border-radius:43px; pointer-events:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.16); z-index:50; }
+  .screen{ position:relative; width:100%; height:100%; border-radius:43px; overflow:hidden; background:var(--paper); display:flex; flex-direction:column; }
+  .island{ position:absolute; top:12px; left:50%; transform:translateX(-50%); width:116px; height:34px; background:#000; border-radius:20px; z-index:60; }
+  .statusbar{ height:52px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:14px 30px 0; font-size:15px; font-weight:600; color:var(--ink); z-index:30; }
+  .sb-icons{ display:flex; align-items:center; gap:6px; } .sb-icons svg{ display:block; }
+  .topbar{ flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:2px 18px 10px; z-index:30; }
+  .topbar .tb-title{ font-size:16px; font-weight:600; letter-spacing:-.01em; }
+  .topbar .tb-sub{ font-size:11.5px; color:var(--ink2); }
+  .topbar .spacer{ margin-left:auto; }
+  .icon-btn{ width:38px; height:38px; border-radius:999px; display:grid; place-items:center; color:var(--ink); background:rgba(255,255,255,.7); border:1px solid var(--line); cursor:pointer; }
+  .seg{ display:flex; background:rgba(255,255,255,.6); border:1px solid var(--line); border-radius:999px; padding:3px; }
+  .seg button{ border:0; background:transparent; font:inherit; font-size:12.5px; font-weight:600; color:var(--ink2); padding:5px 12px; border-radius:999px; cursor:pointer; }
+  .seg button.on{ background:var(--ink); color:#fff; }
+
+  /* ---------- live map ---------- */
+  .mapwrap{ position:relative; flex:1 1 auto; min-height:0; margin:0 14px 14px; border-radius:26px; overflow:hidden;
+    background:var(--map-paper);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.55), 0 24px 50px -30px rgba(20,40,34,.6); }
+  #map{ position:absolute; inset:0; z-index:1; background:var(--map-paper); }
+  .leaflet-tile-pane{ filter:saturate(.86) sepia(.14) brightness(1.03) contrast(.95); }
+  .mapwrap .vignette{ position:absolute; inset:0; z-index:2; pointer-events:none;
+    box-shadow:inset 0 0 70px rgba(90,80,55,.16); background:radial-gradient(120% 80% at 50% 0%, rgba(255,255,255,.10), rgba(0,0,0,0) 60%); }
+  .leaflet-container{ font-family:inherit; background:var(--map-paper); }
+  .leaflet-control-attribution{ background:rgba(251,250,247,.82)!important; color:var(--ink3)!important; font-size:9.5px!important; }
+  .leaflet-control-attribution a{ color:var(--ink2)!important; }
+  .leaflet-control-zoom{ display:none; }
+  .leaflet-bottom{ margin-bottom:44px; }
+
+  .map-overlay{ position:absolute; z-index:8; }
+  .topinfo{ top:10px; left:10px; right:10px; display:flex; gap:8px; align-items:flex-start; }
+  .pill{ background:rgba(251,250,247,.9); border:1px solid var(--line); border-radius:999px; padding:6px 11px; font-size:11.5px; color:var(--ink2);
+    box-shadow:0 6px 16px -12px rgba(0,0,0,.5); backdrop-filter:blur(3px); }
+  .pill b{ color:var(--ink); font-weight:600; }
+  .keys{ top:46px; left:10px; background:rgba(251,250,247,.92); border:1px solid var(--line); border-radius:12px; padding:8px 10px;
+    box-shadow:0 8px 20px -16px rgba(0,0,0,.5); backdrop-filter:blur(3px); }
+  .keys .kt{ font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink3); margin-bottom:6px; }
+  .keys .kr{ display:flex; align-items:center; gap:7px; font-size:11px; color:var(--ink2); margin-top:4px; }
+  .keys .kr .sw{ width:13px; height:13px; display:grid; place-items:center; }
+  .chipsrow{ bottom:12px; left:0; right:0; display:flex; gap:6px; overflow-x:auto; padding:2px 12px 4px; scrollbar-width:none; }
+  .chipsrow::-webkit-scrollbar{ display:none; }
+  .chipsrow .c{ flex:0 0 auto; font-size:12px; font-weight:500; color:var(--ink2); background:rgba(251,250,247,.92); border:1px solid var(--line);
+    padding:6px 12px; border-radius:999px; cursor:pointer; box-shadow:0 6px 16px -14px rgba(0,0,0,.5); white-space:nowrap; }
+  .chipsrow .c.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  .chipsrow .c .n{ opacity:.6; margin-left:3px; }
+  .chipsrow .c.quiet{ color:var(--k-quiet); border-color:#c8d2d6; }
+  .chipsrow .c.quiet.on{ background:var(--k-quiet); color:#fff; border-color:var(--k-quiet); }
+
+  .empty-note{ position:absolute; z-index:8; left:50%; top:50%; transform:translate(-50%,-50%); text-align:center;
+    background:rgba(251,250,247,.94); border:1px solid var(--line); border-radius:14px; padding:14px 18px; max-width:80%;
+    box-shadow:0 16px 34px -22px rgba(0,0,0,.6); display:none; }
+  .empty-note b{ font-family:"Fraunces",serif; font-weight:500; display:block; font-size:16px; margin-bottom:2px; }
+  .empty-note span{ font-size:12.5px; color:var(--ink2); }
+
+  .layers-pop{ position:absolute; z-index:9; top:52px; right:12px; background:var(--sheet); border:1px solid var(--line); border-radius:14px;
+    padding:12px 13px; width:210px; box-shadow:0 20px 44px -24px rgba(0,0,0,.6); display:none; }
+  .layers-pop .lt{ font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink3); margin-bottom:8px; }
+  .lyt{ display:flex; align-items:center; gap:9px; font-size:13px; color:var(--ink2); margin-top:9px; }
+  .lyt .lb{ flex:1; } .lyt .lb small{ display:block; font-size:10.5px; color:var(--ink3); }
+  .sw-tog{ width:34px; height:20px; border-radius:999px; background:var(--line2); border:0; position:relative; cursor:pointer; flex:0 0 auto; }
+  .sw-tog::after{ content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; transition:left .18s; box-shadow:0 1px 2px rgba(0,0,0,.25); }
+  .sw-tog.on{ background:var(--accent); } .sw-tog.on::after{ left:16px; }
+
+  /* spot markers */
+  .spot-mk{ display:grid; place-items:center; cursor:pointer; }
+  .spot-mk svg{ display:block; filter:drop-shadow(0 3px 4px rgba(20,30,25,.35)); transition:transform .12s; }
+  .spot-mk.sel svg{ transform:scale(1.28); }
+  .access-mk{ display:grid; place-items:center; opacity:.9; }
+  .bridge-mk{ display:grid; place-items:center; opacity:.85; }
+
+  /* ---------- bottom sheet ---------- */
+  .sheet{ position:absolute; left:0; right:0; bottom:0; z-index:20; max-height:72%; display:flex; flex-direction:column;
+    background:var(--sheet); border-top-left-radius:26px; border-top-right-radius:26px; border:1px solid var(--line); border-bottom:0;
+    box-shadow:0 -24px 60px -30px rgba(20,40,34,.6); transform:translateY(105%); transition:transform .32s cubic-bezier(.22,1,.36,1); }
+  .sheet.up{ transform:translateY(0); }
+  .grab{ width:40px; height:4px; border-radius:3px; background:var(--line2); margin:9px auto 3px; flex:0 0 auto; }
+  .sheet-head{ padding:4px 20px 12px; border-bottom:1px solid var(--line); flex:0 0 auto; display:flex; align-items:flex-start; gap:10px; }
+  .sheet-head .h4{ font-family:"Fraunces",serif; font-weight:500; font-size:20px; line-height:1.2; letter-spacing:-.01em; margin:4px 0 0; }
+  .sheet-head .sub{ font-size:12px; color:var(--ink2); margin-top:3px; }
+  .sheet-head .kbtns{ margin-left:auto; display:flex; gap:6px; align-items:center; }
+  .sheet-body{ overflow-y:auto; padding:0 0 8px; } .sheet-body::-webkit-scrollbar{ width:0; }
+  .block{ padding:13px 20px; border-bottom:1px solid var(--line); }
+  .bh{ display:flex; align-items:center; gap:8px; font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:8px; }
+  .bh .idx{ width:17px; height:17px; border-radius:50%; border:1px solid var(--line2); display:grid; place-items:center; font-size:9.5px; color:var(--ink3); letter-spacing:0; }
+  .body{ font-family:"Fraunces",serif; font-size:15px; color:#283630; line-height:1.5; }
+  .caption{ font-size:11px; color:var(--ink3); margin-top:7px; }
+  .caption .ic{ color:var(--accent); }
+  .rec{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-top:9px; font-size:13px; color:#283630; }
+  .rec .t{ font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink3); display:block; margin-bottom:3px; }
+  .rec b{ color:var(--accent-2); font-weight:600; }
+  .ph{ border:1px dashed var(--line2); border-radius:12px; padding:11px 12px; background:linear-gradient(180deg,#f6f3ea,#fbfaf7); }
+  .ph .tag{ color:var(--accent-2); background:rgba(46,107,96,.12); border:1px solid rgba(46,107,96,.28); display:inline-block; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; padding:2px 8px; border-radius:999px; margin-bottom:7px; }
+  .ph .t{ font-family:"Fraunces",serif; font-size:14.5px; color:#283630; margin-bottom:3px; }
+  .ph .d{ font-size:11.5px; color:var(--ink2); }
+  .rowline{ display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:13px; padding:8px 0; border-bottom:1px dashed var(--line2); }
+  .rowline:last-child{ border-bottom:0; }
+  .rowline .l{ color:#283630; } .rowline .l .note{ color:var(--ink3); font-size:11.5px; } .rowline .r{ color:var(--ink2); font-size:12px; white-space:nowrap; }
+  .src{ font-size:10.5px; color:var(--ink3); margin-top:9px; letter-spacing:.04em; text-transform:uppercase; }
+  .minilist .mi{ display:flex; align-items:center; gap:9px; font-size:13px; color:#283630; padding:8px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+  .minilist .mi:last-child{ border-bottom:0; }
+  .minilist .mi .r{ margin-left:auto; font-size:11.5px; color:var(--ink3); }
+  .minilist .mi.na{ cursor:default; }
+  .gbtn{ background:var(--accent); color:#fff; border:0; font:inherit; font-weight:600; font-size:13px; padding:8px 14px; border-radius:11px; cursor:pointer; }
+  .gbtn.ghost{ background:transparent; color:var(--accent); border:1px solid var(--line2); }
+  .kchip{ display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--ink2); background:rgba(255,255,255,.7); border:1px solid var(--line); padding:4px 10px; border-radius:999px; }
+  .kdot{ width:9px; height:9px; border-radius:2px; flex:0 0 auto; }
+
+  /* pin markers + sheet reuse .sheet */
+  .pin-mk{ display:grid; place-items:center; cursor:pointer; }
+  .pin-mk svg{ display:block; filter:drop-shadow(0 3px 4px rgba(20,30,25,.4)); }
+
+  /* ---------- generic cards / tables (restyled to field guide) ---------- */
+  .grid2{ display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:16px; }
+  .card{ background:var(--sheet); border:1px solid var(--line); border-radius:var(--r-card); padding:20px; box-shadow:0 20px 50px -46px rgba(20,40,34,.6); }
+  .card h4{ font-weight:500; font-size:17px; margin:0 0 6px; }
+  .card p{ margin:0; font-size:14px; color:var(--ink2); }
+  .card .cap{ font-size:11.5px; color:var(--ink3); margin-top:8px; }
+  .panel{ background:var(--sheet); border-radius:var(--r-card); padding:28px; border:1px solid var(--line); box-shadow:0 24px 60px -50px rgba(20,40,34,.6); }
+  table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  caption{ caption-side:top; text-align:left; font-size:12.5px; color:var(--ink2); padding-bottom:10px; }
+  th,td{ text-align:left; padding:10px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th{ font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink3); font-weight:600; white-space:nowrap; }
+  tbody tr:hover{ background:rgba(46,107,96,.05); }
+  td code{ white-space:nowrap; }
+  .tblwrap{ overflow-x:auto; border:1px solid var(--line); border-radius:var(--r-card); background:var(--sheet); }
+  .tblwrap table{ min-width:640px; } .tblwrap td,.tblwrap th{ padding:12px 16px; }
+  .badge{ display:inline-block; font-size:10px; letter-spacing:.06em; text-transform:uppercase; padding:2px 8px; border-radius:999px; border:1px solid var(--line2); color:var(--ink2); white-space:nowrap; }
+  .badge.live{ color:var(--accent-2); border-color:rgba(46,107,96,.4); background:rgba(46,107,96,.08); }
+  .badge.gap{ color:#8a6a2e; border-color:#dcc79a; background:#f6efdd; }
+  .swatch{ display:inline-block; width:11px; height:11px; border-radius:3px; vertical-align:middle; margin-right:7px; }
+  .beforeafter{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:640px){ .beforeafter{ grid-template-columns:1fr; } }
+  .ba{ border:1px solid var(--line); border-radius:var(--r-card); padding:18px; background:var(--sheet); }
+  .ba .lbl{ font-size:11px; letter-spacing:.1em; text-transform:uppercase; margin-bottom:10px; font-weight:600; }
+  .ba.old .lbl{ color:#A8543A; } .ba.new .lbl{ color:var(--accent); }
+  .kv{ font-size:13px; color:#283630; padding:6px 0; border-bottom:1px dashed var(--line2); }
+  .kv:last-child{ border-bottom:0; } .kv .x{ color:var(--ink3); }
+  .foot{ margin-top:40px; font-size:13px; color:var(--ink2); border-top:1px solid var(--line); padding-top:20px; }
+  .callouts{ flex:1 1 320px; min-width:280px; display:flex; flex-direction:column; gap:14px; }
+  .co{ display:flex; gap:11px; align-items:flex-start; }
+  .co .num{ width:22px; height:22px; flex:0 0 22px; border-radius:50%; background:var(--sheet); border:1px solid var(--line2); display:grid; place-items:center; font-size:11px; color:var(--accent); }
+  .co b{ font-size:13.5px; }
+  .co p{ font-size:12.5px; color:var(--ink2); margin:2px 0 0; }
+  .demo{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:14px; }
+  .demo .dlbl{ font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink3); margin-right:4px; }
+  .demo button{ font:inherit; font-size:12.5px; font-weight:600; color:var(--accent); background:rgba(46,107,96,.08); border:1px solid rgba(46,107,96,.3); padding:6px 12px; border-radius:999px; cursor:pointer; }
+  .demo button:hover{ background:rgba(46,107,96,.16); }
+
+  /* ---------- spot card, four blocks ---------- */
+  .blocktog{ display:flex; align-items:center; gap:8px; width:100%; background:none; border:0; font:inherit; text-align:left; cursor:pointer; padding:0; }
+  .blocktog .bht{ font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); font-weight:600; }
+  .blocktog .caret{ margin-left:auto; color:var(--ink3); font-size:11px; }
+  .block .blockbody{ margin-top:9px; }
+  .block.closed .blockbody{ display:none; }
+  .hookbody{ font-family:"Fraunces",serif; font-size:16px; color:#283630; line-height:1.5; }
+  .hookbody.honest{ color:var(--ink2); font-style:italic; }
+  .hookbody.care{ color:#7a4a2e; background:rgba(200,120,60,.09); border:1px solid rgba(200,120,60,.3); border-radius:12px; padding:10px 12px; font-family:inherit; font-size:13.5px; }
+  .sprow{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px dashed var(--line2); }
+  .sprow:last-child{ border-bottom:0; }
+  .spmain{ font-size:14px; color:#283630; }
+  .spmain .sci{ color:var(--ink2); font-size:12.5px; }
+  .spcite{ font-size:10.5px; color:var(--ink3); white-space:nowrap; display:flex; gap:6px; align-items:center; }
+  .ev{ font-size:9px; letter-spacing:.08em; text-transform:uppercase; padding:1px 6px; border-radius:999px; border:1px solid var(--line2); color:var(--ink2); }
+  .ev.survey{ color:var(--accent-2); border-color:rgba(46,107,96,.4); background:rgba(46,107,96,.08); }
+  .empties{ font-size:13px; color:var(--ink2); background:#f4f1e9; border:1px dashed var(--line2); border-radius:10px; padding:9px 11px; }
+  .empties.small{ font-size:12px; }
+  .caption.caveat{ color:var(--ink2); font-style:italic; }
+  .caption.note{ color:#8a6a2e; }
+  .general{ margin:10px 0 2px; padding:10px 12px; background:rgba(46,107,96,.05); border:1px solid rgba(46,107,96,.18); border-radius:12px; }
+  .general .gtext{ font-family:"Fraunces",serif; font-size:14px; color:#283630; line-height:1.5; }
+  .factshead{ font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); margin:13px 0 2px; }
+  .gtitem{ padding:8px 0; border-bottom:1px dashed var(--line2); }
+  .gtitem:last-child{ border-bottom:0; }
+  .gtitem .gtline{ font-size:13.5px; color:#283630; }
+  .gtitem .note{ font-size:11.5px; color:var(--ink2); margin-top:2px; }
+  .gtitem .src{ margin-top:3px; }
+  .unver{ margin-top:11px; }
+  .unver .ut{ font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink3); margin-bottom:4px; }
+  .unver ul{ margin:0; padding-left:16px; } .unver li{ font-size:11.5px; color:var(--ink2); margin:3px 0; }
+  .terms{ margin-top:10px; }
+  .term{ font-size:12px; color:var(--ink2); border-top:1px solid var(--line); padding:8px 0; }
+  .term summary{ cursor:pointer; color:var(--accent); }
+  .term div{ margin-top:5px; }
+  .minilist .mi .mit{ flex:1; min-width:0; }
+  .loading{ display:flex; align-items:center; gap:9px; justify-content:center; padding:34px 16px; color:var(--ink2); font-size:13px; }
+  .spin{ width:15px; height:15px; border-radius:50%; border:2px solid var(--line2); border-top-color:var(--accent); animation:spin .7s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .cardstates{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:18px; }
+  .cardface{ background:var(--sheet); border:1px solid var(--line); border-radius:var(--r-card); overflow:hidden; box-shadow:0 24px 60px -50px rgba(20,40,34,.6); }
+  .cardface .cf-head{ padding:14px 18px; border-bottom:1px solid var(--line); }
+  .cardface .cf-head .h4{ font-family:"Fraunces",serif; font-weight:500; font-size:17px; margin:0; }
+  .cardface .cf-head .sub{ font-size:11.5px; color:var(--ink2); margin-top:3px; }
+  .cardface .block{ padding:12px 18px; }
+  .cardface .cf-state{ font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink3); padding:8px 18px 0; }
+
+
+  /* ================= NEW (this round): filters, layers, weeds, conditions ================= */
+  /* filter button lives in the topbar next to the layers button */
+  .icon-btn.badged{ position:relative; }
+  .icon-btn.badged .dot{ position:absolute; top:6px; right:6px; width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 2px rgba(255,255,255,.9); display:none; }
+  .icon-btn.badged.on .dot{ display:block; }
+
+  .filter-pop{ position:absolute; z-index:9; top:52px; right:12px; background:var(--sheet); border:1px solid var(--line); border-radius:16px;
+    padding:13px 14px; width:250px; box-shadow:0 20px 44px -24px rgba(0,0,0,.6); display:none; }
+  .filter-pop .lt{ font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink3); margin:0 0 8px; }
+  .filter-pop .fgroup{ margin-top:12px; }
+  .filter-pop .fgroup:first-of-type{ margin-top:0; }
+  .filter-pop label.fl{ font-size:12px; font-weight:600; color:var(--ink); display:flex; align-items:center; gap:6px; }
+  .filter-pop .fhint{ font-size:10.5px; color:var(--ink3); margin-top:3px; line-height:1.4; }
+  .filter-pop input[type=text]{ width:100%; font:inherit; font-size:13px; padding:7px 10px; border:1px solid var(--line2); border-radius:9px; background:#fff; color:var(--ink); margin-top:6px; }
+  .filter-pop input[type=text]:focus{ outline:2px solid rgba(46,107,96,.35); border-color:var(--accent); }
+  .splist{ max-height:132px; overflow-y:auto; margin-top:6px; border:1px solid var(--line); border-radius:9px; background:#fff; }
+  .splist::-webkit-scrollbar{ width:0; }
+  .spopt{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:7px 10px; font-size:12.5px; color:#283630; cursor:pointer; border-bottom:1px solid var(--line); }
+  .spopt:last-child{ border-bottom:0; }
+  .spopt:hover{ background:rgba(46,107,96,.06); }
+  .spopt.on{ background:rgba(46,107,96,.12); }
+  .spopt .sci{ font-size:11px; color:var(--ink3); font-style:italic; }
+  .spopt.none{ color:var(--ink3); cursor:default; font-size:11.5px; }
+  .range-wrap{ display:flex; align-items:center; gap:9px; margin-top:7px; }
+  .range-wrap input[type=range]{ flex:1; accent-color:var(--accent); }
+  .range-val{ font-size:11.5px; color:var(--ink2); white-space:nowrap; min-width:52px; text-align:right; }
+  .ftog{ display:flex; align-items:center; gap:9px; margin-top:8px; }
+  .ftog .fl{ flex:1; }
+  .ftog.disabled{ opacity:.55; }
+  .pill.act{ border-color:rgba(46,107,96,.5); background:rgba(46,107,96,.1); color:var(--accent-2); }
+  .pill .x{ cursor:pointer; margin-left:6px; color:var(--ink3); font-weight:700; }
+
+  /* weed-edge layer glyphs drawn on the map */
+  .weed-mk{ display:grid; place-items:center; cursor:pointer; }
+  .weed-mk svg{ display:block; filter:drop-shadow(0 3px 4px rgba(20,30,25,.35)); }
+  .weed-line{ cursor:pointer; }
+
+  /* lake label overlay on the map */
+  .lake-label{ background:transparent; border:0; }
+  .lake-label .ll{ font-family:"Fraunces",serif; font-size:12.5px; letter-spacing:.04em; color:#4b6a63; text-transform:uppercase;
+    white-space:nowrap; text-shadow:0 1px 0 rgba(251,250,247,.85), 0 0 8px rgba(251,250,247,.7); }
+  .lake-label .ll small{ display:block; text-transform:none; letter-spacing:0; font-size:9.5px; color:#8a9a93; font-family:system-ui,sans-serif; }
+
+  /* shoreline feature chips on the demo map */
+  .shore-mk{ display:grid; place-items:center; }
+  .shore-mk svg{ display:block; filter:drop-shadow(0 2px 3px rgba(20,30,25,.4)); }
+
+  /* ---------- conditions panel ---------- */
+  .cond-group{ margin-top:12px; }
+  .cond-group:first-child{ margin-top:2px; }
+  .cond-gh{ display:flex; align-items:center; gap:7px; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink3); margin-bottom:2px; }
+  .cond-row{ display:grid; grid-template-columns:1fr auto; gap:2px 10px; padding:8px 0; border-bottom:1px dashed var(--line2); }
+  .cond-row:last-child{ border-bottom:0; }
+  .cond-row .cl{ font-size:13px; color:#283630; }
+  .cond-row .cl .src{ margin-top:2px; text-transform:none; letter-spacing:.02em; }
+  .cond-row .cv{ font-size:13.5px; color:var(--ink); text-align:right; white-space:nowrap; }
+  .cond-row .cv b{ font-weight:600; }
+  .trend{ display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:var(--ink2); }
+  .trend .ar{ font-size:13px; line-height:1; }
+  .trend.up .ar{ color:#2E6B60; } .trend.down .ar{ color:#A8543A; } .trend.flat .ar{ color:var(--ink3); }
+  .cond-panel-note{ font-size:11px; color:var(--ink3); margin-top:10px; }
+  .stale-badge{ display:inline-block; font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; padding:1px 7px; border-radius:999px; border:1px solid #dcc79a; background:#f6efdd; color:#8a6a2e; margin-left:6px; }
+
+  /* ---------- watermark / illustrative tag ---------- */
+  .illus{ display:inline-flex; align-items:center; gap:6px; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:#8a6a2e;
+    background:#f6efdd; border:1px solid #dcc79a; padding:3px 9px; border-radius:999px; }
+  .illus-note{ font-size:12px; color:var(--ink2); border-left:3px solid #dcc79a; padding-left:11px; margin:12px 0; }
+
+  /* demo map panel (shoreline) */
+  .demomap{ height:360px; border-radius:var(--r-card); overflow:hidden; border:1px solid var(--line); position:relative; background:var(--map-paper); }
+  .demomap .leaflet-tile-pane{ filter:saturate(.86) sepia(.14) brightness(1.03) contrast(.95); }
+  .demomap .leaflet-control-zoom{ display:none; }
+  .shakey{ position:absolute; z-index:600; left:12px; bottom:12px; background:rgba(251,250,247,.92); border:1px solid var(--line); border-radius:11px; padding:8px 10px;
+    box-shadow:0 8px 20px -16px rgba(0,0,0,.5); font-size:10.5px; color:var(--ink2); }
+  .shakey .kr{ display:flex; align-items:center; gap:7px; margin-top:4px; }
+  .shakey .kt{ font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink3); margin-bottom:2px; }
+
+  /* method chips for endpoint listings */
+  .endpoint{ display:flex; align-items:center; gap:8px; font-size:12.5px; padding:9px 0; border-bottom:1px solid var(--line); }
+  .endpoint:last-child{ border-bottom:0; }
+  .endpoint .m{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; font-weight:600; color:#fff; background:var(--accent); padding:2px 7px; border-radius:5px; }
+  .endpoint .m.post{ background:#B08A3E; } .endpoint .m.get{ background:var(--accent); } .endpoint .m.del{ background:#A8543A; }
+  .endpoint .p{ font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; color:#283630; }
+  .endpoint .n{ color:var(--ink2); margin-left:auto; text-align:right; font-size:11.5px; }
+
+  .weed-row{ display:flex; gap:12px; align-items:flex-start; padding:11px 0; border-bottom:1px solid var(--line); }
+  .weed-row:last-child{ border-bottom:0; }
+  .weed-row .wg{ flex:0 0 auto; margin-top:2px; }
+  .weed-row .wb{ flex:1; min-width:0; }
+  .weed-row .wt{ font-size:13.5px; color:#283630; }
+  .weed-row .wd{ font-size:11.5px; color:var(--ink2); margin-top:2px; }
+  .weed-row .wc{ font-size:10.5px; color:var(--ink3); margin-top:3px; }
+  .errbox{ background:#faf1ec; border:1px solid #e6cdbf; border-radius:11px; padding:10px 12px; font-size:12px; color:#7a4a2e; margin-top:8px; }
+  .errbox .ec{ font-family:ui-monospace,Monaco,monospace; font-weight:600; }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <p class="kicker">FishDex · Explore · field guide</p>
+    <h1>The map, now with <em>layers you can name</em>.</h1>
+    <p class="deck">The Explore map rebuilt around <b>spots</b>, in the same naturalist look as the species guide — and now carrying everything the backend landed this round. It is a <b>real map</b>: pan it, zoom it, filter it, toggle its layers, and tap a spot to open the four-block card. <b>Filters</b> (species, near me), the <b>getting-there and bridges layers</b>, <b>lake outlines and shoreline features</b>, <b>private weed-edge reports</b> and the <b>pin conditions panel</b> are all shown below, each drawn from the real contract fixture.</p>
+    <div class="metachips">
+      <span class="mchip">Look · <b>field guide</b> (Fraunces on paper)</span>
+      <span class="mchip">Map · <b>Leaflet</b> + OpenStreetMap tiles (no key)</span>
+      <span class="mchip">New · <b>filters, layers, shorelines, weeds, conditions</b></span>
+      <span class="mchip">Data · <b>spots_api_responses.json</b></span>
+      <span class="mchip">Contract · <b>spots-api.md</b> (2026-10-14, #15–#22)</span>
+    </div>
+  </header>
+
+  <!-- ============================ LIVE MAP ============================ -->
+  <section id="explore">
+    <div class="label-row"><h2>Explore — the live spots map</h2><span>Drag to pan, scroll to zoom, tap a marker, open Filters and Layers.</span></div>
+    <p class="role"><b>Who it's for:</b> anyone deciding where to go. Spots are the pins at every zoom; the water body is the context around them. Density follows the contract's <code>tier</code> (headline spots first, more appearing as you zoom in); only what is in view is drawn, exactly as a <code>bbox</code> + <code>tier</code> call intends. The two new control surfaces — <b>Filters</b> and <b>Layers</b> — are the round's headline change.</p>
+
+    <div class="devices">
+      <div class="device-wrap">
+        <span class="tag">Explore</span>
+        <div class="phone">
+          <div class="screen">
+            <div class="island"></div>
+            <div class="statusbar"><span class="num">9:41</span>
+              <span class="sb-icons"><svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="4.5" y="5.5" width="3" height="6.5" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg>
+              <svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x=".5" y=".5" width="21" height="12" rx="3.5" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="16" height="9" rx="2.2" fill="currentColor"/><path d="M23.5 4.2v4.6c1-.4 1.6-1.2 1.6-2.3s-.6-1.9-1.6-2.3Z" fill="currentColor" opacity=".5"/></svg></span>
+            </div>
+            <div class="topbar">
+              <div><div class="tb-title" id="tb-title">Explore</div><div class="tb-sub" id="tb-sub">Spots, not river lines</div></div>
+              <span class="spacer"></span>
+              <div class="seg" id="modeseg"><button class="on" data-mode="explore">Explore</button><button data-mode="personal">Personal</button></div>
+              <span class="icon-btn badged" id="filter-btn" title="Filters"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4"/></svg><span class="dot"></span></span>
+              <span class="icon-btn" id="layers-btn" title="Layers"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg></span>
+            </div>
+
+            <div class="mapwrap">
+              <div id="map"></div>
+              <div class="vignette"></div>
+
+              <div class="map-overlay topinfo">
+                <span class="pill" id="countpill"><b>—</b></span>
+                <span id="activefilters" style="display:flex;gap:6px;flex-wrap:wrap"></span>
+                <span class="pill" id="zoompill" style="margin-left:auto">zoom —</span>
+              </div>
+              <div class="map-overlay keys" id="keys">
+                <div class="kt">Map key</div>
+                <div id="keys-body"></div>
+                <div class="kr" style="margin-top:6px;border-top:1px dashed var(--line2);padding-top:6px"><span class="sw"><svg width="13" height="13" viewBox="0 0 16 16"><path d="M1 8c2-3 4-3 6 0s4 3 6 0" fill="none" stroke="#6f8f89" stroke-width="2" stroke-dasharray="3 2.4"/></svg></span>Weed edge (yours)</div>
+              </div>
+              <div class="map-overlay chipsrow" id="chipsrow"></div>
+              <div class="empty-note" id="emptynote"><b>No spots in this view</b><span>Pan, zoom out, or clear a filter to find spots.</span></div>
+
+              <div class="layers-pop" id="layers-pop">
+                <div class="lt">Layers</div>
+                <div class="lyt"><div class="lb">Getting there<small id="gt-note">Mapped by volunteers; not checked on the ground.</small></div><button class="sw-tog on" id="lyr-gt"></button></div>
+                <div class="lyt"><div class="lb">Bridges<small>A way to reach small water, not a place to fish.</small></div><button class="sw-tog" id="lyr-br"></button></div>
+                <div class="lyt"><div class="lb">Lake outlines<small>Matched from the OHN Waterbody layer.</small></div><button class="sw-tog on" id="lyr-lakes"></button></div>
+                <div class="lyt"><div class="lb">Shoreline features<small>Inlets, outlets, points, islands.</small></div><button class="sw-tog" id="lyr-shore"></button></div>
+                <div class="lyt"><div class="lb">Your weed edges<small>Private to you. Not checked against anything.</small></div><button class="sw-tog on" id="lyr-weed"></button></div>
+              </div>
+
+              <div class="filter-pop" id="filter-pop">
+                <div class="lt">Filters</div>
+                <div class="fgroup">
+                  <label class="fl">Species</label>
+                  <input type="text" id="species-input" placeholder="Search recorded species…" autocomplete="off">
+                  <div class="splist" id="species-list"></div>
+                  <div class="fhint">A spot matches when that species has records within 2&nbsp;km. Listed (at-risk) species are never returned.</div>
+                </div>
+                <div class="fgroup">
+                  <label class="fl">Near me</label>
+                  <div class="ftog"><div class="fl" style="font-size:12px;color:var(--ink2)">Sort by distance, nearest first</div><button class="sw-tog" id="near-toggle"></button></div>
+                  <div class="range-wrap"><input type="range" id="near-radius" min="10" max="200" step="10" value="50"><span class="range-val" id="near-val">50 km</span></div>
+                  <div class="fhint">Radius defaults to 50&nbsp;km, capped at 200&nbsp;km. From your home in Oakville.</div>
+                </div>
+                <div class="fgroup ftog disabled">
+                  <div class="fl"><span>New to me</span><span class="illus" style="margin-left:6px">phase 5</span></div>
+                  <button class="sw-tog" id="newtome-toggle" disabled></button>
+                </div>
+                <div class="fgroup"><button class="gbtn ghost" id="filter-clear" style="width:100%">Clear filters</button></div>
+              </div>
+
+              <!-- spot / pin sheet -->
+              <div class="sheet" id="sheet">
+                <div class="grab"></div>
+                <div id="sheet-content"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="device-cap"><b>Explore — live, interactive</b>A real Leaflet map on OpenStreetMap raster tiles (no API key, no key needed — the handoff's allowed option). Water bodies are drawn as muted lines from their own <code>geometry</code>; lakes with no outline get a <b>label, not a shape</b>. The chip row, map key and every card string come from <code>GET /map/spots/labels</code> and the spot payload. The two round icons open <b>Filters</b> and <b>Layers</b>. Tapping a marker fetches its detail on demand, with a loading state.</div>
+      </div>
+
+      <div class="callouts">
+        <div class="co"><span class="num">1</span><div><b>Filters are real params.</b><p>Species and Near-me map to <code>species=</code> and <code>near=lat,lon,radius</code> on <code>GET /map/spots</code>. Kind is the chip row. New-to-me is a disabled slot, marked <em>phase 5</em> — the chip exists, the data does not.</p></div></div>
+        <div class="co"><span class="num">2</span><div><b>Layers came off the spot.</b><p>Getting-there and Bridges used to be drawn from each spot's own arrays. They are now their own bbox endpoints, so a parking spot shared by two spots appears once. Bridges stay off by default.</p></div></div>
+        <div class="co"><span class="num">3</span><div><b>Lakes: outline or honest label.</b><p>A curated lake gets its OHN Waterbody polygon matched by position. A lake with no match shows a <b>name label and “no outline on file”</b> — never an invented shape.</p></div></div>
+        <div class="co"><span class="num">4</span><div><b>Weed edges are yours alone.</b><p>The private layer is on by default for you, off for everyone else. Every report is stamped <em>reported, not verified</em>; there are no counts and no sharing.</p></div></div>
+        <div class="co"><span class="num">5</span><div><b>Conditions, with their source and age.</b><p>The pin sheet shows flow as a trend, weather, water temperature and chemistry — each with source, station, distance and age. A stale value is shown but flagged, never hidden.</p></div></div>
+        <div class="co"><span class="num">6</span><div><b>Still quiet about scores.</b><p>Nothing colours water by a score. <code>tier</code> only decides what draws at which zoom, and the word never appears in the phone.</p></div></div>
+
+        <div class="demo">
+          <span class="dlbl">Demo zoom</span>
+          <button data-zoom="8">Province</button>
+          <button data-zoom="10">Regional</button>
+          <button data-zoom="13">Street</button>
+          <button data-zoom="16">Close</button>
+          <button data-fit="all">Fit spots</button>
+        </div>
+        <p class="role" style="margin-top:6px">The presets jump the map so you can watch spots appear and disappear with zoom. <span class="badge">review aid</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ FILTERS ============================ -->
+  <section id="filters">
+    <div class="label-row"><h2>Filters and layers — the round's headline change</h2><span><code>species=</code>, <code>near=</code>, <code>GET /map/layers/*</code>.</span></div>
+    <p class="role">The filter model (§5.4) is now backed by query parameters instead of a client-side pass. Everything the user can narrow by, and where it is served:</p>
+    <div class="tblwrap">
+      <table>
+        <caption>The filter row, its parameter, and its state.</caption>
+        <thead><tr><th>Control</th><th>Parameter</th><th>Behaviour</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Kind chips</td><td><code>kind=</code></td><td>One or more of the five kinds; chip counts come from <code>meta.kind_counts</code>, which counts <em>every</em> kind ignoring the kind filter, so the chips show what each would add.</td><td><span class="badge live">served</span></td></tr>
+          <tr><td>Species</td><td><code>species=</code></td><td>A spot matches when that species has records within 2&nbsp;km. A listed (at-risk) species is never returned — selecting one yields no spots by design.</td><td><span class="badge live">served</span></td></tr>
+          <tr><td>Near me</td><td><code>near=lat,lon[,radius_km]</code></td><td>Sorted by distance, nearest first. Radius defaults to 50&nbsp;km, capped at 200&nbsp;km.</td><td><span class="badge live">served</span></td></tr>
+          <tr><td>New to me</td><td>—</td><td>Per-user “recorded − confirmed”, minus at-risk species. The chip exists in the row; the data needs the logged-in user.</td><td><span class="badge gap">phase 5</span></td></tr>
+          <tr><td>Quiet water</td><td><code>kind=quiet_water</code></td><td>A ranking of reaches, not a located structure. The kind and chip exist so the row can be designed; no spot has this kind yet.</td><td><span class="badge gap">phase 6</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="illus-note">In this snapshot only two spot cards carry recorded species (the fixture's example records), so the Species list is short and illustrative of behaviour, not of range. The fixture holds no example <code>species=</code> or <code>near=</code> response yet — the UI is wired to the documented shape and marked accordingly.</p>
+  </section>
+
+  <!-- ============================ SHORELINE ============================ -->
+  <section id="shoreline">
+    <div class="label-row"><h2>Lake outlines and shoreline features</h2><span><code>GET /map/water-bodies</code> + <code>/map/water-bodies/{id}/features</code>.</span></div>
+    <p class="role">A curated lake's <b>OHN Waterbody polygon is matched by position at build time</b>, never by name alone, and served as <code>geometry</code> with its source OGF_IDs, name, effective date and licence on <code>attributes</code>. A lake with no match stays <code>geometry: null</code> — the honest answer on the map is a <b>label, not a shape</b>. Lake Ontario in this snapshot is exactly that case. Shoreline features (inlets, outlets, islands, points, peninsulas) are read off the lake's outline and the OHN streams that end at its shore.</p>
+
+    <div class="devices">
+      <div class="device-wrap" style="width:100%;max-width:760px">
+        <span class="illus">illustrative — no matched outline in this fixture</span>
+        <div class="demomap" id="shoremap" style="width:100%">
+          <div class="shakey"><div class="kt">Shoreline features</div>
+            <div class="kr" id="shore-key"></div>
+          </div>
+        </div>
+      </div>
+      <div class="callouts">
+        <div class="co"><span class="num">1</span><div><b>Inlet / outlet — a record.</b><p>A mapped OHN stream ends at the shore. Provenance <code>record</code>; derivation phrased <em>“where a mapped stream meets the shore.”</em> The Credit River inlet below is the doc's own example coordinate.</p></div></div>
+        <div class="co"><span class="num">2</span><div><b>Island — a record.</b><p>A ring inside the source polygon. Carries <code>area_m2</code>. Derivation phrased <em>“from the shoreline outline.”</em></p></div></div>
+        <div class="co"><span class="num">3</span><div><b>Point / peninsula — an inference.</b><p>A shape computed from the outline's own edge. Provenance <code>inference</code>, with <code>length_m</code> for how far it reaches out. Marked as inference, never as a fact about fish.</p></div></div>
+        <div class="co"><span class="num">4</span><div><b>No outline, no awkwardness.</b><p>Lake Ontario's own card shows <code>geometry: null</code> and the note <em>“No outline is on file for this water, so it has no shape on the map yet.”</em> The map draws its label and says so.</p></div></div>
+        <div class="co"><span class="num">5</span><div><b>Deeper structure is not built.</b><p>Drop-offs, humps and weed lines need bathymetry, not an outline — see Coming soon. The only weed edges are the private ones a user reports.</p></div></div>
+      </div>
+    </div>
+
+    <div class="demomap-note illus-note">The polygon and the point/peninsula markers on this demo map are drawn from the contract's own feature shape for review. No lake in the fixture has a matched outline (<code>geometry: null</code> throughout), so the live map shows labels only; against the live API the matched polygons draw beneath the spot pins.</div>
+  </section>
+
+  <!-- ============================ WEED REPORTS ============================ -->
+  <section id="weeds">
+    <div class="label-row"><h2>Private weed-edge reports</h2><span><code>/map/weed-reports</code> · visible to you only.</span></div>
+    <p class="role" id="weed-role"></p>
+    <div class="grid2">
+      <div class="panel">
+        <div class="label-row" style="margin-bottom:10px"><h2 style="font-size:18px">Your reported edges</h2><span>the private layer</span></div>
+        <div id="weed-list"></div>
+        <div class="caption" id="weed-layer-note" style="margin-top:10px"></div>
+      </div>
+      <div class="panel">
+        <div class="label-row" style="margin-bottom:10px"><h2 style="font-size:18px">Reporting rules</h2><span>enforced server-side</span></div>
+        <div class="endpoint"><span class="m post">POST</span><span class="p">/map/weed-reports</span><span class="n">201 · returns the report with its caption</span></div>
+        <div class="endpoint"><span class="m get">GET</span><span class="p">/map/weed-reports/layer?bbox=</span><span class="n">your layer, <code>visible_to: you</code></span></div>
+        <div class="endpoint"><span class="m get">GET</span><span class="p">/map/weed-reports/{id}</span><span class="n">one report · 404 if not yours</span></div>
+        <div class="endpoint"><span class="m post">PATCH</span><span class="p">/map/weed-reports/{id}</span><span class="n">edit date / note</span></div>
+        <div class="endpoint"><span class="m del">DEL</span><span class="p">/map/weed-reports/{id}</span><span class="n">returns <code>{"deleted": id}</code></span></div>
+        <div class="factshead" style="margin-top:14px">What the server refuses, and how it says so</div>
+        <div id="weed-errors"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ PERSONAL / CONDITIONS ============================ -->
+  <section id="personal">
+    <div class="label-row"><h2>Personal — the pin sheet, with conditions</h2><span>PR #21 · <code>GET /pins/{id}/conditions</code>.</span></div>
+    <p class="role">Switch the phone to <b>Personal</b> and tap a pin to open this sheet. Conditions arrive grouped — <b>weather</b>, <b>water flow</b>, <b>water temperature</b>, <b>water quality</b> — and each value carries its <b>source, station, distance and age</b>. A <b>stale</b> value (a single dated sample, not a live reading) is shown but flagged, never hidden. Flow and level come as a <b>trend</b> with the reasoning the API already wrote.</p>
+
+    <div class="devices">
+      <div class="device-wrap">
+        <span class="tag">Pin conditions</span>
+        <div class="phone">
+          <div class="screen">
+            <div class="island"></div>
+            <div class="statusbar"><span class="num">9:41</span>
+              <span class="sb-icons"><svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="4.5" y="5.5" width="3" height="6.5" rx="1"/><rect x="9" y="3" width="3" height="9" rx="1"/><rect x="13.5" y="0" width="3" height="12" rx="1"/></svg>
+              <svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x=".5" y=".5" width="21" height="12" rx="3.5" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="16" height="9" rx="2.2" fill="currentColor"/><path d="M23.5 4.2v4.6c1-.4 1.6-1.2 1.6-2.3s-.6-1.9-1.6-2.3Z" fill="currentColor" opacity=".5"/></svg></span>
+            </div>
+            <div class="topbar">
+              <div><div class="tb-title">My map</div><div class="tb-sub">Your pins · private</div></div>
+              <span class="spacer"></span>
+              <div class="seg"><button data-mode="explore">Explore</button><button class="on" data-mode="personal">Personal</button></div>
+              <span class="icon-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg></span>
+            </div>
+            <div class="mapwrap" style="background:#e6e8e4">
+              <div class="vignette"></div>
+              <div class="sheet up" style="max-height:88%">
+                <div class="grab"></div>
+                <div id="pin-sheet"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="device-cap"><b>Personal pin — conditions panel</b>Rendered from the real <code>pin_conditions_response.json</code> (12 fields, four groups). The map behind is left un-drawn here so the sheet is the subject; in the live phone it is the same map as Explore, with your pins on top.</div>
+      </div>
+
+      <div class="callouts">
+        <div class="co"><span class="num">1</span><div><b>Every value has a source.</b><p>Weather from Open-Meteo; flow and level from WSC gauge 02HB027, 3&nbsp;km away; temperature and chemistry from PWQMN, 1.4&nbsp;km away. The station name is shown, not hidden.</p></div></div>
+        <div class="co"><span class="num">2</span><div><b>Age, not freshness theatre.</b><p>“5 min ago” for weather; “60 min ago” for flow; “2157 days ago” for the single water sample. Age is the input, shown plainly.</p></div></div>
+        <div class="co"><span class="num">3</span><div><b>Stale is shown, flagged.</b><p>Water temperature, DO and pH are each from one 2020 sample, so each carries a <span class="stale-badge">stale</span> badge. Hiding them would read as “no data”; the badge says “old data”.</p></div></div>
+        <div class="co"><span class="num">4</span><div><b>Trends come with the reasoning.</b><p>Pressure <em>falling</em> — “ahead of weather, often triggers a feeding window.” Flow <em>rising</em>, level <em>steady</em>. The API writes the meaning; the UI does not.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ CARD STATES ============================ -->
+  <section id="cardstates">
+    <div class="label-row"><h2>The spot card, still four blocks</h2><span><code>card</code> on <code>GET /map/spots/{spot_id}</code>.</span></div>
+    <p class="role">Unchanged this round, and still rendered straight from a real fixture response by the same code the map sheet uses. Blocks 1–2 open, 3–4 expand. The hook changes shape with what the spot has: a plain <b>structure</b> sentence, an <b>honest empty</b>, or a <b>protected-species</b> care message that names no fish.</p>
+    <div class="cardstates" id="cardstates-grid"></div>
+    <div class="label-row" style="margin-top:26px"><h2 style="font-size:19px">Fetch states — loading, not found, bad input</h2><span>every fetch has all three</span></div>
+    <p class="role">Tapping a marker fetches its detail on demand. The sheet shows a <b>loading</b> state first; a spot id that no longer exists returns <b>404</b> and the card says so plainly; a bad filter returns <b>422</b> with the API's own sentence. The map stays usable in every case.</p>
+    <div class="cardstates" id="states-grid"></div>
+  </section>
+
+  <!-- ============================ KINDS ============================ -->
+  <section id="kinds">
+    <div class="label-row"><h2>Kinds and wording</h2><span><code>GET /map/spots/labels</code> · every word below is the API's.</span></div>
+    <div class="tblwrap">
+      <table>
+        <caption>Spot kinds, their marker, and the plain meaning shown to the user.</caption>
+        <thead><tr><th>Kind</th><th>Chip label</th><th>Marker</th><th>One-liner</th></tr></thead>
+        <tbody id="kinds-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================ COMING SOON ============================ -->
+  <section id="notbuilt">
+    <div class="label-row"><h2>Coming soon — what the placeholders stand for</h2><span>Each dashed block maps to a phase in the report (§7).</span></div>
+    <div class="tblwrap">
+      <table>
+        <caption>What is served now, and what the remaining placeholders wait on.</caption>
+        <thead><tr><th>Item</th><th>Where</th><th>Status</th><th>Served by</th></tr></thead>
+        <tbody>
+          <tr><td>Species &amp; near filters</td><td>Explore · Filters</td><td><span class="badge live">served</span></td><td><code>species=</code>, <code>near=</code> on <code>GET /map/spots</code></td></tr>
+          <tr><td>Getting-there &amp; bridges layers</td><td>Explore · Layers</td><td><span class="badge live">served</span></td><td><code>GET /map/layers/getting-there</code>, <code>/bridges</code></td></tr>
+          <tr><td>Lake outlines &amp; shoreline features</td><td>Basemap + lake card</td><td><span class="badge live">served</span></td><td><code>GET /map/water-bodies/{id}/features</code></td></tr>
+          <tr><td>Private weed-edge reports</td><td>Explore · Layers + your edits</td><td><span class="badge live">served</span></td><td><code>/map/weed-reports</code></td></tr>
+          <tr><td>Pin conditions panel</td><td>Pin sheet</td><td><span class="badge live">served</span></td><td><code>GET /pins/{id}/conditions</code></td></tr>
+          <tr><td>New to you hook + filter</td><td>Hook + Filters</td><td><span class="badge gap">phase 5</span></td><td>per-user recorded − confirmed, minus at-risk species</td></tr>
+          <tr><td>“Recorded more often here” hook</td><td>Card · block 1</td><td><span class="badge gap">phase 6</span></td><td>spot share vs river share, above a minimum count</td></tr>
+          <tr><td>Quiet-water spots</td><td>Explore · chip + map</td><td><span class="badge gap">phase 6</span></td><td><code>explore()</code>-derived spots, kind <code>quiet_water</code></td></tr>
+          <tr><td>Lake depth (drop-offs, humps)</td><td>Lake card</td><td><span class="badge gap">in progress</span></td><td>only where a dated depth survey exists, with source + date</td></tr>
+          <tr><td>Harbours, piers, breakwaters</td><td>Shoreline features</td><td><span class="badge gap">queued</span></td><td>from OpenStreetMap, as lake / Great-Lake features</td></tr>
+          <tr><td>Match indicator &amp; Today sort</td><td>Pin sheet + map sort</td><td><span class="badge gap">pins phase 3</span></td><td>match endpoint; final label unresolved</td></tr>
+          <tr><td>Angler profile</td><td>Wording &amp; emphasis</td><td><span class="badge gap">in design</span></td><td>adapts wording per user; nothing hidden</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================ RULES ============================ -->
+  <section id="rules">
+    <div class="label-row"><h2>Rules the UI keeps</h2><span>Checked against every screen above.</span></div>
+    <div class="tblwrap">
+      <table>
+        <caption>Where each contract rule shows up.</caption>
+        <thead><tr><th>Rule</th><th>How it is kept</th></tr></thead>
+        <tbody>
+          <tr><td>A spot is one reason at one place</td><td>Pins are never merged by proximity; two reasons = two pins, each opening its own card.</td></tr>
+          <tr><td>Every word comes from the API</td><td>Chips, kinds, block titles, species, citations, conditions labels and the “why fish gather here” copy are read from the payloads, never composed.</td></tr>
+          <tr><td>Lakes have a shape or a label, never a guess</td><td>An unmatched lake is <code>geometry: null</code>; the map draws a label and the note <em>“No outline is on file…”</em>.</td></tr>
+          <tr><td>Inference is marked as inference</td><td>Shoreline points and peninsulas show provenance <code>inference</code>; islands and inlets show <code>record</code>.</td></tr>
+          <tr><td>Weed edges are private and unverified</td><td>Layer is <code>visible_to: you</code>; each report reads <em>reported, not verified</em>; no counts, no sharing, no export.</td></tr>
+          <tr><td>Stale conditions are shown and flagged</td><td>Temperature, DO and pH carry a <span class="stale-badge">stale</span> badge; the value is never hidden.</td></tr>
+          <tr><td>A protected-species card names no protected fish</td><td>The hook becomes the care message; the withheld species appears in no list and no count. Other recorded fish may still be listed.</td></tr>
+          <tr><td>Quiet water is distinct and last</td><td>Own hue, hollow dashed marker, chip listed after every other kind.</td></tr>
+          <tr><td>Bridges are off by default</td><td>The Layers popover starts with Bridges off; a crossing is described, never drawn as a spot.</td></tr>
+          <tr><td>Never show <code>tier</code>, no scores</td><td><code>tier</code> only decides what draws at which zoom; nothing colours water by a score or says “popular”.</td></tr>
+          <tr><td>Fish records ≠ angler pressure</td><td>The card's “You might find” is records within 2&nbsp;km with its caveat; your pins count your own fish only, and Explore never reads them.</td></tr>
+          <tr><td>Personal pins are private</td><td>No export, share or public counts on a pin card.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================ ASKS ============================ -->
+  <section id="asks">
+    <div class="label-row"><h2>Backend asks</h2><span>The full list is next to this file in <code>backend-asks.md</code>.</span></div>
+    <div class="grid2">
+      <div class="card"><h4>Served now — everything this round</h4><p>Filters (<code>species=</code>, <code>near=</code>), the getting-there and bridges layers, lake outlines and shoreline features, the private weed-report CRUD, and the pin conditions panel. This mockup draws them from the real fixture.</p></div>
+      <div class="card"><h4>Fixture breadth to widen</h4><p>The snapshot still carries cards for only a few spots and records for two of them, so the Species filter and the fish-record card states are thin. One card per kind and per hook variant would let every state be reviewed from data.</p></div>
+      <div class="card"><h4>Not yet in the fixture</h4><p>No example responses are captured for <code>species=</code>, <code>near=</code>, <code>/map/layers/getting-there</code>, <code>/map/layers/bridges</code> or <code>/map/water-bodies/{id}/features</code>, and no lake has a matched outline. The UI is wired to the documented shapes and marked illustrative.</p></div>
+      <div class="card"><h4>Still to come</h4><p>“New to you” and “recorded more often here” hook text; quiet-water spots; lake depth; harbours/piers/breakwaters; the conditions-match indicator and Today sort.</p></div>
+    </div>
+    <p class="role" style="margin-top:14px">No file in the project's <code>src/</code> was changed to produce this mockup. Spots, water bodies, spot cards, weed reports and pin conditions are the real fixture responses; personal-pin labels and the shoreline demo polygon are illustrative and marked.</p>
+  </section>
+
+  <p class="foot">Field-guide look carried from <code>.lavish/fishdex-field-guide.html</code> and <code>fishdex-anglers.html</code>. Spots, labels, spot cards, water bodies, weed reports and pin conditions are the real fixture responses from <code>contract/</code>; personal-pin facts and the shoreline demo polygon are illustrative. Basemap is OpenStreetMap raster tiles (© OpenStreetMap contributors) via Leaflet — no API key. FishDex map mockup — review artifact only.</p>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const FD = {"labels":{"kinds":[{"kind":"river_mouth","chip":"River mouths","one_liner":"Where a river runs out into a lake.","distinct":false,"why_fish_gather":{"text":"Fish that live in the lake pass through here to feed or to run upstream. The river also carries food out into open water.","label":"General reasoning, not a record about this spot","provenance":"inference"}},{"kind":"creek_junction","chip":"Where creeks join","one_liner":"Two streams meeting. Different temperature, speed and food mix at the join.","distinct":false,"why_fish_gather":{"text":"Two flows mixing makes a seam between fast and slow water, which fish use for shelter with food drifting past. A creek that runs cooler than the river can also give fish a place to ease out of warm water.","label":"General reasoning, not a record about this spot","provenance":"inference"}},{"kind":"below_dam","chip":"Below dams","one_liner":"The water just downstream of a dam or weir.","distinct":false,"why_fish_gather":{"text":"A dam or weir blocks fish from moving further upstream, so they gather in the water just below it. That water is churned up and rich in oxygen.","label":"General reasoning, not a record about this spot","provenance":"inference"}},{"kind":"public_fishing","chip":"Public fishing spots","one_liner":"Places that volunteer mappers have marked as set aside for fishing.","distinct":false,"why_fish_gather":{"text":"Someone has mapped this as a place to fish, usually because the water is easy and allowed to reach. That is about access, so it says nothing by itself about what is swimming there.","label":"General reasoning, not a record about this spot","provenance":"inference"}},{"kind":"quiet_water","chip":"Quiet water","one_liner":"Reaches with few public observation records, which may mean few anglers or just few observers.","distinct":true,"why_fish_gather":{"text":"These reaches have few public observation records. That can mean fewer anglers, few observers or hard access, and it never tells you whether fish are there.","label":"General reasoning, not a record about this spot","provenance":"inference"}}],"river_mouth_subline":"Where a river meets a lake","water_body_types":[{"type":"river","chip":"Rivers","label":"River","unnamed":"A river with no name on file"},{"type":"creek","chip":"Creeks","label":"Creek","unnamed":"A creek with no name on file"},{"type":"lake","chip":"Lakes","label":"Lake","unnamed":"A lake with no name on file"},{"type":"pond","chip":"Ponds","label":"Pond","unnamed":"A pond with no name on file"},{"type":"great_lake","chip":"Great Lakes","label":"Great Lake","unnamed":"A Great Lake with no name on file"}],"name_sources":{"curated":"Named in this app's own list of fishing waters","curated_region":"Taken from the area the river runs through","ohn":"Ontario government water map","osm":"OpenStreetMap volunteers","unknown":"No name on file"},"no_outline_note":"No outline is on file for this water, so it has no shape on the map yet.","shoreline_features":[{"kind":"inlet","label":"Inlet","chip":"Inlets","one_liner":"A mapped stream flows in here."},{"kind":"outlet","label":"Outlet","chip":"Outlets","one_liner":"The lake drains out here."},{"kind":"island","label":"Island","chip":"Islands","one_liner":"Land inside the water."},{"kind":"point","label":"Point","chip":"Points","one_liner":"A point of land reaches out."},{"kind":"peninsula","label":"Peninsula","chip":"Peninsulas","one_liner":"A long point of land reaches out."}],"shoreline_derivations":{"shoreline_outline":"from the shoreline outline","watercourse_endpoint":"where a mapped stream meets the shore"},"layers":{"getting_there":{"label":"Getting there","kinds":["parking","trail_head","boat_launch"],"default_on":true,"note":"Mapped by OpenStreetMap volunteers; not checked on the ground."},"bridges":{"label":"Bridges","kinds":["road_crossing"],"default_on":false,"note":"Public road crossings. A way to reach small water, not a place to fish."}},"access_labels":{"parking":"Parking","trail_head":"Trailhead","boat_launch":"Boat launch","road_crossing":"Road crossing"},"glossary":{"weir":"A weir is a low wall built across a river that water flows over. It holds the water back a little.","confluence":"A confluence is the place where two streams meet and become one.","tailwater":"A tailwater is the stretch of river just downstream of a dam."}},"spots":[{"spot_id":"creek_junction:n8038226_4319286","kind":"creek_junction","title":"Where the Nith River joins the Grand River","subtitle":"Grand River · Cambridge to Paris","tier":1,"lat":43.19286,"lng":-80.38226,"water_body_id":"river:grand-river","water_id":"grand-cambridge-paris","water_name":"Cambridge to Paris","signals":{"named":true,"nearest_bridge_m":187,"nearest_parking_m":138,"size_class":"large"}},{"spot_id":"below_dam:n8038314_4319587","kind":"below_dam","title":"Below the Paris Dam","subtitle":"Grand River · Cambridge to Paris","tier":1,"lat":43.195868,"lng":-80.38314,"water_body_id":"river:grand-river","water_id":"grand-cambridge-paris","water_name":"Cambridge to Paris","signals":{"named":true,"nearest_bridge_m":171,"nearest_parking_m":150}},{"spot_id":"river_mouth:n7957731_4354567","kind":"river_mouth","title":"Where the Credit River meets Lake Ontario","subtitle":"Credit River · Lower Credit — Streetsville to Port Credit","tier":1,"lat":43.54567,"lng":-79.57731,"water_body_id":"river:credit-river","water_id":"credit-streetsville-port-credit","water_name":"Lower Credit — Streetsville to Port Credit","signals":{"named":true}},{"spot_id":"creek_junction:n7966741_4355566","kind":"creek_junction","title":"Where Mullet Creek joins the Credit River","subtitle":"Credit River · Lower Credit — Streetsville to Port Credit","tier":1,"lat":43.55566,"lng":-79.66741,"water_body_id":"river:credit-river","water_id":"credit-streetsville-port-credit","water_name":"Lower Credit — Streetsville to Port Credit","signals":{"named":true,"size_class":"medium"}},{"spot_id":"creek_junction:n7969691_4345188","kind":"creek_junction","title":"Where Morrison Creek joins Sixteen Mile Creek","subtitle":"Sixteen Mile Creek — Milton to Oakville Harbour","tier":1,"lat":43.45188,"lng":-79.69691,"water_body_id":"creek:sixteen-mile-creek","water_id":"sixteen-mile-milton-oakville","water_name":"Sixteen Mile Creek — Milton to Oakville Harbour","signals":{"named":true,"size_class":"medium"}},{"spot_id":"creek_junction:n7971768_4360952","kind":"creek_junction","title":"Where Fletchers Creek joins the Credit River","subtitle":"Credit River · Middle Credit — Glen Williams to Streetsville","tier":1,"lat":43.60952,"lng":-79.71768,"water_body_id":"river:credit-river","water_id":"credit-glen-williams-streetsville","water_name":"Middle Credit — Glen Williams to Streetsville","signals":{"named":true,"size_class":"medium"}},{"spot_id":"below_dam:n8029646_4315097","kind":"below_dam","title":"Below the Wilkes Dam","subtitle":"Grand River · Paris to Brantford","tier":1,"lat":43.150969,"lng":-80.296465,"water_body_id":"river:grand-river","water_id":"grand-paris-brantford","water_name":"Paris to Brantford","signals":{"named":true,"nearest_bridge_m":237,"nearest_launch_m":910,"nearest_parking_m":239}},{"spot_id":"below_dam:n8031658_4336296","kind":"below_dam","title":"Below the Parkhill Dam","subtitle":"Grand River · Middle Grand — Conestogo to Cambridge","tier":1,"lat":43.362961,"lng":-80.316581,"water_body_id":"river:grand-river","water_id":"grand-conestogo-cambridge","water_name":"Middle Grand — Conestogo to Cambridge","signals":{"named":true,"nearest_bridge_m":13,"nearest_launch_m":950,"nearest_parking_m":91}},{"spot_id":"below_dam:n8041639_4341168","kind":"below_dam","title":"Below the Kitchener Weir","subtitle":"Grand River · Middle Grand — Conestogo to Cambridge","tier":1,"lat":43.411683,"lng":-80.416387,"water_body_id":"river:grand-river","water_id":"grand-conestogo-cambridge","water_name":"Middle Grand — Conestogo to Cambridge","signals":{"named":true,"nearest_parking_m":1095}},{"spot_id":"below_dam:n8042412_4368246","kind":"below_dam","title":"Below the Bissel Weir","subtitle":"Grand River · Upper Grand — Shand Dam to West Montrose","tier":1,"lat":43.682462,"lng":-80.424123,"water_body_id":"river:grand-river","water_id":"grand-shand-dam-west-montrose","water_name":"Upper Grand — Shand Dam to West Montrose","signals":{"named":true,"nearest_bridge_m":469,"nearest_launch_m":1041,"nearest_parking_m":133}},{"spot_id":"below_dam:n8043244_4368085","kind":"below_dam","title":"Below the Drimmie Mill Dam","subtitle":"Grand River · Upper Grand — Shand Dam to West Montrose","tier":1,"lat":43.680852,"lng":-80.432444,"water_body_id":"river:grand-river","water_id":"grand-shand-dam-west-montrose","water_name":"Upper Grand — Shand Dam to West Montrose","signals":{"named":true,"nearest_bridge_m":198,"nearest_parking_m":105}},{"spot_id":"below_dam:n8037144_4370995","kind":"below_dam","title":"Below the weir on the Grand River","subtitle":"Grand River · Upper Grand — Shand Dam to West Montrose","tier":2,"lat":43.709951,"lng":-80.371444,"water_body_id":"river:grand-river","water_id":"grand-shand-dam-west-montrose","water_name":"Upper Grand — Shand Dam to West Montrose","signals":{"named":false,"nearest_bridge_m":240,"nearest_parking_m":231}},{"spot_id":"below_dam:n8037795_4370422","kind":"below_dam","title":"Below the dam on the Grand River","subtitle":"Grand River · Upper Grand — Shand Dam to West Montrose","tier":2,"lat":43.704216,"lng":-80.377954,"water_body_id":"river:grand-river","water_id":"grand-shand-dam-west-montrose","water_name":"Upper Grand — Shand Dam to West Montrose","signals":{"named":false,"nearest_bridge_m":118,"nearest_parking_m":100}},{"spot_id":"below_dam:n8045086_4366205","kind":"below_dam","title":"Below the dam on the Grand River","subtitle":"Grand River · Upper Grand — Shand Dam to West Montrose","tier":2,"lat":43.662046,"lng":-80.450855,"water_body_id":"river:grand-river","water_id":"grand-shand-dam-west-montrose","water_name":"Upper Grand — Shand Dam to West Montrose","signals":{"named":false,"nearest_parking_m":723}},{"spot_id":"creek_junction:n7986378_4364837","kind":"creek_junction","title":"Where Black Creek joins the Credit River","subtitle":"","tier":1,"lat":43.64837,"lng":-79.86378,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7992945_4379759","kind":"creek_junction","title":"Where the Little Credit River joins the Credit River","subtitle":"","tier":1,"lat":43.79759,"lng":-79.92945,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7993701_4371236","kind":"creek_junction","title":"Where Rogers Creek joins the Credit River","subtitle":"","tier":1,"lat":43.71236,"lng":-79.93701,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7959213_4355165","kind":"creek_junction","title":"Where Mary Fix Creek joins the Credit River","subtitle":"","tier":2,"lat":43.55165,"lng":-79.59213,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7965757_4354286","kind":"creek_junction","title":"Where Sawmill Creek joins the Credit River","subtitle":"","tier":2,"lat":43.54286,"lng":-79.65757,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7969383_4357433","kind":"creek_junction","title":"Where Carolyn Creek joins the Credit River","subtitle":"","tier":2,"lat":43.57433,"lng":-79.69383,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7978988_4364540","kind":"creek_junction","title":"Where a creek joins the Credit River","subtitle":"","tier":2,"lat":43.6454,"lng":-79.78988,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7994036_4381068","kind":"creek_junction","title":"Where Black Creek joins the Credit River","subtitle":"","tier":2,"lat":43.81068,"lng":-79.94036,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7976707_4364057","kind":"creek_junction","title":"Where a small creek joins the Credit River","subtitle":"","tier":3,"lat":43.64057,"lng":-79.76707,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7977626_4364444","kind":"creek_junction","title":"Where a small creek joins the Credit River","subtitle":"","tier":3,"lat":43.64444,"lng":-79.77626,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7984665_4364705","kind":"creek_junction","title":"Where a small creek joins the Credit River","subtitle":"","tier":3,"lat":43.64705,"lng":-79.84665,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7991364_4366331","kind":"creek_junction","title":"Where a small creek joins the Credit River","subtitle":"","tier":3,"lat":43.66331,"lng":-79.91364,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7992716_4373248","kind":"creek_junction","title":"Where a small creek joins the Credit River","subtitle":"","tier":3,"lat":43.73248,"lng":-79.92716,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7993604_4371405","kind":"creek_junction","title":"Where a small creek joins the Credit River","subtitle":"","tier":3,"lat":43.71405,"lng":-79.93604,"water_body_id":"river:credit-river","water_id":null,"water_name":null,"signals":{}},{"spot_id":"river_mouth:n7829204_4393725","kind":"river_mouth","title":"Where the Ganaraska River meets Lake Ontario","subtitle":"","tier":1,"lat":43.93725,"lng":-78.29204,"water_body_id":"great_lake:lake-ontario","water_id":null,"water_name":null,"signals":{}},{"spot_id":"river_mouth:n7859506_4389124","kind":"river_mouth","title":"Where Wilmot Creek meets Lake Ontario","subtitle":"","tier":1,"lat":43.89124,"lng":-78.59506,"water_body_id":"great_lake:lake-ontario","water_id":null,"water_name":null,"signals":{}},{"spot_id":"river_mouth:n7865768_4387791","kind":"river_mouth","title":"Where Bowmanville Creek meets Lake Ontario","subtitle":"","tier":1,"lat":43.87791,"lng":-78.65768,"water_body_id":"great_lake:lake-ontario","water_id":null,"water_name":null,"signals":{}},{"spot_id":"river_mouth:n7903376_4381408","kind":"river_mouth","title":"Where Duffins Creek meets Lake Ontario","subtitle":"","tier":1,"lat":43.81408,"lng":-79.03376,"water_body_id":"great_lake:lake-ontario","water_id":null,"water_name":null,"signals":{}},{"spot_id":"river_mouth:n7906666_4325985","kind":"river_mouth","title":"Where the Niagara River meets Lake Ontario","subtitle":"","tier":1,"lat":43.25985,"lng":-79.06666,"water_body_id":"great_lake:lake-ontario","water_id":null,"water_name":null,"signals":{}},{"spot_id":"river_mouth:n7911321_4379191","kind":"river_mouth","title":"Where the Rouge River meets Lake Ontario","subtitle":"","tier":1,"lat":43.79191,"lng":-79.11321,"water_body_id":"great_lake:lake-ontario","water_id":null,"water_name":null,"signals":{}},{"spot_id":"river_mouth:n7937293_4319108","kind":"river_mouth","title":"Where Twenty Mile Creek meets Lake Ontario","subtitle":"","tier":1,"lat":43.19108,"lng":-79.37293,"water_body_id":"great_lake:lake-ontario","water_id":null,"water_name":null,"signals":{}},{"spot_id":"river_mouth:n7964903_4343105","kind":"river_mouth","title":"Where Sixteen Mile Creek meets Lake Ontario","subtitle":"","tier":1,"lat":43.43105,"lng":-79.64903,"water_body_id":"great_lake:lake-ontario","water_id":null,"water_name":null,"signals":{}},{"spot_id":"river_mouth:n7968540_4337634","kind":"river_mouth","title":"Where Bronte Creek meets Lake Ontario","subtitle":"","tier":1,"lat":43.37634,"lng":-79.6854,"water_body_id":"great_lake:lake-ontario","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7970095_4338322","kind":"creek_junction","title":"Where Sheldon Creek joins Bronte Creek","subtitle":"","tier":1,"lat":43.38322,"lng":-79.70095,"water_body_id":"creek:bronte-creek","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7985031_4342883","kind":"creek_junction","title":"Where a creek joins Bronte Creek","subtitle":"","tier":2,"lat":43.42883,"lng":-79.85031,"water_body_id":"creek:bronte-creek","water_id":null,"water_name":null,"signals":{}},{"spot_id":"creek_junction:n7984537_4342573","kind":"creek_junction","title":"Where a small creek joins Bronte Creek","subtitle":"","tier":3,"lat":43.42573,"lng":-79.84537,"water_body_id":"creek:bronte-creek","water_id":null,"water_name":null,"signals":{}}],"details":{"below_dam:n8038314_4319587":{"spot_id":"below_dam:n8038314_4319587","kind":"below_dam","jurisdiction":"CA-ON","lat":43.195868,"lng":-80.38314,"water_id":"grand-cambridge-paris","water_name":"Cambridge to Paris","water_body_id":"river:grand-river","also_on_water_body_ids":[],"title":"Below the Paris Dam","subtitle":"Grand River · Cambridge to Paris","tier":1,"structure_type":"dam","structure_attrs":{"dam_kind":"dam","reach_m":410,"tailwater_verified":true},"signals":{"named":true,"nearest_bridge_m":171,"nearest_parking_m":150},"getting_there":[{"kind":"parking","name":null,"lat":43.196501,"lng":-80.3815019,"distance_m":150,"source_ref":"way/533807418","attributes":{}},{"kind":"parking","name":null,"lat":43.1936867,"lng":-80.3843379,"distance_m":262,"source_ref":"way/475398031","attributes":{"access":"yes","fee":"no","surface":"asphalt"}}],"bridges":[{"kind":"road_crossing","name":"William Street","lat":43.194342,"lng":-80.383334,"distance_m":171,"source_ref":"way/40790441","attributes":{"ref":"CR 50"}}],"sources":[{"kind":"osm","ref":"way/248706708","anchor_ids":["grand-cambridge-paris:tailwater:osm-way-248706708"],"built_at":"2026-10-12T21:43:44+00:00"},{"kind":"osm","ref":"way/248706708","anchor_ids":["grand-cambridge-paris:dam:osm-way-248706708"],"built_at":"2026-10-12T21:43:44+00:00"}],"built_at":"2026-10-12T21:43:44+00:00","water_body":{"water_body_id":"river:grand-river","name":"Grand River","display_name":"Grand River","name_source":"curated","type":"river"},"also_on_water_bodies":[],"more_on_this_water":[{"spot_id":"creek_junction:n8038226_4319286","kind":"creek_junction","title":"Where the Nith River joins the Grand River","tier":1},{"spot_id":"creek_junction:n8031055_4330884","kind":"creek_junction","title":"Where Alder Creek joins the Grand River","tier":2},{"spot_id":"creek_junction:n8031731_4334263","kind":"creek_junction","title":"Where Moffatt's Creek joins the Grand River","tier":2}],"card":{"spot_id":"below_dam:n8038314_4319587","hook":{"title":"Why it's interesting","kind":"structure","text":"The water just downstream of a dam."},"might_find":{"title":"You might find","species":[{"name":"Rainbow Darter","scientific_name":"Etheostoma caeruleum","source":"GBIF/Example fish survey","date":"2019-07-10","evidence":"survey","cite":"GBIF/Example fish survey, 2019-07-10","note":null},{"name":"Creek Chub","scientific_name":"Semotilus atromaculatus","source":"iNaturalist","date":"2024-06-03","evidence":"sighting","cite":"iNaturalist, 2024-06-03","note":null},{"name":"Blacknose Dace","scientific_name":"Rhinichthys atratulus","source":"iNaturalist","date":"2023-08-19","evidence":"sighting","cite":"iNaturalist, 2023-08-19","note":null},{"name":"White Sucker","scientific_name":"Catostomus commersonii","source":"iNaturalist","date":"2022-05-02","evidence":"sighting","cite":"iNaturalist, 2022-05-02","note":null}],"more_text":null,"caveat":"Recorded nearby, not a catch guarantee.","empty_text":null,"note":null,"radius_km":2.0,"default_open":true},"why_gather":{"title":"Why fish gather here","what_it_is":"The water just downstream of a dam or weir.","general":{"text":"A dam or weir blocks fish from moving further upstream, so they gather in the water just below it. That water is churned up and rich in oxygen.","label":"General reasoning, not a record about this spot","provenance":"inference"},"facts_title":"What our records say about this spot","facts":[{"text":"Mapped as a dam.","provenance":"record","source":"OpenStreetMap"},{"text":"4 fish records within 2 km, covering 4 species.","provenance":"record","source":"GBIF, iNaturalist"}],"default_open":false},"getting_there":{"title":"Getting there","items":[{"kind":"parking","label":"Parking","text":"Parking about 150 m away","distance_m":150,"details":[],"source":"OpenStreetMap"},{"kind":"road_crossing","label":"Road crossing","text":"Public road crossing (William Street) about 170 m away","distance_m":171,"details":[],"source":"OpenStreetMap"}],"empty_text":null,"crown_land":{"state":"not_checked","text":"We have no Crown land data for this area.","source":null},"unverified_title":"Not checked on the ground","unverified":["Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.","Distances are in a straight line, not by road or trail.","Fishing rules and permission to cross private land are not checked here."],"default_open":false},"terms":[],"meta":{"records_radius_km":2.0,"species_shown":4,"species_withheld_protected":0,"species_withheld_imprecise":0,"species_status_unchecked":4,"cache_key":"below_dam:n8038314_4319587@2026-10-12T21:43:44+00:00"}}},"creek_junction:n8038226_4319286":{"spot_id":"creek_junction:n8038226_4319286","kind":"creek_junction","jurisdiction":"CA-ON","lat":43.19286,"lng":-80.38226,"water_id":"grand-cambridge-paris","water_name":"Cambridge to Paris","water_body_id":"river:grand-river","also_on_water_body_ids":["river:nith-river"],"title":"Where the Nith River joins the Grand River","subtitle":"Grand River · Cambridge to Paris","tier":1,"structure_type":"confluence","structure_attrs":{"also_on_water_ids":["nith-ayr-paris"],"joining_ogf_ids":[127449221],"joining_upstream_km":1377.5,"stretch_flows_on":true,"stretch_upstream_km":4298.4,"tributary_name_from_water_id":"nith-ayr-paris"},"signals":{"named":true,"nearest_bridge_m":187,"nearest_parking_m":138,"size_class":"large"},"getting_there":[{"kind":"parking","name":null,"lat":43.1930835,"lng":-80.3839275,"distance_m":138,"source_ref":"way/475398032","attributes":{"access":"yes","fee":"no","surface":"asphalt"}},{"kind":"parking","name":null,"lat":43.1921315,"lng":-80.3837112,"distance_m":143,"source_ref":"way/687309977","attributes":{}}],"bridges":[{"kind":"road_crossing","name":"William Street","lat":43.194342,"lng":-80.383334,"distance_m":187,"source_ref":"way/40790441","attributes":{"ref":"CR 50"}},{"kind":"road_crossing","name":"Dundas Street","lat":43.189487,"lng":-80.374248,"distance_m":751,"source_ref":"way/25388237","attributes":{"ref":"CH 2","surface":"asphalt"}}],"sources":[{"kind":"ohn_topology","ref":"ogf:127449216,127449221,127449252","anchor_ids":["grand-cambridge-paris:confluence:n8038226_4319286"],"built_at":"2026-10-12T21:43:44+00:00"},{"kind":"ohn_topology","ref":"ogf:127449221,127449252","anchor_ids":["nith-ayr-paris:confluence:n8038226_4319286"],"built_at":"2026-10-12T21:43:44+00:00"}],"built_at":"2026-10-12T21:43:44+00:00","water_body":{"water_body_id":"river:grand-river","name":"Grand River","display_name":"Grand River","name_source":"curated","type":"river"},"also_on_water_bodies":[{"water_body_id":"river:nith-river","name":"Nith River","display_name":"Nith River","name_source":"curated","type":"river"}],"more_on_this_water":[{"spot_id":"below_dam:n8038314_4319587","kind":"below_dam","title":"Below the Paris Dam","tier":1},{"spot_id":"creek_junction:n8031055_4330884","kind":"creek_junction","title":"Where Alder Creek joins the Grand River","tier":2},{"spot_id":"creek_junction:n8031731_4334263","kind":"creek_junction","title":"Where Moffatt's Creek joins the Grand River","tier":2}],"card":{"spot_id":"creek_junction:n8038226_4319286","hook":{"title":"Why it's interesting","kind":"structure","text":"Two streams meet here, one fed by about 1378 km of channel upstream and the other by about 4298 km."},"might_find":{"title":"You might find","species":[],"more_text":null,"caveat":"Recorded nearby, not a catch guarantee.","empty_text":"We hold no fish records for this area yet.","note":null,"radius_km":2.0,"default_open":true},"why_gather":{"title":"Why fish gather here","what_it_is":"Two streams meeting. Different temperature, speed and food mix at the join.","general":{"text":"Two flows mixing makes a seam between fast and slow water, which fish use for shelter with food drifting past. A creek that runs cooler than the river can also give fish a place to ease out of warm water.","label":"General reasoning, not a record about this spot","provenance":"inference"},"facts_title":"What our records say about this spot","facts":[{"text":"The smaller stream has about 1378 km of channel upstream of this point; the larger has about 4298 km.","provenance":"record","source":"Ontario Hydro Network"}],"default_open":false},"getting_there":{"title":"Getting there","items":[{"kind":"parking","label":"Parking","text":"Parking about 140 m away","distance_m":138,"details":["mapped as open to the public","mapped as free","asphalt"],"source":"OpenStreetMap"},{"kind":"road_crossing","label":"Road crossing","text":"Public road crossing (William Street) about 190 m away","distance_m":187,"details":[],"source":"OpenStreetMap"}],"empty_text":null,"crown_land":{"state":"not_checked","text":"We have no Crown land data for this area.","source":null},"unverified_title":"Not checked on the ground","unverified":["Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.","Distances are in a straight line, not by road or trail.","Fishing rules and permission to cross private land are not checked here."],"default_open":false},"terms":[],"meta":{"records_radius_km":2.0,"species_shown":0,"species_withheld_protected":0,"species_withheld_imprecise":0,"species_status_unchecked":0,"cache_key":"creek_junction:n8038226_4319286@2026-10-12T21:43:44+00:00"}}},"river_mouth:n7957731_4354567":{"spot_id":"river_mouth:n7957731_4354567","kind":"river_mouth","jurisdiction":"CA-ON","lat":43.54567,"lng":-79.57731,"water_id":"credit-streetsville-port-credit","water_name":"Lower Credit — Streetsville to Port Credit","water_body_id":"river:credit-river","also_on_water_body_ids":["great_lake:lake-ontario"],"title":"Where the Credit River meets Lake Ontario","subtitle":"Credit River · Lower Credit — Streetsville to Port Credit","tier":1,"structure_type":"lake_mouth","structure_attrs":{"lake":"Lake Ontario","lake_name_source":"curated","shore_ogf_ids":[214624516,214624565]},"signals":{"named":true},"getting_there":[],"bridges":[],"sources":[{"kind":"ohn_topology","ref":"ogf:214624516,214624565,214624585","anchor_ids":["credit-streetsville-port-credit:lake_mouth:n7957731_4354567"],"built_at":"2026-10-12T21:43:44+00:00"}],"built_at":"2026-10-12T21:43:44+00:00","water_body":{"water_body_id":"river:credit-river","name":"Credit River","display_name":"Credit River","name_source":"curated","type":"river"},"also_on_water_bodies":[{"water_body_id":"great_lake:lake-ontario","name":"Lake Ontario","display_name":"Lake Ontario","name_source":"curated","type":"great_lake"}],"more_on_this_water":[{"spot_id":"creek_junction:n7966741_4355566","kind":"creek_junction","title":"Where Mullet Creek joins the Credit River","tier":1},{"spot_id":"creek_junction:n7959213_4355165","kind":"creek_junction","title":"Where Mary Fix Creek joins the Credit River","tier":2},{"spot_id":"creek_junction:n7965757_4354286","kind":"creek_junction","title":"Where Sawmill Creek joins the Credit River","tier":2},{"spot_id":"creek_junction:n7969383_4357433","kind":"creek_junction","title":"Where Carolyn Creek joins the Credit River","tier":2}],"card":{"spot_id":"river_mouth:n7957731_4354567","hook":{"title":"Why it's interesting","kind":"structure","text":"A river running out into Lake Ontario."},"might_find":{"title":"You might find","species":[],"more_text":null,"caveat":"Recorded nearby, not a catch guarantee.","empty_text":"We hold no fish records for this area yet.","note":null,"radius_km":2.0,"default_open":true},"why_gather":{"title":"Why fish gather here","what_it_is":"Where a river runs out into a lake.","general":{"text":"Fish that live in the lake pass through here to feed or to run upstream. The river also carries food out into open water.","label":"General reasoning, not a record about this spot","provenance":"inference"},"facts_title":"What our records say about this spot","facts":[{"text":"The river runs out into Lake Ontario.","provenance":"record","source":"Fishdex's own list of rivers"}],"default_open":false},"getting_there":{"title":"Getting there","items":[],"empty_text":"No parking, trailhead or boat launch found within 1.5 km in our map data.","crown_land":{"state":"not_checked","text":"We have no Crown land data for this area.","source":null},"unverified_title":"Not checked on the ground","unverified":["Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.","Fishing rules and permission to cross private land are not checked here."],"default_open":false},"terms":[],"meta":{"records_radius_km":2.0,"species_shown":0,"species_withheld_protected":0,"species_withheld_imprecise":0,"species_status_unchecked":0,"cache_key":"river_mouth:n7957731_4354567@2026-10-12T21:43:44+00:00"}}},"creek_junction:n7742945_4424383":{"spot_id":"creek_junction:n7742945_4424383","kind":"creek_junction","jurisdiction":"CA-ON","lat":44.24383,"lng":-77.42945,"water_id":"moira-foxboro-belleville","water_name":"Moira River — Foxboro to Belleville","water_body_id":"river:moira-river","also_on_water_body_ids":[],"title":"Where Palliser Creek joins the Moira River","subtitle":"Moira River — Foxboro to Belleville","tier":1,"structure_type":"confluence","structure_attrs":{"joining_ogf_ids":[214561918],"joining_upstream_km":100.8,"name_from_ogf_id":121770066,"stretch_flows_on":true,"stretch_upstream_km":0.0},"signals":{"named":true,"size_class":"large"},"getting_there":[],"bridges":[],"sources":[{"kind":"ohn_topology","ref":"ogf:214561918,214562103","anchor_ids":["moira-foxboro-belleville:confluence:n7742945_4424383"],"built_at":"2026-10-12T21:43:44+00:00"}],"built_at":"2026-10-12T21:43:44+00:00","water_body":{"water_body_id":"river:moira-river","name":"Moira River","display_name":"Moira River","name_source":"curated","type":"river"},"also_on_water_bodies":[],"more_on_this_water":[{"spot_id":"river_mouth:n7737973_4414834","kind":"river_mouth","title":"Where the Moira River meets the Bay of Quinte","tier":1},{"spot_id":"creek_junction:n7738520_4421457","kind":"creek_junction","title":"Where a small creek joins the Moira River","tier":3},{"spot_id":"creek_junction:n7741878_4422916","kind":"creek_junction","title":"Where a small creek joins the Moira River","tier":3}],"card":{"spot_id":"creek_junction:n7742945_4424383","hook":{"title":"Why it's interesting","kind":"honest_empty","text":"No fish records within 2 km, so this is a place to find out."},"might_find":{"title":"You might find","species":[],"more_text":null,"caveat":"Recorded nearby, not a catch guarantee.","empty_text":"We hold no fish records for this area yet.","note":null,"radius_km":2.0,"default_open":true},"why_gather":{"title":"Why fish gather here","what_it_is":"Two streams meeting. Different temperature, speed and food mix at the join.","general":{"text":"Two flows mixing makes a seam between fast and slow water, which fish use for shelter with food drifting past. A creek that runs cooler than the river can also give fish a place to ease out of warm water.","label":"General reasoning, not a record about this spot","provenance":"inference"},"facts_title":"What our records say about this spot","facts":[],"default_open":false},"getting_there":{"title":"Getting there","items":[],"empty_text":"No parking, trailhead or boat launch found within 1.5 km in our map data.","crown_land":{"state":"not_checked","text":"We have no Crown land data for this area.","source":null},"unverified_title":"Not checked on the ground","unverified":["Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.","Fishing rules and permission to cross private land are not checked here."],"default_open":false},"terms":[],"meta":{"records_radius_km":2.0,"species_shown":0,"species_withheld_protected":0,"species_withheld_imprecise":0,"species_status_unchecked":0,"cache_key":"creek_junction:n7742945_4424383@2026-10-12T21:43:44+00:00"}}},"creek_junction:n7966741_4355566":{"spot_id":"creek_junction:n7966741_4355566","kind":"creek_junction","jurisdiction":"CA-ON","lat":43.55566,"lng":-79.66741,"water_id":"credit-streetsville-port-credit","water_name":"Lower Credit — Streetsville to Port Credit","water_body_id":"river:credit-river","also_on_water_body_ids":[],"title":"Where Mullet Creek joins the Credit River","subtitle":"Credit River · Lower Credit — Streetsville to Port Credit","tier":1,"structure_type":"confluence","structure_attrs":{"joining_ogf_ids":[214624304],"joining_upstream_km":46.0,"name_from_ogf_id":67870681,"stretch_flows_on":true,"stretch_upstream_km":1238.2},"signals":{"named":true,"size_class":"medium"},"getting_there":[],"bridges":[],"sources":[{"kind":"ohn_topology","ref":"ogf:214624303,214624304,214624337","anchor_ids":["credit-streetsville-port-credit:confluence:n7966741_4355566"],"built_at":"2026-10-12T21:43:44+00:00"}],"built_at":"2026-10-12T21:43:44+00:00","water_body":{"water_body_id":"river:credit-river","name":"Credit River","display_name":"Credit River","name_source":"curated","type":"river"},"also_on_water_bodies":[],"more_on_this_water":[{"spot_id":"river_mouth:n7957731_4354567","kind":"river_mouth","title":"Where the Credit River meets Lake Ontario","tier":1},{"spot_id":"creek_junction:n7959213_4355165","kind":"creek_junction","title":"Where Mary Fix Creek joins the Credit River","tier":2},{"spot_id":"creek_junction:n7965757_4354286","kind":"creek_junction","title":"Where Sawmill Creek joins the Credit River","tier":2},{"spot_id":"creek_junction:n7969383_4357433","kind":"creek_junction","title":"Where Carolyn Creek joins the Credit River","tier":2}],"card":{"spot_id":"creek_junction:n7966741_4355566","hook":{"title":"Why it's interesting","kind":"protected_species","text":"Protected fish have been recorded near here. Handle any fish with care and release it."},"might_find":{"title":"You might find","species":[{"name":"Rainbow Darter","scientific_name":"Etheostoma caeruleum","source":"GBIF/Example fish survey","date":"2019-07-10","evidence":"survey","cite":"GBIF/Example fish survey, 2019-07-10","note":null},{"name":"Creek Chub","scientific_name":"Semotilus atromaculatus","source":"iNaturalist","date":"2024-06-03","evidence":"sighting","cite":"iNaturalist, 2024-06-03","note":null},{"name":"Blacknose Dace","scientific_name":"Rhinichthys atratulus","source":"iNaturalist","date":"2023-08-19","evidence":"sighting","cite":"iNaturalist, 2023-08-19","note":null},{"name":"White Sucker","scientific_name":"Catostomus commersonii","source":"iNaturalist","date":"2022-05-02","evidence":"sighting","cite":"iNaturalist, 2022-05-02","note":null}],"more_text":null,"caveat":"Recorded nearby, not a catch guarantee.","empty_text":null,"note":"Protected species recorded nearby are not listed.","radius_km":2.0,"default_open":true},"why_gather":{"title":"Why fish gather here","what_it_is":"Two streams meeting. Different temperature, speed and food mix at the join.","general":{"text":"Two flows mixing makes a seam between fast and slow water, which fish use for shelter with food drifting past. A creek that runs cooler than the river can also give fish a place to ease out of warm water.","label":"General reasoning, not a record about this spot","provenance":"inference"},"facts_title":"What our records say about this spot","facts":[{"text":"The smaller stream has about 46 km of channel upstream of this point; the larger has about 1238 km.","provenance":"record","source":"Ontario Hydro Network"},{"text":"4 fish records within 2 km, covering 4 species.","provenance":"record","source":"GBIF, iNaturalist"}],"default_open":false},"getting_there":{"title":"Getting there","items":[],"empty_text":"No parking, trailhead or boat launch found within 1.5 km in our map data.","crown_land":{"state":"not_checked","text":"We have no Crown land data for this area.","source":null},"unverified_title":"Not checked on the ground","unverified":["Parking, trails, launches and road crossings come from OpenStreetMap, which volunteers map. A missing one may just be unmapped.","Fishing rules and permission to cross private land are not checked here."],"default_open":false},"terms":[],"meta":{"records_radius_km":2.0,"species_shown":4,"species_withheld_protected":1,"species_withheld_imprecise":0,"species_status_unchecked":4,"cache_key":"creek_junction:n7966741_4355566@2026-10-12T21:43:44+00:00"}}}},"wbDetails":{"river:credit-river":{"water_body_id":"river:credit-river","jurisdiction":"CA-ON","name":"Credit River","name_source":"curated","type":"river","geometry":{"coordinates":[[[-79.98834,43.80977],[-79.97764,43.80647],[-79.97519,43.80644],[-79.97338,43.80692],[-79.97043,43.81066],[-79.96628,43.81321],[-79.96461,43.81345]],[[-79.96461,43.81345],[-79.96423,43.8139]],[[-79.96461,43.81345],[-79.96423,43.8139]],[[-79.96423,43.8139],[-79.96307,43.81495],[-79.95875,43.81619],[-79.95071,43.81501],[-79.94979,43.81291],[-79.94665,43.81008],[-79.94386,43.80975],[-79.94036,43.81068],[-79.93626,43.80856],[-79.93433,43.80861],[-79.9336,43.80657],[-79.93232,43.80592],[-79.92929,43.80068],[-79.92816,43.80005],[-79.92822,43.79926],[-79.93032,43.79868],[-79.92843,43.79537],[-79.9274,43.79491],[-79.92795,43.79448],[-79.92752,43.79376],[-79.92877,43.79346],[-79.92893,43.79163],[-79.93038,43.79018],[-79.92941,43.78943],[-79.93144,43.78483],[-79.93068,43.78325],[-79.92684,43.7798],[-79.92801,43.77894],[-79.92669,43.77622],[-79.92634,43.77126],[-79.92387,43.76907],[-79.92441,43.76699],[-79.92158,43.76342],[-79.91993,43.75966],[-79.92471,43.75833],[-79.92465,43.75643],[-79.9225,43.75517],[-79.9227,43.75213],[-79.92095,43.75008],[-79.92097,43.74907],[-79.9233,43.74624],[-79.92345,43.74476],[-79.92679,43.74434],[-79.92664,43.74284],[-79.92346,43.74055],[-79.9282,43.73619],[-79.92864,43.73477],[-79.92694,43.7332],[-79.9267,43.7288],[-79.92844,43.72801],[-79.93041,43.72565],[-79.93178,43.72136],[-79.9309,43.72076],[-79.93397,43.71823],[-79.93704,43.71299],[-79.93679,43.70933],[-79.93305,43.70664],[-79.93226,43.70432],[-79.93491,43.70242],[-79.93358,43.70078],[-79.9336,43.69878],[-79.9369,43.6966],[-79.93407,43.69408],[-79.92854,43.69302],[-79.92802,43.69112],[-79.92589,43.68991],[-79.92684,43.68575],[-79.93088,43.68408],[-79.93056,43.68122],[-79.93279,43.67823],[-79.92878,43.67491],[-79.92483,43.6731],[-79.92828,43.67102]],[[-79.92828,43.67102],[-79.92742,43.66882],[-79.92416,43.66725],[-79.91869,43.66282],[-79.91687,43.66213],[-79.91364,43.66331],[-79.90772,43.66145],[-79.90542,43.65991],[-79.90271,43.66031],[-79.89968,43.65969],[-79.89922,43.65862],[-79.9013,43.65759],[-79.9006,43.65677],[-79.89598,43.6587],[-79.8939,43.65623],[-79.89258,43.6567],[-79.89122,43.65862],[-79.88637,43.65699],[-79.88321,43.65792],[-79.87838,43.65728],[-79.87577,43.65383],[-79.87156,43.65302],[-79.8676,43.65344],[-79.86537,43.65148],[-79.86556,43.64943],[-79.86174,43.64739],[-79.85927,43.64788],[-79.85794,43.64977],[-79.85632,43.64779],[-79.85598,43.64426],[-79.85491,43.64384],[-79.85045,43.64528],[-79.84917,43.64738],[-79.84768,43.64752],[-79.84461,43.64607],[-79.84281,43.64669],[-79.84089,43.64868],[-79.83887,43.64789],[-79.8382,43.64475],[-79.83654,43.64321],[-79.83444,43.64373],[-79.83257,43.643],[-79.83005,43.64345],[-79.82648,43.64281],[-79.82449,43.64381],[-79.81923,43.6432],[-79.81934,43.64567],[-79.81862,43.64661],[-79.81086,43.64494],[-79.80844,43.6451],[-79.80611,43.64391],[-79.80228,43.64545],[-79.79207,43.64387],[-79.78616,43.64712],[-79.7825,43.64645],[-79.78132,43.64519],[-79.77869,43.64426],[-79.77917,43.64321],[-79.77626,43.64444],[-79.77104,43.64315],[-79.76954,43.64189],[-79.76829,43.6423],[-79.76231,43.6364],[-79.76234,43.63453],[-79.75554,43.63174],[-79.75154,43.63415],[-79.74835,43.63255],[-79.7453,43.62849],[-79.74325,43.62886],[-79.73909,43.63314],[-79.73711,43.63295],[-79.73586,43.63127],[-79.73733,43.62835],[-79.73461,43.6269],[-79.73438,43.62467],[-79.73217,43.62511],[-79.73338,43.62251],[-79.73235,43.62092],[-79.73098,43.62054],[-79.73191,43.61928],[-79.72855,43.61626],[-79.72807,43.61411],[-79.72931,43.61261],[-79.72846,43.61126],[-79.72133,43.60717],[-79.71768,43.60952],[-79.7151,43.60981],[-79.71236,43.60768],[-79.71499,43.605],[-79.71806,43.60355],[-79.71868,43.60076],[-79.72378,43.60095],[-79.72485,43.60033],[-79.72295,43.59633],[-79.71756,43.59418],[-79.71711,43.59084],[-79.71533,43.58956],[-79.71692,43.58755],[-79.7124,43.58411],[-79.70873,43.5835],[-79.70846,43.58096],[-79.70327,43.57721],[-79.69979,43.57799],[-79.69838,43.57598],[-79.69383,43.57433]],[[-79.69383,43.57433],[-79.69287,43.57258],[-79.69354,43.57058],[-79.6909,43.56871],[-79.69084,43.56689],[-79.68801,43.56692],[-79.68302,43.5651],[-79.68431,43.56257],[-79.68363,43.56151],[-79.67962,43.56283],[-79.67751,43.56172],[-79.67383,43.5619],[-79.66741,43.55566],[-79.66367,43.5558],[-79.6613,43.5532],[-79.65784,43.55197],[-79.65502,43.54895],[-79.65843,43.54382],[-79.65757,43.54286],[-79.65301,43.54217],[-79.65218,43.5406],[-79.65019,43.53952],[-79.64807,43.54258],[-79.64855,43.5447],[-79.64721,43.54657],[-79.64078,43.54635],[-79.64069,43.54741],[-79.64252,43.54929],[-79.64119,43.55054],[-79.63054,43.54813],[-79.62947,43.54851],[-79.62794,43.5517],[-79.62153,43.55438],[-79.60966,43.55663],[-79.60617,43.55484],[-79.60104,43.55489],[-79.59735,43.5527],[-79.58647,43.55073],[-79.57731,43.54567]]],"type":"MultiLineString"},"geometry_source":"stretch_union","bbox":[-79.98834,43.53952,-79.57731,43.81619],"stretch_ids":["credit-forks-glen-williams","credit-glen-williams-streetsville","credit-streetsville-port-credit"],"attributes":{"type_basis":"name_suffix"},"built_at":"2026-10-12T21:43:44+00:00","display_name":"Credit River","spots":[{"spot_id":"river_mouth:n7957731_4354567","kind":"river_mouth","title":"Where the Credit River meets Lake Ontario","tier":1,"lat":43.54567,"lng":-79.57731},{"spot_id":"creek_junction:n7966741_4355566","kind":"creek_junction","title":"Where Mullet Creek joins the Credit River","tier":1,"lat":43.55566,"lng":-79.66741},{"spot_id":"creek_junction:n7971768_4360952","kind":"creek_junction","title":"Where Fletchers Creek joins the Credit River","tier":1,"lat":43.60952,"lng":-79.71768},{"spot_id":"creek_junction:n7986378_4364837","kind":"creek_junction","title":"Where Black Creek joins the Credit River","tier":1,"lat":43.64837,"lng":-79.86378},{"spot_id":"creek_junction:n7992945_4379759","kind":"creek_junction","title":"Where the Little Credit River joins the Credit River","tier":1,"lat":43.79759,"lng":-79.92945},{"spot_id":"creek_junction:n7993701_4371236","kind":"creek_junction","title":"Where Rogers Creek joins the Credit River","tier":1,"lat":43.71236,"lng":-79.93701},{"spot_id":"creek_junction:n7959213_4355165","kind":"creek_junction","title":"Where Mary Fix Creek joins the Credit River","tier":2,"lat":43.55165,"lng":-79.59213},{"spot_id":"creek_junction:n7965757_4354286","kind":"creek_junction","title":"Where Sawmill Creek joins the Credit River","tier":2,"lat":43.54286,"lng":-79.65757},{"spot_id":"creek_junction:n7969383_4357433","kind":"creek_junction","title":"Where Carolyn Creek joins the Credit River","tier":2,"lat":43.57433,"lng":-79.69383},{"spot_id":"creek_junction:n7978988_4364540","kind":"creek_junction","title":"Where a creek joins the Credit River","tier":2,"lat":43.6454,"lng":-79.78988},{"spot_id":"creek_junction:n7994036_4381068","kind":"creek_junction","title":"Where Black Creek joins the Credit River","tier":2,"lat":43.81068,"lng":-79.94036},{"spot_id":"creek_junction:n7976707_4364057","kind":"creek_junction","title":"Where a small creek joins the Credit River","tier":3,"lat":43.64057,"lng":-79.76707},{"spot_id":"creek_junction:n7977626_4364444","kind":"creek_junction","title":"Where a small creek joins the Credit River","tier":3,"lat":43.64444,"lng":-79.77626},{"spot_id":"creek_junction:n7984665_4364705","kind":"creek_junction","title":"Where a small creek joins the Credit River","tier":3,"lat":43.64705,"lng":-79.84665},{"spot_id":"creek_junction:n7991364_4366331","kind":"creek_junction","title":"Where a small creek joins the Credit River","tier":3,"lat":43.66331,"lng":-79.91364},{"spot_id":"creek_junction:n7992716_4373248","kind":"creek_junction","title":"Where a small creek joins the Credit River","tier":3,"lat":43.73248,"lng":-79.92716},{"spot_id":"creek_junction:n7993604_4371405","kind":"creek_junction","title":"Where a small creek joins the Credit River","tier":3,"lat":43.71405,"lng":-79.93604}],"also_here_spots":[]},"great_lake:lake-ontario":{"water_body_id":"great_lake:lake-ontario","jurisdiction":"CA-ON","name":"Lake Ontario","name_source":"curated","type":"great_lake","geometry":null,"geometry_source":"none","bbox":[-79.6854,43.19108,-78.29204,43.93725],"stretch_ids":["bowmanville-soper","bronte-lowville-bronte","credit-streetsville-port-credit","duffins-pickering-ajax","ganaraska-garden-hill-port-hope","niagara-lower-queenston-notl","rouge-lower","sixteen-mile-milton-oakville","twenty-mile-balls-falls-jordan","wilmot-newcastle"],"attributes":{"bbox_basis":"river_mouths","type_basis":"great_lakes_list"},"built_at":"2026-10-12T21:43:44+00:00","display_name":"Lake Ontario","spots":[],"also_here_spots":[{"spot_id":"river_mouth:n7829204_4393725","kind":"river_mouth","title":"Where the Ganaraska River meets Lake Ontario","tier":1,"lat":43.93725,"lng":-78.29204},{"spot_id":"river_mouth:n7859506_4389124","kind":"river_mouth","title":"Where Wilmot Creek meets Lake Ontario","tier":1,"lat":43.89124,"lng":-78.59506},{"spot_id":"river_mouth:n7865768_4387791","kind":"river_mouth","title":"Where Bowmanville Creek meets Lake Ontario","tier":1,"lat":43.87791,"lng":-78.65768},{"spot_id":"river_mouth:n7903376_4381408","kind":"river_mouth","title":"Where Duffins Creek meets Lake Ontario","tier":1,"lat":43.81408,"lng":-79.03376},{"spot_id":"river_mouth:n7906666_4325985","kind":"river_mouth","title":"Where the Niagara River meets Lake Ontario","tier":1,"lat":43.25985,"lng":-79.06666},{"spot_id":"river_mouth:n7911321_4379191","kind":"river_mouth","title":"Where the Rouge River meets Lake Ontario","tier":1,"lat":43.79191,"lng":-79.11321},{"spot_id":"river_mouth:n7937293_4319108","kind":"river_mouth","title":"Where Twenty Mile Creek meets Lake Ontario","tier":1,"lat":43.19108,"lng":-79.37293},{"spot_id":"river_mouth:n7957731_4354567","kind":"river_mouth","title":"Where the Credit River meets Lake Ontario","tier":1,"lat":43.54567,"lng":-79.57731},{"spot_id":"river_mouth:n7964903_4343105","kind":"river_mouth","title":"Where Sixteen Mile Creek meets Lake Ontario","tier":1,"lat":43.43105,"lng":-79.64903},{"spot_id":"river_mouth:n7968540_4337634","kind":"river_mouth","title":"Where Bronte Creek meets Lake Ontario","tier":1,"lat":43.37634,"lng":-79.6854}]},"creek:bronte-creek":{"water_body_id":"creek:bronte-creek","jurisdiction":"CA-ON","name":"Bronte Creek","name_source":"curated","type":"creek","geometry":{"coordinates":[[[-79.85031,43.42883],[-79.84866,43.42726],[-79.84584,43.42793],[-79.84537,43.42573],[-79.84344,43.4256],[-79.83929,43.42828],[-79.83903,43.42754],[-79.83727,43.42746],[-79.83492,43.42424],[-79.83369,43.42398],[-79.83055,43.42515],[-79.82738,43.42239],[-79.82113,43.42224],[-79.8203,43.4204],[-79.81731,43.42067],[-79.81536,43.4188],[-79.8126,43.41881],[-79.81437,43.41692],[-79.81442,43.41535],[-79.81149,43.41668],[-79.80996,43.41935],[-79.80766,43.41886],[-79.80387,43.4201],[-79.80188,43.41777],[-79.79958,43.41721],[-79.80228,43.41632],[-79.80257,43.41497],[-79.79809,43.41435],[-79.79824,43.41224],[-79.79453,43.41269],[-79.78938,43.41114],[-79.78731,43.41185],[-79.78686,43.40938],[-79.78405,43.40898],[-79.78102,43.41163],[-79.77943,43.41175],[-79.77608,43.41015],[-79.77407,43.41217],[-79.76989,43.41151],[-79.76791,43.41359],[-79.76409,43.41274],[-79.76103,43.41408],[-79.75759,43.41361],[-79.75371,43.41482],[-79.75198,43.41344],[-79.74861,43.41354],[-79.74421,43.41004],[-79.73923,43.40784],[-79.74158,43.40521],[-79.73757,43.40402],[-79.73592,43.40177],[-79.73383,43.40078],[-79.7344,43.39941],[-79.73325,43.39808],[-79.72781,43.39849],[-79.72402,43.39581],[-79.72116,43.39502],[-79.72018,43.39325],[-79.71567,43.39451],[-79.71355,43.39164],[-79.71016,43.39334],[-79.70625,43.39276],[-79.70095,43.38322],[-79.6854,43.37634]]],"type":"MultiLineString"},"geometry_source":"stretch_union","bbox":[-79.85031,43.37634,-79.6854,43.42883],"stretch_ids":["bronte-lowville-bronte"],"attributes":{"type_basis":"name_suffix"},"built_at":"2026-10-12T21:43:44+00:00","display_name":"Bronte Creek","spots":[{"spot_id":"river_mouth:n7968540_4337634","kind":"river_mouth","title":"Where Bronte Creek meets Lake Ontario","tier":1,"lat":43.37634,"lng":-79.6854},{"spot_id":"creek_junction:n7970095_4338322","kind":"creek_junction","title":"Where Sheldon Creek joins Bronte Creek","tier":1,"lat":43.38322,"lng":-79.70095},{"spot_id":"creek_junction:n7985031_4342883","kind":"creek_junction","title":"Where a creek joins Bronte Creek","tier":2,"lat":43.42883,"lng":-79.85031},{"spot_id":"creek_junction:n7984537_4342573","kind":"creek_junction","title":"Where a small creek joins Bronte Creek","tier":3,"lat":43.42573,"lng":-79.84537}],"also_here_spots":[]}},"errors":{"spot404":"No spot with id 'creek_junction:n0_0'","badKind":"unknown kind 'lake'; one of ['below_dam', 'creek_junction', 'public_fishing', 'quiet_water', 'river_mouth']","wb404":"No water body with id 'river:no-such-river'","badType":"unknown type 'ocean'; one of ['creek', 'great_lake', 'lake', 'pond', 'river']"},"wbSets":{"oakville":{"type":"FeatureCollection","meta":{"count":3,"type_counts":{"river":0,"creek":2,"lake":0,"pond":0,"great_lake":1}},"features":[{"type":"Feature","id":"creek:bronte-creek","geometry":{"coordinates":[[[-79.85031,43.42883],[-79.84866,43.42726],[-79.84584,43.42793],[-79.84537,43.42573],[-79.84344,43.4256],[-79.83929,43.42828],[-79.83903,43.42754],[-79.83727,43.42746],[-79.83492,43.42424],[-79.83369,43.42398],[-79.83055,43.42515],[-79.82738,43.42239],[-79.82113,43.42224],[-79.8203,43.4204],[-79.81731,43.42067],[-79.81536,43.4188],[-79.8126,43.41881],[-79.81437,43.41692],[-79.81442,43.41535],[-79.81149,43.41668],[-79.80996,43.41935],[-79.80766,43.41886],[-79.80387,43.4201],[-79.80188,43.41777],[-79.79958,43.41721],[-79.80228,43.41632],[-79.80257,43.41497],[-79.79809,43.41435],[-79.79824,43.41224],[-79.79453,43.41269],[-79.78938,43.41114],[-79.78731,43.41185],[-79.78686,43.40938],[-79.78405,43.40898],[-79.78102,43.41163],[-79.77943,43.41175],[-79.77608,43.41015],[-79.77407,43.41217],[-79.76989,43.41151],[-79.76791,43.41359],[-79.76409,43.41274],[-79.76103,43.41408],[-79.75759,43.41361],[-79.75371,43.41482],[-79.75198,43.41344],[-79.74861,43.41354],[-79.74421,43.41004],[-79.73923,43.40784],[-79.74158,43.40521],[-79.73757,43.40402],[-79.73592,43.40177],[-79.73383,43.40078],[-79.7344,43.39941],[-79.73325,43.39808],[-79.72781,43.39849],[-79.72402,43.39581],[-79.72116,43.39502],[-79.72018,43.39325],[-79.71567,43.39451],[-79.71355,43.39164],[-79.71016,43.39334],[-79.70625,43.39276],[-79.70095,43.38322],[-79.6854,43.37634]]],"type":"MultiLineString"},"properties":{"water_body_id":"creek:bronte-creek","name":"Bronte Creek","display_name":"Bronte Creek","name_source":"curated","type":"creek","jurisdiction":"CA-ON","bbox":[-79.85031,43.37634,-79.6854,43.42883],"spot_counts":{"creek_junction":2,"river_mouth":1}}},{"type":"Feature","id":"creek:sixteen-mile-creek","geometry":{"coordinates":[[[-79.87115,43.50984],[-79.86395,43.5051],[-79.86216,43.50452],[-79.8615,43.50507],[-79.85812,43.50364],[-79.8578,43.50266],[-79.85637,43.50252],[-79.85209,43.49908],[-79.84642,43.49895],[-79.83844,43.49484],[-79.83447,43.49403],[-79.83274,43.49552],[-79.83129,43.49443],[-79.83197,43.49317],[-79.83082,43.49279],[-79.82796,43.48905],[-79.82408,43.49021],[-79.82275,43.4894],[-79.82201,43.48749],[-79.8191,43.48702],[-79.81578,43.48771],[-79.81487,43.48556],[-79.81261,43.48619],[-79.81154,43.48531],[-79.80836,43.48499],[-79.80787,43.4839],[-79.80527,43.48349],[-79.80248,43.48166],[-79.80335,43.48049],[-79.80269,43.47989],[-79.79939,43.48057],[-79.79747,43.47706],[-79.79871,43.47529],[-79.79811,43.47384],[-79.79698,43.47321],[-79.79494,43.47432],[-79.79385,43.47613],[-79.79242,43.47634],[-79.79011,43.47521],[-79.79099,43.47379],[-79.79044,43.47228],[-79.78867,43.47144],[-79.78705,43.47181],[-79.78534,43.46989],[-79.78704,43.46928],[-79.78695,43.4686],[-79.78555,43.46834],[-79.78805,43.46696],[-79.78769,43.46618],[-79.78301,43.46688],[-79.78065,43.46624],[-79.78057,43.46174],[-79.7775,43.4615],[-79.77603,43.4623],[-79.7739,43.4608],[-79.76921,43.46232],[-79.76833,43.45996],[-79.76695,43.45875],[-79.76348,43.45988],[-79.76206,43.46128],[-79.75729,43.46118],[-79.75619,43.46187],[-79.74852,43.45768],[-79.74308,43.45817],[-79.74183,43.45747],[-79.7382,43.45818],[-79.73679,43.45757],[-79.73407,43.45431],[-79.73004,43.457],[-79.72844,43.45574],[-79.72765,43.45353],[-79.7267,43.45343],[-79.72451,43.4543],[-79.7229,43.45769],[-79.71997,43.45799],[-79.71829,43.45479],[-79.71613,43.45343],[-79.71349,43.45393],[-79.71232,43.45514],[-79.7107,43.45498],[-79.70779,43.45086],[-79.70513,43.45272],[-79.70246,43.4528],[-79.70002,43.45128],[-79.69409,43.4524],[-79.69236,43.45147],[-79.69116,43.44935],[-79.6899,43.44912],[-79.68856,43.4501],[-79.68898,43.45149],[-79.69037,43.4525],[-79.69015,43.45329],[-79.68833,43.4532],[-79.6878,43.45155],[-79.68571,43.45005],[-79.68408,43.45033],[-79.68086,43.45287],[-79.67818,43.45261],[-79.67239,43.45],[-79.67011,43.44816],[-79.67102,43.44621],[-79.6747,43.44563],[-79.67434,43.44385],[-79.67031,43.44262],[-79.66654,43.44066],[-79.66544,43.43856],[-79.64903,43.43105]]],"type":"MultiLineString"},"properties":{"water_body_id":"creek:sixteen-mile-creek","name":"Sixteen Mile Creek","display_name":"Sixteen Mile Creek","name_source":"curated","type":"creek","jurisdiction":"CA-ON","bbox":[-79.87115,43.43105,-79.64903,43.50984],"spot_counts":{"creek_junction":3,"river_mouth":1}}},{"type":"Feature","id":"great_lake:lake-ontario","geometry":null,"properties":{"water_body_id":"great_lake:lake-ontario","name":"Lake Ontario","display_name":"Lake Ontario","name_source":"curated","type":"great_lake","jurisdiction":"CA-ON","bbox":[-79.6854,43.19108,-78.29204,43.93725],"spot_counts":{}}}]},"lakes":{"type":"FeatureCollection","meta":{"count":10,"type_counts":{"river":31,"creek":10,"lake":6,"pond":0,"great_lake":4}},"features":[{"type":"Feature","id":"lake:bay-of-quinte","geometry":null,"properties":{"water_body_id":"lake:bay-of-quinte","name":"Bay of Quinte","display_name":"Bay of Quinte","name_source":"curated","type":"lake","jurisdiction":"CA-ON","bbox":[-77.57587,44.1037,-77.37973,44.14834],"spot_counts":{}}},{"type":"Feature","id":"lake:humber-bay","geometry":null,"properties":{"water_body_id":"lake:humber-bay","name":"Humber Bay","display_name":"Humber Bay","name_source":"curated","type":"lake","jurisdiction":"CA-ON","bbox":[-79.4675,43.63037,-79.4675,43.63037],"spot_counts":{}}},{"type":"Feature","id":"lake:lake-st-clair","geometry":null,"properties":{"water_body_id":"lake:lake-st-clair","name":"Lake St. Clair","display_name":"Lake St. Clair","name_source":"curated","type":"lake","jurisdiction":"CA-ON","bbox":[-82.46017,42.33967,-82.46017,42.33967],"spot_counts":{}}},{"type":"Feature","id":"lake:long-point-bay","geometry":null,"properties":{"water_body_id":"lake:long-point-bay","name":"Long Point Bay","display_name":"Long Point Bay","name_source":"curated","type":"lake","jurisdiction":"CA-ON","bbox":[-80.44586,42.60255,-80.44586,42.60255],"spot_counts":{}}},{"type":"Feature","id":"lake:owen-sound","geometry":null,"properties":{"water_body_id":"lake:owen-sound","name":"Owen Sound","display_name":"Owen Sound","name_source":"curated","type":"lake","jurisdiction":"CA-ON","bbox":[-80.93917,44.58183,-80.93917,44.58183],"spot_counts":{}}},{"type":"Feature","id":"lake:rice-lake","geometry":null,"properties":{"water_body_id":"lake:rice-lake","name":"Rice Lake","display_name":"Rice Lake","name_source":"curated","type":"lake","jurisdiction":"CA-ON","bbox":[-78.24095,44.19156,-78.24095,44.19156],"spot_counts":{}}},{"type":"Feature","id":"great_lake:georgian-bay","geometry":null,"properties":{"water_body_id":"great_lake:georgian-bay","name":"Georgian Bay","display_name":"Georgian Bay","name_source":"curated","type":"great_lake","jurisdiction":"CA-ON","bbox":[-80.5787,44.54422,-79.72501,44.79575],"spot_counts":{}}},{"type":"Feature","id":"great_lake:lake-erie","geometry":null,"properties":{"water_body_id":"great_lake:lake-erie","name":"Lake Erie","display_name":"Lake Erie","name_source":"curated","type":"great_lake","jurisdiction":"CA-ON","bbox":[-83.11473,42.09986,-79.57763,42.84817],"spot_counts":{}}},{"type":"Feature","id":"great_lake:lake-huron","geometry":null,"properties":{"water_body_id":"great_lake:lake-huron","name":"Lake Huron","display_name":"Lake Huron","name_source":"curated","type":"great_lake","jurisdiction":"CA-ON","bbox":[-81.91622,43.25015,-81.37628,44.50217],"spot_counts":{}}},{"type":"Feature","id":"great_lake:lake-ontario","geometry":null,"properties":{"water_body_id":"great_lake:lake-ontario","name":"Lake Ontario","display_name":"Lake Ontario","name_source":"curated","type":"great_lake","jurisdiction":"CA-ON","bbox":[-79.6854,43.19108,-78.29204,43.93725],"spot_counts":{}}}]},"creeks":{"type":"FeatureCollection","meta":{"count":2,"type_counts":{"river":1,"creek":2,"lake":0,"pond":0,"great_lake":1}},"features":[{"type":"Feature","id":"creek:bronte-creek","geometry":{"coordinates":[[[-79.85031,43.42883],[-79.84866,43.42726],[-79.84584,43.42793],[-79.84537,43.42573],[-79.84344,43.4256],[-79.83929,43.42828],[-79.83903,43.42754],[-79.83727,43.42746],[-79.83492,43.42424],[-79.83369,43.42398],[-79.83055,43.42515],[-79.82738,43.42239],[-79.82113,43.42224],[-79.8203,43.4204],[-79.81731,43.42067],[-79.81536,43.4188],[-79.8126,43.41881],[-79.81437,43.41692],[-79.81442,43.41535],[-79.81149,43.41668],[-79.80996,43.41935],[-79.80766,43.41886],[-79.80387,43.4201],[-79.80188,43.41777],[-79.79958,43.41721],[-79.80228,43.41632],[-79.80257,43.41497],[-79.79809,43.41435],[-79.79824,43.41224],[-79.79453,43.41269],[-79.78938,43.41114],[-79.78731,43.41185],[-79.78686,43.40938],[-79.78405,43.40898],[-79.78102,43.41163],[-79.77943,43.41175],[-79.77608,43.41015],[-79.77407,43.41217],[-79.76989,43.41151],[-79.76791,43.41359],[-79.76409,43.41274],[-79.76103,43.41408],[-79.75759,43.41361],[-79.75371,43.41482],[-79.75198,43.41344],[-79.74861,43.41354],[-79.74421,43.41004],[-79.73923,43.40784],[-79.74158,43.40521],[-79.73757,43.40402],[-79.73592,43.40177],[-79.73383,43.40078],[-79.7344,43.39941],[-79.73325,43.39808],[-79.72781,43.39849],[-79.72402,43.39581],[-79.72116,43.39502],[-79.72018,43.39325],[-79.71567,43.39451],[-79.71355,43.39164],[-79.71016,43.39334],[-79.70625,43.39276],[-79.70095,43.38322],[-79.6854,43.37634]]],"type":"MultiLineString"},"properties":{"water_body_id":"creek:bronte-creek","name":"Bronte Creek","display_name":"Bronte Creek","name_source":"curated","type":"creek","jurisdiction":"CA-ON","bbox":[-79.85031,43.37634,-79.6854,43.42883],"spot_counts":{"creek_junction":2,"river_mouth":1}}},{"type":"Feature","id":"creek:sixteen-mile-creek","geometry":{"coordinates":[[[-79.87115,43.50984],[-79.86395,43.5051],[-79.86216,43.50452],[-79.8615,43.50507],[-79.85812,43.50364],[-79.8578,43.50266],[-79.85637,43.50252],[-79.85209,43.49908],[-79.84642,43.49895],[-79.83844,43.49484],[-79.83447,43.49403],[-79.83274,43.49552],[-79.83129,43.49443],[-79.83197,43.49317],[-79.83082,43.49279],[-79.82796,43.48905],[-79.82408,43.49021],[-79.82275,43.4894],[-79.82201,43.48749],[-79.8191,43.48702],[-79.81578,43.48771],[-79.81487,43.48556],[-79.81261,43.48619],[-79.81154,43.48531],[-79.80836,43.48499],[-79.80787,43.4839],[-79.80527,43.48349],[-79.80248,43.48166],[-79.80335,43.48049],[-79.80269,43.47989],[-79.79939,43.48057],[-79.79747,43.47706],[-79.79871,43.47529],[-79.79811,43.47384],[-79.79698,43.47321],[-79.79494,43.47432],[-79.79385,43.47613],[-79.79242,43.47634],[-79.79011,43.47521],[-79.79099,43.47379],[-79.79044,43.47228],[-79.78867,43.47144],[-79.78705,43.47181],[-79.78534,43.46989],[-79.78704,43.46928],[-79.78695,43.4686],[-79.78555,43.46834],[-79.78805,43.46696],[-79.78769,43.46618],[-79.78301,43.46688],[-79.78065,43.46624],[-79.78057,43.46174],[-79.7775,43.4615],[-79.77603,43.4623],[-79.7739,43.4608],[-79.76921,43.46232],[-79.76833,43.45996],[-79.76695,43.45875],[-79.76348,43.45988],[-79.76206,43.46128],[-79.75729,43.46118],[-79.75619,43.46187],[-79.74852,43.45768],[-79.74308,43.45817],[-79.74183,43.45747],[-79.7382,43.45818],[-79.73679,43.45757],[-79.73407,43.45431],[-79.73004,43.457],[-79.72844,43.45574],[-79.72765,43.45353],[-79.7267,43.45343],[-79.72451,43.4543],[-79.7229,43.45769],[-79.71997,43.45799],[-79.71829,43.45479],[-79.71613,43.45343],[-79.71349,43.45393],[-79.71232,43.45514],[-79.7107,43.45498],[-79.70779,43.45086],[-79.70513,43.45272],[-79.70246,43.4528],[-79.70002,43.45128],[-79.69409,43.4524],[-79.69236,43.45147],[-79.69116,43.44935],[-79.6899,43.44912],[-79.68856,43.4501],[-79.68898,43.45149],[-79.69037,43.4525],[-79.69015,43.45329],[-79.68833,43.4532],[-79.6878,43.45155],[-79.68571,43.45005],[-79.68408,43.45033],[-79.68086,43.45287],[-79.67818,43.45261],[-79.67239,43.45],[-79.67011,43.44816],[-79.67102,43.44621],[-79.6747,43.44563],[-79.67434,43.44385],[-79.67031,43.44262],[-79.66654,43.44066],[-79.66544,43.43856],[-79.64903,43.43105]]],"type":"MultiLineString"},"properties":{"water_body_id":"creek:sixteen-mile-creek","name":"Sixteen Mile Creek","display_name":"Sixteen Mile Creek","name_source":"curated","type":"creek","jurisdiction":"CA-ON","bbox":[-79.87115,43.43105,-79.64903,43.50984],"spot_counts":{"creek_junction":3,"river_mouth":1}}}]}},"weed":{"labels":{"kind_label":"Weed edge","status_label":"reported, not verified","provenance_label":"Reported by you","layer":{"label":"Your weed edges","note":"Weed edges you reported. Only you can see them. They are your sightings, not checked against anything else.","default_on":true},"shape_labels":{"Point":"A spot on the edge","LineString":"A line along the edge"},"near_line_m":150,"near_outline_m":100,"max_line_length_m":10000},"layer":{"type":"FeatureCollection","meta":{"layer":"Your weed edges","note":"Weed edges you reported. Only you can see them. They are your sightings, not checked against anything else.","visible_to":"you"},"features":[{"type":"Feature","id":1,"geometry":{"type":"Point","coordinates":[-79.96423,43.8139]},"properties":{"weed_report_id":1,"water_body_id":"river:credit-river","water_body_name":"Credit River","jurisdiction":"CA-ON","shape_label":"A spot on the edge","observed_on":"2026-10-04","note":"Example: weeds thin out below the riffle.","provenance":"user_reported","provenance_label":"Reported by you","kind_label":"Weed edge","status_label":"reported, not verified","date_label":"seen 2026-10-04","caption":"Weed edge · reported, not verified · seen 2026-10-04"}},{"type":"Feature","id":2,"geometry":{"type":"LineString","coordinates":[[-79.96423,43.8139],[-79.96307,43.81495]]},"properties":{"weed_report_id":2,"water_body_id":"river:credit-river","water_body_name":"Credit River","jurisdiction":"CA-ON","shape_label":"A line along the edge","observed_on":"2026-09-21","note":null,"provenance":"user_reported","provenance_label":"Reported by you","kind_label":"Weed edge","status_label":"reported, not verified","date_label":"seen 2026-09-21","caption":"Weed edge · reported, not verified · seen 2026-09-21"}},{"type":"Feature","id":3,"geometry":{"type":"Point","coordinates":[-79.84537,43.42573]},"properties":{"weed_report_id":3,"water_body_id":"creek:bronte-creek","water_body_name":"Bronte Creek","jurisdiction":"CA-ON","shape_label":"A spot on the edge","observed_on":"2026-08-15","note":"Example: lilies along the near bank.","provenance":"user_reported","provenance_label":"Reported by you","kind_label":"Weed edge","status_label":"reported, not verified","date_label":"seen 2026-08-15","caption":"Weed edge · reported, not verified · seen 2026-08-15"}}]},"list":[{"type":"Feature","id":1,"geometry":{"type":"Point","coordinates":[-79.96423,43.8139]},"properties":{"weed_report_id":1,"water_body_id":"river:credit-river","water_body_name":"Credit River","jurisdiction":"CA-ON","shape_label":"A spot on the edge","observed_on":"2026-10-04","note":"Example: weeds thin out below the riffle.","provenance":"user_reported","provenance_label":"Reported by you","kind_label":"Weed edge","status_label":"reported, not verified","date_label":"seen 2026-10-04","caption":"Weed edge · reported, not verified · seen 2026-10-04"}},{"type":"Feature","id":2,"geometry":{"type":"LineString","coordinates":[[-79.96423,43.8139],[-79.96307,43.81495]]},"properties":{"weed_report_id":2,"water_body_id":"river:credit-river","water_body_name":"Credit River","jurisdiction":"CA-ON","shape_label":"A line along the edge","observed_on":"2026-09-21","note":null,"provenance":"user_reported","provenance_label":"Reported by you","kind_label":"Weed edge","status_label":"reported, not verified","date_label":"seen 2026-09-21","caption":"Weed edge · reported, not verified · seen 2026-09-21"}},{"type":"Feature","id":3,"geometry":{"type":"Point","coordinates":[-79.84537,43.42573]},"properties":{"weed_report_id":3,"water_body_id":"creek:bronte-creek","water_body_name":"Bronte Creek","jurisdiction":"CA-ON","shape_label":"A spot on the edge","observed_on":"2026-08-15","note":"Example: lilies along the near bank.","provenance":"user_reported","provenance_label":"Reported by you","kind_label":"Weed edge","status_label":"reported, not verified","date_label":"seen 2026-08-15","caption":"Weed edge · reported, not verified · seen 2026-08-15"}}],"created":[{"weed_report_id":1,"water_body_id":"river:credit-river","water_body_name":"Credit River","jurisdiction":"CA-ON","geometry":{"type":"Point","coordinates":[-79.96423,43.8139]},"shape_label":"A spot on the edge","observed_on":"2026-10-04","note":"Example: weeds thin out below the riffle.","provenance":"user_reported","provenance_label":"Reported by you","kind_label":"Weed edge","status_label":"reported, not verified","date_label":"seen 2026-10-04","caption":"Weed edge · reported, not verified · seen 2026-10-04","created_at":"2026-10-13 16:05:09","updated_at":null},{"weed_report_id":2,"water_body_id":"river:credit-river","water_body_name":"Credit River","jurisdiction":"CA-ON","geometry":{"type":"LineString","coordinates":[[-79.96423,43.8139],[-79.96307,43.81495]]},"shape_label":"A line along the edge","observed_on":"2026-09-21","note":null,"provenance":"user_reported","provenance_label":"Reported by you","kind_label":"Weed edge","status_label":"reported, not verified","date_label":"seen 2026-09-21","caption":"Weed edge · reported, not verified · seen 2026-09-21","created_at":"2026-10-13 16:05:09","updated_at":null},{"weed_report_id":3,"water_body_id":"creek:bronte-creek","water_body_name":"Bronte Creek","jurisdiction":"CA-ON","geometry":{"type":"Point","coordinates":[-79.84537,43.42573]},"shape_label":"A spot on the edge","observed_on":"2026-08-15","note":"Example: lilies along the near bank.","provenance":"user_reported","provenance_label":"Reported by you","kind_label":"Weed edge","status_label":"reported, not verified","date_label":"seen 2026-08-15","caption":"Weed edge · reported, not verified · seen 2026-08-15","created_at":"2026-10-13 16:05:09","updated_at":null}],"errors":{"notOnWater":"That is 6,180 m from Credit River. A weed edge has to be on the water, within 150 m of its drawn line.","noOutline":"Lake Ontario has no outline on file, so a weed edge cannot be checked against it. Weed edges can only be reported on water that is drawn.","notFound":"No such weed report"}},"conditions":[{"field":"air_temp_c","label":"Air temperature","group":"weather","value":23.7,"unit":"°C","meaning":null,"source":"Open-Meteo","station":null,"distance_km":null,"observed_at":"2026-10-13T16:00:00+00:00","age_s":318,"age_label":"5 min ago","stale":false,"empty_reason":null},{"field":"wind_speed_kmh","label":"Wind","group":"weather","value":23.4,"unit":"km/h","meaning":null,"source":"Open-Meteo","station":null,"distance_km":null,"observed_at":"2026-10-13T16:00:00+00:00","age_s":318,"age_label":"5 min ago","stale":false,"empty_reason":null},{"field":"precipitation_mm","label":"Precipitation","group":"weather","value":0.0,"unit":"mm","meaning":null,"source":"Open-Meteo","station":null,"distance_km":null,"observed_at":"2026-10-13T16:00:00+00:00","age_s":318,"age_label":"5 min ago","stale":false,"empty_reason":null},{"field":"pressure_hpa","label":"Air pressure","group":"weather","value":991.5,"unit":"hPa","meaning":null,"source":"Open-Meteo","station":null,"distance_km":null,"observed_at":"2026-10-13T16:00:00+00:00","age_s":318,"age_label":"5 min ago","stale":false,"empty_reason":null},{"field":"pressure_trend","label":"Pressure trend","group":"weather","value":"falling","unit":null,"meaning":"falling pressure ahead of weather often triggers a feeding window","source":"Open-Meteo","station":null,"distance_km":null,"observed_at":"2026-10-13T16:00:00+00:00","age_s":318,"age_label":"5 min ago","stale":false,"empty_reason":null},{"field":"flow_cms","label":"River flow","group":"water_flow","value":0.105,"unit":"m³/s","meaning":null,"source":"WSC station 02HB027","station":"FOURTEEN MILE CREEK AT OAKVILLE","distance_km":3.0,"observed_at":"2026-10-13T15:05:00+00:00","age_s":3618,"age_label":"60 min ago","stale":false,"empty_reason":null},{"field":"flow_trend","label":"Flow trend","group":"water_flow","value":"rising","unit":null,"meaning":"rising over the last 3 hours","source":"WSC station 02HB027","station":"FOURTEEN MILE CREEK AT OAKVILLE","distance_km":3.0,"observed_at":"2026-10-13T15:05:00+00:00","age_s":3618,"age_label":"60 min ago","stale":false,"empty_reason":null},{"field":"level_m","label":"Water level","group":"water_flow","value":1.318,"unit":"m","meaning":null,"source":"WSC station 02HB027","station":"FOURTEEN MILE CREEK AT OAKVILLE","distance_km":3.0,"observed_at":"2026-10-13T15:05:00+00:00","age_s":3618,"age_label":"60 min ago","stale":false,"empty_reason":null},{"field":"level_trend","label":"Level trend","group":"water_flow","value":"steady","unit":null,"meaning":"little change over the last 3 hours","source":"WSC station 02HB027","station":"FOURTEEN MILE CREEK AT OAKVILLE","distance_km":3.0,"observed_at":"2026-10-13T15:05:00+00:00","age_s":3618,"age_label":"60 min ago","stale":false,"empty_reason":null},{"field":"water_temp_c","label":"Water temperature","group":"water_temperature","value":4.8,"unit":"°C","meaning":"a single dated sample at the nearest monitoring station, not a live reading","source":"PWQMN","station":"Fourteen Mile Creek","distance_km":1.4,"observed_at":"2020-11-17","age_s":186336318,"age_label":"2157 days ago","stale":true,"empty_reason":null},{"field":"dissolved_oxygen_mgl","label":"Dissolved oxygen","group":"water_quality","value":13.0,"unit":"mg/L","meaning":"well oxygenated, cold enough for trout if temperature agrees","source":"PWQMN","station":"Fourteen Mile Creek","distance_km":1.4,"observed_at":"2020-11-17","age_s":186336318,"age_label":"2157 days ago","stale":true,"empty_reason":null},{"field":"ph","label":"pH","group":"water_quality","value":8.3,"unit":null,"meaning":null,"source":"PWQMN","station":"Fourteen Mile Creek","distance_km":1.4,"observed_at":"2020-11-17","age_s":186336318,"age_label":"2157 days ago","stale":true,"empty_reason":null}],"home":[43.4675,-79.6877]};
+</script>
+<script>
+/* =====================================================================
+   FishDex Explore map mockup — app.  Data is injected above as FD:
+   FD.labels, FD.spots, FD.details, FD.wbDetails, FD.wbSets, FD.weed,
+   FD.conditions, FD.kindCounts, FD.home. All fixture responses verbatim.
+   ===================================================================== */
+const LABELS      = FD.labels;
+const SPOTS       = FD.spots;              // merged spot features (properties + lat/lng)
+const DETAILS     = FD.details;            // spot_id -> GET /map/spots/{id}
+const WB_DETAILS  = FD.wbDetails;          // water_body_id -> GET /map/water-bodies/{id}
+const WEED        = FD.weed;               // labels, layer, list, created[], errors
+const CONDITIONS  = FD.conditions;         // pin conditions fields
+const HOME        = FD.home || [43.4675,-79.6877];   // Oakville
+const RATING_LABELS={1:"skunked",2:"slow",3:"decent",4:"great",5:"best of the year"};
+const STATE_LABELS={saved:"Saved",visited:"Visited"};
+
+/* example personal pins — shape from the merged pins API; illustrative values */
+const PINS = [
+  {id:"pin_paris",   name:"Paris dam pool", state:"visited", favourite:true,  lat:43.1960,  lng:-80.3826,
+   facts:{visits:4, fish:23, per_hour:1.8, species:6, biggest:'16.2″', biggest_species:"smallmouth bass", best_rating:"great"},
+   species:[["Smallmouth bass",9],["Rock bass",6],["Yellow perch",4],["Northern pike",2],["Longnose dace",1],["Walleye",1]],
+   trips:[["14 Sep 2026","4 fish","decent"],["3 Aug 2026","9 fish","great"],["21 Jun 2026","7 fish","decent"],["Summer 2019","3 fish","recalled"]]},
+  {id:"pin_credit",  name:"Credit mouth at dawn", state:"saved", favourite:false, lat:43.54567, lng:-79.57731,
+   facts:{visits:0, fish:0, per_hour:null, species:0, biggest:null, best_rating:null}, species:[], trips:[]},
+  {id:"pin_bronte",  name:"Bronte harbour wall", state:"visited", favourite:false, lat:43.37634, lng:-79.6854,
+   facts:{visits:2, fish:11, per_hour:1.1, species:4, biggest:'21.5″', biggest_species:"channel catfish", best_rating:"great"},
+   species:[["Channel catfish",6],["Freshwater drum",3],["Walleye",2]],
+   trips:[["28 Aug 2026","8 fish","great"],["12 Jul 2026","3 fish","slow"]]}
+];
+const RATING_SET={skunked:1,slow:2,decent:3,great:4,"best of the year":5};
+
+/* ============================ STYLE MAPS ============================ */
+const KSTYLE={
+  river_mouth:{c:"#2E6B60", shape:"ring",   word:"River mouths"},
+  creek_junction:{c:"#6B7A3A", shape:"diamond", word:"Where creeks join"},
+  below_dam:{c:"#A8543A", shape:"square",   word:"Below dams"},
+  public_fishing:{c:"#B08A3E", shape:"dot",  word:"Public fishing spots"},
+  quiet_water:{c:"#5E7A86", shape:"hollow",  word:"Quiet water"}
+};
+const SRC_LABEL={osm:"OpenStreetMap", ohn_topology:"Ontario Hydro Network (OHN)", curation:"Fishdex's own list"};
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function kindBy(kind){ return LABELS.kinds.find(k=>k.kind===kind); }
+function wbType(type){ return LABELS.water_body_types.find(t=>t.type===type); }
+function wbTypeLabel(type){ const t=wbType(type); return t?t.label:"Water body"; }
+function whichWord(type){ const t=wbType(type); return t&&t.label?t.label.toLowerCase():"water"; }
+function pinColor(kind){ return KSTYLE[kind]?KSTYLE[kind].c:"#2E6B60"; }
+
+function markerGlyph(kind,size){
+  const s=KSTYLE[kind]||KSTYLE.river_mouth; let g="";
+  if(s.shape==="ring")   g=`<circle cx="15" cy="15" r="4" fill="none" stroke="${s.c}" stroke-width="3"/>`;
+  if(s.shape==="diamond")g=`<rect x="10" y="10" width="10" height="10" rx="1" fill="${s.c}" transform="rotate(45 15 15)"/>`;
+  if(s.shape==="square") g=`<rect x="10.5" y="10.5" width="9" height="9" rx="1.5" fill="${s.c}"/>`;
+  if(s.shape==="dot")    g=`<circle cx="15" cy="15" r="4.6" fill="${s.c}"/>`;
+  if(s.shape==="hollow") g=`<circle cx="15" cy="15" r="5" fill="none" stroke="${s.c}" stroke-width="2.2" stroke-dasharray="2.6 2.2"/>`;
+  const dashed=s.shape==="hollow"?` stroke-dasharray="3 3"`:"";
+  const svg=`<svg width="30" height="30" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="#fff" stroke="${s.c}" stroke-width="3"${dashed}/>${g}</svg>`;
+  return size?svg.replace('width="30" height="30"',`width="${size}" height="${size}"`):svg;
+}
+function markerIcon(kind){ return L.divIcon({className:"spot-mk", html:markerGlyph(kind), iconSize:[30,30], iconAnchor:[15,15]}); }
+function accessIcon(){
+  return L.divIcon({className:"access-mk", iconSize:[16,16], iconAnchor:[8,8],
+    html:`<svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4.6" fill="#fff" stroke="#5E6A64" stroke-width="2"/><circle cx="8" cy="8" r="1.5" fill="#5E6A64"/></svg>`});
+}
+function bridgeIcon(){
+  return L.divIcon({className:"bridge-mk", iconSize:[16,16], iconAnchor:[8,8],
+    html:`<svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 6h12M4 6v5M12 6v5M2 11h12" stroke="#8a8578" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>`});
+}
+function weedPointIcon(){
+  return L.divIcon({className:"weed-mk", iconSize:[20,20], iconAnchor:[10,10],
+    html:`<svg width="20" height="20" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6" fill="#7fae86" fill-opacity=".9" stroke="#3f7a58" stroke-width="2" stroke-dasharray="2.4 2"/></svg>`});
+}
+function pinIcon(state){
+  const fill=state==="visited"?"#2E6B60":"#fff", inner=state==="visited"?"#fff":"#2E6B60";
+  return L.divIcon({className:"pin-mk", iconSize:[26,32], iconAnchor:[13,30],
+    html:`<svg width="26" height="32" viewBox="0 0 26 32"><path d="M13 1C6.9 1 2 5.9 2 12c0 7.5 11 19 11 19s11-11.5 11-19c0-6.1-4.9-11-11-11Z" fill="${fill}" stroke="#2E6B60" stroke-width="2"/><circle cx="13" cy="12" r="4.2" fill="${inner}"/></svg>`});
+}
+function shoreIcon(kind){
+  const col = kind==="inlet"||kind==="outlet" ? "#2E6B60" : (kind==="island" ? "#6B7A3A" : "#B08A3E");
+  const dashed = (kind==="point"||kind==="peninsula") ? ` stroke-dasharray="3 2.5"` : "";
+  return L.divIcon({className:"shore-mk", iconSize:[18,18], iconAnchor:[9,9],
+    html:`<svg width="18" height="18" viewBox="0 0 18 18"><rect x="3.5" y="3.5" width="11" height="11" rx="3" fill="#fff" stroke="${col}" stroke-width="2.4"${dashed}/></svg>`});
+}
+
+/* ============================ MAP ============================ */
+let mainMap=null, shoreMap=null;
+if(document.getElementById("map")){
+  mainMap=L.map("map",{zoomControl:false, attributionControl:true, zoomSnap:0.5, minZoom:6, maxZoom:17}).setView([43.45,-79.95],8.5);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    maxZoom:19,
+    attribution:'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(mainMap);
+  mainMap.whenReady(()=>mainMap.invalidateSize());
+}
+
+const waterLayer = mainMap?L.layerGroup().addTo(mainMap):null;
+const lakeLayer  = mainMap?L.layerGroup().addTo(mainMap):null;
+const spotLayer  = mainMap?L.layerGroup().addTo(mainMap):null;
+const accessLayer= mainMap?L.layerGroup().addTo(mainMap):null;
+const bridgeLayer= mainMap?L.layerGroup().addTo(mainMap):null;
+const weedLayer  = mainMap?L.layerGroup().addTo(mainMap):null;
+const shoreMainLayer = mainMap?L.layerGroup():null;   // toggled on the Explore map
+const pinLayer   = mainMap?L.layerGroup().addTo(mainMap):null;
+const shoreDemoLayer = L.layerGroup();               // lives on the demo map only
+
+/* ---- water body lines drawn from each body's own geometry (real fixture) ---- */
+function drawWaterBodies(){
+  if(!waterLayer) return; waterLayer.clearLayers();
+  Object.values(WB_DETAILS).forEach(wb=>{
+    const g=wb.geometry; if(!g) return;
+    const parts = g.type==="MultiLineString" ? g.coordinates : (g.type==="LineString"?[g.coordinates]:[]);
+    parts.forEach(line=>{
+      L.polyline(line.map(([x,y])=>[y,x]),{color:"#8fafa8",weight:1.6,opacity:.75}).addTo(waterLayer);
+    });
+  });
+}
+/* ---- lakes: a matched outline if present, else an honest label ---- */
+function drawLakes(){
+  if(!lakeLayer) return; lakeLayer.clearLayers();
+  if(!layersOn.lakes) return;
+  Object.values(WB_DETAILS).forEach(wb=>{
+    if(wb.type!=="lake"&&wb.type!=="great_lake"&&wb.type!=="pond") return;
+    if(wb.geometry){
+      const rings=wb.geometry.type==="Polygon"?[wb.geometry.coordinates]:wb.geometry.coordinates;
+      rings.forEach(ring=>L.polygon(ring.map(([x,y])=>[y,x]),{color:"#7fa9c9",weight:1,fillColor:"#bcd6e8",fillOpacity:.35}).addTo(lakeLayer));
+    }else{
+      const b=wb.bbox, lat=b?((b[1]+b[3])/2):43.44, lng=b?((b[0]+b[2])/2):-79.42;
+      const pos = /ontario/i.test(wb.display_name||"") ? [43.44,-79.44] : [lat,lng];
+      L.marker(pos,{interactive:false,icon:L.divIcon({className:"lake-label",iconSize:[10,10],
+        html:`<div class="ll">${esc(wb.display_name||wb.name)}<small>no outline on file</small></div>`})}).addTo(lakeLayer);
+    }
+  });
+}
+
+/* ---- illustrative shoreline features (doc's own example shape) ---- */
+const SHORE_FEATURES=[
+  {kind:"inlet", name:"Credit River", derivation:"watercourse_endpoint", provenance:"record", lat:43.54567, lng:-79.57731,
+   note:"A mapped stream flows in here. Credit River is mapped here. Read from the Ontario government water map."},
+  {kind:"point", name:null, derivation:"shoreline_outline", provenance:"inference", lat:43.548, lng:-79.64, length_m:240,
+   note:"A point of land reaches out. Read from the shoreline outline."},
+  {kind:"peninsula", name:null, derivation:"shoreline_outline", provenance:"inference", lat:43.541, lng:-79.71, length_m:610,
+   note:"A long point of land reaches out. Read from the shoreline outline."},
+  {kind:"island", name:null, derivation:"shoreline_outline", provenance:"record", area_m2:590000, poly:[[-79.61,43.515],[-79.598,43.515],[-79.598,43.524],[-79.61,43.524],[-79.61,43.515]],
+   note:"Land inside the water. Read from the shoreline outline."}
+];
+const SHORE_POLY=[[-79.72,43.545],[-79.66,43.552],[-79.60,43.553],[-79.577,43.5457],[-79.55,43.552],[-79.50,43.559],[-79.48,43.505],[-79.74,43.50],[-79.72,43.545]];
+function drawShoreInto(group){
+  group.clearLayers();
+  L.polygon(SHORE_POLY.map(([x,y])=>[y,x]),{color:"#7fa9c9",weight:1.4,fillColor:"#bcd6e8",fillOpacity:.3}).addTo(group);
+  SHORE_FEATURES.forEach(f=>{
+    if(f.poly){ L.polygon(f.poly.map(([x,y])=>[y,x]),{color:"#6B7A3A",weight:1.6,fillColor:"#cfe0b0",fillOpacity:.5}).addTo(group); }
+    else{
+      L.marker([f.lat,f.lng],{icon:shoreIcon(f.kind)}).addTo(group).bindPopup(
+        `<div style="font-family:'Fraunces',serif;font-size:13px;max-width:210px"><b>${esc(shoreKindLabel(f.kind))}</b>
+         <div style="font-size:11.5px;color:#5E6A64;margin-top:3px">${esc(f.note)}</div>
+         <div style="font-size:10px;color:#97A19B;margin-top:5px;text-transform:uppercase;letter-spacing:.05em">${esc(f.provenance)} · ${esc((LABELS.shoreline_derivations&&LABELS.shoreline_derivations[f.derivation])||f.derivation)}${f.length_m?` · ${f.length_m} m`:""}${f.area_m2?` · ${(f.area_m2/10000).toFixed(0)} ha`:""}</div></div>`);
+    }
+  });
+}
+function shoreKindLabel(kind){ const s=LABELS.shoreline_features.find(x=>x.kind===kind); return s?s.label:kind; }
+if(document.getElementById("shoremap")){
+  shoreMap=L.map("shoremap",{zoomControl:false, attributionControl:true, zoomSnap:0.5, minZoom:8, maxZoom:16}).setView([43.535,-79.60],12);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,
+    attribution:'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(shoreMap);
+  drawShoreInto(shoreDemoLayer); shoreDemoLayer.addTo(shoreMap);
+  const key=document.getElementById("shore-key");
+  if(key) key.innerHTML=[...new Set(SHORE_FEATURES.map(f=>f.kind))].map(k=>
+    `<div class="kr"><span class="sw" style="width:13px;height:13px;display:grid;place-items:center">${shoreIcon(k).options.html.replace('width="18" height="18"','width="13" height="13"')}</span>${esc(shoreKindLabel(k))}</div>`).join("");
+  shoreMap.whenReady(()=>shoreMap.invalidateSize());
+}
+
+/* ============================ FILTER / LAYER STATE ============================ */
+let activeKind="all", mode="explore", selectedId=null;
+let gettingThereOn=true, bridgesOn=false, layersOn={lakes:true}, weedOn=true, shoreOn=false;
+let activeSpecies=null, nearOn=false, nearRadius=50;
+const accessOn=()=>gettingThereOn;
+
+/* ============================ RENDER ============================ */
+const markersById={};
+function tierForZoom(z){ return z<=9?1 : (z<=11?2:3); }
+function kindCounts(){ const c={}; LABELS.kinds.forEach(k=>c[k.kind]=0); SPOTS.forEach(f=>c[f.kind]=(c[f.kind]||0)+1); return c; }
+function distKm(a,b){ const R=6371,dLat=(b[0]-a[0])*Math.PI/180,dLon=(b[1]-a[1])*Math.PI/180;
+  const la1=a[0]*Math.PI/180,la2=b[0]*Math.PI/180;
+  const h=Math.sin(dLat/2)**2+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
+
+function buildChips(){
+  const row=document.getElementById("chipsrow"); if(!row) return; row.innerHTML="";
+  const mk=(key,label,count,on,cls)=>{ const el=document.createElement("span"); el.className="c"+(on?" on":"")+(cls?" "+cls:"");
+    el.innerHTML=esc(label)+(count!=null?`<span class="n">${count}</span>`:"");
+    el.onclick=()=>{ activeKind=key; buildChips(); refresh(); }; row.appendChild(el); };
+  const counts=kindCounts();
+  mk("all","All",SPOTS.length,activeKind==="all","");
+  LABELS.kinds.forEach(k=>mk(k.kind,k.chip,counts[k.kind]||0,activeKind===k.kind,k.distinct?"quiet":""));
+}
+function buildKey(){
+  const body=document.getElementById("keys-body"); if(!body) return; body.innerHTML="";
+  LABELS.kinds.filter(k=>kindCounts()[k.kind]>0).forEach(k=>{
+    const el=document.createElement("div"); el.className="kr";
+    el.innerHTML=`<span class="sw">${markerGlyph(k.kind,13)}</span>${esc(k.chip)}`; body.appendChild(el);
+  });
+}
+function activeFilterPills(){
+  const box=document.getElementById("activefilters"); if(!box) return; let h="";
+  if(activeSpecies) h+=`<span class="pill act">species · <b>${esc(activeSpecies)}</b><span class="x" data-clear="species">×</span></span>`;
+  if(nearOn)        h+=`<span class="pill act">within <b>${nearRadius} km</b> of home<span class="x" data-clear="near">×</span></span>`;
+  box.innerHTML=h;
+  box.querySelectorAll("[data-clear]").forEach(x=>x.onclick=()=>{ const w=x.dataset.clear;
+    if(w==="species"){ activeSpecies=null; syncSpecies(); } if(w==="near"){ nearOn=false; const t=document.getElementById("near-toggle"); if(t)t.classList.remove("on"); }
+    refresh(); });
+}
+function buildSpeciesList(){
+  const list=document.getElementById("species-list"); if(!list) return;
+  const names=new Map();
+  Object.values(DETAILS).forEach(d=>{ const sp=d.card&&d.card.might_find&&d.card.might_find.species; (sp||[]).forEach(s=>{ if(!names.has(s.name)) names.set(s.name,s.scientific_name); }); });
+  window.__speciesNames=[...names.keys()].sort();
+  const term=(document.getElementById("species-input").value||"").trim().toLowerCase();
+  const shown=window.__speciesNames.filter(n=>!term||n.toLowerCase().includes(term));
+  if(!shown.length){ list.innerHTML=`<div class="spopt none">No recorded species match. In this snapshot only two cards carry records.</div>`; return; }
+  list.innerHTML=shown.map(n=>`<div class="spopt${n===activeSpecies?" on":""}" data-sp="${esc(n)}"><span>${esc(n)}</span><span class="sci">${esc(names.get(n)||"")}</span></div>`).join("");
+  list.querySelectorAll("[data-sp]").forEach(el=>el.onclick=()=>{ activeSpecies=el.dataset.sp; syncSpecies(); refresh(); });
+}
+function syncSpecies(){ const i=document.getElementById("species-input"); if(i&&activeSpecies) i.value=activeSpecies; buildSpeciesList(); }
+
+function clearSpotMarkers(){ spotLayer&&spotLayer.clearLayers(); accessLayer&&accessLayer.clearLayers(); bridgeLayer&&bridgeLayer.clearLayers(); Object.keys(markersById).forEach(k=>delete markersById[k]); }
+
+function filteredSpots(){
+  let list=SPOTS.slice();
+  if(activeSpecies){ list=list.filter(f=>{ const d=DETAILS[f.spot_id]; const sp=d&&d.card&&d.card.might_find&&d.card.might_find.species; return sp&&sp.some(s=>s.name===activeSpecies); }); }
+  if(nearOn){ list=list.map(f=>({f,d:distKm(HOME,[f.lat,f.lng])})).filter(x=>x.d<=nearRadius).sort((a,b)=>a.d-b.d).map(x=>x.f); }
+  return list;
+}
+function refresh(){
+  if(!mainMap) return;
+  if(mode==="personal"){ document.getElementById("countpill").innerHTML=`<b>${PINS.length}</b> pins · private`;
+    const en=document.getElementById("emptynote"); if(en) en.style.display="none"; return; }
+  const z=mainMap.getZoom(), tier=tierForZoom(z), b=mainMap.getBounds();
+  const zp=document.getElementById("zoompill"); if(zp) zp.textContent="zoom "+z;
+  clearSpotMarkers();
+  const base=filteredSpots();
+  const inBox=base.filter(f=>b.contains([f.lat,f.lng]));
+  const allowed=inBox.filter(f=>f.kind==="quiet_water"?false:f.tier<=tier);
+  const shown=allowed.filter(f=>activeKind==="all"||f.kind===activeKind);
+  const hiddenByZoom=inBox.filter(f=>f.tier>tier&&(activeKind==="all"||f.kind===activeKind)).length;
+
+  // access + bridges from the spot payloads (fixture has no /map/layers response yet)
+  if(accessOn()) shown.forEach(f=>{ const d=DETAILS[f.spot_id]; if(!d)return; (d.getting_there||[]).forEach(g=>{ if(g.lat!=null) L.marker([g.lat,g.lng],{icon:accessIcon(),interactive:false}).addTo(accessLayer); }); });
+  if(bridgesOn) shown.forEach(f=>{ const d=DETAILS[f.spot_id]; if(!d)return; (d.bridges||[]).forEach(g=>{ if(g.lat!=null) L.marker([g.lat,g.lng],{icon:bridgeIcon(),interactive:false}).addTo(bridgeLayer); }); });
+
+  shown.forEach(f=>{
+    const m=L.marker([f.lat,f.lng],{icon:markerIcon(f.kind),riseOnHover:true}).addTo(spotLayer);
+    if(f.spot_id===selectedId) m.getElement()?.classList.add("sel");
+    m.on("click",()=>openSpot(f)); markersById[f.spot_id]=m;
+  });
+  // shore demo layer (illustrative) toggled on the main map too
+  if(shoreMainLayer){
+    if(shoreOn){ drawShoreInto(shoreMainLayer); if(!mainMap.hasLayer(shoreMainLayer)) shoreMainLayer.addTo(mainMap); }
+    else if(mainMap.hasLayer(shoreMainLayer)) mainMap.removeLayer(shoreMainLayer);
+  }
+  drawLakes();
+
+  const cn=document.getElementById("countpill");
+  if(shown.length===0) cn.innerHTML="<b>0</b> spots in view";
+  else cn.innerHTML=`<b>${shown.length}</b> spot${shown.length>1?"s":""} in view`+(hiddenByZoom?` <span style="color:var(--ink3)">· +${hiddenByZoom} closer up</span>`:"");
+  const en=document.getElementById("emptynote");
+  if(en) en.style.display=(shown.length===0&&hiddenByZoom===0)?"block":"none";
+  activeFilterPills();
+}
+function drawWeedLayer(){
+  if(!weedLayer) return; weedLayer.clearLayers();
+  if(!weedOn||mode!=="explore") return;
+  const fc=WEED.layer; if(!fc) return;
+  fc.features.forEach(ft=>{
+    const p=ft.properties;
+    if(ft.geometry.type==="LineString"){
+      L.polyline(ft.geometry.coordinates.map(([x,y])=>[y,x]),{className:"weed-line",color:"#3f7a58",weight:3,dashArray:"6 5",opacity:.9})
+        .addTo(weedLayer).bindPopup(weedPopup(p));
+    }else{
+      L.marker([ft.geometry.coordinates[1],ft.geometry.coordinates[0]],{icon:weedPointIcon()}).addTo(weedLayer).bindPopup(weedPopup(p));
+    }
+  });
+}
+function weedPopup(p){ return `<div style="font-family:'Fraunces',serif;font-size:12.5px;max-width:200px"><b>${esc(p.kind_label)}</b>
+  <div style="font-size:11px;color:#5E6A64;margin-top:3px">${esc(p.status_label)} · ${esc(p.date_label)} · ${esc(p.water_body_name)}</div>
+  ${p.note?`<div style="font-size:11.5px;color:#283630;margin-top:4px">${esc(p.note)}</div>`:""}</div>`; }
+
+/* ============================ SHEET (spot card) ============================ */
+const sheet=document.getElementById("sheet"), sheetContent=document.getElementById("sheet-content");
+function closeSheet(){ if(sheet) sheet.classList.remove("up"); selectedId=null; Object.values(markersById).forEach(m=>m.getElement()?.classList.remove("sel")); }
+function openSheet(html,conn){ if(!sheetContent)return; sheetContent.innerHTML=html; sheet.classList.add("up"); if(conn)conn(); }
+function kindChip(kind){ const k=kindBy(kind); const c=pinColor(kind);
+  return `<span class="kchip"><span class="kdot" style="background:${c}"></span>${esc(k?k.chip:kind)}</span>`; }
+function ratingLabel(w){ return RATING_LABELS[RATING_SET[w]]||w; }
+
+function hookBody(hook){ const cls=hook.kind==="protected_species"?"care":hook.kind==="honest_empty"?"honest":"";
+  return `<div class="hookbody ${cls}">${esc(hook.text)}</div>`; }
+function speciesRow(s){ const sci=s.scientific_name?` <i class="sci">${esc(s.scientific_name)}</i>`:"";
+  const note=s.note?` <span class="badge gap">${esc(s.note)}</span>`:"";
+  const ev=s.evidence==="survey"?`<span class="ev survey">survey</span>`:`<span class="ev">${esc(s.evidence||"record")}</span>`;
+  return `<div class="sprow"><div class="spmain"><b>${esc(s.name)}</b>${sci}${note}</div><div class="spcite">${ev}<span>${esc(s.cite)}</span></div></div>`; }
+function mightFindBody(mf){ let h="";
+  if(mf.species&&mf.species.length){ h+=mf.species.map(speciesRow).join("");
+    if(mf.more_text) h+=`<div class="caption">${esc(mf.more_text)}</div>`;
+    if(mf.note) h+=`<div class="caption note">${esc(mf.note)}</div>`;
+    h+=`<div class="caption caveat">${esc(mf.caveat)}</div>`;
+  }else{ if(mf.empty_text) h+=`<div class="empties">${esc(mf.empty_text)}</div>`; h+=`<div class="caption caveat">${esc(mf.caveat)}</div>`; }
+  return h; }
+function whyGatherBody(wg){ let h=`<div class="body">${esc(wg.what_it_is||"")}</div>`;
+  if(wg.general) h+=`<div class="general"><div class="gtext">${esc(wg.general.text)}</div><div class="caption"><span class="ic">&#10047;</span> ${esc(wg.general.label)}</div></div>`;
+  h+=`<div class="factshead">${esc(wg.facts_title||"")}</div>`;
+  if(wg.facts&&wg.facts.length) h+=wg.facts.map(f=>`<div class="rec"><span class="t">${esc(f.source||"")}</span>${esc(f.text)}</div>`).join("");
+  else h+=`<div class="empties small">No record about this spot yet.</div>`; return h; }
+function gettingThereBody(gt){ let h="";
+  if(gt.items&&gt.items.length) h+=gt.items.map(it=>{ const det=(it.details&&it.details.length)?`<div class="note">${esc(it.details.join(" &middot; "))}</div>`:"";
+    return `<div class="gtitem"><div class="gtline">${esc(it.text)}</div>${det}<div class="src">${esc(it.label)} &middot; ${esc(it.source||"")}</div></div>`; }).join("");
+  else if(gt.empty_text) h+=`<div class="empties small">${esc(gt.empty_text)}</div>`;
+  if(gt.crown_land) h+=`<div class="rowline"><span class="l">Crown land <span class="note">${esc(gt.crown_land.text)}</span></span></div>`;
+  if(gt.unverified&&gt.unverified.length) h+=`<div class="unver"><div class="ut">${esc(gt.unverified_title||"Not checked on the ground")}</div><ul>${gt.unverified.map(u=>`<li>${esc(u)}</li>`).join("")}</ul></div>`;
+  return h; }
+function blockHTML(n,title,body,open,kind){ return `<div class="block ${open?"open":"closed"}${kind?" k-"+esc(kind):""}" data-block>
+    <button class="blocktog" data-toggle><span class="idx">${n}</span><span class="bht">${esc(title)}</span><span class="caret">${open?"&#9662;":"&#9656;"}</span></button>
+    <div class="blockbody">${body}</div></div>`; }
+function termsHTML(card){ if(!card.terms||!card.terms.length) return "";
+  return `<div class="terms">`+card.terms.map(t=>{ const g=(LABELS.glossary&&LABELS.glossary[t.term])||t.text;
+    return `<details class="term"><summary>What's a ${esc(t.term)}?</summary><div>${esc(g)}</div></details>`; }).join("")+`</div>`; }
+function miniListHTML(heading,wbname,list){ const items=list.slice(0,8).map(s=>{ const known=!!SPOTS.find(y=>y.spot_id===s.spot_id); const c=pinColor(s.kind);
+    return `<div class="mi${known?"":" na"}" ${known?`data-goto="${esc(s.spot_id)}"`:""}><span class="kdot" style="background:${c};border-radius:50%"></span><span class="mit">${esc(s.title)}</span><span class="r">${known?"tap to view":""}</span></div>`; }).join("");
+  const extra=list.length>8?`<div class="caption">and ${list.length-8} more</div>`:"";
+  return `<div class="block"><div class="bh"><span class="idx">&#8627;</span>${esc(heading)}${wbname?` &middot; <span style="color:var(--ink2)">${esc(wbname)}</span>`:""}</div><div class="minilist">${items}</div>${extra}</div>`; }
+function moreSpotsHTML(spot){ const parts=[]; const wb=spot.water_body;
+  if(wb){ const wbd=WB_DETAILS[wb.water_body_id];
+    if(wbd&&wbd.spots&&wbd.spots.length){ const list=wbd.spots.filter(s=>s.spot_id!==spot.spot_id); if(list.length) parts.push(miniListHTML(`More spots on this ${whichWord(wb.type)}`,wb.display_name||wb.name,list)); }
+    else if(spot.more_on_this_water&&spot.more_on_this_water.length){ const list=spot.more_on_this_water.filter(s=>s.spot_id!==spot.spot_id); if(list.length) parts.push(miniListHTML(`More spots on this ${whichWord(wb.type)}`,wb.display_name||wb.name,list)); } }
+  (spot.also_on_water_bodies||[]).forEach(awb=>{ const d=WB_DETAILS[awb.water_body_id]; if(!d) return;
+    const list=(d.spots||[]).concat(d.also_here_spots||[]).filter(s=>s.spot_id!==spot.spot_id);
+    if(list.length) parts.push(miniListHTML(`More spots on this ${whichWord(awb.type)}`,awb.display_name||awb.name,list)); });
+  return parts.join(""); }
+function sourcesHTML(d){ if(!d.sources||!d.sources.length) return ""; const names=[...new Set(d.sources.map(s=>SRC_LABEL[s.kind]||s.kind))];
+  return `<div class="src">Sources &middot; ${names.map(esc).join(" &middot; ")}</div>`; }
+function cardBody(spot,d){ const c=d.card;
+  return blockHTML(1,c.hook.title,hookBody(c.hook),c.hook.default_open!==false,c.hook.kind)
+       + blockHTML(2,c.might_find.title,mightFindBody(c.might_find),c.might_find.default_open,c.might_find.kind)
+       + blockHTML(3,c.why_gather.title,whyGatherBody(c.why_gather),c.why_gather.default_open)
+       + blockHTML(4,c.getting_there.title,gettingThereBody(c.getting_there),c.getting_there.default_open)
+       + termsHTML(c)+moreSpotsHTML(spot)+sourcesHTML(d); }
+function noCardHTML(){ return `<div class="block"><div class="bh"><span class="idx">!</span>No card in this snapshot</div>
+  <div class="empties small">This fixture carries a spot card for only a few spots. Against the live API the same four blocks would load here.</div></div>`; }
+function headHTML(spot){ return `<div class="sheet-head"><span style="margin-top:6px">${markerGlyph(spot.kind,20)}</span>
+  <div><div class="h4">${esc(spot.title)}</div><div class="sub">${esc(spot.subtitle||"")}</div><div style="margin-top:8px">${kindChip(spot.kind)}</div></div>
+  <div class="kbtns"><button class="gbtn" data-save="${esc(spot.spot_id)}">Save</button>
+  <span class="icon-btn" data-close style="width:30px;height:30px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div></div>`; }
+
+let openSpotTimer=null;
+function openSpot(spot,opts){
+  selectedId=spot.spot_id;
+  sheetContent.innerHTML=headHTML(spot)+`<div class="sheet-body"><div class="loading"><span class="spin"></span>Loading this spot…</div></div>`;
+  sheet.classList.add("up");
+  Object.entries(markersById).forEach(([id,m])=>m.getElement()?.classList.toggle("sel",id===spot.spot_id));
+  clearTimeout(openSpotTimer);
+  openSpotTimer=setTimeout(()=>{ const d=DETAILS[spot.spot_id];
+    sheetContent.innerHTML=headHTML(spot)+`<div class="sheet-body">${d?cardBody(spot,d):noCardHTML()}</div>`; wireSheet(); },260);
+  if(!opts||opts.fly!==false){ try{ mainMap.flyTo([spot.lat,spot.lng],Math.max(mainMap.getZoom(),13),{duration:.55}); }catch(e){} }
+}
+
+/* ---------- conditions panel (real fixture) ---------- */
+const COND_GROUPS=[["weather","Weather"],["water_flow","Water flow"],["water_temperature","Water temperature"],["water_quality","Water quality"]];
+function trendArrow(v){ return v==="rising"?"↑":v==="falling"?"↓":v==="steady"?"→":""; }
+function trendClass(v){ return v==="rising"?"up":v==="falling"?"down":"flat"; }
+function conditionsPanelHTML(conds){
+  let h="";
+  COND_GROUPS.forEach(([g,glabel])=>{
+    const rows=conds.filter(c=>c.group===g); if(!rows.length) return;
+    h+=`<div class="cond-group"><div class="cond-gh">${esc(glabel)}</div>`;
+    rows.forEach(c=>{
+      const isTrend=/_trend$/.test(c.field);
+      const src=[c.source,c.station?`· ${c.station}`:"",c.distance_km!=null?`· ${c.distance_km} km`:"",c.age_label?`· ${c.age_label}`:""].filter(Boolean).join(" ");
+      const value=isTrend
+        ? `<span class="trend ${trendClass(c.value)}"><span class="ar">${trendArrow(c.value)}</span>${esc(c.value)}</span>`
+        : `<b>${esc(c.value)}</b>${c.unit?` <span style="color:var(--ink2)">${esc(c.unit)}</span>`:""}`;
+      h+=`<div class="cond-row"><div class="cl">${esc(c.label)}${c.stale?' <span class="stale-badge">stale</span>':""}
+        <div class="src">${esc(src)}</div>${c.meaning?`<div class="src" style="text-transform:none;letter-spacing:.02em;color:var(--ink2)">${esc(c.meaning)}</div>`:""}</div>
+        <div class="cv">${value}</div></div>`;
+    });
+    h+=`</div>`;
+  });
+  return h;
+}
+function openPin(p){
+  selectedId=null; const f=p.facts;
+  const rows=[["Visits",f.visits],["Fish logged",f.fish],["Fish / hour",f.per_hour==null?"—":f.per_hour],["Species",f.species],["Biggest",f.biggest||"—"],["Best rated",f.best_rating?ratingLabel(f.best_rating):"—"]];
+  const factHTML=rows.map(([k,v])=>`<div class="rec" style="margin:0"><span class="t">${esc(k)}</span><b>${esc(v)}</b></div>`).join("");
+  const spHTML=p.species.length?p.species.map(([n,c])=>`<span class="kchip" style="margin:0 5px 5px 0">${esc(n)} ×${c}</span>`).join(""):`<span class="body" style="font-family:inherit;font-size:12.5px;color:var(--ink2)">No species logged yet.</span>`;
+  const tripHTML=p.trips.length?p.trips.map(([d,n,r])=>{ const recalled=r==="recalled";
+      return `<div class="rowline"><span class="l"${recalled?' style="color:var(--ink3)"':""}>${esc(d)} · ${esc(n)}${recalled?' <span class="badge">recalled</span>':""}</span><span class="r"${recalled?' style="color:var(--ink3)"':""}>${recalled?"not counted":esc(r)}</span></div>`; }).join("")
+    :`<div class="body" style="font-family:inherit;font-size:12.5px;color:var(--ink2)">No trips logged yet.</div>`;
+  const html=`
+    <div class="sheet-head"><span style="margin-top:7px">${pinIcon(p.state).options.html.replace('width="26" height="32"','width="20" height="24"')}</span>
+      <div><div class="h4">${esc(p.name)} ${p.favourite?'<span style="color:var(--sand)">★</span>':""}</div><div class="sub">Your pin · ${esc(STATE_LABELS[p.state])}</div>
+        <div style="margin-top:8px"><span class="kchip">${p.state==="visited"?"Visited":"Saved"}</span></div></div>
+      <div class="kbtns"><span class="icon-btn" data-close style="width:30px;height:30px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div></div>
+    <div class="sheet-body">
+      <div class="block"><div class="bh">Your facts</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">${factHTML}</div>
+        <div class="body" style="font-family:inherit;font-size:11px;color:var(--ink3);margin-top:9px">Counts use your own logged trips only. Ratings use the API’s words (skunked · slow · decent · great · best of the year).</div></div>
+      <div class="block"><div class="bh">Species caught here</div><div>${spHTML}</div></div>
+      <div class="block"><div class="bh">Trips</div>${tripHTML}
+        <div class="body" style="font-family:inherit;font-size:11px;color:var(--ink3);margin-top:8px">A recalled record is marked and left out of every count and rate.</div></div>
+      <div class="block"><div class="bh"><span class="idx">↻</span>Conditions</div>
+        ${conditionsPanelHTML(CONDITIONS)}
+        <div class="cond-panel-note">Each value with its source, station, distance and age. Stale values are shown but flagged, never hidden.</div></div>
+      <div class="block" style="display:flex;gap:8px;border-bottom:0"><span class="gbtn ghost">Edit</span><span class="gbtn ghost">Move on map</span><span class="gbtn ghost" style="margin-left:auto;color:#A8543A;border-color:#e0c3b7">Delete</span></div>
+    </div>`;
+  openSheet(html,wireSheet);
+}
+function wireSheet(){ if(!sheetContent) return;
+  sheetContent.querySelectorAll("[data-close]").forEach(b=>b.onclick=closeSheet);
+  sheetContent.querySelectorAll("[data-save]").forEach(b=>b.onclick=()=>{ b.textContent="Saved"; b.classList.add("ghost"); });
+  sheetContent.querySelectorAll("[data-goto]").forEach(el=>el.onclick=()=>{ const f=SPOTS.find(x=>x.spot_id===el.getAttribute("data-goto")); if(f) openSpot(f); });
+  sheetContent.querySelectorAll("[data-toggle]").forEach(b=>b.onclick=()=>{ const bl=b.closest("[data-block]"); const open=bl.classList.toggle("open"); bl.classList.toggle("closed",!open);
+    const caret=b.querySelector(".caret"); if(caret) caret.innerHTML=open?"&#9662;":"&#9656;"; });
+}
+
+/* ============================ PERSONAL ============================ */
+function showPersonal(){ if(!mainMap) return; clearSpotMarkers(); drawWeedLayer();
+  const cr=document.getElementById("chipsrow"); if(cr) cr.style.display="none";
+  const kk=document.getElementById("keys"); if(kk) kk.style.display="none";
+  PINS.forEach(p=>{ L.marker([p.lat,p.lng],{icon:pinIcon(p.state),riseOnHover:true}).addTo(pinLayer).on("click",()=>openPin(p)); });
+  const t=document.getElementById("tb-title"), s=document.getElementById("tb-sub");
+  if(t)t.textContent="My map"; if(s)s.textContent="Your pins · private";
+  const cn=document.getElementById("countpill"); if(cn) cn.innerHTML=`<b>${PINS.length}</b> pins · private`;
+  const zp=document.getElementById("zoompill"); if(zp) zp.textContent="zoom "+mainMap.getZoom();
+  if(PINS.length) mainMap.flyTo([43.5,-79.9],8.5,{duration:.6});
+}
+function showExplore(){
+  if(pinLayer) pinLayer.clearLayers();
+  const cr=document.getElementById("chipsrow"); if(cr) cr.style.display="";
+  const kk=document.getElementById("keys"); if(kk) kk.style.display="";
+  const t=document.getElementById("tb-title"), s=document.getElementById("tb-sub");
+  if(t)t.textContent="Explore"; if(s)s.textContent="Spots, not river lines";
+  drawWeedLayer(); refresh();
+}
+const modeseg=document.getElementById("modeseg");
+if(modeseg) modeseg.addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b)return;
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle("on",x===b)); mode=b.dataset.mode;
+  if(mode==="personal") showPersonal(); else showExplore(); });
+
+/* popovers */
+const lp=document.getElementById("layers-pop"), fp=document.getElementById("filter-pop");
+const lb=document.getElementById("layers-btn"), fb=document.getElementById("filter-btn");
+if(lb) lb.onclick=()=>{ if(fp)fp.style.display="none"; lp.style.display=lp.style.display==="block"?"none":"block"; };
+if(fb) fb.onclick=()=>{ if(lp)lp.style.display="none"; fp.style.display=fp.style.display==="block"?"none":"block"; };
+function bindTog(id,get,set,after){ const el=document.getElementById(id); if(!el)return;
+  el.onclick=()=>{ set(!get()); el.classList.toggle("on",get()); if(after)after(); }; }
+bindTog("lyr-gt",()=>gettingThereOn,v=>gettingThereOn=v,refresh);
+bindTog("lyr-br",()=>bridgesOn,v=>bridgesOn=v,refresh);
+bindTog("lyr-lakes",()=>layersOn.lakes,v=>{layersOn.lakes=v;},()=>{drawLakes();});
+bindTog("lyr-weed",()=>weedOn,v=>weedOn=v,drawWeedLayer);
+bindTog("lyr-shore",()=>shoreOn,v=>shoreOn=v,refresh);
+bindTog("near-toggle",()=>nearOn,v=>nearOn=v,refresh);
+const si=document.getElementById("species-input"); if(si) si.oninput=buildSpeciesList;
+const nr=document.getElementById("near-radius"), nv=document.getElementById("near-val");
+if(nr) nr.oninput=()=>{ nearRadius=+nr.value; if(nv) nv.textContent=nearRadius+" km"; if(nearOn) refresh(); };
+const fc=document.getElementById("filter-clear"); if(fc) fc.onclick=()=>{ activeSpecies=null; nearOn=false; nearRadius=50;
+  if(si)si.value=""; if(nr)nr.value=50; if(nv)nv.textContent="50 km"; const nt=document.getElementById("near-toggle"); if(nt)nt.classList.remove("on"); syncSpecies(); refresh(); };
+
+/* demo zoom */
+document.querySelectorAll("[data-zoom]").forEach(b=>b.onclick=()=>{ if(mode!=="explore"||!mainMap)return; mainMap.setZoom(+b.dataset.zoom); });
+const fitb=document.querySelector("[data-fit]"); if(fitb) fitb.onclick=()=>{ if(mode!=="explore"||!mainMap)return; mainMap.fitBounds(SPOTS.map(f=>[f.lat,f.lng]),{padding:[30,30]}); };
+if(mainMap){ mainMap.on("moveend",refresh); mainMap.on("zoomend",refresh);
+  if(window.ResizeObserver) new ResizeObserver(()=>mainMap.invalidateSize()).observe(document.querySelector(".mapwrap")); }
+
+/* ============================ WEED SECTION ============================ */
+(function renderWeedSection(){
+  const role=document.getElementById("weed-role"); if(role) role.innerHTML=`<b>${esc(WEED.labels.kind_label)}</b> — ${esc(WEED.labels.layer.note)}`;
+  const note=document.getElementById("weed-layer-note"); if(note) note.textContent=`Layer: “${WEED.labels.layer.label}” · note: “${WEED.labels.layer.note}” · default_on: ${WEED.labels.layer.default_on}`;
+  const list=document.getElementById("weed-list");
+  if(list) list.innerHTML=WEED.created.map(r=>`<div class="weed-row">
+    <span class="wg">${r.geometry.type==="LineString"
+      ? `<svg width="26" height="26" viewBox="0 0 26 26"><path d="M4 20 L22 6" stroke="#3f7a58" stroke-width="3" stroke-dasharray="6 5" fill="none" stroke-linecap="round"/></svg>`
+      : `<svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="7" fill="#7fae86" fill-opacity=".9" stroke="#3f7a58" stroke-width="2" stroke-dasharray="2.4 2"/></svg>`}</span>
+    <span class="wb"><span class="wt">${esc(r.water_body_name)}</span>
+      <div class="wd">${esc(r.shape_label)}${r.note?` · ${esc(r.note)}`:""}</div>
+      <div class="wc">${esc(r.caption)}</div></span>
+    <span class="r" style="font-size:11.5px;color:var(--ink3);margin-left:auto;white-space:nowrap">id ${r.weed_report_id}</span>
+  </div>`).join("");
+  const errs=document.getElementById("weed-errors");
+  if(errs) errs.innerHTML=`
+    <div class="errbox"><span class="ec">422</span> · not on the water<br>“${esc(WEED.errors.notOnWater)}”</div>
+    <div class="errbox"><span class="ec">422</span> · no outline to check against<br>“${esc(WEED.errors.noOutline)}”</div>
+    <div class="errbox"><span class="ec">422</span> · a future date<br>“observed_on cannot be in the future”</div>
+    <div class="errbox" style="background:#f4f1e9;border-color:var(--line2);color:var(--ink2)"><span class="ec">404</span> · not yours or gone<br>“${esc(WEED.errors.notFound)}”</div>`;
+})();
+
+/* ============================ STATIC SECTIONS ============================ */
+function cardFaceHTML(spotLike,d,stateLabel){ const c=d.card;
+  return `<div class="cardface"><div class="cf-state">${esc(stateLabel)}</div>
+    <div class="cf-head"><div class="h4">${esc(spotLike.title)}</div><div class="sub">${esc(spotLike.subtitle)}</div></div>
+    <div>${blockHTML(1,c.hook.title,hookBody(c.hook),true,c.hook.kind)}${blockHTML(2,c.might_find.title,mightFindBody(c.might_find),c.might_find.default_open)}
+      ${blockHTML(3,c.why_gather.title,whyGatherBody(c.why_gather),c.why_gather.default_open)}${blockHTML(4,c.getting_there.title,gettingThereBody(c.getting_there),c.getting_there.default_open)}</div></div>`; }
+function staticSpotFromDetail(d){ return {spot_id:d.spot_id,kind:d.kind,title:d.title,subtitle:d.subtitle,water_body:d.water_body,more_on_this_water:d.more_on_this_water}; }
+function wireBlocksIn(root){ root.querySelectorAll("[data-toggle]").forEach(b=>b.onclick=()=>{ const bl=b.closest("[data-block]"); const open=bl.classList.toggle("open"); bl.classList.toggle("closed",!open);
+  const caret=b.querySelector(".caret"); if(caret) caret.innerHTML=open?"&#9662;":"&#9656;"; }); }
+(function renderStatic(){
+  const kb=document.getElementById("kinds-body");
+  if(kb) kb.innerHTML=LABELS.kinds.map(k=>{ const c=KSTYLE[k.kind].c;
+    return `<tr><td><code>${esc(k.kind)}</code></td><td>${esc(k.chip)}</td>
+      <td><span class="swatch" style="background:${c};border-radius:${k.distinct?"50%":"2px"}"></span>${esc(KSTYLE[k.kind].shape)}</td>
+      <td>${esc(k.one_liner)}</td></tr>`; }).join("");
+  const states=[{state:"Structure + records",spot:"below_dam:n8038314_4319587"},
+    {state:"Protected species (no fish named)",spot:"creek_junction:n7966741_4355566"},
+    {state:"Honest empty",spot:"creek_junction:n7742945_4424383"}];
+  const grid=document.getElementById("cardstates-grid");
+  if(grid){ grid.innerHTML=states.map(s=>{ const d=DETAILS[s.spot]; return d?cardFaceHTML(staticSpotFromDetail(d),d,s.state):""; }).join(""); wireBlocksIn(grid); }
+
+  // fetch states — loading, 404 not-found, 422 bad input, empty view (real messages)
+  const sg=document.getElementById("states-grid");
+  if(sg) sg.innerHTML=`
+    <div class="cardface"><div class="cf-state">Loading</div>
+      <div class="cf-head"><div class="h4">A spot while its detail loads</div><div class="sub">the card fetches GET /map/spots/{spot_id}</div></div>
+      <div class="sheet-body"><div class="loading"><span class="spin"></span>Loading this spot…</div></div></div>
+    <div class="cardface"><div class="cf-state">Not found · 404</div>
+      <div class="cf-head"><div class="h4">This spot is gone</div><div class="sub">the id no longer resolves</div></div>
+      <div class="block"><div class="empties small" style="margin-top:8px"><b>404</b> · “${esc(FD.errors.spot404)}”</div>
+        <div class="gtitem" style="margin-top:10px"><div class="gtline">The card says so plainly and offers a retry.</div></div>
+        <div style="margin-top:10px"><span class="gbtn ghost">Retry</span> <span class="gbtn ghost">Back to the map</span></div></div></div>
+    <div class="cardface"><div class="cf-state">Bad input · 422</div>
+      <div class="cf-head"><div class="h4">A filter the API refuses</div><div class="sub">e.g. an unknown kind</div></div>
+      <div class="block"><div class="empties small" style="margin-top:8px"><b>422</b> · “${esc(FD.errors.badKind)}”</div>
+        <div class="gtitem" style="margin-top:10px"><div class="gtline">The message is the API's own; the UI never composes it.</div></div></div></div>
+    <div class="cardface"><div class="cf-state">Empty view</div>
+      <div class="cf-head"><div class="h4">No spots in this view</div><div class="sub">a real result, not a dead end</div></div>
+      <div class="block"><div class="ph" style="margin-top:8px"><span class="tag">Empty state</span><div class="t">Nothing here after filtering</div>
+        <div class="d">Shown on the map when a viewport really holds none. The card text for an empty spot is the hook's own <em>honest empty</em> variant, above.</div></div></div></div>`;
+})();
+
+/* static pin sheet preview (Personal section) */
+(function renderPinPreview(){
+  const box=document.getElementById("pin-sheet"); if(!box) return;
+  const p=PINS[2], f=p.facts;
+  const rows=[["Visits",f.visits],["Fish logged",f.fish],["Fish / hour",f.per_hour],["Species",f.species],["Biggest",f.biggest],["Best rated",ratingLabel(f.best_rating)]];
+  box.innerHTML=`
+    <div class="sheet-head"><span style="margin-top:7px">${pinIcon(p.state).options.html.replace('width="26" height="32"','width="20" height="24"')}</span>
+      <div><div class="h4">${esc(p.name)}</div><div class="sub">Your pin · ${esc(STATE_LABELS[p.state])}</div>
+        <div style="margin-top:8px"><span class="kchip">Visited</span></div></div>
+      <div class="kbtns"><span class="icon-btn" style="width:30px;height:30px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></span></div></div>
+    <div class="sheet-body">
+      <div class="block"><div class="bh">Your facts</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">${rows.map(([k,v])=>`<div class="rec" style="margin:0"><span class="t">${esc(k)}</span><b>${esc(v)}</b></div>`).join("")}</div></div>
+      <div class="block"><div class="bh">Species caught here</div><div>${p.species.map(([n,c])=>`<span class="kchip" style="margin:0 5px 5px 0">${esc(n)} ×${c}</span>`).join("")}</div></div>
+      <div class="block"><div class="bh"><span class="idx">↻</span>Conditions</div>${conditionsPanelHTML(CONDITIONS)}
+        <div class="cond-panel-note">Source, station, distance and age on every value; stale values shown but flagged.</div></div>
+      <div class="block" style="display:flex;gap:8px;border-bottom:0"><span class="gbtn ghost">Edit</span><span class="gbtn ghost">Move on map</span><span class="gbtn ghost" style="margin-left:auto;color:#A8543A;border-color:#e0c3b7">Delete</span></div>
+    </div>`;
+})();
+
+/* ============================ BOOT ============================ */
+drawWaterBodies(); drawLakes(); drawWeedLayer(); buildChips(); buildKey(); buildSpeciesList(); showExplore();
+setTimeout(()=>{ if(mainMap){ mainMap.invalidateSize(); refresh(); } },250);
+
+</script>
+</body>
+</html>
