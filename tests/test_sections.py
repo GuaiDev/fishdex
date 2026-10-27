@@ -197,7 +197,13 @@ def features():
         feature("inlet", 1, pt(-78.30, 44.10), "watercourse_endpoint"),
         feature("inlet", 2, pt(-78.30, 44.15), "watercourse_endpoint"),
         feature("island", 1, {"type": "Polygon", "coordinates": [ISLAND]}),
-        feature("drop_off", 1, pt(-78.10, 44.15), "bathymetry_contours", {"survey_year": 1970}),
+        feature(
+            "drop_off",
+            1,
+            pt(-78.10, 44.15),
+            "bathymetry_contours",
+            {"survey_year": 1970, "depth_change_m": 5.0},
+        ),
         feature(
             "hump",
             1,

@@ -11,7 +11,7 @@ import sqlite3
 from sqlite_utils.db import Database
 
 from src.models.bathymetry import BathymetryContour
-from src.models.shoreline_feature import ShorelineFeature
+from src.models.shoreline_feature import DROP_OFF_MIN_DEPTH_CHANGE_M, ShorelineFeature
 from src.models.water_body import WaterBody
 
 _COLUMNS_WITHOUT_GEOMETRY = (
@@ -140,12 +140,17 @@ def count_shoreline_features(db: Database, jurisdiction: str | None = None) -> i
     ).fetchone()[0]
 
 
+_CURRENT_FEATURES = (
+    "(kind != 'drop_off' OR COALESCE(json_extract(attributes_json, '$.depth_change_m'), 0) >= ?)"
+)
+
+
 def list_shoreline_features(
     db: Database, water_body_id: str, kinds: list[str] | None = None
 ) -> list[ShorelineFeature]:
     """A water body's shoreline features, in id order. Optionally one or more kinds."""
-    clauses = ["water_body_id = ?"]
-    params: list = [water_body_id]
+    clauses = ["water_body_id = ?", _CURRENT_FEATURES]
+    params: list = [water_body_id, DROP_OFF_MIN_DEPTH_CHANGE_M]
     if kinds:
         clauses.append(f"kind IN ({', '.join('?' * len(kinds))})")
         params += kinds
@@ -160,10 +165,13 @@ def count_shoreline_features_by_kind(
     db: Database, jurisdiction: str | None = None
 ) -> dict[str, dict[str, int]]:
     """Shoreline and depth features per water body per kind: the counts on a lake."""
-    where, params = ("WHERE jurisdiction = ?", [jurisdiction]) if jurisdiction else ("", [])
+    where, params = (
+        ("WHERE jurisdiction = ? AND", [jurisdiction]) if jurisdiction else ("WHERE", [])
+    )
+    params = [*params, DROP_OFF_MIN_DEPTH_CHANGE_M]
     out: dict[str, dict[str, int]] = {}
     for wb_id, kind, n in db.execute(
-        f"SELECT water_body_id, kind, COUNT(*) FROM shoreline_features {where} "
+        f"SELECT water_body_id, kind, COUNT(*) FROM shoreline_features {where} {_CURRENT_FEATURES} "
         "GROUP BY water_body_id, kind",
         params,
     ).fetchall():

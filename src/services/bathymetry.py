@@ -43,7 +43,7 @@ from src.models.bathymetry import BathymetryContour, BathymetryIndex
 from src.models.context import ProvenanceKind
 from src.models.jurisdiction import JurisdictionCode
 from src.models.lake_outline import LakeOutline
-from src.models.shoreline_feature import ShorelineFeature
+from src.models.shoreline_feature import DROP_OFF_MIN_DEPTH_CHANGE_M, ShorelineFeature
 from src.services.geometry_utils import M_PER_DEG, approx_area_m2
 
 logger = logging.getLogger(__name__)
@@ -53,11 +53,8 @@ logger = logging.getLogger(__name__)
 MIN_HUMP_AREA_M2 = 20_000.0
 MAX_HUMPS = 25
 # A drop-off needs the bottom to fall at least this far between two contours ...
-# Served or not, decided: a 1 m to 3 m change (2 m) is a gentle slope, not a place
-# the bottom "falls away quickly", so it is not a feature. It was 40 features on
-# one lake, 23 of them 2 m changes. The API applies the same floor to a build made
-# before it was raised (services/water_bodies.py), so no rebuild is needed.
-DROP_OFF_MIN_DEPTH_CHANGE_M = 3.0
+# (DROP_OFF_MIN_DEPTH_CHANGE_M lives in models.shoreline_feature: storage applies it
+# on read, so a build made under a lower floor needs no rebuild.)
 # ... that run at most this far apart. Two drop-offs found within
 # DROP_OFF_DEDUPE_M of each other are the same slope, kept once (the steepest).
 DROP_OFF_MAX_GAP_M = 100.0
