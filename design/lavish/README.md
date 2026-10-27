@@ -26,4 +26,4 @@ cd design/lavish
 python3 -m http.server 8765
 ```
 
-Then open http://localhost:8765/fishdex-map-revision.html. Opening the files directly from disk may not load the tiles; use a server.
+Then open http://localhost:8765/ (the clickable prototype; any page also opens on its own). Opening the files directly from disk may not load the tiles; use a server.
