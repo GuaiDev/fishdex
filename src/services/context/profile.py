@@ -297,9 +297,7 @@ def logged_sessions(db: Database, user_id: int) -> list:
     return _sessions(db, user_id)
 
 
-def _pins(
-    db: Database, user_id: int, sessions: list
-) -> list[tuple[int, float, float, bool, int]]:
+def _pins(db: Database, user_id: int, sessions: list) -> list[tuple[int, float, float, bool, int]]:
     """`(id, lat, lng, is_favourite, sessions logged since it was saved)` per pin."""
     if "pins" not in db.table_names():
         return []

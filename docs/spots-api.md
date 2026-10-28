@@ -2834,7 +2834,7 @@ those that fit are returned. What fits depends on the person:
 - an **explorer** (the explore dial, below) gets places they have not fished, on the kind
   of water they fish most: ponds for a pond angler, creeks for a small-creek angler;
 - a **regular** gets the spots they fish again and again, kept in front;
-- someone in between gets both. Nothing about fish size or catch outcomes is used, and no
+- someone in between (explore dial between 0.4 and 0.6) gets the best-fitting few (up to 10) of both, ranked rather than cut at a bar, so the list is not empty; they still have to suit the water they fish. Nothing about fish size or catch outcomes is used, and no
   feature promises any.
 
 The signals are *preferred water type* (where logged trips and saved pins have been,
