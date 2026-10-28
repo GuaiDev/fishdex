@@ -56,6 +56,7 @@ _FINGERPRINT_SOURCES = (
         "catches",
         "SELECT COUNT(*), COALESCE(SUM(species_confirmed), 0) FROM catches WHERE user_id = ?",
     ),
+    ("pins", "SELECT COUNT(*), COALESCE(MAX(id), 0) FROM pins WHERE user_id = ?"),
 )
 
 
@@ -100,14 +101,15 @@ def input_fingerprint(db: Database, user_id: int) -> str:
                     # it is what the profile reads, so the confirmed total is
                     # part of the fingerprint.
                     ("catches", "user_id = ?", "SUM(species_confirmed)"),
+                    ("pins", "user_id = ?", "MAX(id)"),
                 )
             ),
-            [user_id] * 8,
+            [user_id] * 10,
         ).fetchone()
     except Exception:  # noqa: BLE001 - a table missing on a fresh DB is normal
         return _fingerprint_slow(db, user_id)
 
-    for i, name in enumerate(("stops", "sessions", "insights", "catches")):
+    for i, name in enumerate(("stops", "sessions", "insights", "catches", "pins")):
         parts.append(f"{name}:{row[i * 2]}:{row[i * 2 + 1]}")
     return "|".join(parts) + _SIGNALS_PART
 

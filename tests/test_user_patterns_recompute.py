@@ -230,3 +230,15 @@ def test_a_cold_cache_does_not_probe_for_the_table(tmp_path, monkeypatch):
 
     bare = Database(tmp_path / "cold.db")
     assert user_patterns.load(bare, 1, "anything") is None
+
+
+def test_fingerprint_moves_when_a_pin_is_saved_or_removed(db):
+    from src.storage import pins
+
+    pins.ensure_tables(db)
+    before = user_patterns.input_fingerprint(db, 1)
+    pin_id = pins.create_pin(db, 1, "Bend pool", 43.5, -79.6)
+    saved = user_patterns.input_fingerprint(db, 1)
+    assert saved != before
+    pins.delete_pin(db, 1, pin_id)
+    assert user_patterns.input_fingerprint(db, 1) != saved

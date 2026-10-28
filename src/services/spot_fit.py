@@ -17,7 +17,9 @@ from src.models.angler_signals import Personalisation, SpotCandidate, SpotFit
 from src.models.spot import Spot
 from src.services.context import angler_profile
 from src.services.context.profile import logged_sessions
-from src.services.context.signals import fit_candidate, personalisation
+from src.services.context.signals import fit_candidate, is_active, personalisation
+from src.services.context.signals.algorithm import REASON_AT
+from src.services.context.signals.exploration import EXPLORER_AT, REGULAR_AT
 from src.services.context.weights import decay
 from src.storage.water_bodies import water_body_types
 
@@ -28,6 +30,9 @@ VISIT_RADIUS_M = 750.0
 FAVOURITE_MIN_SESSIONS = 2
 FAVOURITE_MIN_RECENT = 1.0
 HALF_LIFE_SESSIONS = 20
+# An angler who neither explores nor grinds has no fit that clears the hard bar
+# for unvisited, favourite or once-fished spots alike, so they get the best few.
+MIXED_TOP = 10
 
 _CELL_DEG = 0.01  # ~1.1 km of latitude, wider than VISIT_RADIUS_M
 _M_PER_DEG = 111_320.0
@@ -112,7 +117,29 @@ def fit_spots(
         return [(s, SpotFit(spot_id=s.spot_id)) for s in spots], summary
     history = AnglerHistory.load(db, user_id)
     types = water_body_types(db, [s.water_body_id for s in spots if s.water_body_id])
-    return [
+    fitted = [
         (s, fit_candidate(profile.signals, history.candidate(s, types.get(s.water_body_id))))
         for s in spots
-    ], summary
+    ]
+    explore = profile.signals.get("explore")
+    if explore is not None and is_active(explore) and REGULAR_AT < explore.value < EXPLORER_AT:
+        _keep_best_matches(fitted)
+    return fitted, summary
+
+
+def _keep_best_matches(fitted: list[tuple[Spot, SpotFit]]) -> None:
+    """Mixed explorer/regular: rank by fit and keep the top few that suit the water.
+
+    Every other signal has to agree (a creek is not shown to a pond angler);
+    only the explore dial is relaxed, because for this angler it cannot clear a
+    fixed bar for any kind of spot.
+    """
+    suits = [
+        f
+        for _, f in fitted
+        if f.score is not None
+        and all(x.score >= REASON_AT for x in f.fits if x.signal_id != "explore")
+    ]
+    suits.sort(key=lambda f: (-f.score, f.spot_id))
+    for f in suits[:MIXED_TOP]:
+        f.keep = True

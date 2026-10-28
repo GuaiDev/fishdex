@@ -471,3 +471,63 @@ def test_the_profile_endpoint_gains_signals_without_losing_anything(client):
     assert client.put("/profile/declared/signal:water_type", json={"value": 0.5}).status_code == 400
     assert client.delete("/profile/declared/signal:explore").status_code == 200
     assert "explore" not in client.get("/profile").json()["signals"]
+
+
+# ── the mixed explore band ───────────────────────────────────────────────────
+
+
+def _fit_mixed(monkeypatch, explore, candidates):
+    from types import SimpleNamespace
+
+    from src.services import spot_fit
+
+    spots = [spot(lat=43.5 + i * STEP, lng=LNG) for i in range(len(candidates))]
+    by_id = {
+        s.spot_id: SpotCandidate(spot_id=s.spot_id, water_type=wt, visits=v, is_favourite=fav)
+        for s, (wt, v, fav) in zip(spots, candidates)
+    }
+    monkeypatch.setattr(
+        spot_fit,
+        "angler_profile",
+        lambda db, user_id: SimpleNamespace(signals=pond_angler(explore)),
+    )
+    monkeypatch.setattr(spot_fit, "water_body_types", lambda db, ids: {})
+    monkeypatch.setattr(
+        spot_fit.AnglerHistory,
+        "load",
+        classmethod(
+            lambda cls, db, user_id: SimpleNamespace(candidate=lambda s, wt: by_id[s.spot_id])
+        ),
+    )
+    fitted, summary = spot_fit.fit_spots(None, ALICE, spots)
+    return spots, {s.spot_id: f for s, f in fitted}, summary
+
+
+@pytest.mark.parametrize("explore", [0.42, 0.5, 0.58])
+def test_a_mixed_angler_is_never_left_with_an_empty_map(monkeypatch, explore):
+    spots, fits, summary = _fit_mixed(
+        monkeypatch,
+        explore,
+        [("pond", 0, False), ("pond", 6, True), ("pond", 1, False), ("creek", 0, False)],
+    )
+    assert summary.active
+    unvisited, favourite, once, creek = (fits[s.spot_id] for s in spots)
+    assert unvisited.keep and favourite.keep and once.keep
+    assert not creek.keep  # still not the water they fish
+
+
+def test_a_mixed_angler_gets_only_the_best_few(monkeypatch):
+    from src.services import spot_fit
+
+    n = spot_fit.MIXED_TOP + 5
+    spots, fits, _ = _fit_mixed(
+        monkeypatch, 0.5, [("pond", 0, False)] * 3 + [("pond", 1, False)] * (n - 3)
+    )
+    kept = [f for f in fits.values() if f.keep]
+    assert len(kept) == spot_fit.MIXED_TOP
+    assert all(fits[s.spot_id].keep for s in spots[:3])  # ranked ahead of once-fished spots
+
+
+def test_a_clear_explorer_still_gets_the_hard_bar(monkeypatch):
+    spots, fits, _ = _fit_mixed(monkeypatch, 0.85, [("pond", 0, False), ("pond", 1, False)])
+    assert fits[spots[0].spot_id].keep and not fits[spots[1].spot_id].keep
