@@ -103,7 +103,7 @@ export function initMap(root, { goto }) {
       renderer: canvas,
       style: (f) => WATER_STYLE[f.properties.type] || WATER_STYLE.river,
       onEachFeature: (f, layer) => {
-        layer.bindTooltip(f.properties.name, { sticky: true });
+        layer.bindTooltip(h('span', null, f.properties.name), { sticky: true });
         layer.on('click', (ev) => { L.DomEvent.stop(ev); selectSection(f); });
       },
     }).addTo(waterLayer);
@@ -114,7 +114,7 @@ export function initMap(root, { goto }) {
       L.marker([lat, lng], {
         icon: L.divIcon({ className: 'lake-label', html: '', iconSize: [0, 0] }),
         keyboard: false,
-      }).bindTooltip(p.display_name || p.name, { permanent: true, direction: 'center', className: 'lake-tip' })
+      }).bindTooltip(h('span', null, p.display_name || p.name), { permanent: true, direction: 'center', className: 'lake-tip' })
         .on('click', () => selectWater({
           id: p.water_body_id, name: p.display_name || p.name, subtitle: p.type_label,
           lat, lng, jurisdiction: p.jurisdiction, note: p.note,
@@ -133,7 +133,7 @@ export function initMap(root, { goto }) {
       L.circleMarker([lat, lng], {
         renderer: canvas, radius: p.tier === 1 ? 9 : p.tier === 2 ? 7 : 5.5,
         color: '#fff', weight: 1.5, fillColor: kindColor(p.kind), fillOpacity: 0.95,
-      }).bindTooltip(p.title, { direction: 'top' })
+      }).bindTooltip(h('span', null, p.title), { direction: 'top' })
         .on('click', (ev) => { L.DomEvent.stop(ev); selectSpot(p.spot_id, f); })
         .addTo(spotLayer);
     }
