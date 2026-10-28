@@ -115,6 +115,9 @@ make run
 # Serve the API locally on http://localhost:8000
 make serve
 
+# Serve the web app (map, field guide, coach) on http://localhost:8765/app/ - see app/README.md
+make app
+
 # Run all ingestion adapters around home
 make ingest
 
