@@ -1,4 +1,4 @@
-.PHONY: run serve test lint format ingest weekly-ingest ingest-hydat ingest-trca harvest-ca recent build-features train-sdm compute-access compute-untapped build-stretches build-anchors build-spots export-map
+.PHONY: run serve app test lint format ingest weekly-ingest ingest-hydat ingest-trca harvest-ca recent build-features train-sdm compute-access compute-untapped build-stretches build-anchors build-spots export-map
 
 run:
 	uv run python -m src.cli.main run
@@ -10,6 +10,12 @@ SERVE_HOST ?= 127.0.0.1
 SERVE_PORT ?= 8000
 serve:
 	uv run python -m src.cli.main serve --host $(SERVE_HOST) --port $(SERVE_PORT)
+
+# The web app (app/): plain files, no build. Needs the API running (make serve) and a token
+# (uv run python -m src.cli.main token). Opens at http://localhost:8765/app/
+APP_PORT ?= 8765
+app:
+	python3 app/serve.py $(APP_PORT)
 
 test:
 	uv run pytest tests/
