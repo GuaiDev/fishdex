@@ -76,6 +76,24 @@ AnchorIssueKind = Literal[
 ]
 
 
+OsmCoverageStatus = Literal["fetched", "not_fetched"]
+
+
+class StretchOsmCoverage(BaseModel):
+    """Whether OpenStreetMap was ever fetched for a stretch.
+
+    This is what lets "no parking found" (OSM was read and held none) be told
+    apart from "no parking looked up" (OSM was never read for this water, or the
+    only attempts failed). A stretch whose latest fetch failed but which still
+    carries an earlier build's OSM anchors stays `fetched`.
+    """
+
+    stretch_id: StretchId
+    status: OsmCoverageStatus
+    detail: str = ""
+    checked_at: str
+
+
 class AnchorBuildIssue(BaseModel):
     stretch_id: StretchId
     kind: AnchorIssueKind
@@ -94,6 +112,11 @@ class AnchorBuildReport(BaseModel):
     dropped: dict[str, int] = Field(default_factory=dict)
     issues: list[AnchorBuildIssue] = Field(default_factory=list)
     carried_over_stretches: list[StretchId] = Field(default_factory=list)
+    # Stretches with no OSM data at all after this build: never fetched, or every
+    # attempt failed and there was nothing from an earlier build to keep. Their
+    # spots say "not fetched" for getting there, not "nothing found".
+    osm_not_fetched: list[StretchId] = Field(default_factory=list)
+    osm_fetched: int = 0
 
     def drop(self, reason: str, n: int = 1) -> None:
         self.dropped[reason] = self.dropped.get(reason, 0) + n

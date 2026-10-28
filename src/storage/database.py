@@ -146,6 +146,15 @@ def _ensure_stretch_anchors(db: Database) -> None:
             geometry_geojson    TEXT NOT NULL
         )
     """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS stretch_osm_coverage (
+            stretch_id          TEXT PRIMARY KEY,
+            jurisdiction        TEXT NOT NULL,
+            status              TEXT NOT NULL,
+            detail              TEXT NOT NULL DEFAULT '',
+            checked_at          TEXT NOT NULL
+        )
+    """)
     db.execute(
         "CREATE INDEX IF NOT EXISTS idx_stretch_anchors_stretch ON stretch_anchors(stretch_id)"
     )
@@ -194,6 +203,7 @@ def _ensure_spots(db: Database) -> None:
     for col, decl in (
         ("water_body_id", "TEXT"),
         ("also_on_water_body_ids_json", "TEXT NOT NULL DEFAULT '[]'"),
+        ("getting_there_status", "TEXT NOT NULL DEFAULT 'unknown'"),
     ):
         try:
             db.execute(f"ALTER TABLE spots ADD COLUMN {col} {decl}")

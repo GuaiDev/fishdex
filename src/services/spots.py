@@ -74,7 +74,7 @@ from src.services.stretch_anchors import DAM_MERGE_M, _coord_key
 from src.services.stretches import DEFAULT_CURATION_PATH, load_curation
 from src.services.water_bodies import LakeRef, WaterBodySet, derive_water_bodies, slugify
 from src.storage.spots import count_spots_of_kind, get_spot, list_spots, replace_spots
-from src.storage.stretch_anchors import list_anchors
+from src.storage.stretch_anchors import list_anchors, list_osm_coverage
 from src.storage.stretches import list_stretches
 from src.storage.water_bodies import get_water_body
 
@@ -161,6 +161,7 @@ def classify(
     watercourses: list[StreamSegment] | None = None,
     bathymetry: dict[str, LakeBathymetry] | None = None,
     shore_structures: list[ShoreStructure] | None = None,
+    osm_fetched: dict[str, bool] | None = None,
 ) -> SpotClassification:
     """Spots from anchors: merged, deduped, titled, gated and tiered. Pure.
 
@@ -174,6 +175,10 @@ def classify(
     them, the lakes get their shore geometry and their shoreline features.
     `bathymetry` maps a lake name to its surveyed contours, likewise fetched by
     the caller, for the drop-offs and humps read off the bottom.
+
+    `osm_fetched` maps a stretch id to whether OpenStreetMap was ever fetched for it
+    (build_spots reads it from the anchor build). It decides whether an empty
+    getting-there means "nothing found" or "not fetched"; None means unknown.
     """
     built_at = built_at or datetime.now(UTC).isoformat(timespec="seconds")
     hints = hints or {}
@@ -186,6 +191,7 @@ def classify(
         report=report,
         built_at=built_at,
         jurisdiction=jurisdiction,
+        osm_fetched=osm_fetched,
     )
 
     spots = (
@@ -233,6 +239,7 @@ class _Context:
     report: SpotBuildReport
     built_at: str
     jurisdiction: JurisdictionCode
+    osm_fetched: dict[str, bool] | None = None
 
     def river(self, stretch_id: str) -> str:
         """The river's name for a title; the stretch's place names if it has none."""
@@ -683,8 +690,29 @@ def _attach_access(ctx: _Context, spots: list[Spot], anchors: list[StretchAnchor
                 spot.signals[field] = first.distance_m
         if spot.bridges:
             spot.signals["nearest_bridge_m"] = spot.bridges[0].distance_m
+        spot.getting_there_status = _getting_there_status(ctx, spot)
         if not spot.getting_there and not spot.bridges:
             ctx.report.spots_without_access += 1
+            if spot.getting_there_status == "not_fetched":
+                ctx.report.spots_access_not_fetched += 1
+
+
+def _getting_there_status(ctx: _Context, spot: Spot) -> str:
+    """Whether an empty getting-there is "nothing found" or "never looked up".
+
+    A spot counts as looked up when OpenStreetMap was fetched for the stretch it
+    sits on or for any other it is listed under. Nothing recorded for any of them
+    (no coverage given, or none of these stretches in it) is "unknown", never a guess.
+    """
+    if spot.getting_there or spot.bridges:
+        return "found"
+    if ctx.osm_fetched is None:
+        return "unknown"
+    ids = [i for i in [spot.water_id, *spot.structure_attrs.get("also_on_water_ids", [])] if i]
+    known = [ctx.osm_fetched[i] for i in ids if i in ctx.osm_fetched]
+    if not known:
+        return "unknown"
+    return "none_found" if any(known) else "not_fetched"
 
 
 def _access_ref(a: StretchAnchor, distance_m: float) -> AccessRef:
@@ -849,10 +877,17 @@ def build_spots(
     anchors = list_anchors(db, jurisdiction=jurisdiction)
     stretches = list_stretches(db, jurisdiction)
     failures: dict[str, int] = {}
+    failed_lakes: dict[str, set[str]] = {}
     outlines, watercourses, shore_structures = _lake_outline_inputs(
-        anchors, jurisdiction, outline_resolver, watercourse_fetcher, structure_fetcher, failures
+        anchors,
+        jurisdiction,
+        outline_resolver,
+        watercourse_fetcher,
+        structure_fetcher,
+        failures,
+        failed_lakes,
     )
-    bathymetry = _bathymetry_inputs(outlines, bathymetry_fetcher, failures)
+    bathymetry = _bathymetry_inputs(outlines, bathymetry_fetcher, failures, failed_lakes)
     built_at = datetime.now(UTC).isoformat(timespec="seconds")
     result = classify(
         anchors,
@@ -864,6 +899,9 @@ def build_spots(
         watercourses=watercourses,
         shore_structures=shore_structures,
         bathymetry=bathymetry,
+        osm_fetched={
+            i: c.status == "fetched" for i, c in list_osm_coverage(db, jurisdiction).items()
+        },
     )
     quiet = build_quiet_water(db, jurisdiction, built_at, quiet_water_areas)
     replace_spots(
@@ -877,14 +915,18 @@ def build_spots(
 
     report = result.report
     for step, n in failures.items():
-        report.upstream_failed(step, n)
+        report.upstream_failed(step, n, sorted(failed_lakes.get(step, ())))
     if failures:
         logger.warning(
             "%d upstream lake fetches failed and were skipped (%s): the lakes involved are "
             "missing an outline, an inlet or a depth, which says nothing about the water. "
             "Run the build again; only the failed fetches are retried.",
             sum(failures.values()),
-            ", ".join(f"{step} x{n}" for step, n in sorted(failures.items())),
+            ", ".join(
+                f"{step} x{n}"
+                + (f" [{', '.join(sorted(failed_lakes[step]))}]" if failed_lakes.get(step) else "")
+                for step, n in sorted(failures.items())
+            ),
         )
     if not anchors:
         logger.warning(
@@ -925,6 +967,7 @@ def _lake_outline_inputs(
     ]
     | None = None,
     failures: dict[str, int] | None = None,
+    failed_lakes: dict[str, set[str]] | None = None,
 ) -> tuple[dict[str, LakeOutline], list[StreamSegment], list[ShoreStructure]]:
     """Named lake mouths in the anchors → outlines plus the features read off them.
 
@@ -939,10 +982,13 @@ def _lake_outline_inputs(
     into `failures` (the OSM fetcher returns its skipped-cell count with its
     structures); it never stops the build. The default resolver isolates each lake
     itself and flags it `lookup_failed`; a resolver that raises is caught here.
+    `failed_lakes` collects, per failed step, the names of the lakes involved so the
+    report can say which lake lost what, not just how many fetches failed.
     """
     from shapely.geometry import shape as _shape
 
     failures = failures if failures is not None else {}
+    failed_lakes = failed_lakes if failed_lakes is not None else {}
 
     mouths_by_lake: dict[str, list[tuple[float, float]]] = {}
     for a in anchors:
@@ -969,18 +1015,22 @@ def _lake_outline_inputs(
     except Exception:  # noqa: BLE001 - a flaky upstream must not stop the build
         logger.warning("lake outline resolver failed; no lake outlines this run", exc_info=True)
         failures["lake_outline"] = failures.get("lake_outline", 0) + len(mouths_by_lake)
+        failed_lakes.setdefault("lake_outline", set()).update(mouths_by_lake)
         return {}, [], []
     for outline in outlines.values():
         if outline.lookup_failed:
             step = "lake_outline_widen" if outline.matched else "lake_outline"
             failures[step] = failures.get(step, 0) + 1
+            failed_lakes.setdefault(step, set()).add(outline.curated_name)
 
     cells: list[tuple[float, float, float, float]] = []
     seen_cells: set[tuple[float, float, float, float]] = set()
+    lakes_of_cell: dict[tuple[float, float, float, float], set[str]] = {}
     for outline in outlines.values():
         if not outline.matched or not outline.geometry:
             continue
         for cell in _shore_cells(_shape(outline.geometry).boundary):
+            lakes_of_cell.setdefault(cell, set()).add(outline.curated_name)
             if cell not in seen_cells:
                 seen_cells.add(cell)
                 cells.append(cell)
@@ -993,6 +1043,7 @@ def _lake_outline_inputs(
         except Exception:  # noqa: BLE001 - one flaky tile must not stop the build
             logger.warning("shore watercourse fetch failed for cell %s", cell, exc_info=True)
             failures["shore_watercourses"] = failures.get("shore_watercourses", 0) + 1
+            failed_lakes.setdefault("shore_watercourses", set()).update(lakes_of_cell[cell])
             continue
         for seg in segments:
             if seg.ogf_id not in seen_ogf:
@@ -1005,9 +1056,17 @@ def _lake_outline_inputs(
             shore_structures, cells_failed = structure_fetcher(cells)
             if cells_failed:
                 failures["shore_structures"] = failures.get("shore_structures", 0) + cells_failed
+                # The fetcher counts skipped cells without saying which, so every lake
+                # on the shore cells is named: some of them are the ones that lost piers.
+                failed_lakes.setdefault("shore_structures", set()).update(
+                    name for names in lakes_of_cell.values() for name in names
+                )
         except Exception:  # noqa: BLE001 - a flaky OSM query must not stop the build
             logger.warning("shore structure fetch failed; no piers this run", exc_info=True)
             failures["shore_structures"] = failures.get("shore_structures", 0) + 1
+            failed_lakes.setdefault("shore_structures", set()).update(
+                name for names in lakes_of_cell.values() for name in names
+            )
     return outlines, watercourses, shore_structures
 
 
@@ -1015,6 +1074,7 @@ def _bathymetry_inputs(
     outlines: dict[str, LakeOutline],
     bathymetry_fetcher: Callable[[LakeOutline], LakeBathymetry] | None = None,
     failures: dict[str, int] | None = None,
+    failed_lakes: dict[str, set[str]] | None = None,
 ) -> dict[str, LakeBathymetry]:
     """Each matched lake's surveyed contours, keyed by curated name.
 
@@ -1025,6 +1085,7 @@ def _bathymetry_inputs(
     `failures` and treated the same way for this run, so one lake cannot stop the build.
     """
     failures = failures if failures is not None else {}
+    failed_lakes = failed_lakes if failed_lakes is not None else {}
     matched = {name: o for name, o in outlines.items() if o.matched and o.geometry}
     if not matched:
         return {}
@@ -1039,6 +1100,7 @@ def _bathymetry_inputs(
         except Exception:  # noqa: BLE001 - one flaky survey fetch must not stop the build
             logger.warning("bathymetry fetch failed for %r", name, exc_info=True)
             failures["bathymetry"] = failures.get("bathymetry", 0) + 1
+            failed_lakes.setdefault("bathymetry", set()).add(name)
             continue
         if lake.index is not None or lake.contours:
             out[name] = lake
@@ -1387,11 +1449,28 @@ def _access_layer_geojson(
     kind_counts = {k: 0 for k in words.LAYERS[attr]["kinds"]}
     for f in features:
         kind_counts[f["properties"]["kind"]] += 1
+    # Spots in view whose water never had OpenStreetMap fetched: an empty patch of
+    # this layer there is "not looked up", not "nothing there".
+    unfetched = [s for s in spots if s.getting_there_status == "not_fetched" and _in_bbox(s, bbox)]
     return {
         "type": "FeatureCollection",
-        "meta": {"count": len(features), "kind_counts": kind_counts},
+        "meta": {
+            "count": len(features),
+            "kind_counts": kind_counts,
+            "not_fetched": {
+                "spots": len(unfetched),
+                "water_ids": sorted({s.water_id for s in unfetched if s.water_id}),
+            },
+        },
         "features": features,
     }
+
+
+def _in_bbox(spot: Spot, bbox: tuple[float, float, float, float] | None) -> bool:
+    if bbox is None:
+        return True
+    min_lon, min_lat, max_lon, max_lat = bbox
+    return min_lon <= spot.lng <= max_lon and min_lat <= spot.lat <= max_lat
 
 
 def getting_there_geojson(

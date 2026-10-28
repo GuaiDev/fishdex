@@ -159,6 +159,9 @@ class GettingThereBlock(BaseModel):
     title: str
     items: list[AccessItem] = Field(default_factory=list)
     empty_text: str | None = None
+    # Why `items` is empty, or "found" when it is not. "not_fetched" means the map
+    # data for this water was never read, so empty_text must not claim nothing is there.
+    coverage: Literal["found", "none_found", "not_fetched", "unknown"] = "unknown"
     crown_land: CrownLandFlag
     unverified_title: str
     unverified: list[str] = Field(default_factory=list)

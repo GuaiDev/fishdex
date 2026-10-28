@@ -183,6 +183,7 @@ def _spot_row(s: Spot) -> dict:
         "signals_json": _dumps(s.signals),
         "getting_there_json": _dumps([r.model_dump() for r in s.getting_there]),
         "bridges_json": _dumps([r.model_dump() for r in s.bridges]),
+        "getting_there_status": s.getting_there_status,
         "sources_json": _dumps([r.model_dump() for r in s.sources]),
         "built_at": s.built_at,
     }
@@ -207,6 +208,7 @@ def _row_to_spot(r: dict) -> Spot:
         signals=json.loads(r["signals_json"]),
         getting_there=json.loads(r["getting_there_json"]),
         bridges=json.loads(r["bridges_json"]),
+        getting_there_status=r.get("getting_there_status", "unknown"),
         sources=json.loads(r["sources_json"]),
         built_at=r["built_at"],
     )

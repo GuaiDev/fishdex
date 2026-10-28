@@ -101,6 +101,11 @@ class Spot(BaseModel):
     # Nearest parking, trailheads and boat launches; and nearest road crossings.
     getting_there: list[AccessRef] = Field(default_factory=list)
     bridges: list[AccessRef] = Field(default_factory=list)
+    # Why `getting_there` is empty, when it is. "found": something is listed.
+    # "none_found": OpenStreetMap was read for this water and held nothing near.
+    # "not_fetched": OpenStreetMap was never read for this water (or every try failed),
+    # so an empty list says nothing about the ground. "unknown": built before this was tracked.
+    getting_there_status: Literal["found", "none_found", "not_fetched", "unknown"] = "unknown"
     sources: list[SpotSource] = Field(default_factory=list)
     built_at: str
 
@@ -160,6 +165,9 @@ class SpotBuildReport(BaseModel):
     # Access anchors attached to spots, and spots with no access found nearby.
     access_anchors: int = 0
     spots_without_access: int = 0
+    # Of those, spots whose water never had OpenStreetMap fetched: no access found
+    # because none was looked for, which is not the same as none existing.
+    spots_access_not_fetched: int = 0
     # Water bodies derived, and how the spots hang off them. A spot with no water
     # body is a spot whose stretch the build could not find, never a quiet default.
     water_bodies_total: int = 0
@@ -186,6 +194,10 @@ class SpotBuildReport(BaseModel):
     # inlet, its depth), which says nothing about the lake. Re-running the build
     # retries only these, because every fetch that worked is cached.
     upstream_failures: dict[str, int] = Field(default_factory=dict)
+    # The lakes behind those failures, by the same step names. Complete for outlines,
+    # widening, watercourses and bathymetry; for shore_structures the fetcher counts
+    # skipped cells without naming them, so it lists every lake on the fetched shores.
+    upstream_failure_lakes: dict[str, list[str]] = Field(default_factory=dict)
     # OSM piers, breakwaters and harbours fetched at the lakes' shores. Kept or
     # dropped (off-shore) they are counted against the shoreline features above.
     shore_structures_fetched: int = 0
@@ -194,9 +206,13 @@ class SpotBuildReport(BaseModel):
         if n > 0:  # a zero would read as a reason that fired
             self.dropped[reason] = self.dropped.get(reason, 0) + n
 
-    def upstream_failed(self, step: str, n: int = 1) -> None:
+    def upstream_failed(self, step: str, n: int = 1, lakes: list[str] | None = None) -> None:
         if n > 0:  # a zero would read as a step that failed
             self.upstream_failures[step] = self.upstream_failures.get(step, 0) + n
+            if lakes:
+                self.upstream_failure_lakes[step] = sorted(
+                    {*self.upstream_failure_lakes.get(step, []), *lakes}
+                )
 
     def hold_back(self, reason: str, n: int = 1) -> None:
         if n > 0:  # a zero would read as a reason that fired
