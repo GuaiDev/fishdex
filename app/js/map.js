@@ -212,7 +212,7 @@ export function initMap(root, { goto }) {
     refresh();
     renderOverview();
   }
-  map.on('click', () => { if (selectedId) clearSelection(); });
+  map.on('click', () => { if (selectedId || store.get().place) clearSelection(); });
 
   // The guide strip or the coach can change the place too: follow it.
   store.subscribe((s) => {
@@ -376,6 +376,8 @@ export function initMap(root, { goto }) {
       if (pl && pl.kind === 'spot') {
         map.setView([pl.lat, pl.lng], 13);
         selectSpot(pl.id, { geometry: { coordinates: [pl.lng, pl.lat] }, properties: { title: pl.name } });
+      } else if (pl) {
+        store.clearPlace(); // a stretch is not reopened after a reload; don't leave a chip with nothing behind it
       }
       await refresh();
       if (!boxes.length) setStatus('This database has no map data yet. Build it with: make build-spots');
