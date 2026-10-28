@@ -11,7 +11,7 @@ import json
 
 from sqlite_utils.db import Database
 
-from src.models.stretch_anchor import StretchAnchor, StretchSegmentLine
+from src.models.stretch_anchor import StretchAnchor, StretchOsmCoverage, StretchSegmentLine
 
 
 def replace_anchors(
@@ -19,10 +19,13 @@ def replace_anchors(
     jurisdiction: str,
     anchors: list[StretchAnchor],
     lines: list[StretchSegmentLine],
+    coverage: list[StretchOsmCoverage] | None = None,
 ) -> int:
     """Swap in a jurisdiction's anchors and segment lines. Returns anchors now stored.
 
-    Plain executemany inside one `with conn`, as in replace_stretches.
+    Plain executemany inside one `with conn`, as in replace_stretches. `coverage`
+    (which stretches had OpenStreetMap fetched) goes in the same transaction;
+    None leaves the stored coverage alone.
     """
     anchor_rows = [_anchor_row(a) for a in anchors]
     line_rows = [_line_row(line) for line in lines]
@@ -30,6 +33,14 @@ def replace_anchors(
     with conn:
         conn.execute("DELETE FROM stretch_anchors WHERE jurisdiction = ?", [jurisdiction])
         conn.execute("DELETE FROM stretch_segment_lines WHERE jurisdiction = ?", [jurisdiction])
+        if coverage is not None:
+            conn.execute("DELETE FROM stretch_osm_coverage WHERE jurisdiction = ?", [jurisdiction])
+            conn.executemany(
+                "INSERT INTO stretch_osm_coverage "
+                "(stretch_id, jurisdiction, status, detail, checked_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [(c.stretch_id, jurisdiction, c.status, c.detail, c.checked_at) for c in coverage],
+            )
         if anchor_rows:
             cols = list(anchor_rows[0])
             conn.executemany(
@@ -45,6 +56,16 @@ def replace_anchors(
                 line_rows,
             )
     return count_anchors(db, jurisdiction)
+
+
+def list_osm_coverage(db: Database, jurisdiction: str) -> dict[str, StretchOsmCoverage]:
+    """Per-stretch OSM fetch status. A stretch with no row was never part of a build."""
+    rows = db.execute_returning_dicts(
+        "SELECT stretch_id, status, detail, checked_at FROM stretch_osm_coverage "
+        "WHERE jurisdiction = ?",
+        [jurisdiction],
+    )
+    return {r["stretch_id"]: StretchOsmCoverage(**r) for r in rows}
 
 
 def count_anchors(db: Database, jurisdiction: str | None = None) -> int:

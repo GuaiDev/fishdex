@@ -847,3 +847,18 @@ def test_the_fixture_shows_a_recorded_more_often_here_card_built_from_real_recor
             line["elsewhere_records"] / line["elsewhere_total"]
         )
     assert "lives here" not in json.dumps(card).lower()
+
+
+def test_card_says_not_looked_up_apart_from_nothing_found(db):
+    never = junction().model_copy(update={"getting_there_status": "not_fetched"})
+    block = build_spot_card(db, never).getting_there
+    assert block.coverage == "not_fetched"
+    assert "have not looked up" in block.empty_text
+    assert "No parking" not in block.empty_text
+
+    looked = junction().model_copy(update={"getting_there_status": "none_found"})
+    block = build_spot_card(db, looked).getting_there
+    assert block.coverage == "none_found" and block.empty_text.startswith("No parking")
+
+    found = junction(getting_there=[ref("parking", 262)])
+    assert build_spot_card(db, found).getting_there.coverage == "found"

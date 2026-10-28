@@ -1631,6 +1631,11 @@ def _print_spot_report(report) -> None:
         )
     table.add_row("getting-there anchors", str(report.access_anchors))
     table.add_row("spots with no access nearby", str(report.spots_without_access))
+    if report.spots_access_not_fetched:
+        table.add_row(
+            "[yellow]  of those, OpenStreetMap never fetched for their water[/yellow]",
+            f"[yellow]{report.spots_access_not_fetched}[/yellow]",
+        )
     table.add_row("water bodies", str(report.water_bodies_total))
     for wb_type, n in sorted(report.water_bodies_by_type.items()):
         table.add_row(f"  {wb_type}", str(n))
@@ -1663,6 +1668,17 @@ def _print_spot_report(report) -> None:
             f"[yellow]{report.spots_without_water_body}[/yellow]",
         )
     console.print(table)
+    for step, n in sorted(report.upstream_failures.items()):
+        lakes = ", ".join(report.upstream_failure_lakes.get(step, []))
+        console.print(
+            f"[yellow]upstream fetch failed, skipped: {step} x{n}[/yellow]"
+            + (f" — {lakes}" if lakes else "")
+        )
+    if report.upstream_failures:
+        console.print(
+            "[yellow]The build finished without them. Run it again; only the failed fetches "
+            "are retried.[/yellow]"
+        )
 
 
 def _print_anchor_report(report) -> None:
@@ -1679,6 +1695,12 @@ def _print_anchor_report(report) -> None:
 
     for issue in report.issues:
         console.print(f"[yellow]{issue.stretch_id}: {issue.kind}[/yellow] {issue.detail}")
+    if report.osm_not_fetched:
+        console.print(
+            f"[yellow]{len(report.osm_not_fetched)} of {report.stretches} stretches have no "
+            "OpenStreetMap data (their spots show getting-there as not fetched):[/yellow] "
+            + ", ".join(report.osm_not_fetched)
+        )
     if report.stretches == 0:
         console.print(
             "[yellow]No stretches are stored — run `make build-stretches` first.[/yellow]"

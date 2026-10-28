@@ -843,6 +843,7 @@ def test_a_layer_has_stable_ids_meta_and_a_name_for_every_unnamed_point(db, cura
     assert first["meta"] == {
         "count": 1,
         "kind_counts": {"parking": 1, "trail_head": 0, "boat_launch": 0},
+        "not_fetched": {"spots": 0, "water_ids": []},
     }
     assert feature["properties"]["name"] == "Parking near the Credit River"
     assert feature["properties"]["name_source"] == "fallback"
@@ -1174,3 +1175,53 @@ def test_layers_getting_there_and_bridges():
     assert r.status_code == 200
     r = client.get("/map/layers/bridges")
     assert r.status_code == 200
+
+
+# ── getting there: not fetched vs nothing found ───────────────────────────────
+
+
+def test_empty_access_says_not_fetched_when_osm_was_never_read_for_the_water():
+    result = classify(
+        [confluence("c", 43.5, -79.5, 20.0)],
+        [stretch()],
+        JURISDICTION,
+        built_at=BUILT,
+        osm_fetched={"credit-lower": False},
+    )
+    (spot,) = only(result, "creek_junction")
+    assert spot.getting_there == [] and spot.getting_there_status == "not_fetched"
+    assert result.report.spots_access_not_fetched == 1
+
+
+def test_empty_access_says_none_found_when_osm_was_read_and_held_nothing():
+    result = classify(
+        [confluence("c", 43.5, -79.5, 20.0)],
+        [stretch()],
+        JURISDICTION,
+        built_at=BUILT,
+        osm_fetched={"credit-lower": True},
+    )
+    (spot,) = only(result, "creek_junction")
+    assert spot.getting_there_status == "none_found"
+    assert result.report.spots_access_not_fetched == 0
+
+
+def test_access_found_wins_over_a_stretch_that_was_not_fetched():
+    """Parking from a neighbouring stretch's corridor still counts as found."""
+    result = classify(
+        [
+            confluence("c", 43.5, -79.5, 20.0),
+            access("parking", "way/1", 43.5005, -79.5, sid="other"),
+        ],
+        [stretch()],
+        JURISDICTION,
+        built_at=BUILT,
+        osm_fetched={"credit-lower": False},
+    )
+    (spot,) = only(result, "creek_junction")
+    assert spot.getting_there_status == "found"
+
+
+def test_access_status_is_unknown_without_coverage_data():
+    (spot,) = only(run([confluence("c", 43.5, -79.5, 20.0)]), "creek_junction")
+    assert spot.getting_there_status == "unknown"

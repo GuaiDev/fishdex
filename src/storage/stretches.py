@@ -48,7 +48,7 @@ def replace_stretches(
         # must not outlive it. Those of a stretch that was only rebuilt stay
         # until build_anchors replaces them, so an OpenStreetMap outage during
         # that step still leaves the last good dams and access points.
-        for table in ("stretch_anchors", "stretch_segment_lines"):
+        for table in ("stretch_anchors", "stretch_segment_lines", "stretch_osm_coverage"):
             conn.execute(
                 f"DELETE FROM {table} WHERE jurisdiction = ? "
                 "AND stretch_id NOT IN (SELECT stretch_id FROM fishing_stretches)",

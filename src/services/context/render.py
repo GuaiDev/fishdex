@@ -575,6 +575,10 @@ IMPRECISE_NOTE = "Records with a deliberately fuzzy location are left out."
 FACTS_TITLE = "What our records say about this spot"
 UNVERIFIED_TITLE = "Not checked on the ground"
 NO_ACCESS = "No parking, trailhead or boat launch found within {radius} km in our map data."
+ACCESS_NOT_FETCHED = (
+    "We have not looked up parking, trailheads or boat launches for this water yet, "
+    "so this says nothing about whether there are any."
+)
 OLDER_RECORD = "Older record"
 UNVERIFIED_ALWAYS = "Fishing rules and permission to cross private land are not checked here."
 UNVERIFIED_OSM = (
@@ -990,6 +994,12 @@ def _crown_land(c: _CardInputs) -> CrownLandFlag:
     return CrownLandFlag(state="not_checked", text=CROWN_UNCHECKED)
 
 
+def _no_access_text(status: str) -> str:
+    if status == "not_fetched":
+        return ACCESS_NOT_FETCHED
+    return NO_ACCESS.format(radius="1.5")
+
+
 def _getting_there(c: _CardInputs) -> GettingThereBlock:
     spot = c.spot
     nearest: dict[str, AccessRef] = {}
@@ -1013,7 +1023,8 @@ def _getting_there(c: _CardInputs) -> GettingThereBlock:
     return GettingThereBlock(
         title=CARD_TITLES["getting_there"],
         items=items,
-        empty_text=None if items else NO_ACCESS.format(radius="1.5"),
+        empty_text=None if items else _no_access_text(spot.getting_there_status),
+        coverage="found" if items else spot.getting_there_status,
         crown_land=_crown_land(c),
         unverified_title=UNVERIFIED_TITLE,
         unverified=unverified,

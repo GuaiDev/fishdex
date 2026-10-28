@@ -1392,3 +1392,51 @@ def test_skipped_shore_cells_reach_the_build_failures():
     )
     assert structures == []
     assert failures == {"shore_structures": 2}
+
+
+def test_the_report_names_the_lake_behind_each_failed_fetch(db, curation):
+    store(db, [mouth(name="Rice Lake")], [stretch()])
+
+    def resolver(mouths):
+        return {
+            "Rice Lake": outline(),
+            "Georgian Bay": LakeOutline(
+                curated_name="Georgian Bay",
+                matched=True,
+                geometry=outline().geometry,
+                lookup_failed=True,
+            ),
+            "Lake Ontario": LakeOutline(
+                curated_name="Lake Ontario", matched=False, lookup_failed=True
+            ),
+        }
+
+    def flaky(_outline):
+        raise RuntimeError("timeout")
+
+    report = build_spots(
+        db,
+        curation,
+        outline_resolver=resolver,
+        watercourse_fetcher=lambda *_: [],
+        bathymetry_fetcher=flaky,
+    )
+    assert report.upstream_failure_lakes["lake_outline"] == ["Lake Ontario"]
+    assert report.upstream_failure_lakes["lake_outline_widen"] == ["Georgian Bay"]
+    assert "Rice Lake" in report.upstream_failure_lakes["bathymetry"]
+
+
+def test_a_resolver_that_raises_names_every_lake_it_cost(db, curation):
+    store(db, [mouth(name="Rice Lake")], [stretch()])
+
+    def broken(_mouths):
+        raise RuntimeError("HTTP 200 with a 500 error body")
+
+    report = build_spots(
+        db,
+        curation,
+        outline_resolver=broken,
+        watercourse_fetcher=lambda *_: [],
+        bathymetry_fetcher=lambda _o: _no_bathymetry(),
+    )
+    assert report.upstream_failure_lakes == {"lake_outline": ["Rice Lake"]}

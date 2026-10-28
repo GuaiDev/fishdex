@@ -44,12 +44,18 @@ from src.models.stretch_anchor import (
     AnchorBuildIssue,
     AnchorBuildReport,
     StretchAnchor,
+    StretchOsmCoverage,
     StretchSegmentLine,
 )
 from src.models.water_feature import CorridorFeature
 from src.services.stretch_clustering import StreamNetwork, _metres, display_name
 from src.services.stretches import DEFAULT_CURATION_PATH, load_curation, load_network
-from src.storage.stretch_anchors import list_anchors, list_segment_lines, replace_anchors
+from src.storage.stretch_anchors import (
+    list_anchors,
+    list_osm_coverage,
+    list_segment_lines,
+    replace_anchors,
+)
 from src.storage.stretches import get_stretch, list_stretches, stretch_segment_ids
 
 logger = logging.getLogger(__name__)
@@ -147,6 +153,9 @@ def build_anchors(
         for s in stretches
     }
 
+    previous_coverage = list_osm_coverage(db, jurisdiction)
+    coverage: list[StretchOsmCoverage] = []
+
     previous_tailwaters = [
         a for kept in previous_osm.values() for a in kept if a.anchor_type == "tailwater"
     ]
@@ -187,18 +196,38 @@ def build_anchors(
             kept = previous_osm[stretch.stretch_id]
             if kept:
                 report.carried_over_stretches.append(stretch.stretch_id)
+            # Earlier OSM data (anchors or a recorded successful fetch) still counts as
+            # fetched; with neither, nothing was ever read for this water.
+            earlier = previous_coverage.get(stretch.stretch_id)
+            had_osm = bool(kept) or (earlier is not None and earlier.status == "fetched")
+            coverage.append(
+                StretchOsmCoverage(
+                    stretch_id=stretch.stretch_id,
+                    status="fetched" if had_osm else "not_fetched",
+                    detail=failure,
+                    checked_at=(earlier.checked_at if had_osm and earlier else built_at),
+                )
+            )
+            if not had_osm:
+                report.osm_not_fetched.append(stretch.stretch_id)
             kept_dams = {a.source_ref for a in kept if a.anchor_type == "dam"}
             found += kept + [
                 a for a in previous_tailwaters if a.attributes.get("dam_source_ref") in kept_dams
             ]
         else:
             consecutive_failures = 0
+            coverage.append(
+                StretchOsmCoverage(
+                    stretch_id=stretch.stretch_id, status="fetched", checked_at=built_at
+                )
+            )
             found += _osm_anchors(ctx, stretch, ids, corridor, claimed, built_at, report)
         anchors.extend(found)
 
     anchors = _unique(anchors)
     anchors.sort(key=lambda a: (a.stretch_id, a.anchor_type, a.anchor_id))
-    replace_anchors(db, jurisdiction, anchors, lines)
+    replace_anchors(db, jurisdiction, anchors, lines, coverage)
+    report.osm_fetched = sum(1 for c in coverage if c.status == "fetched")
 
     for a in anchors:
         per = report.by_stretch.setdefault(a.stretch_id, {})
@@ -208,6 +237,14 @@ def build_anchors(
 
     for issue in report.issues:
         logger.warning("stretch %s: %s — %s", issue.stretch_id, issue.kind, issue.detail)
+    if report.osm_not_fetched:
+        logger.warning(
+            "%d of %d stretches have no OpenStreetMap data (%s): their spots say getting-there "
+            "was not fetched, not that nothing was found",
+            len(report.osm_not_fetched),
+            report.stretches,
+            ", ".join(report.osm_not_fetched),
+        )
     if report.stretches_without_osm:
         logger.warning(
             "OSM was unavailable for %d of %d stretches (%s): their dams and access points are %s",

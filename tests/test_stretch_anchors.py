@@ -793,3 +793,41 @@ def test_an_off_river_dam_does_not_swallow_a_weir_on_the_river(db, stretches):
     assert dam.source_ref == "node/51" and dam.subtype == "weir"
     assert dam.attributes.get("also_mapped_as") is None
     assert report.dropped["dam_off_channel"] >= 1
+
+
+def test_a_stretch_whose_osm_fetch_failed_and_was_never_fetched_is_reported_not_fetched(
+    db, stretches
+):
+    from src.storage.stretch_anchors import list_osm_coverage
+
+    def down(line, jurisdiction):
+        raise TimeoutError("slow")
+
+    report = build(db, stretches, down)
+    assert report.osm_not_fetched == ["test-lower", "test-maple", "test-upper"]
+    assert report.osm_fetched == 0
+    coverage = list_osm_coverage(db, "CA-ON")
+    assert {c.status for c in coverage.values()} == {"not_fetched"}
+    assert "slow" in coverage["test-lower"].detail
+
+
+def test_a_fetch_with_nothing_found_is_fetched_not_missing(db, stretches):
+    from src.storage.stretch_anchors import list_osm_coverage
+
+    report = build(db, stretches, lambda line, jurisdiction: [])
+    assert report.osm_not_fetched == []
+    assert report.osm_fetched == 3
+    assert {c.status for c in list_osm_coverage(db, "CA-ON").values()} == {"fetched"}
+
+
+def test_an_outage_after_a_good_build_keeps_the_stretches_marked_fetched(db, stretches):
+    from src.storage.stretch_anchors import list_osm_coverage
+
+    build(db, stretches, lambda line, jurisdiction: [])
+
+    def down(line, jurisdiction):
+        raise ConnectionError("overpass is down")
+
+    report = build(db, stretches, down)
+    assert report.osm_not_fetched == []  # an earlier fetch still stands
+    assert {c.status for c in list_osm_coverage(db, "CA-ON").values()} == {"fetched"}
