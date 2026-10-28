@@ -343,7 +343,7 @@ GeoJSON `FeatureCollection` of points, light enough to load for a whole viewport
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
 | `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. The records are read around each spot in view, so pass a `bbox`: a province-wide request looks up every spot. |
 | `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, nearest first. Radius defaults to 50 km and is capped at 200 km. Each feature then carries `properties.distance_km` (straight-line, one decimal), and `meta.near` says what was applied (see below). |
-| `new_to_me` | `true` keeps only spots with at least one species recorded within 2 km that **the caller** has not caught (see [New to you](#new-to-you)). Per-user, computed for this request, never cached; the response is `Cache-Control: private, no-store`. Combines with every other filter. It reads the records around each spot, so a `bbox` is required: without one the request is rejected with 422 (`new_to_me needs a bbox`). Default `false`. |
+| `new_to_me` | `true` keeps only spots with at least one species recorded within 2 km that **the caller** has not caught (see [New to you](#new-to-you)). Per-user, computed for this request, never cached; the response is `Cache-Control: private, no-store`. Combines with every other filter. It reads the records around each spot, so a `bbox` is required: without one the request is rejected with 422 (`new_to_me needs a bbox`). Something unseen is necessary but not enough: the spots are then narrowed to the caller's own pattern (see [New to me follows the angler](#new-to-me-follows-the-angler)). Default `false`. |
 
 `meta.kind_counts` counts the spots in view for **every** kind, ignoring the `kind`
 filter, so the chips can show how many each would add. It is present in every mode, `near`
@@ -365,6 +365,7 @@ Each feature's `properties`: `spot_id`, `kind`, `title`, `subtitle`, `tier`,
 `/map/water-bodies`), `water_id`, `water_name` (the river section it sits on) and `signals`.
 With `new_to_me=true` each feature also has `new_to_you` = `{count, text}` (`text` is the
 ready-made "2 species recorded here you haven't caught yet"), and `meta.new_to_me` is `true`.
+It also has `fit` = `{score, reasons[]}` (see below), and `meta.personalisation` says what the angler's profile had to go on.
 Quiet-water features add `caveats`, `[{kind, text}]`, already written: `records` always, plus
 `access` unless the access figure was measured. The key is absent on every other kind. They have
 `water_body_id: null` and `water_id: null` on purpose: a quiet reach belongs to no curated river.
@@ -2823,6 +2824,39 @@ something new, each with its count (`meta.new_to_me` is `true`):
 ```
 
 (Trimmed here; the fixture has the full feature and the full response.)
+
+### New to me follows the angler
+
+Having a species the caller has not caught is the first test, never the last. The spots
+that pass it are fitted to the caller's own profile (`GET /profile` → `signals`) and only
+those that fit are returned. What fits depends on the person:
+
+- an **explorer** (the explore dial, below) gets places they have not fished, on the kind
+  of water they fish most: ponds for a pond angler, creeks for a small-creek angler;
+- a **regular** gets the spots they fish again and again, kept in front;
+- someone in between gets both. Nothing about fish size or catch outcomes is used, and no
+  feature promises any.
+
+The signals are *preferred water type* (where logged trips and saved pins have been,
+by the water body's `type`) and the *explore dial* (how often a trip goes to water the
+angler had not fished before). Older trips and pins count for less. Both are registered in
+`src/services/context/signals/`; a signal added there changes this filter without a change
+here.
+
+Added to the response, all additive:
+
+- `properties.fit` on each feature: `{score, reasons[]}`. `reasons` are plain sentences in
+  the angler's terms ("you mostly fish ponds", "a place you haven't fished, and you tend to
+  try new water"), so a wrong guess can be seen and corrected. Features are ordered by
+  `score`, highest first (with `near`, the distance order is kept).
+- `meta.personalisation`: `{active, confidence, signals[], note}`. `signals[]` is
+  `{signal_id, confidence, summary}` for each signal that took part.
+
+**With too little to go on the list is empty, not wide.** Behaviour alone must not narrow
+the answer early: an undeclared signal takes part once it has about six trips behind it
+(`BEHAVIOUR_ONLY_MIN`), a declared one at once. Until then `features` is `[]`,
+`meta.personalisation.active` is `false` and `note` says what to do: log a few trips, or
+set the explore dial with `PUT /profile/declared/signal:explore`.
 
 ## About the example data
 

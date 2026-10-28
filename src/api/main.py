@@ -1659,7 +1659,7 @@ def put_declared_value(key: str, body: dict, user: dict = Depends(get_current_us
     """Write a declared value: {"value": 0..1, "weight": 0..MAX (default 3), "override": bool}.
     A questionnaire writes a starting value that fades as trips are logged; settings
     writes an override that holds until cleared. Keys: orientation, size_focus,
-    micro_focus, concept:<term_id>."""
+    micro_focus, signal:explore, concept:<term_id>."""
     from src.storage import angler_profile as store
     from src.storage.database import get_db
 
@@ -1715,7 +1715,9 @@ def get_map_spots(
     the normal ones (default), 3 everything. Built by `make build-spots` (and at the
     end of `make build-anchors`); an empty collection means it has not been run.
     `new_to_me=true` keeps only spots with a recorded species the caller has not caught
-    (confirmed catches only), and is computed for the caller alone. It needs a `bbox`.
+    (confirmed catches only) and that fits the caller's own pattern (preferred water type,
+    explorer or regular; see docs/spots-api.md), and is computed for the caller alone. It
+    needs a `bbox`.
     """
     from src.services.spots import spots_geojson
     from src.storage.database import get_db

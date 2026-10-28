@@ -6,6 +6,7 @@ water body the rebuild removed.
 """
 
 import json
+import math
 import sqlite3
 
 from sqlite_utils.db import Database
@@ -123,6 +124,52 @@ def get_water_body_geometry_text(db: Database, water_body_id: str) -> str | None
         "SELECT geometry_geojson FROM water_bodies WHERE water_body_id = ?", [water_body_id]
     ).fetchone()
     return row[0] if row and row[0] else None
+
+
+def water_body_types(db: Database, water_body_ids: list[str]) -> dict[str, str]:
+    """`{water_body_id: type}` for the ids that exist; one query, no geometry read."""
+    ids = sorted({i for i in water_body_ids if i})
+    out: dict[str, str] = {}
+    for start in range(0, len(ids), 500):
+        chunk = ids[start : start + 500]
+        for wb_id, wb_type in db.execute(
+            f"SELECT water_body_id, type FROM water_bodies "
+            f"WHERE water_body_id IN ({', '.join('?' * len(chunk))})",
+            chunk,
+        ).fetchall():
+            out[wb_id] = wb_type
+    return out
+
+
+_M_PER_DEG = 111_320.0
+
+
+def nearest_spot_water_type(
+    db: Database, lat: float, lng: float, max_m: float
+) -> tuple[str, float] | None:
+    """The type of the water the nearest spot within `max_m` sits on, and how far it is.
+
+    A logged stop carries coordinates but no water type; the spots table already
+    knows, for every spot, which water body it is a child of. None when no spot
+    with a known water body is that close, which is an honest 'don't know' and
+    not a reason to guess.
+    """
+    dlat = max_m / _M_PER_DEG
+    dlng = dlat / max(math.cos(math.radians(lat)), 0.01)
+    rows = db.execute(
+        "SELECT s.lat, s.lng, w.type FROM spots s "
+        "JOIN water_bodies w ON w.water_body_id = s.water_body_id "
+        "WHERE s.lat BETWEEN ? AND ? AND s.lng BETWEEN ? AND ?",
+        [lat - dlat, lat + dlat, lng - dlng, lng + dlng],
+    ).fetchall()
+    best: tuple[str, float] | None = None
+    for s_lat, s_lng, wb_type in rows:
+        d = math.hypot(
+            (s_lat - lat) * _M_PER_DEG, (s_lng - lng) * _M_PER_DEG * math.cos(math.radians(lat))
+        )
+        if d <= max_m and (best is None or d < best[1]):
+            best = (wb_type, d)
+    return best
 
 
 def get_water_body(db: Database, water_body_id: str) -> WaterBody | None:

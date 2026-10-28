@@ -46,16 +46,21 @@ from sqlite_utils import Database
 from src.models.angler_profile import (
     CONCEPT_KEY_PREFIX,
     CONCEPT_STATE_VALUE,
+    SIGNAL_KEY_PREFIX,
+    SIGNALS_VERSION,
     AnglerProfile,
     BlendedValue,
     ConceptEvidence,
     ConceptState,
     ProfileValue,
     SessionEvidence,
+    SignalReading,
 )
 from src.models.context import LocalRichness
 from src.services import terms
 from src.services.context.richness import local_richness
+from src.services.context.signals import REGISTRY, SignalInputs, derive_signals
+from src.services.context.weights import clip, confidence, decay
 from src.services.species_mapping import COMMON_TO_SCIENTIFIC
 from src.storage import angler_profile as store
 
@@ -73,7 +78,6 @@ UNRECORDED_PLACE_CONFIDENCE = 0.25
 SESSION_EVIDENCE_CAP = 1.0  # one session's weight never exceeds this
 SPECTRUM_HALF_LIFE_SESSIONS = 20  # older sessions count half after this many
 NEUTRAL_PRIOR_WEIGHT = 8.0  # pseudo-sessions at 0.5: two strong trips move it ~0.1
-CONFIDENCE_SCALE = 8.0  # accumulated weight at which confidence is ~0.63
 
 # ── side values ───────────────────────────────────────────────────────────────
 SIDE_HALF_LIFE_SESSIONS = 20
@@ -153,12 +157,15 @@ def derive_profile(db: Database, user_id: int) -> AnglerProfile:
     evidence, orientation = _orientation(db, sessions)
     size, micro = _side_values(sessions)
     concepts = _concepts(db, user_id, sessions)
+    signals = derive_signals(SignalInputs(db, user_id, sessions, _pins(db, user_id, sessions)))
     return AnglerProfile(
         user_id=user_id,
         orientation=orientation,
         size_focus=size,
         micro_focus=micro,
         concepts=concepts,
+        signals=signals,
+        signals_version=SIGNALS_VERSION,
         sessions_used=len(sessions),
         session_evidence=evidence,
         computed_at=datetime.now(UTC).isoformat(),
@@ -175,6 +182,10 @@ def inferred_rows(profile: AnglerProfile) -> dict[str, tuple[float, float]]:
     for term_id, c in profile.concepts.items():
         weight = float(sum(e.count for e in c.evidence))
         rows[CONCEPT_KEY_PREFIX + term_id] = (CONCEPT_STATE_VALUE[c.state], weight)
+    for signal_id, reading in profile.signals.items():
+        signal = REGISTRY.get(signal_id)
+        if signal is not None and signal.declarable and reading.inferred is not None:
+            rows[SIGNAL_KEY_PREFIX + signal_id] = (reading.inferred.value, reading.inferred.weight)
     return rows
 
 
@@ -208,14 +219,8 @@ def blend(db: Database, profile: AnglerProfile) -> AnglerProfile:
                 BlendedValue(value=d.value, confidence=1.0, inferred=cur.inferred, declared=d),
             )
             continue
-        d_w = d.weight * _decay(
-            store.sessions_since(db, profile.user_id, d.updated_at), DECLARED_HALF_LIFE_SESSIONS
-        )
         inf = cur.inferred
-        inf_v, inf_w = (inf.value, inf.weight) if inf else (prior_value, 0.0)
-        value = (prior_value * prior_weight + d.value * d_w + inf_v * inf_w) / (
-            prior_weight + d_w + inf_w
-        )
+        value, d_w, inf_w = _blend_scalar(db, profile.user_id, d, inf, prior_value, prior_weight)
         setattr(
             out,
             key,
@@ -241,10 +246,70 @@ def blend(db: Database, profile: AnglerProfile) -> AnglerProfile:
             out.concepts[term_id] = cur_c.model_copy(
                 update={"state": d_state, "source": "declared"}
             )
+    for signal_id, signal in REGISTRY.items():
+        d = declared.get(SIGNAL_KEY_PREFIX + signal_id)
+        if d is None or not signal.declarable:
+            continue
+        cur_s = out.signals.get(signal_id) or SignalReading(signal_id=signal_id, kind=signal.kind)
+        if d.is_override:
+            value, conf = d.value, 1.0
+        else:
+            value, d_w, inf_w = _blend_scalar(
+                db, profile.user_id, d, cur_s.inferred, signal.prior_value, signal.prior_weight
+            )
+            conf = _confidence(d_w + inf_w)
+        blended = cur_s.model_copy(
+            update={"value": _clip(value), "confidence": conf, "declared": d}
+        )
+        blended.summary = signal.describe(blended)
+        out.signals[signal_id] = blended
     return out
 
 
+def _blend_scalar(
+    db: Database,
+    user_id: int,
+    declared: ProfileValue,
+    inferred: ProfileValue | None,
+    prior_value: float,
+    prior_weight: float,
+) -> tuple[float, float, float]:
+    """`(value, declared weight now, inferred weight)` for a declared, non-override value.
+
+    The declared value is a prior whose weight halves every `DECLARED_HALF_LIFE_SESSIONS`
+    sessions logged after it; the inferred value arrives with the weight it earned.
+    """
+    d_w = declared.weight * _decay(
+        store.sessions_since(db, user_id, declared.updated_at), DECLARED_HALF_LIFE_SESSIONS
+    )
+    inf_v, inf_w = (inferred.value, inferred.weight) if inferred else (prior_value, 0.0)
+    value = (prior_value * prior_weight + declared.value * d_w + inf_v * inf_w) / (
+        prior_weight + d_w + inf_w
+    )
+    return value, d_w, inf_w
+
+
 # ── inputs ───────────────────────────────────────────────────────────────────
+
+
+def logged_sessions(db: Database, user_id: int) -> list:
+    """This user's sessions oldest first, each with its stops and confirmed catches."""
+    return _sessions(db, user_id)
+
+
+def _pins(
+    db: Database, user_id: int, sessions: list
+) -> list[tuple[int, float, float, bool, int]]:
+    """`(id, lat, lng, is_favourite, sessions logged since it was saved)` per pin."""
+    if "pins" not in db.table_names():
+        return []
+    out = []
+    for pin_id, lat, lng, favourite, created in db.execute(
+        "SELECT id, lat, lng, is_favourite, created_at FROM pins WHERE user_id = ?", [user_id]
+    ).fetchall():
+        since = store.sessions_since(db, user_id, created) if sessions else 0
+        out.append((pin_id, lat, lng, bool(favourite), since))
+    return out
 
 
 class _Stop:
@@ -602,16 +667,9 @@ def _metres(lat1, lng1, lat2, lng2) -> float:
     return 6371000.0 * 2 * math.asin(math.sqrt(a))
 
 
-def _decay(sessions: int, half_life: float) -> float:
-    return 0.5 ** (sessions / half_life)
-
-
-def _confidence(weight: float) -> float:
-    return round(1 - math.exp(-weight / CONFIDENCE_SCALE), 4)
-
-
-def _clip(v: float) -> float:
-    return round(min(max(v, 0.0), 1.0), 4)
+_decay = decay
+_confidence = confidence
+_clip = clip
 
 
 def _state_for(value: float) -> str:

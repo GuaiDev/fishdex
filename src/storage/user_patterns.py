@@ -22,6 +22,7 @@ import logging
 
 from sqlite_utils import Database
 
+from src.models.angler_profile import SIGNALS_VERSION
 from src.models.context import UserLayer
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,11 @@ _FINGERPRINT_SOURCES = (
         "SELECT COUNT(*), COALESCE(SUM(species_confirmed), 0) FROM catches WHERE user_id = ?",
     ),
 )
+
+
+# A layer stored before the signals existed, or under another signals version,
+# is a miss: the profile it holds would answer with no signals at all.
+_SIGNALS_PART = f"|signals:{SIGNALS_VERSION}"
 
 
 def input_fingerprint(db: Database, user_id: int) -> str:
@@ -103,7 +109,7 @@ def input_fingerprint(db: Database, user_id: int) -> str:
 
     for i, name in enumerate(("stops", "sessions", "insights", "catches")):
         parts.append(f"{name}:{row[i * 2]}:{row[i * 2 + 1]}")
-    return "|".join(parts)
+    return "|".join(parts) + _SIGNALS_PART
 
 
 def _fingerprint_slow(db: Database, user_id: int) -> str:
@@ -121,7 +127,7 @@ def _fingerprint_slow(db: Database, user_id: int) -> str:
             parts.append(f"{label}:unreadable")
             continue
         parts.append(f"{label}:{row[0]}:{row[1]}")
-    return "|".join(parts)
+    return "|".join(parts) + _SIGNALS_PART
 
 
 def load(db: Database, user_id: int, fingerprint: str) -> UserLayer | None:
@@ -173,6 +179,18 @@ def store(db: Database, layer: UserLayer, fingerprint: str) -> None:
         )
     except Exception:  # noqa: BLE001
         logger.warning("Could not store derived user layer", exc_info=True)
+
+
+def invalidate_all(db: Database) -> None:
+    """Drop every stored layer. For a change to what the layers read besides the user's own
+    rows (a spots rebuild changes which water a stop is on); costs time, not answers."""
+    if TABLE not in db.table_names():
+        return
+    try:
+        with db.conn:
+            db.execute(f"DELETE FROM {TABLE}")
+    except Exception:  # noqa: BLE001
+        logger.warning("Could not invalidate derived user layers", exc_info=True)
 
 
 def invalidate(db: Database, user_id: int) -> None:

@@ -42,6 +42,7 @@ from pathlib import Path
 
 from sqlite_utils.db import Database
 
+from src.models.angler_signals import SpotFit
 from src.models.bathymetry import BathymetryContour
 from src.models.hydrology import StreamSegment
 from src.models.ingest_area import IngestArea
@@ -73,6 +74,7 @@ from src.services.spot_repeats import distinguish_titles, merge_repeats
 from src.services.stretch_anchors import DAM_MERGE_M, _coord_key
 from src.services.stretches import DEFAULT_CURATION_PATH, load_curation
 from src.services.water_bodies import LakeRef, WaterBodySet, derive_water_bodies, slugify
+from src.storage import user_patterns
 from src.storage.spots import count_spots_of_kind, get_spot, list_spots, replace_spots
 from src.storage.stretch_anchors import list_anchors, list_osm_coverage
 from src.storage.stretches import list_stretches
@@ -912,6 +914,9 @@ def build_spots(
         result.shoreline_features,
         result.bathymetry_contours,
     )
+    # Each angler's water-type signal reads which water their stops are on, and
+    # that just changed.
+    user_patterns.invalidate_all(db)
 
     report = result.report
     for step, n in failures.items():
@@ -1176,10 +1181,13 @@ def spots_geojson(
     """Spots as a GeoJSON FeatureCollection of points, light enough for a whole map.
 
     `new_to_me` keeps only spots with at least one nameable recorded species the
-    user (`user_id`) has not caught, and adds `properties.new_to_you` to each. It
-    is per-user, computed in this call from that user's confirmed catches, and
-    stored nowhere; with no `user_id` it is ignored. It runs a records lookup per
-    spot, so pass a `bbox`.
+    user (`user_id`) has not caught, then only those that fit the user's own pattern
+    (`spot_fit`: unvisited water of the kind they fish for an explorer, favourites for
+    a regular). It adds `properties.new_to_you` and `properties.fit` to each and
+    `meta.personalisation`. With no pattern to go on it returns nothing, never every
+    spot with an unseen species. It is per-user, computed in this call, and stored
+    nowhere; with no `user_id` it is ignored. It runs a records lookup per spot, so
+    pass a `bbox`.
 
     `max_tier` is cumulative: 1 is the headline spots only, 3 is everything.
     `kinds` counts in the `meta` are taken before the kind filter, so the
@@ -1218,10 +1226,13 @@ def spots_geojson(
     else:
         shown.sort(key=lambda s: (s.tier, _KIND_ORDER[s.kind], s.spot_id))
     new_counts: dict[str, int] = {}
+    fits: dict[str, SpotFit] = {}
+    personalisation = None
     new_to_me_applied = bool(new_to_me and user_id)
     if new_to_me_applied:
         from src.services.new_to_you import caught_keys
         from src.services.spot_card import new_species_at_spot
+        from src.services.spot_fit import fit_spots
 
         caught_by_jurisdiction: dict[str, frozenset[str]] = {}
         kept = []
@@ -1234,7 +1245,15 @@ def spots_geojson(
             if n := len(new_species_at_spot(db, s, caught)):
                 new_counts[s.spot_id] = n
                 kept.append(s)
-        shown = kept
+        # Something unseen is necessary, never sufficient: the angler's own pattern
+        # decides which of these are worth showing, and with nothing to go on none are.
+        fitted, personalisation = fit_spots(db, user_id, kept)
+        for s, f in fitted:
+            if f.keep:
+                fits[s.spot_id] = f
+        shown = [s for s, f in fitted if f.keep]
+        if not near:
+            shown.sort(key=lambda s: -(fits[s.spot_id].score or 0.0))
     meta: dict = {"count": len(shown), "kind_counts": counts, "max_tier": max_tier}
     if near_meta:
         meta["near"] = near_meta
@@ -1245,17 +1264,24 @@ def spots_geojson(
         meta["notes"] = notes
     if new_to_me_applied:
         meta["new_to_me"] = True
+        meta["personalisation"] = personalisation.model_dump()
     return {
         "type": "FeatureCollection",
         "meta": meta,
         "features": [
-            spot_feature(s, new_counts.get(s.spot_id), distances.get(s.spot_id)) for s in shown
+            spot_feature(
+                s, new_counts.get(s.spot_id), distances.get(s.spot_id), fits.get(s.spot_id)
+            )
+            for s in shown
         ],
     }
 
 
 def spot_feature(
-    s: Spot, new_to_you_count: int | None = None, distance_km: float | None = None
+    s: Spot,
+    new_to_you_count: int | None = None,
+    distance_km: float | None = None,
+    fit: SpotFit | None = None,
 ) -> dict:
     properties = {
         "spot_id": s.spot_id,
@@ -1274,6 +1300,9 @@ def spot_feature(
         properties["caveats"] = caveats
     if new_to_you_count is not None:
         properties["new_to_you"] = _new_to_you_property(new_to_you_count)
+    # Present only for a `new_to_me` request: why this spot suits this angler, in words.
+    if fit is not None:
+        properties["fit"] = {"score": fit.score, "reasons": fit.reasons}
     # Present only for a `near` request, where the list is ordered by it.
     if distance_km is not None:
         properties["distance_km"] = round(distance_km, 1)

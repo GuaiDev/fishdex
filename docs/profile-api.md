@@ -50,6 +50,12 @@ from the path or the body.
 The full profile: `orientation`, `size_focus`, `micro_focus` (each `{value, confidence,
 inferred, declared}`), `concepts` (per term: `state`, `source`, `evidence[]`) and
 `session_evidence[]` (what each logged session contributed to the orientation, with reasons).
+`signals` (added later, absent from older recordings) holds one reading per registered signal:
+`water_type` (`shares` by water type: river, creek, lake, pond, great_lake; where trips and pins
+have been, never what was caught) and `explore` (a 0..1 dial, 1 = explorer, 0 = regular, with
+`inferred`/`declared` like the values above). Each carries `confidence`, a plain-sentence
+`summary` ("you mostly fish creeks") and `evidence[]`; `unresolved` counts stops that were on no
+mapped water and so were left out. Older trips and pins count for less (half-life 20 sessions).
 For settings and for checking what has been inferred. Not needed to render the map or the dex.
 
 ### `GET /profile/presentation`
@@ -85,8 +91,9 @@ term or kind gets `400`.
 ### `PUT /profile/declared/{key}` and `DELETE /profile/declared/{key}`
 
 `{"value": 0..1, "weight": 0..50 (default 3), "override": false}`. Keys: `orientation`,
-`size_focus`, `micro_focus` and `concept:<term_id>` (value `0` unseen, `0.5` introduced,
-`1` familiar). Any other key, including any skill or expertise field, gets `400`. So does a
+`size_focus`, `micro_focus`, `signal:explore` (the explore dial: `0` goes back to the same water,
+`1` always tries new water) and `concept:<term_id>` (value `0` unseen, `0.5` introduced,
+`1` familiar). The other signals cannot be declared (`400`). Any other key, including any skill or expertise field, gets `400`. So does a
 non-finite weight or one above `MAX_DECLARED_WEIGHT` (`src/storage/angler_profile.py`).
 
 - A future questionnaire writes `override: false` starting values that fade.

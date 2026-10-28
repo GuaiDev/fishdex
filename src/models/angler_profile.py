@@ -96,12 +96,49 @@ class SessionEvidence(BaseModel):
     richness_basis: list[str] = Field(default_factory=list)
 
 
+SignalKind = Literal["scalar", "distribution"]
+SIGNAL_KEY_PREFIX = "signal:"
+# Bump when a signal's meaning changes: a stored layer built under another
+# version is a cache miss (see `storage/user_patterns.input_fingerprint`).
+SIGNALS_VERSION = 1
+
+
+class SignalReading(BaseModel):
+    """What one registered signal says about this angler.
+
+    A signal is one thing learned from logged behaviour that shapes what the app
+    recommends (preferred water type, explorer-versus-regular, and whatever is
+    registered later). A *scalar* signal is a 0..1 dial stored like the other
+    profile values: inferred and declared parts with their weights, blended. A
+    *distribution* signal is shares over named categories. Neither filters a
+    fact; readings only change which spots come first and which are kept.
+    """
+
+    signal_id: str
+    kind: SignalKind
+    value: float | None = Field(default=None, ge=0.0, le=1.0)
+    """Scalar signals: the blended dial."""
+    shares: dict[str, float] = Field(default_factory=dict)
+    """Distribution signals: share of the (decayed) evidence per category, summing to 1."""
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    inferred: ProfileValue | None = None
+    declared: ProfileValue | None = None
+    summary: str | None = None
+    """One plain sentence a person can read and say 'no, that's wrong' to."""
+    evidence: list[str] = Field(default_factory=list)
+    unresolved: int = 0
+    """Events that could not be classified (a stop with no water nearby). They are
+    left out of the shares, not guessed, and counted here so a thin reading says why."""
+
+
 class AnglerProfile(BaseModel):
     user_id: int
     orientation: BlendedValue
     size_focus: BlendedValue
     micro_focus: BlendedValue
     concepts: dict[str, ConceptState] = Field(default_factory=dict)
+    signals: dict[str, SignalReading] = Field(default_factory=dict)
+    signals_version: int = 0
     sessions_used: int = 0
     session_evidence: list[SessionEvidence] = Field(default_factory=list)
     computed_at: str | None = None
