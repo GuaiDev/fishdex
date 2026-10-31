@@ -405,6 +405,43 @@ def render_user_layer(layer: UserLayer) -> str:
     return "\n".join(lines)
 
 
+def render_angler_style(profile: AnglerProfile | None) -> str:
+    """How the coach should lean for this angler, from signals that clear the gate.
+
+    Only an active signal (the same gate spot fit uses) is rendered; with none
+    active the block says the style is not known and must not be assumed. Style
+    shapes emphasis in open-ended answers and nothing else.
+    """
+    from src.services.context.signals import active_signals, words
+    from src.services.context.signals import coaching_words as cw
+    from src.services.context.signals.exploration import EXPLORER_AT, REGULAR_AT
+    from src.services.context.signals.water_type import MOSTLY_SHARE
+
+    lines = [cw.HEADER]
+    active = {r.signal_id: r for r in active_signals(profile.signals)} if profile else {}
+    explore = active.get("explore")
+    water = active.get("water_type")
+
+    if explore is None and water is None:
+        lines.append(cw.UNKNOWN)
+    if explore is not None and explore.value is not None:
+        if explore.value >= EXPLORER_AT:
+            brief = cw.EXPLORER
+        elif explore.value <= REGULAR_AT:
+            brief = cw.REGULAR
+        else:
+            brief = cw.MIXED
+        if explore.declared is not None:
+            brief += " " + cw.DECLARED_NOTE
+        lines.append(brief)
+    if water is not None and water.shares:
+        top = max(water.shares, key=water.shares.get)
+        if water.shares[top] >= MOSTLY_SHARE:
+            lines.append(cw.WATER_TYPE.format(water=words.water_plural(top)))
+    lines += [cw.DIRECT_QUESTION, cw.QUIET, cw.NO_PROMISES]
+    return "\n".join(lines)
+
+
 def _profile_lines(profile: AnglerProfile | None) -> list[str]:
     """The angler profile as register guidance, never as a level.
 
