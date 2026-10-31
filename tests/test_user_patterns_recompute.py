@@ -143,8 +143,7 @@ def test_an_unwritable_cache_still_returns_the_right_answer(db, monkeypatch, cap
         layer = user_layer(db, user_id=1)
 
     assert layer.total_stops == 1
-    assert any("store" in r.getMessage() or "user layer" in r.getMessage()
-               for r in caplog.records)
+    assert any("store" in r.getMessage() or "user layer" in r.getMessage() for r in caplog.records)
 
 
 def test_force_rebuilds_even_when_the_fingerprint_matches(db, counted):
@@ -182,9 +181,7 @@ def test_fingerprint_moves_when_an_insight_is_recorded(db):
 
 def test_fingerprint_is_stable_when_nothing_changed(db):
     _add_stop(db)
-    assert user_patterns.input_fingerprint(db, 1) == user_patterns.input_fingerprint(
-        db, 1
-    )
+    assert user_patterns.input_fingerprint(db, 1) == user_patterns.input_fingerprint(db, 1)
 
 
 # -- the freshness check must be cheaper than a miss ---------------------------
@@ -230,3 +227,15 @@ def test_a_cold_cache_does_not_probe_for_the_table(tmp_path, monkeypatch):
 
     bare = Database(tmp_path / "cold.db")
     assert user_patterns.load(bare, 1, "anything") is None
+
+
+def test_fingerprint_moves_when_a_pin_is_saved_or_removed(db):
+    from src.storage import pins
+
+    pins.ensure_tables(db)
+    before = user_patterns.input_fingerprint(db, 1)
+    pin_id = pins.create_pin(db, 1, "Bend pool", 43.5, -79.6)
+    saved = user_patterns.input_fingerprint(db, 1)
+    assert saved != before
+    pins.delete_pin(db, 1, pin_id)
+    assert user_patterns.input_fingerprint(db, 1) != saved

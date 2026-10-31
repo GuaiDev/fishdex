@@ -13,8 +13,9 @@ against a second user.
     happens and folded into the concept states at the next recompute, so the
     profile still only changes once per logged session.
 
-Writable keys are fixed (`models/angler_profile.SCALAR_KEYS` and
-`concept:<term_id>` for a registered term). Anything else is refused, so no
+Writable keys are fixed (`models/angler_profile.SCALAR_KEYS`,
+`concept:<term_id>` for a registered term, and `signal:<id>` for a registered
+signal that is declarable). Anything else is refused, so no
 skill or expertise field can come back through a questionnaire.
 """
 
@@ -23,7 +24,12 @@ from datetime import UTC, datetime
 
 from sqlite_utils import Database
 
-from src.models.angler_profile import CONCEPT_KEY_PREFIX, SCALAR_KEYS, ProfileValue
+from src.models.angler_profile import (
+    CONCEPT_KEY_PREFIX,
+    SCALAR_KEYS,
+    SIGNAL_KEY_PREFIX,
+    ProfileValue,
+)
 from src.services import terms
 
 VALUES = "angler_profile_values"
@@ -66,6 +72,13 @@ def validate_key(key: str) -> str:
         return key
     if key.startswith(CONCEPT_KEY_PREFIX) and key[len(CONCEPT_KEY_PREFIX) :] in terms.TERMS:
         return key
+    if key.startswith(SIGNAL_KEY_PREFIX):
+        # Imported here: the signal modules read storage, so a top-level import would loop.
+        from src.services.context.signals import REGISTRY
+
+        signal = REGISTRY.get(key[len(SIGNAL_KEY_PREFIX) :])
+        if signal is not None and signal.declarable:
+            return key
     raise ValueError(f"not a profile key: {key!r}")
 
 

@@ -16,6 +16,7 @@ from src.services import spot_labels
 from src.services.new_to_you import MIN_SPECIES_FOR_HOOK, caught_keys, caught_species_count
 from src.services.spot_card import build_spot_card
 from src.services.spots import spots_geojson
+from src.storage import angler_profile as profile_store
 from src.storage.catches import insert_catch
 from src.storage.species_ranges import upsert_species_ranges
 from src.storage.spots import replace_spots
@@ -61,7 +62,18 @@ def db(tmp_path, _template_db):
             species_row(DACE[1], DACE[0], sara_status="Endangered"),
         ],
     )
+    declare_explorers(db)
     return db
+
+
+def declare_explorers(db):
+    """Both test anglers say they like new water, so the filter has a pattern to follow.
+
+    Without one, `new_to_me` has nothing to personalise and returns nothing (see
+    tests/test_angler_signals.py); these tests are about the species side of it.
+    """
+    for user_id in (ALICE, BOB):
+        profile_store.set_declared(db, user_id, "signal:explore", 0.9, 3.0, is_override=True)
 
 
 def record_three(db):
@@ -391,6 +403,7 @@ def client(tmp_path, monkeypatch, _template_db):
         ],
     )
     two_spots(api_db)
+    declare_explorers(api_db)
     inat(api_db, *DARTER)
     who = {"id": ALICE}
     app.dependency_overrides[get_current_user] = lambda: dict(who)
