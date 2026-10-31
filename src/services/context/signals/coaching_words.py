@@ -55,8 +55,3 @@ QUIET = (
     "- Do not tell the angler which style you assumed, and do not ask them to confirm it, "
     "unless they ask. Style never changes the facts shown or any conservation rule."
 )
-
-NO_PROMISES = (
-    "- Never promise or predict size or catch outcomes, and never suggest seeing any "
-    "unseen species as a goal."
-)

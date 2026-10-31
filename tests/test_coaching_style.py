@@ -74,7 +74,8 @@ def test_style_text_names_no_jurisdiction_and_makes_no_promises():
     text = render_angler_style(_profile(_explore(0.9), _water({"river": 1.0})))
     for banned in ("Ontario", "Canada", "MNRF", "CA-ON", "province", "state of"):
         assert banned not in text
-    assert "Never promise or predict size or catch outcomes" in text
+    assert "promise" not in text.lower()
+    assert "unseen species" not in text
     assert "directly" in text
 
 
@@ -156,7 +157,8 @@ def test_location_prompt_carries_style_and_rules(db_conn, captured):  # noqa: F8
     get_location_coaching(db_conn, "Home Creek")
     prompt = captured["prompt"]
     assert "same water" in prompt
-    assert "Never promise or predict size or catch outcomes" in prompt
+    assert prompt.count("Never promise or predict size or catch outcomes") == 1
+    assert prompt.count("any unseen species") == 1
 
 
 def test_default_question_is_outcome_neutral(db_conn, captured):  # noqa: F811
@@ -187,9 +189,3 @@ def test_listed_species_still_refuses_whatever_the_style(db_conn, captured, monk
     prompt = captured["prompt"]
     assert "CONSERVATION OVERRIDE" in prompt
     assert prompt.rindex("CONSERVATION OVERRIDE") > prompt.index("Angler style")
-
-
-def test_rules_carry_the_no_unseen_species_line():
-    from src.services.coaching import _RULES
-
-    assert "any unseen species" in _RULES

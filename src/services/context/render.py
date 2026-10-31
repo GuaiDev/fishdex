@@ -438,7 +438,7 @@ def render_angler_style(profile: AnglerProfile | None) -> str:
         top = max(water.shares, key=water.shares.get)
         if water.shares[top] >= MOSTLY_SHARE:
             lines.append(cw.WATER_TYPE.format(water=words.water_plural(top)))
-    lines += [cw.DIRECT_QUESTION, cw.QUIET, cw.NO_PROMISES]
+    lines += [cw.DIRECT_QUESTION, cw.QUIET]
     return "\n".join(lines)
 
 
