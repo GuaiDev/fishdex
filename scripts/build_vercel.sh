@@ -8,7 +8,7 @@
 # fly.toml app name.
 set -e
 cd "$(dirname "$0")/.."
-API_URL="${FISHDEX_API_URL:-https://fishdex-api.fly.dev}"
+API_URL="${FISHDEX_API_URL:-https://fishdex-api-jason.fly.dev}"
 API_URL="${API_URL%/}"
 
 rm -rf dist

@@ -13,7 +13,7 @@ the API open.
 | `fishing.db`, catch photos, live-call cache | Fly volume `/data` (`DATA_DIR`) | `fly.toml` `[mounts]` |
 
 The Vercel build copies `app/` and `design/lavish/` into `dist/` and writes `dist/app/config.js`
-with the API address (`FISHDEX_API_URL`, default `https://fishdex-api.fly.dev`). The app uses that
+with the API address (`FISHDEX_API_URL`, default `https://fishdex-api-jason.fly.dev`). The app uses that
 as its default; the connect dialog and `?api=` still override it.
 
 ## Data: seed vs re-ingest
@@ -34,7 +34,7 @@ as its default; the connect dialog and `?api=` still override it.
 
 1. Install the CLIs: `curl -L https://fly.io/install.sh | sh` and `npm i -g vercel`.
 2. `fly auth login`
-3. From the repo root: `fly launch --no-deploy --copy-config --name fishdex-api` (change the name
+3. From the repo root: `fly launch --no-deploy --copy-config --name fishdex-api-jason` (change the name
    in `fly.toml` if taken; keep it as `app =`).
 4. `fly volumes create fishdex_data --size 3 --region yyz`
 5. Set secrets (you pick the values; use `python -c "import secrets; print(secrets.token_urlsafe(32))"`
@@ -49,7 +49,7 @@ as its default; the connect dialog and `?api=` still override it.
    For friends, create invite codes with `POST /admin/invite` using that token.
 10. `vercel login`, then from the repo root `vercel link` and `vercel --prod`. In the Vercel
     project settings set `FISHDEX_API_URL=https://<app>.fly.dev` before the deploy if the Fly name
-    differs from `fishdex-api`.
+    differs from `fishdex-api-jason`.
 11. Put the final Vercel address in `fly.toml` `FISHBOT_CORS_ORIGINS` (default
     `https://fishdex.vercel.app`) and `fly deploy` again. Until it matches, browsers block the app
     from calling the API.
