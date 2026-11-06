@@ -622,6 +622,7 @@ Design pending:
 ### Railway deployment 🔨
 > Superseded 2026-10-09: Railway was dropped. The app is served with `make serve`
 > and the weekly ingest runs locally with `make weekly-ingest` — see README.
+> Public hosting is now Vercel + Fly.io — see `deploy/README.md`.
 
 URL: https://web-production-e2094.up.railway.app
 Volume vol_wc8gnr3fyrcdcydx is attached but DATA_DIR env var is NOT set in
