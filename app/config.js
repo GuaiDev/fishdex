@@ -1,0 +1,1 @@
+window.FISHDEX_CONFIG = {};

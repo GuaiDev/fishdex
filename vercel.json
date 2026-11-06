@@ -1,7 +1,13 @@
 {
-  "buildCommand": "",
-  "outputDirectory": "design/lavish",
+  "buildCommand": "sh scripts/build_vercel.sh",
+  "outputDirectory": "dist",
   "redirects": [
-    { "source": "/", "destination": "/index.html", "permanent": false }
+    { "source": "/", "destination": "/app/", "permanent": false }
+  ],
+  "headers": [
+    {
+      "source": "/app/config.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+    }
   ]
 }

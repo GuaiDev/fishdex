@@ -1,7 +1,8 @@
 // The one place that talks to the FishDex API. Everything else calls these.
 
 const KEY = 'fishdex.conn.v1';
-export const DEFAULT_BASE = 'http://localhost:8000';
+// config.js (written by scripts/build_vercel.sh on the hosted site) sets the default API address.
+export const DEFAULT_BASE = (window.FISHDEX_CONFIG && window.FISHDEX_CONFIG.api) || 'http://localhost:8000';
 
 export class ApiError extends Error {
   constructor(status, detail) {

@@ -181,10 +181,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS: FISHBOT_CORS_ORIGINS is a comma-separated list of origins allowed to call the API from
+# a browser (the hosted app's address). Unset keeps the local default of "any origin", which is
+# fine on localhost. Auth is a Bearer header, never a cookie, so credentials stay off.
+_cors_raw = os.environ.get("FISHBOT_CORS_ORIGINS", "*")
+_cors_origins = [o.strip().rstrip("/") for o in _cors_raw.split(",") if o.strip()] or ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -1080,11 +1086,11 @@ def list_users(user: dict = Depends(get_current_user)):
 
 
 @app.post("/ingest")
-def ingest(body: dict):
+def ingest(body: dict, _: None = Depends(verify_api_key)):
     """Ingest YouTube content for a search query.
 
     Body: {"query": "channel catfish Grand River", "max_videos": 10}
-    Admin/personal use — add auth before making public.
+    Admin only: needs the X-Api-Key header (FISHBOT_API_KEY).
     """
     try:
         from src.ingest.community.youtube_ingest import ingest_query
