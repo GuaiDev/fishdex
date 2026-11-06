@@ -90,6 +90,32 @@ def get_current_user(authorization: str = Header(None)) -> dict:
     return user
 
 
+def public_demo_enabled() -> bool:
+    """The read-only demo is on unless FISHBOT_PUBLIC_DEMO is set to 0/false/off/no."""
+    return os.environ.get("FISHBOT_PUBLIC_DEMO", "1").strip().lower() not in {
+        "0",
+        "false",
+        "off",
+        "no",
+    }
+
+
+def get_user_or_demo(authorization: str = Header(None)) -> dict:
+    """Read-only routes the public demo shows: a real user if a token is sent, else the demo.
+
+    A request with no Authorization header is the demo caller: `id` is None, so every
+    per-user lookup (weed reports, "new to you") sees nobody and returns nothing personal.
+    A token that is sent must still be valid; a stale one is a 401, not a silent demo,
+    so the app can ask the person to sign in again. Never use this on a route that
+    writes, calls the model, or is not meant for the public.
+    """
+    if authorization:
+        return get_current_user(authorization)
+    if not public_demo_enabled():
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return {"id": None, "username": "demo", "display_name": "Demo", "role": "demo", "demo": True}
+
+
 def get_current_user_or_apikey(
     authorization: str = Header(None),
     x_api_key: str = Header(None),
@@ -1596,7 +1622,7 @@ def _parse_spot_filters(
 
 
 @app.get("/map/spots/labels")
-def get_map_spot_labels(user: dict = Depends(get_current_user)):
+def get_map_spot_labels(user: dict = Depends(get_user_or_demo)):
     """Every user-facing word the spots map shows: chips, one-liners, layer names, and the
     labelled general-reasoning paragraph per kind. The web app reads this; it hardcodes none."""
     from src.services.spot_labels import labels_payload
@@ -1711,7 +1737,7 @@ def get_map_spots(
     near: str | None = None,
     new_to_me: bool = False,
     response: Response = None,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_user_or_demo),
 ):
     """Spots for the explore map, as GeoJSON points.
 
@@ -1730,6 +1756,8 @@ def get_map_spots(
 
     box, kinds, species_f, near_f = _parse_spot_filters(bbox, kind, tier, species, near)
     if new_to_me:
+        if user.get("demo"):
+            raise HTTPException(status_code=401, detail="Sign in to see spots new to you")
         if box is None:
             raise HTTPException(status_code=422, detail="new_to_me needs a bbox")
         # Per-user answer: never let a browser or proxy keep it for the next person.
@@ -1748,7 +1776,7 @@ def get_map_spots(
 
 
 @app.get("/map/spots/{spot_id}")
-def get_map_spot(spot_id: str, response: Response, user: dict = Depends(get_current_user)):
+def get_map_spot(spot_id: str, response: Response, user: dict = Depends(get_user_or_demo)):
     """One spot in full: title, structure facts, separate signals, nearby parking and
     bridges, sources, the other spots on the same river, and `card`: the four resolved
     blocks a tap reveals (why it's interesting, you might find, why fish gather here,
@@ -1858,7 +1886,7 @@ def get_map_sections(
     tier: int = 2,
     jurisdiction: str | None = None,
     response: Response = None,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_user_or_demo),
 ):
     """The overview map's layer: one shape per river section and per lake with an outline.
 
@@ -1897,7 +1925,7 @@ def get_map_section(
     section_id: str,
     response: Response,
     tier: int = 2,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_user_or_demo),
 ):
     """One section and every point of interest in it, as pins.
 

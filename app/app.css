@@ -138,3 +138,11 @@ dialog::backdrop{ background:rgba(30,42,39,.45); }
 .who button{ white-space:nowrap; }
 .chat-log{ scrollbar-width:thin; }
 @media (max-width:760px){ .leaflet-control-zoom{ display:none; } }
+
+/* public demo */
+.demo-banner{ display:none; }
+body.demo .demo-banner{ display:block; position:fixed; top:var(--nav-h); left:0; right:0; z-index:900; padding:5px 16px; font-size:13px; background:var(--sheet); border-bottom:1px solid var(--line); text-align:center; line-height:1.3; }
+body.demo .pane{ top:30px; }
+@media (max-width:760px){ body.demo .pane{ top:56px; } }
+.linklike{ background:none; border:0; padding:0; font:inherit; color:inherit; text-decoration:underline; cursor:pointer; }
+.demo-note{ margin:0 auto; max-width:780px; width:100%; padding:0 20px 8px; }

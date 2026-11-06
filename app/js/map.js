@@ -60,7 +60,7 @@ export function initMap(root, { goto }) {
         onclick: () => { on ? activeKinds.delete(k.kind) : activeKinds.add(k.kind); drawChips(); refresh(); },
       }, h('i', { class: 'dot', style: `background:${kindColor(k.kind)}` }), k.chip));
     }
-    chips.append(h('button', {
+    if (!api.isDemo()) chips.append(h('button', {
       class: 'chip' + (newToMe ? ' on' : ''), type: 'button', 'aria-pressed': newToMe,
       title: 'Only spots with a recorded species you have not caught yet (your confirmed catches).',
       onclick: () => { newToMe = !newToMe; drawChips(); refresh(); },

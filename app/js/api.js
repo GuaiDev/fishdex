@@ -22,6 +22,8 @@ export function loadConn() {
 
 let conn = loadConn();
 export const getConn = () => conn;
+// No token means the public read-only demo: the map and field guide work, nothing is saved or sent to the coach.
+export const isDemo = () => !conn.token;
 
 export function saveConn(next) {
   conn = { base: (next.base || DEFAULT_BASE).replace(/\/+$/, ''), token: cleanToken(next.token) };

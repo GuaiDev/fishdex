@@ -27,6 +27,13 @@ function takeLinkParams() {
   history.replaceState(null, '', location.pathname + location.hash);
 }
 
+function buildDemoBanner() {
+  $('demo-banner').append(
+    h('b', null, 'Demo'), ' — a read-only look at FishDex. Browse the real map and field guide; ',
+    'the coach shows a saved example and nothing you do is saved. ',
+    h('button', { type: 'button', class: 'linklike', onclick: () => showConnect() }, 'Sign in'), ' if you have a token or invite code.');
+}
+
 function buildNav() {
   const seg = $('seg'), tabs = $('tabs'), stage = $('stage');
   for (const s of SCREENS) {
@@ -82,11 +89,11 @@ function showConnect(message) {
 
   async function finish(newConn) {
     try {
-      const u = await api.me({ base: newConn.base.replace(/\/+$/, ''), token: api.cleanToken(newConn.token) });
+      await api.me({ base: newConn.base.replace(/\/+$/, ''), token: api.cleanToken(newConn.token) });
       api.saveConn(newConn);
+      // Reload so the coach and map are built for a signed-in user, not the demo.
       dlg.close();
-      setUser(u);
-      start();
+      location.reload();
     } catch (e) { err.textContent = e.status === 401 ? 'That token was not accepted.' : e.message; }
   }
   clear(dlg).append(h('form', { method: 'dialog', class: 'connect-form', onsubmit: (e) => e.preventDefault() },
@@ -95,6 +102,7 @@ function showConnect(message) {
     h('label', null, 'API address', base),
     h('label', null, h('span', null, 'Token ', h('span', { class: 'muted small' }, '(run ', h('code', null, 'uv run python -m src.cli.main token'), ')')), token),
     h('button', { class: 'btn primary', type: 'button', onclick: () => finish({ base: base.value, token: token.value }) }, 'Connect'),
+    api.isDemo() && h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Keep exploring the demo'),
     h('details', null, h('summary', null, 'I have an invite code'),
       h('label', null, 'Invite code', code), h('label', null, 'Username', user),
       h('button', { class: 'btn', type: 'button', onclick: async () => {
@@ -110,6 +118,12 @@ function showConnect(message) {
 function setUser(u) {
   const el = $('who');
   clear(el);
+  document.body.classList.toggle('demo', api.isDemo());
+  if (api.isDemo()) {
+    el.append(h('button', { type: 'button', title: 'Sign in with a token or invite code', onclick: () => showConnect() },
+      h('i', { class: 'live' }), 'Demo · Sign in'));
+    return;
+  }
   el.append(h('button', { type: 'button', title: 'Connection settings', onclick: () => showConnect() },
     h('i', { class: 'live' }), u ? (u.display_name || u.username) : 'Not connected'));
 }
@@ -130,12 +144,13 @@ async function start() {
 async function init() {
   takeLinkParams();
   buildNav();
+  buildDemoBanner();
   store.subscribe(drawPlaceChip);
   drawPlaceChip();
   window.addEventListener('hashchange', route);
   api.onAuthNeeded((msg) => showConnect(msg || 'Please sign in again.'));
   setUser(null);
-  if (!api.getConn().token) { route(); showConnect(); return; }
+  if (api.isDemo()) { setUser(null); start(); return; }
   try {
     setUser(await api.me());
     start();
