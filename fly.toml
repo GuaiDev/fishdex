@@ -9,7 +9,7 @@ primary_region = "yyz"
 [env]
   DATA_DIR = "/data"
   # The Vercel address of the app. Comma-separate to allow more than one.
-  FISHBOT_CORS_ORIGINS = "https://fishdex.vercel.app"
+  FISHBOT_CORS_ORIGINS = "https://fishdex-red.vercel.app"
 
 [mounts]
   source = "fishdex_data"

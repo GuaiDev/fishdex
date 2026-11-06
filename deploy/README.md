@@ -16,6 +16,10 @@ The Vercel build copies `app/` and `design/lavish/` into `dist/` and writes `dis
 with the API address (`FISHDEX_API_URL`, default `https://fishdex-api-jason.fly.dev`). The app uses that
 as its default; the connect dialog and `?api=` still override it.
 
+`vercel.json` sets `"framework": null` on purpose. The repo has a FastAPI backend at its root, so
+without it Vercel auto-detects FastAPI and tries to build the Python app, and the deploy fails. This
+project is a static build (`buildCommand` + `outputDirectory`).
+
 ## Data: seed vs re-ingest
 
 `data/` is about 1.8 GB locally, but most of it never needs to reach the host.
@@ -51,7 +55,7 @@ as its default; the connect dialog and `?api=` still override it.
     project settings set `FISHDEX_API_URL=https://<app>.fly.dev` before the deploy if the Fly name
     differs from `fishdex-api-jason`.
 11. Put the final Vercel address in `fly.toml` `FISHBOT_CORS_ORIGINS` (default
-    `https://fishdex.vercel.app`) and `fly deploy` again. Until it matches, browsers block the app
+    `https://fishdex-red.vercel.app`) and `fly deploy` again. Until it matches, browsers block the app
     from calling the API.
 12. Open the Vercel URL, paste the token, and try the map and the coach.
 

@@ -1,4 +1,5 @@
 {
+  "framework": null,
   "buildCommand": "sh scripts/build_vercel.sh",
   "outputDirectory": "dist",
   "redirects": [
