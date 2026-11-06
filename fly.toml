@@ -1,6 +1,6 @@
 # FishDex API on Fly.io. First deploy steps are in deploy/README.md.
 # Change `app` if the name is taken (and set FISHDEX_API_URL on Vercel to match).
-app = "fishdex-api"
+app = "fishdex-api-jason"
 primary_region = "yyz"
 
 [build]
