@@ -1,0 +1,23 @@
+.git
+.venv
+.env
+.github
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+design
+app
+docs
+tests
+scripts
+fishbot.db
+# Local data that must not ship in the image: the database and photos go on the volume.
+data/fishing.db
+data/fishbot.db
+data/photos
+data/cache
+data/raw
+data/user_profile.json
+data/processed/map_index.html
+data/weekly_ingest.log

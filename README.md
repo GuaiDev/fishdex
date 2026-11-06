@@ -164,9 +164,11 @@ Note that `.env.example` currently documents only `ANTHROPIC_API_KEY`, `CLAUDE_M
 
 The API's admin endpoints (`POST /admin/token`, `/admin/dashboard`, `/ingest/data*`, and so on) are protected by `FISHBOT_API_KEY`. If it is unset or empty they refuse every request with HTTP 503 rather than letting anyone in; a wrong or missing `X-Api-Key` header gets 401. So set it before `make serve`: add a line such as `FISHBOT_API_KEY=pick-any-long-random-string` to `.env` (generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`), or export it in your shell.
 
-### Everything runs locally
+### Running locally and hosting
 
-There is no hosted deployment. `make serve` runs the FastAPI backend on `127.0.0.1:8000` against the local database at `data/fishing.db`; set `DATA_DIR` to keep the database and catch photos somewhere else. `SERVE_HOST=0.0.0.0 make serve` makes it reachable from a phone on the same network.
+`make serve` runs the FastAPI backend on `127.0.0.1:8000` against the local database at `data/fishing.db`; set `DATA_DIR` to keep the database and catch photos somewhere else. `SERVE_HOST=0.0.0.0 make serve` makes it reachable from a phone on the same network.
+
+A public deployment is prepared but not live until the steps are run: the static app (`app/`) on Vercel and the API on Fly.io with the database on a volume. Access stays behind a token or invite code. `FISHBOT_CORS_ORIGINS` limits which sites a browser lets call the API. The setup, what to seed versus re-ingest, and the login and secret steps are in [`deploy/README.md`](deploy/README.md).
 
 The weekly data refresh is `make weekly-ingest`. It reads the list of areas (label, jurisdiction, lat, lng, radius and which source bundles to run) from `data/ingest_areas.json` and runs each one through the same service code as the `/ingest/data*` endpoints, one after another, then prints what each dataset stored and what failed. Edit that file to add or drop an area. To preview without fetching anything:
 
