@@ -90,6 +90,32 @@ def get_current_user(authorization: str = Header(None)) -> dict:
     return user
 
 
+def public_demo_enabled() -> bool:
+    """The read-only demo is on unless FISHBOT_PUBLIC_DEMO is set to 0/false/off/no."""
+    return os.environ.get("FISHBOT_PUBLIC_DEMO", "1").strip().lower() not in {
+        "0",
+        "false",
+        "off",
+        "no",
+    }
+
+
+def get_user_or_demo(authorization: str = Header(None)) -> dict:
+    """Read-only routes the public demo shows: a real user if a token is sent, else the demo.
+
+    A request with no Authorization header is the demo caller: `id` is None, so every
+    per-user lookup (weed reports, "new to you") sees nobody and returns nothing personal.
+    A token that is sent must still be valid; a stale one is a 401, not a silent demo,
+    so the app can ask the person to sign in again. Never use this on a route that
+    writes, calls the model, or is not meant for the public.
+    """
+    if authorization:
+        return get_current_user(authorization)
+    if not public_demo_enabled():
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return {"id": None, "username": "demo", "display_name": "Demo", "role": "demo", "demo": True}
+
+
 def get_current_user_or_apikey(
     authorization: str = Header(None),
     x_api_key: str = Header(None),
@@ -1532,6 +1558,32 @@ def _parse_bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
     return parts
 
 
+DEMO_MAX_TIER = 1
+DEMO_MAX_SPAN_DEG = 1.0
+DEMO_DEFAULT_CENTER = (-79.7, 43.45)
+
+
+def _demo_limits(user: dict, box, tier: int):
+    """The slice of spots a signed-out demo caller may see: tier 1 only, inside one
+    modest box. A missing box becomes one around home; an oversized one is shrunk
+    around its centre. Signed-in callers pass through unchanged."""
+    if not user.get("demo"):
+        return box, tier
+    half = DEMO_MAX_SPAN_DEG / 2
+    if box is None:
+        cx, cy = DEMO_DEFAULT_CENTER
+        box = (cx - half, cy - half, cx + half, cy + half)
+    else:
+        cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+        box = (
+            max(box[0], cx - half),
+            max(box[1], cy - half),
+            min(box[2], cx + half),
+            min(box[3], cy + half),
+        )
+    return box, min(tier, DEMO_MAX_TIER)
+
+
 def _parse_shape_options(
     geometry: bool, simplify: float | None, zoom: float | None
 ) -> tuple[float | None, float | None]:
@@ -1596,7 +1648,7 @@ def _parse_spot_filters(
 
 
 @app.get("/map/spots/labels")
-def get_map_spot_labels(user: dict = Depends(get_current_user)):
+def get_map_spot_labels(user: dict = Depends(get_user_or_demo)):
     """Every user-facing word the spots map shows: chips, one-liners, layer names, and the
     labelled general-reasoning paragraph per kind. The web app reads this; it hardcodes none."""
     from src.services.spot_labels import labels_payload
@@ -1711,7 +1763,7 @@ def get_map_spots(
     near: str | None = None,
     new_to_me: bool = False,
     response: Response = None,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_user_or_demo),
 ):
     """Spots for the explore map, as GeoJSON points.
 
@@ -1729,7 +1781,10 @@ def get_map_spots(
     from src.storage.database import get_db
 
     box, kinds, species_f, near_f = _parse_spot_filters(bbox, kind, tier, species, near)
+    box, tier = _demo_limits(user, box, tier)
     if new_to_me:
+        if user.get("demo"):
+            raise HTTPException(status_code=401, detail="Sign in to see spots new to you")
         if box is None:
             raise HTTPException(status_code=422, detail="new_to_me needs a bbox")
         # Per-user answer: never let a browser or proxy keep it for the next person.
@@ -1748,7 +1803,7 @@ def get_map_spots(
 
 
 @app.get("/map/spots/{spot_id}")
-def get_map_spot(spot_id: str, response: Response, user: dict = Depends(get_current_user)):
+def get_map_spot(spot_id: str, response: Response, user: dict = Depends(get_user_or_demo)):
     """One spot in full: title, structure facts, separate signals, nearby parking and
     bridges, sources, the other spots on the same river, and `card`: the four resolved
     blocks a tap reveals (why it's interesting, you might find, why fish gather here,
@@ -1759,8 +1814,12 @@ def get_map_spot(spot_id: str, response: Response, user: dict = Depends(get_curr
     from src.storage.database import get_db
 
     detail = get_spot_detail(get_db(), spot_id, user["id"])
-    if detail is None:
+    if detail is None or (user.get("demo") and detail.get("tier", 1) > DEMO_MAX_TIER):
         raise HTTPException(status_code=404, detail=f"No spot with id {spot_id!r}")
+    if user.get("demo"):
+        detail["more_on_this_water"] = [
+            o for o in detail["more_on_this_water"] if o["tier"] <= DEMO_MAX_TIER
+        ]
     # The card now depends on who is asking (the "new to you" hook), and a catch
     # confirmed a minute ago must show: no caching at all, shared or private.
     response.headers["Cache-Control"] = "private, no-store"
@@ -1858,7 +1917,7 @@ def get_map_sections(
     tier: int = 2,
     jurisdiction: str | None = None,
     response: Response = None,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_user_or_demo),
 ):
     """The overview map's layer: one shape per river section and per lake with an outline.
 
@@ -1885,6 +1944,7 @@ def get_map_sections(
             )
     if tier not in (1, 2, 3):
         raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
+    box, tier = _demo_limits(user, box, tier)
     # The weed counts are the caller's own: never let a browser or proxy keep them for anyone else.
     response.headers["Cache-Control"] = "private, no-store"
     return sections_geojson(
@@ -1897,7 +1957,7 @@ def get_map_section(
     section_id: str,
     response: Response,
     tier: int = 2,
-    user: dict = Depends(get_current_user),
+    user: dict = Depends(get_user_or_demo),
 ):
     """One section and every point of interest in it, as pins.
 
@@ -1912,6 +1972,8 @@ def get_map_section(
 
     if tier not in (1, 2, 3):
         raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
+    if user.get("demo"):
+        tier = min(tier, DEMO_MAX_TIER)
     detail = section_detail(get_db(), section_id, user["id"], max_tier=tier)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"No section with id {section_id!r}")

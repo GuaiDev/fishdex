@@ -6,7 +6,7 @@ river, the water just below a dam, an official fishing spot. The map shows spots
 river lines; the river is context ("more spots on this river").
 
 The spots, water-body and section endpoints are read-only GETs, and every endpoint here needs the same
-`Authorization: Bearer <token>` as the other `/map/*` endpoints. The one exception to read-only is
+`Authorization: Bearer <token>` as the other `/map/*` endpoints, except the spots, labels and section reads, which also answer a request with no `Authorization` header as a public demo caller (tier 1 only, a box at most 1° wide, no `new_to_me`, no personal data; off when `FISHBOT_PUBLIC_DEMO=0`). A token that is sent must still be valid. The one exception to read-only is
 the private [weed reports](#weed-reports) the user writes themselves. The older `/map/stretches`,
 `/map/stretches/{id}/anchors` and `/map/segments` endpoints are **legacy**: they are served only
 for a UI that no longer exists in this repository, are not part of the spots API, keep their

@@ -6,6 +6,21 @@ import * as api from './api.js';
 import * as store from './store.js';
 import { h, clear, renderMarkdown } from './util.js';
 
+// Shown in the public demo instead of a live answer: the coach costs model credit, so a visitor with no
+// token never reaches it. This is a written example of the style of answer, not output for any real spot.
+const DEMO_EXAMPLE = {
+  q: 'What are some good microfishing targets?',
+  a: `**Example answer (saved, not live).**
+
+Small streams in southern Ontario hold plenty of fish that most anglers walk past:
+
+- **Rainbow darter** and **fantail darter** on riffles over gravel.
+- **Creek chub** and **blacknose dace** in pools below the riffles.
+- **Stonecat** and other madtoms under flat rocks at night.
+
+Records of *who has seen a fish* mostly show where people look, so check the source of any claim before you rely on it.`,
+};
+
 export function initChat(root) {
   const log = h('div', { class: 'chat-log', role: 'log', 'aria-live': 'polite' });
   const ctx = h('div', { class: 'chat-ctx' });
@@ -25,6 +40,20 @@ export function initChat(root) {
 
   let includePlace = true;
   let busy = false;
+
+  if (api.isDemo()) {
+    // No input, no model call: a labelled example answer and a way to sign in.
+    form.hidden = true;
+    root.append(h('p', { class: 'muted small demo-note' },
+      'The coach is switched off in the demo because it spends model credit. Sign in to ask your own questions.'));
+    const drawDemo = () => {
+      clear(log); clear(ctx); clear(sugg);
+      log.append(h('div', { class: 'msg user' }, h('p', null, DEMO_EXAMPLE.q)),
+        h('div', { class: 'msg assistant' }, renderMarkdown(DEMO_EXAMPLE.a)));
+    };
+    drawDemo();
+    return { ask() {}, refreshUsage() {} };
+  }
 
   const turns = () => store.get().chat.turns;
 

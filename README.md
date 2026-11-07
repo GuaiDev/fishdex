@@ -168,7 +168,7 @@ The API's admin endpoints (`POST /admin/token`, `/admin/dashboard`, `/ingest/dat
 
 `make serve` runs the FastAPI backend on `127.0.0.1:8000` against the local database at `data/fishing.db`; set `DATA_DIR` to keep the database and catch photos somewhere else. `SERVE_HOST=0.0.0.0 make serve` makes it reachable from a phone on the same network.
 
-A public deployment is prepared but not live until the steps are run: the static app (`app/`) on Vercel and the API on Fly.io with the database on a volume. Access stays behind a token or invite code. `FISHBOT_CORS_ORIGINS` limits which sites a browser lets call the API. The setup, what to seed versus re-ingest, and the login and secret steps are in [`deploy/README.md`](deploy/README.md).
+A public deployment is prepared but not live until the steps are run: the static app (`app/`) on Vercel and the API on Fly.io with the database on a volume. Anyone with the link gets a read-only demo with no sign-in (tier 1 spots in a capped map area, a saved example in place of the live coach, nothing saved); everything else needs a token or invite code. Set `FISHBOT_PUBLIC_DEMO=0` to turn the demo off. `FISHBOT_CORS_ORIGINS` limits which sites a browser lets call the API. The setup, what to seed versus re-ingest, and the login and secret steps are in [`deploy/README.md`](deploy/README.md).
 
 The weekly data refresh is `make weekly-ingest`. It reads the list of areas (label, jurisdiction, lat, lng, radius and which source bundles to run) from `data/ingest_areas.json` and runs each one through the same service code as the `/ingest/data*` endpoints, one after another, then prints what each dataset stored and what failed. Edit that file to add or drop an area. To preview without fetching anything:
 
