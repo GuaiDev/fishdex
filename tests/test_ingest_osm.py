@@ -403,7 +403,7 @@ def test_corridor_query_follows_the_river_line(tmp_path):
 
     query = post.call_args.kwargs["data"]["data"]
     assert "42.90330,-79.63460,42.89680,-79.61040,42.84820,-79.57760" in query
-    assert "around:100," in query and "around:300," in query and "around:60," in query
+    assert "around:150," in query and "around:300," in query and "around:60," in query
 
 
 def test_corridor_caches_and_an_empty_answer_is_not_an_error(tmp_path):
@@ -621,3 +621,30 @@ def test_shore_structures_report_how_many_cells_were_skipped(tmp_path):
 
     assert len(structures) == 1
     assert failed == 1  # one quarter of the second cell never answered
+
+
+def test_corridor_query_searches_structures_150_m_from_the_line():
+    osm = importlib.import_module("src.ingest.global.osm")
+    query = osm._corridor_query(CORRIDOR_LINE)
+    assert 'nwr["waterway"~"^(dam|weir|lock_gate)$"](around:150,' in query
+
+
+def test_corridor_cache_only_raises_a_cache_miss_without_calling_overpass(tmp_path):
+    osm = importlib.import_module("src.ingest.global.osm")
+    with (
+        patch("httpx.post") as post,
+        patch("time.sleep"),
+        patch.object(osm, "_CACHE_DIR", tmp_path),
+    ):
+        with pytest.raises(osm.OverpassCacheMiss):
+            osm.fetch_stream_corridor(CORRIDOR_LINE, "CA-ON", cache_only=True)
+    post.assert_not_called()
+
+
+def test_corridor_cache_only_reads_what_a_live_fetch_cached(tmp_path):
+    osm = importlib.import_module("src.ingest.global.osm")
+    live, _ = _corridor(osm, tmp_path, _load_fixture("osm_corridor_dunnville.json"))
+    with patch("httpx.post") as post, patch.object(osm, "_CACHE_DIR", tmp_path):
+        cached = osm.fetch_stream_corridor(CORRIDOR_LINE, "CA-ON", cache_only=True)
+    post.assert_not_called()
+    assert [f.osm_id for f in cached] == [f.osm_id for f in live]

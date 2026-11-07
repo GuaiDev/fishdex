@@ -81,7 +81,9 @@ _NAME_HOPS = 25
 
 # OSM features are matched to the stretch's own channel, whose OHN geometry is
 # generalised to ~35 m, so "on the water" has to allow for that.
-DAM_SNAP_M = 120.0
+# Level with the corridor fetch's structure radius in src/ingest/global/osm.py: a
+# dam fetched but not snapped is a wasted query, one snapped but not fetched is missed.
+DAM_SNAP_M = 150.0
 ACCESS_SNAP_M = 250.0
 CROSSING_SNAP_M = 40.0
 # One physical dam is often mapped as a dam way, a weir node and a lock.
@@ -140,9 +142,10 @@ def build_anchors(
     curated_by_id = {s.id: s for s in curation.stretches}
     if segments is None:
         segments = load_network(curation)
+    # `global` is a keyword, so the adapter package cannot be imported by name.
+    osm = importlib.import_module("src.ingest.global.osm")
     if fetch_corridor is None:
-        # `global` is a keyword, so the adapter package cannot be imported by name.
-        fetch_corridor = importlib.import_module("src.ingest.global.osm").fetch_stream_corridor
+        fetch_corridor = osm.fetch_stream_corridor
 
     network = StreamNetwork(segments)
     stretches = list_stretches(db, jurisdiction)
@@ -176,22 +179,29 @@ def build_anchors(
         found += _lake_mouths(
             ctx, stretch, ids, built_at, report, curated=curated_by_id.get(stretch.stretch_id)
         )
+        # A cache miss from an offline run says nothing about whether Overpass is
+        # up, so it is neither a failure to count nor a success to reset on.
+        counts_as_failure = True
         if consecutive_failures >= _GIVE_UP_AFTER:
             # Each failed fetch has already spent its retries; do not spend
             # them sixty more times against a service that is down.
             corridor = None
             failure = f"skipped: Overpass failed for {_GIVE_UP_AFTER} stretches in a row"
+            issue_kind = "osm_skipped"
         else:
+            issue_kind = "osm_unavailable"
             try:
                 corridor, failure = fetch_corridor(_polyline(stretch), jurisdiction), ""
+            except osm.OverpassCacheMiss as exc:
+                corridor, failure = None, f"not cached (Overpass not asked): {exc}"
+                issue_kind, counts_as_failure = "osm_not_cached", False
             except Exception as exc:  # Overpass down: say so, keep what we had
                 corridor, failure = None, f"{type(exc).__name__}: {exc}"
         if corridor is None:
-            consecutive_failures += 1
+            if counts_as_failure:
+                consecutive_failures += 1
             report.issues.append(
-                AnchorBuildIssue(
-                    stretch_id=stretch.stretch_id, kind="osm_unavailable", detail=failure
-                )
+                AnchorBuildIssue(stretch_id=stretch.stretch_id, kind=issue_kind, detail=failure)
             )
             kept = previous_osm[stretch.stretch_id]
             if kept:
@@ -244,6 +254,14 @@ def build_anchors(
             len(report.osm_not_fetched),
             report.stretches,
             ", ".join(report.osm_not_fetched),
+        )
+    if report.osm_skipped:
+        logger.error(
+            "gave up asking Overpass after %d stretches in a row failed: %d stretches were not "
+            "tried at all (%s). Run the build again once Overpass answers",
+            _GIVE_UP_AFTER,
+            len(report.osm_skipped),
+            ", ".join(report.osm_skipped),
         )
     if report.stretches_without_osm:
         logger.warning(

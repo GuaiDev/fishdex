@@ -94,7 +94,11 @@ def fetch_access_points(lat: float, lng: float, radius_km: float = 25) -> list[A
 
 # How far from the river line each kind of feature is searched for. Dams and
 # roads must be on the water; parking and trailheads only need to be a walk away.
-_CORRIDOR_STRUCTURE_M = 100
+# The structure radius allows for the river line being generalised to ~35 m and for
+# a weir mapped on the bank or an island rather than in the channel: at 100 m a
+# weir 129 m from the line was missed. Keep it level with DAM_SNAP_M in
+# src/services/stretch_anchors.py, which decides which of these are on the river.
+_CORRIDOR_STRUCTURE_M = 150
 _CORRIDOR_ACCESS_M = 300
 _CORRIDOR_ROAD_M = 60
 # Vertices per Overpass query when following a river (see fetch_stream_corridor).
@@ -102,8 +106,18 @@ _CORRIDOR_CHUNK_VERTICES = 24
 _CROSSING_ROADS = "trunk|primary|secondary|tertiary|unclassified|residential"
 
 
+class OverpassCacheMiss(RuntimeError):
+    """A cache-only read found no cached answer. Overpass was never asked.
+
+    Not an outage: nothing is known about whether the service is up, so callers
+    must not count it as a failure of the service.
+    """
+
+
 def fetch_stream_corridor(
-    line: list[tuple[float, float]], jurisdiction: str | None = None
+    line: list[tuple[float, float]],
+    jurisdiction: str | None = None,
+    cache_only: bool = False,
 ) -> list[CorridorFeature]:
     """Dams, access spots and crossing roads beside a river line. Cached 30 days.
 
@@ -117,6 +131,8 @@ def fetch_stream_corridor(
 
     Raises on an Overpass outage, after the usual retries. An empty list
     means Overpass answered and found nothing — the two are different facts.
+    With `cache_only`, never calls Overpass: a piece with no cached answer
+    raises `OverpassCacheMiss`, which is a third fact (not asked), not an outage.
     """
     if len(line) < 2:
         return []
@@ -124,7 +140,7 @@ def fetch_stream_corridor(
     step = _CORRIDOR_CHUNK_VERTICES - 1  # pieces share an end vertex: no gap between them
     for start in range(0, len(line) - 1, step):
         piece = line[start : start + _CORRIDOR_CHUNK_VERTICES]
-        data = _overpass_query(_corridor_query(piece))
+        data = _overpass_query(_corridor_query(piece), cache_only=cache_only)
         for element in data.get("elements", []):
             feature = _parse_corridor_element(element, jurisdiction)
             if feature is not None:
@@ -225,8 +241,11 @@ def _corridor_query(line: list[tuple[float, float]]) -> str:
     )
 
 
-def _overpass_query(query_str: str) -> dict:
-    """POST to Overpass API with 30-day file cache. Sleeps 0.5s before live requests."""
+def _overpass_query(query_str: str, cache_only: bool = False) -> dict:
+    """POST to Overpass API with 30-day file cache. Sleeps 0.5s before live requests.
+
+    With `cache_only`, a cache miss raises `OverpassCacheMiss` instead of calling out.
+    """
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     key = hashlib.sha256(query_str.encode()).hexdigest()[:16]
     cache_file = _CACHE_DIR / f"{key}.json"
@@ -235,6 +254,9 @@ def _overpass_query(query_str: str) -> dict:
         age = time.time() - cache_file.stat().st_mtime
         if age < _CACHE_TTL_SECONDS:
             return json.loads(cache_file.read_text())
+
+    if cache_only:
+        raise OverpassCacheMiss("not in cache")
 
     time.sleep(0.5)
     last_exc: Exception = RuntimeError("No Overpass endpoints available")
