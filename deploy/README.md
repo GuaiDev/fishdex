@@ -1,8 +1,9 @@
 # Hosting FishDex
 
 Two pieces: the static app on **Vercel**, the FastAPI backend on **Fly.io** with the SQLite
-database on a persistent volume. Access stays behind a token or invite code; nothing here makes
-the API open.
+database on a persistent volume. Visitors with no token get a read-only demo (the `/map/spots*` and `/map/sections*`
+routes, limited to tier 1 spots in a capped area; no coach, no writes). Everything else needs a token
+or invite code. Set `FISHBOT_PUBLIC_DEMO=0` (e.g. in `fly.toml` env) to close the demo.
 
 ## What goes where
 
@@ -57,7 +58,7 @@ project is a static build (`buildCommand` + `outputDirectory`).
 11. Put the final Vercel address in `fly.toml` `FISHBOT_CORS_ORIGINS` (default
     `https://fishdex-red.vercel.app`) and `fly deploy` again. Until it matches, browsers block the app
     from calling the API.
-12. Open the Vercel URL, paste the token, and try the map and the coach.
+12. Open the Vercel URL: it should load the demo with no sign-in. Click "Sign in", paste the token, and try the map and the coach.
 
 ## Notes
 
