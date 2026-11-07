@@ -3,6 +3,8 @@
 No model calls; every database is temporary.
 """
 
+from datetime import UTC
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -17,6 +19,8 @@ PUBLIC_GETS = [
     "/map/spots?tier=2",
     "/map/sections?tier=2",
 ]
+
+HOME_BBOX = "-80,43,-79,44"
 
 # Anything personal, model-spending, writing or admin must still need a sign-in.
 PROTECTED = [
@@ -96,3 +100,107 @@ def test_demo_can_be_switched_off(monkeypatch, value):
     monkeypatch.setenv("FISHBOT_PUBLIC_DEMO", value)
     for path in PUBLIC_GETS:
         assert client.get(path).status_code == 401
+
+
+def _seed_spots():
+    from datetime import datetime
+
+    from src.models.spot import Spot
+    from src.storage.spots import replace_spots
+
+    def spot(tier, lat, lng, sid):
+        return Spot(
+            spot_id=sid,
+            kind="river_mouth",
+            jurisdiction="CA-ON",
+            lat=lat,
+            lng=lng,
+            title=f"Spot {sid}",
+            tier=tier,
+            structure_type="lake_mouth",
+            built_at=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+
+    replace_spots(
+        get_db(),
+        "CA-ON",
+        [
+            spot(1, 43.5, -79.5, "river_mouth:n1_1"),
+            spot(2, 43.6, -79.6, "river_mouth:n2_2"),
+            spot(3, 43.7, -79.7, "river_mouth:n3_3"),
+            spot(1, 46.0, -75.0, "river_mouth:far_far"),
+        ],
+    )
+
+
+def _ids(r):
+    return {f["properties"]["spot_id"] for f in r.json()["features"]}
+
+
+def test_demo_spots_are_tier_one_even_when_more_is_asked_for():
+    _seed_spots()
+    for tier in (1, 2, 3):
+        r = client.get(f"/map/spots?tier={tier}&bbox={HOME_BBOX}")
+        assert _ids(r) == {"river_mouth:n1_1"}
+
+
+def test_signed_in_callers_still_get_every_tier():
+    _seed_spots()
+    token = _create_token(get_db(), 1)
+    r = client.get(
+        f"/map/spots?tier=3&bbox={HOME_BBOX}", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert _ids(r) == {"river_mouth:n1_1", "river_mouth:n2_2", "river_mouth:n3_3"}
+
+
+def test_demo_spots_are_limited_to_a_modest_area():
+    _seed_spots()
+    huge = client.get("/map/spots?tier=1&bbox=-90,40,-70,50")
+    assert "river_mouth:far_far" not in _ids(huge)
+    assert "river_mouth:n1_1" in _ids(huge)
+    none = client.get("/map/spots?tier=1")
+    assert _ids(none) == {"river_mouth:n1_1"}
+    token = _create_token(get_db(), 1)
+    full = client.get(
+        "/map/spots?tier=1&bbox=-90,40,-70,50", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert "river_mouth:far_far" in _ids(full)
+
+
+def test_demo_cannot_open_a_spot_above_tier_one():
+    _seed_spots()
+    assert client.get("/map/spots/river_mouth:n2_2").status_code == 404
+    assert client.get("/map/spots/river_mouth:n1_1").status_code == 200
+    token = _create_token(get_db(), 1)
+    r = client.get("/map/spots/river_mouth:n2_2", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+
+
+def test_demo_section_tier_is_clamped_to_one(monkeypatch):
+    import src.services.sections as sections
+
+    seen = []
+
+    def fake_geojson(db, user_id, bbox=None, types=None, jurisdiction=None, max_tier=2):
+        seen.append(("list", bbox, max_tier))
+        return {"type": "FeatureCollection", "features": []}
+
+    def fake_detail(db, section_id, user_id, max_tier=2):
+        seen.append(("detail", None, max_tier))
+        return {"section_id": section_id}
+
+    monkeypatch.setattr(sections, "sections_geojson", fake_geojson)
+    monkeypatch.setattr(sections, "section_detail", fake_detail)
+    client.get("/map/sections?tier=3&bbox=-90,40,-70,50")
+    client.get("/map/sections/abc?tier=3")
+    assert seen[0][2] == 1
+    assert seen[0][1][2] - seen[0][1][0] <= 1.0
+    assert seen[1][2] == 1
+
+    seen.clear()
+    token = _create_token(get_db(), 1)
+    auth = {"Authorization": f"Bearer {token}"}
+    client.get("/map/sections?tier=3&bbox=-90,40,-70,50", headers=auth)
+    client.get("/map/sections/abc?tier=3", headers=auth)
+    assert seen[0][2] == 3 and seen[0][1] == (-90.0, 40.0, -70.0, 50.0)
+    assert seen[1][2] == 3

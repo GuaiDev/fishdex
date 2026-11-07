@@ -1558,6 +1558,32 @@ def _parse_bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
     return parts
 
 
+DEMO_MAX_TIER = 1
+DEMO_MAX_SPAN_DEG = 1.0
+DEMO_DEFAULT_CENTER = (-79.7, 43.45)
+
+
+def _demo_limits(user: dict, box, tier: int):
+    """The slice of spots a signed-out demo caller may see: tier 1 only, inside one
+    modest box. A missing box becomes one around home; an oversized one is shrunk
+    around its centre. Signed-in callers pass through unchanged."""
+    if not user.get("demo"):
+        return box, tier
+    half = DEMO_MAX_SPAN_DEG / 2
+    if box is None:
+        cx, cy = DEMO_DEFAULT_CENTER
+        box = (cx - half, cy - half, cx + half, cy + half)
+    else:
+        cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+        box = (
+            max(box[0], cx - half),
+            max(box[1], cy - half),
+            min(box[2], cx + half),
+            min(box[3], cy + half),
+        )
+    return box, min(tier, DEMO_MAX_TIER)
+
+
 def _parse_shape_options(
     geometry: bool, simplify: float | None, zoom: float | None
 ) -> tuple[float | None, float | None]:
@@ -1755,6 +1781,7 @@ def get_map_spots(
     from src.storage.database import get_db
 
     box, kinds, species_f, near_f = _parse_spot_filters(bbox, kind, tier, species, near)
+    box, tier = _demo_limits(user, box, tier)
     if new_to_me:
         if user.get("demo"):
             raise HTTPException(status_code=401, detail="Sign in to see spots new to you")
@@ -1787,8 +1814,12 @@ def get_map_spot(spot_id: str, response: Response, user: dict = Depends(get_user
     from src.storage.database import get_db
 
     detail = get_spot_detail(get_db(), spot_id, user["id"])
-    if detail is None:
+    if detail is None or (user.get("demo") and detail.get("tier", 1) > DEMO_MAX_TIER):
         raise HTTPException(status_code=404, detail=f"No spot with id {spot_id!r}")
+    if user.get("demo"):
+        detail["more_on_this_water"] = [
+            o for o in detail["more_on_this_water"] if o["tier"] <= DEMO_MAX_TIER
+        ]
     # The card now depends on who is asking (the "new to you" hook), and a catch
     # confirmed a minute ago must show: no caching at all, shared or private.
     response.headers["Cache-Control"] = "private, no-store"
@@ -1913,6 +1944,7 @@ def get_map_sections(
             )
     if tier not in (1, 2, 3):
         raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
+    box, tier = _demo_limits(user, box, tier)
     # The weed counts are the caller's own: never let a browser or proxy keep them for anyone else.
     response.headers["Cache-Control"] = "private, no-store"
     return sections_geojson(
@@ -1940,6 +1972,8 @@ def get_map_section(
 
     if tier not in (1, 2, 3):
         raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
+    if user.get("demo"):
+        tier = min(tier, DEMO_MAX_TIER)
     detail = section_detail(get_db(), section_id, user["id"], max_tier=tier)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"No section with id {section_id!r}")
