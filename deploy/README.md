@@ -60,6 +60,14 @@ project is a static build (`buildCommand` + `outputDirectory`).
     from calling the API.
 12. Open the Vercel URL: it should load the demo with no sign-in. Click "Sign in", paste the token, and try the map and the coach.
 
+## Refreshing the map data on the volume
+
+After `make build-anchors` (live OpenStreetMap, slow: minutes per stretch, cached afterwards)
+rebuilds the anchors and spots in `data/fishing.db`, repeat step 7 with the new file: stop the
+machine, `put data/fishing.db /data/fishing.db`, then `fly machine restart`. Check with
+`GET /map/spots?tier=3&kind=below_dam` that the new below-dam spots are present. The public demo
+only serves tier 1 spots, so a spot ranked tier 2 or 3 appears for signed-in users only.
+
 ## Notes
 
 - `auto_stop_machines` is on, so an idle API sleeps and the first request takes a few seconds.
