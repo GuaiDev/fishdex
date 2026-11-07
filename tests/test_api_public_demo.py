@@ -3,8 +3,6 @@
 No model calls; every database is temporary.
 """
 
-from datetime import UTC
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -103,8 +101,6 @@ def test_demo_can_be_switched_off(monkeypatch, value):
 
 
 def _seed_spots():
-    from datetime import datetime
-
     from src.models.spot import Spot
     from src.storage.spots import replace_spots
 
@@ -118,17 +114,17 @@ def _seed_spots():
             title=f"Spot {sid}",
             tier=tier,
             structure_type="lake_mouth",
-            built_at=datetime(2026, 1, 1, tzinfo=UTC),
+            built_at="2026-01-01T00:00:00+00:00",
         )
 
     replace_spots(
         get_db(),
         "CA-ON",
         [
-            spot(1, 43.5, -79.5, "river_mouth:n1_1"),
-            spot(2, 43.6, -79.6, "river_mouth:n2_2"),
-            spot(3, 43.7, -79.7, "river_mouth:n3_3"),
-            spot(1, 46.0, -75.0, "river_mouth:far_far"),
+            spot(1, 43.5, -79.5, "river_mouth:n795000_435000"),
+            spot(2, 43.6, -79.6, "river_mouth:n796000_436000"),
+            spot(3, 43.7, -79.7, "river_mouth:n797000_437000"),
+            spot(1, 46.0, -75.0, "river_mouth:n750000_460000"),
         ],
     )
 
@@ -141,7 +137,7 @@ def test_demo_spots_are_tier_one_even_when_more_is_asked_for():
     _seed_spots()
     for tier in (1, 2, 3):
         r = client.get(f"/map/spots?tier={tier}&bbox={HOME_BBOX}")
-        assert _ids(r) == {"river_mouth:n1_1"}
+        assert _ids(r) == {"river_mouth:n795000_435000"}
 
 
 def test_signed_in_callers_still_get_every_tier():
@@ -150,29 +146,35 @@ def test_signed_in_callers_still_get_every_tier():
     r = client.get(
         f"/map/spots?tier=3&bbox={HOME_BBOX}", headers={"Authorization": f"Bearer {token}"}
     )
-    assert _ids(r) == {"river_mouth:n1_1", "river_mouth:n2_2", "river_mouth:n3_3"}
+    assert _ids(r) == {
+        "river_mouth:n795000_435000",
+        "river_mouth:n796000_436000",
+        "river_mouth:n797000_437000",
+    }
 
 
 def test_demo_spots_are_limited_to_a_modest_area():
     _seed_spots()
-    huge = client.get("/map/spots?tier=1&bbox=-90,40,-70,50")
-    assert "river_mouth:far_far" not in _ids(huge)
-    assert "river_mouth:n1_1" in _ids(huge)
+    huge = client.get("/map/spots?tier=1&bbox=-85,38,-74,49")
+    assert "river_mouth:n750000_460000" not in _ids(huge)
+    assert "river_mouth:n795000_435000" in _ids(huge)
     none = client.get("/map/spots?tier=1")
-    assert _ids(none) == {"river_mouth:n1_1"}
+    assert _ids(none) == {"river_mouth:n795000_435000"}
     token = _create_token(get_db(), 1)
     full = client.get(
         "/map/spots?tier=1&bbox=-90,40,-70,50", headers={"Authorization": f"Bearer {token}"}
     )
-    assert "river_mouth:far_far" in _ids(full)
+    assert "river_mouth:n750000_460000" in _ids(full)
 
 
 def test_demo_cannot_open_a_spot_above_tier_one():
     _seed_spots()
-    assert client.get("/map/spots/river_mouth:n2_2").status_code == 404
-    assert client.get("/map/spots/river_mouth:n1_1").status_code == 200
+    assert client.get("/map/spots/river_mouth:n796000_436000").status_code == 404
+    assert client.get("/map/spots/river_mouth:n795000_435000").status_code == 200
     token = _create_token(get_db(), 1)
-    r = client.get("/map/spots/river_mouth:n2_2", headers={"Authorization": f"Bearer {token}"})
+    r = client.get(
+        "/map/spots/river_mouth:n796000_436000", headers={"Authorization": f"Bearer {token}"}
+    )
     assert r.status_code == 200
 
 
