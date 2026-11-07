@@ -21,8 +21,15 @@ import logging
 from sqlite_utils import Database
 
 from src.agent.client import get_client
-from src.services.context import describe, describe_species, species_history, user_layer
+from src.services.context import (
+    angler_profile,
+    describe,
+    describe_species,
+    species_history,
+    user_layer,
+)
 from src.services.context.render import (
+    render_angler_style,
     render_place_context,
     render_species_context,
     render_species_history,
@@ -53,7 +60,11 @@ _RULES = """Rules you must follow:
 - Match the register per concept, from the profile lines: say the map words
   they know plainly, define the ones they have met in a few words, and explain
   any other in plain words first. There is no overall skill level; never
-  describe the angler as a beginner or an expert."""
+  describe the angler as a beginner or an expert.
+- Never promise or predict size or catch outcomes, and never suggest seeing
+  "any unseen species" as a goal.
+- The angler style block shapes emphasis only, never which facts are shown.
+  A question that clearly asks for a specific direction is answered directly."""
 
 _SAR_RULES = """
 CONSERVATION OVERRIDE — this species carries a conservation flag.
@@ -85,9 +96,7 @@ def get_species_coaching(
     layer = user_layer(db, user_id=user_id)
     species_ctx = describe_species(db, species)
 
-    question = (
-        specific_question or f"What should I do differently to catch more {species}?"
-    )
+    question = specific_question or f"What could I try next with {species}?"
 
     blocks = [
         "You are a fishing coach working only from this angler's logged data "
@@ -96,6 +105,7 @@ def get_species_coaching(
         render_species_context(species_ctx),
         render_species_history(history),
         render_user_layer(layer),
+        render_angler_style(angler_profile(db, user_id=user_id)),
         _RULES,
     ]
     # Gated on an affirmative listing signal, not on `sar_alert`. Every species
@@ -136,9 +146,7 @@ def get_location_coaching(
         )
 
     layer = user_layer(db, user_id=user_id)
-    question = (
-        specific_question or f"What should I do differently at {location_query}?"
-    )
+    question = specific_question or f"What should I do differently at {location_query}?"
 
     prompt = "\n\n".join(
         [
@@ -146,6 +154,7 @@ def get_location_coaching(
             f'The angler asked: "{question}"',
             render_place_context(ctx),
             render_user_layer(layer),
+            render_angler_style(angler_profile(db, user_id=user_id)),
             _RULES,
             "Structure your answer as: what worked here, what didn't, and one "
             "specific thing to try next visit. If this angler has never fished "
