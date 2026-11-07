@@ -130,6 +130,10 @@ make build-stretches
 
 # Rebuild only the anchors, e.g. to pick up fresh OpenStreetMap data
 make build-anchors
+# Offline variant: reads only the Overpass cache, never calls out. Stretches with
+# nothing cached are reported as "not cached". Do one live run after any change to
+# the corridor query, since that changes every cache key.
+uv run python -m src.cli.main build-anchors --cache-only
 
 # Rebuild the plain-language spots from the stored anchors (no network; see docs/spots-api.md)
 make build-spots
