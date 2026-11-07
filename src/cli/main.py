@@ -1561,6 +1561,12 @@ def build_anchors_cmd(
         "--curation",
         help="Curation file the stretches came from.",
     ),
+    cache_only: bool = typer.Option(
+        False,
+        "--cache-only",
+        help="Read OpenStreetMap from the Overpass cache only. Stretches with nothing "
+        "cached are reported as not fetched; they are not retried or given up on.",
+    ),
 ) -> None:
     """Rebuild the explore map's stretch anchors without rebuilding the stretches.
 
@@ -1568,12 +1574,18 @@ def build_anchors_cmd(
     Use this to pick up new OpenStreetMap data (the Overpass cache lasts 30 days)
     or after changing how anchors are derived.
     """
+    import importlib
+    from functools import partial
     from pathlib import Path
 
     from src.services.stretch_anchors import build_anchors
 
+    fetch = None
+    if cache_only:
+        osm = importlib.import_module("src.ingest.global.osm")
+        fetch = partial(osm.fetch_stream_corridor, cache_only=True)
     db = get_db()
-    _print_anchor_report(build_anchors(db, Path(curation)))
+    _print_anchor_report(build_anchors(db, Path(curation), fetch_corridor=fetch))
     # Spots are derived from the anchors just rebuilt.
     _print_spot_report(_build_spots(db, Path(curation)))
 
@@ -1695,6 +1707,12 @@ def _print_anchor_report(report) -> None:
 
     for issue in report.issues:
         console.print(f"[yellow]{issue.stretch_id}: {issue.kind}[/yellow] {issue.detail}")
+    if report.osm_skipped:
+        console.print(
+            f"[bold red]Gave up on Overpass: {len(report.osm_skipped)} of {report.stretches} "
+            "stretches were never tried because earlier ones kept failing. Dams and access "
+            "points are missing there. Run the build again once Overpass answers.[/bold red]"
+        )
     if report.osm_not_fetched:
         console.print(
             f"[yellow]{len(report.osm_not_fetched)} of {report.stretches} stretches have no "

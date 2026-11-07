@@ -782,9 +782,9 @@ def test_build_anchors_command_reports_what_it_did_not_keep(monkeypatch, tmp_pat
 def test_an_off_river_dam_does_not_swallow_a_weir_on_the_river(db, stretches):
     def fetch(line, j):
         return [
-            # 140 m off the river, so not on it; the weir is 120 m from this dam,
+            # 175 m off the river, so not on it; the weir is 155 m from this dam,
             # inside the merge radius, and ranks below it.
-            feat("dam", 43.045, metres_east(LON, 140), "way/50", name="Pond Dam"),
+            feat("dam", 43.045, metres_east(LON, 175), "way/50", name="Pond Dam"),
             feat("weir", 43.045, metres_east(LON, 20), "node/51"),
         ]
 
@@ -831,3 +831,127 @@ def test_an_outage_after_a_good_build_keeps_the_stretches_marked_fetched(db, str
     report = build(db, stretches, down)
     assert report.osm_not_fetched == []  # an earlier fetch still stands
     assert {c.status for c in list_osm_coverage(db, "CA-ON").values()} == {"fetched"}
+
+
+def test_a_weir_a_little_off_the_generalised_river_line_is_still_on_the_river(db, stretches):
+    # 129 m from the line: missed when the dam radius was 100 m / snap 120 m.
+    def fetch(line, j):
+        return [feat("weir", 43.045, metres_east(LON, 129), "node/60", name="Bank Weir")]
+
+    build(db, stretches, fetch)
+    (dam,) = by(db, "test-lower", "dam")
+    assert (dam.source_ref, dam.subtype) == ("node/60", "weir")
+    assert 120 < dam.snap_distance_m <= 150
+
+
+def test_the_dam_search_radius_is_not_narrower_than_the_snap_radius():
+    import importlib
+
+    import src.services.stretch_anchors as module
+
+    osm = importlib.import_module("src.ingest.global.osm")
+    assert osm._CORRIDOR_STRUCTURE_M >= module.DAM_SNAP_M
+
+
+def test_cache_misses_do_not_trip_the_give_up_rule(db, stretches, monkeypatch):
+    import importlib
+
+    import src.services.stretch_anchors as module
+
+    monkeypatch.setattr(module, "_GIVE_UP_AFTER", 1)
+    miss = importlib.import_module("src.ingest.global.osm").OverpassCacheMiss
+    calls = []
+
+    def offline(line, jurisdiction):
+        calls.append(1)
+        raise miss("not in cache")
+
+    report = build(db, stretches, offline)
+    assert len(calls) == 3  # every stretch was tried; none was skipped as "Overpass is down"
+    assert report.osm_skipped == []
+    assert {i.kind for i in report.issues} == {"osm_not_cached"}
+    assert report.osm_not_fetched == ["test-lower", "test-maple", "test-upper"]
+
+
+def test_a_cache_miss_neither_counts_as_a_failure_nor_resets_the_count(db, stretches, monkeypatch):
+    import importlib
+
+    import src.services.stretch_anchors as module
+
+    monkeypatch.setattr(module, "_GIVE_UP_AFTER", 2)
+    miss = importlib.import_module("src.ingest.global.osm").OverpassCacheMiss
+    outcomes = iter(["down", "miss", "down", "never reached"])
+
+    def fetch(line, jurisdiction):
+        outcome = next(outcomes)
+        if outcome == "miss":
+            raise miss("not in cache")
+        raise TimeoutError("slow")
+
+    stretches_report = build(db, stretches, fetch)
+    kinds = {i.stretch_id: i.kind for i in stretches_report.issues}
+    assert sorted(kinds.values()) == ["osm_not_cached", "osm_unavailable", "osm_unavailable"]
+    assert stretches_report.osm_skipped == []
+
+
+def test_stretches_skipped_by_the_give_up_rule_are_listed_apart_from_failures(
+    db, stretches, monkeypatch, caplog
+):
+    import logging
+
+    import src.services.stretch_anchors as module
+
+    monkeypatch.setattr(module, "_GIVE_UP_AFTER", 1)
+
+    def down(line, jurisdiction):
+        raise TimeoutError("slow")
+
+    with caplog.at_level(logging.WARNING):
+        report = build(db, stretches, down)
+    assert len(report.osm_skipped) == 2
+    assert {i.kind for i in report.issues} == {"osm_unavailable", "osm_skipped"}
+    assert any(
+        r.levelno == logging.ERROR and "gave up asking Overpass" in r.message
+        for r in caplog.records
+    )
+
+
+def test_build_anchors_command_says_loudly_when_stretches_were_skipped(monkeypatch, tmp_path):
+    from typer.testing import CliRunner
+
+    from src.models.stretch_anchor import AnchorBuildIssue
+
+    cli = _cli(monkeypatch, tmp_path)
+    report = AnchorBuildReport(
+        jurisdiction="CA-ON",
+        stretches=5,
+        issues=[AnchorBuildIssue(stretch_id="s", kind="osm_skipped", detail="skipped")],
+    )
+    monkeypatch.setattr("src.services.stretch_anchors.build_anchors", lambda *a, **k: report)
+
+    result = CliRunner().invoke(cli.app, ["build-anchors"])
+    assert "Gave up on Overpass: 1 of 5" in result.output
+
+
+def test_build_anchors_cache_only_flag_hands_the_builder_a_cache_only_fetcher(
+    monkeypatch, tmp_path
+):
+    import importlib
+
+    from typer.testing import CliRunner
+
+    cli = _cli(monkeypatch, tmp_path)
+    seen = {}
+
+    def fake(db, path, segments=None, fetch_corridor=None):
+        seen["fetch"] = fetch_corridor
+        return AnchorBuildReport(jurisdiction="CA-ON", stretches=0)
+
+    monkeypatch.setattr("src.services.stretch_anchors.build_anchors", fake)
+    CliRunner().invoke(cli.app, ["build-anchors", "--cache-only"])
+    assert seen["fetch"].keywords == {"cache_only": True}
+    assert (
+        seen["fetch"].func is importlib.import_module("src.ingest.global.osm").fetch_stream_corridor
+    )
+    CliRunner().invoke(cli.app, ["build-anchors"])
+    assert seen["fetch"] is None

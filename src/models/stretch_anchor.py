@@ -72,6 +72,8 @@ class StretchSegmentLine(BaseModel):
 
 AnchorIssueKind = Literal[
     "osm_unavailable",  # Overpass failed for a stretch; OSM anchors carried over or absent
+    "osm_not_cached",  # cache-only run, nothing cached; Overpass was not asked
+    "osm_skipped",  # not tried: Overpass had failed for several stretches in a row
     "tailwater_unverified",  # a dam sits on water whose flow direction OHN has not verified
 ]
 
@@ -92,6 +94,9 @@ class StretchOsmCoverage(BaseModel):
     status: OsmCoverageStatus
     detail: str = ""
     checked_at: str
+
+
+_OSM_ISSUE_KINDS = ("osm_unavailable", "osm_not_cached", "osm_skipped")
 
 
 class AnchorBuildIssue(BaseModel):
@@ -123,4 +128,9 @@ class AnchorBuildReport(BaseModel):
 
     @property
     def stretches_without_osm(self) -> list[StretchId]:
-        return sorted({i.stretch_id for i in self.issues if i.kind == "osm_unavailable"})
+        return sorted({i.stretch_id for i in self.issues if i.kind in _OSM_ISSUE_KINDS})
+
+    @property
+    def osm_skipped(self) -> list[StretchId]:
+        """Stretches never tried because the build gave up on a failing Overpass."""
+        return sorted({i.stretch_id for i in self.issues if i.kind == "osm_skipped"})
