@@ -287,6 +287,83 @@ def _ensure_shoreline_features(db: Database) -> None:
     _ensure_bathymetry_contours(db)
 
 
+def _ensure_hydro_segments(db: Database) -> None:
+    """Create the hydro_segments table and its R*Tree companion. Idempotent.
+
+    The stream network on disk, so a build loads one stretch's neighbourhood from
+    the R*Tree instead of the whole region into memory. Keyed by
+    (segment_source, seg_id) because two sources can publish the same native id.
+    Nodes are int64 (services.hydro_nodes); upstream_km stays NULL until
+    accumulated. Nothing here is specific to a jurisdiction.
+
+    hydro_segments_rtree is keyed by the table's rowid and kept in step by
+    triggers, so a plain INSERT, DELETE or bbox UPDATE can never leave it stale (an
+    upstream_km update, the bulk case, leaves it alone). Write
+    with `INSERT ... ON CONFLICT(segment_source, seg_id) DO UPDATE` to replace a
+    segment: `INSERT OR REPLACE` gives the row a new rowid and (without
+    recursive_triggers) leaves the old R*Tree entry behind. An orphaned entry is
+    harmless to a join on rowid but wastes space.
+    """
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hydro_segments (
+            jurisdiction      TEXT NOT NULL,
+            segment_source    TEXT NOT NULL,
+            seg_id            INTEGER NOT NULL,
+            start_node        INTEGER NOT NULL,
+            end_node          INTEGER NOT NULL,
+            length_m          REAL NOT NULL,
+            name              TEXT,
+            flow_verified     INTEGER NOT NULL,
+            is_waterbody_path INTEGER NOT NULL DEFAULT 0,
+            upstream_km       REAL,
+            tile_key          TEXT,
+            geom              BLOB NOT NULL,
+            min_lon           REAL NOT NULL,
+            max_lon           REAL NOT NULL,
+            min_lat           REAL NOT NULL,
+            max_lat           REAL NOT NULL,
+            PRIMARY KEY (segment_source, seg_id)
+        )
+    """)
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_hydro_segments_start "
+        "ON hydro_segments(segment_source, start_node)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_hydro_segments_end "
+        "ON hydro_segments(segment_source, end_node)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_hydro_segments_tile "
+        "ON hydro_segments(segment_source, tile_key)"
+    )
+    db.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS hydro_segments_rtree "
+        "USING rtree(id, min_lon, max_lon, min_lat, max_lat)"
+    )
+    db.execute("""
+        CREATE TRIGGER IF NOT EXISTS hydro_segments_rtree_ai
+        AFTER INSERT ON hydro_segments BEGIN
+            INSERT INTO hydro_segments_rtree(id, min_lon, max_lon, min_lat, max_lat)
+            VALUES (new.rowid, new.min_lon, new.max_lon, new.min_lat, new.max_lat);
+        END
+    """)
+    db.execute("""
+        CREATE TRIGGER IF NOT EXISTS hydro_segments_rtree_au
+        AFTER UPDATE OF min_lon, max_lon, min_lat, max_lat ON hydro_segments BEGIN
+            DELETE FROM hydro_segments_rtree WHERE id = old.rowid;
+            INSERT INTO hydro_segments_rtree(id, min_lon, max_lon, min_lat, max_lat)
+            VALUES (new.rowid, new.min_lon, new.max_lon, new.min_lat, new.max_lat);
+        END
+    """)
+    db.execute("""
+        CREATE TRIGGER IF NOT EXISTS hydro_segments_rtree_ad
+        AFTER DELETE ON hydro_segments BEGIN
+            DELETE FROM hydro_segments_rtree WHERE id = old.rowid;
+        END
+    """)
+
+
 def _ensure_bathymetry_contours(db: Database) -> None:
     """Create the bathymetry_contours table. Idempotent.
 
@@ -353,6 +430,7 @@ def _apply_migrations(db: Database) -> None:
     migrate_weed_reports(db)
     migrate_session_conditions_gauge(db)
     migrate_species_images(db)
+    _ensure_hydro_segments(db)
 
 
 def migrate_session_conditions_gauge(db: Database) -> None:
