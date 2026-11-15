@@ -46,6 +46,15 @@ OFF_RIVER = (43.62, -79.45)  # about 13 km north of the line: not "along" it
 
 
 @pytest.fixture
+def db(db):
+    """The shared database plus one Ontario species, so the card's species file is not empty."""
+    from tests.test_spot_card import species_row
+
+    upsert_species_ranges(db, [species_row("Mottled Sculpin", "Cottus bairdii")])
+    return db
+
+
+@pytest.fixture
 def river(db):
     """A 24 km river, west to east along 43.5N, and the stretch it belongs to."""
     st = stretch("credit-lower", "Lower Credit", "Credit River")

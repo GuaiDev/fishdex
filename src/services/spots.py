@@ -1369,7 +1369,7 @@ def _spots_with_species(db: Database, spots: list[Spot], species_l: str) -> list
     """
     from src.models.context import Place
     from src.services.context import slices
-    from src.services.context.species import listing_check
+    from src.services.context.species import has_status_data, listing_check
     from src.services.spot_card import NO_USER
 
     if listing_check(db, scientific_name=species_l, common_name=species_l) is True:
@@ -1385,8 +1385,16 @@ def _spots_with_species(db: Database, spots: list[Spot], species_l: str) -> list
             listed[key] = listing_check(db, scientific_name=r.species, common_name=r.common_name)
         return listed[key] is not False
 
+    # An empty species file cannot clear any fish, so a jurisdiction without status
+    # data answers nothing, the same as the card names nothing there.
+    has_status: dict[str, bool] = {}
+
     found: list[Spot] = []
     for spot in spots:
+        if spot.jurisdiction not in has_status:
+            has_status[spot.jurisdiction] = has_status_data(db, spot.jurisdiction)
+        if not has_status[spot.jurisdiction]:
+            continue
         place = Place(query=spot.spot_id, lat=spot.lat, lng=spot.lng, radius_km=2.0)
         try:
             # No species filter on the query: a row filed under the scientific name

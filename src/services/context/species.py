@@ -40,6 +40,26 @@ def status_known_listed(sr) -> bool:
     return bool({sr.sara_status, sr.ontario_status, sr.cosewic_status} & _LISTED)
 
 
+def has_status_data(db: Database, jurisdiction: str) -> bool:
+    """Does the local species file hold any species for this jurisdiction?
+
+    False means the file cannot tell us about any fish there, not that none are
+    listed. A caller that would otherwise name fish must then fail closed:
+    with an empty file every species reads as "unknown", and an unknown is
+    shown, so a listed fish passes straight through. A lookup error counts as
+    no data for the same reason.
+    """
+    from src.storage.species_ranges import query_species_ranges_for_jurisdiction
+
+    if "species_ranges" not in db.table_names():
+        return False
+    try:
+        return bool(query_species_ranges_for_jurisdiction(db, jurisdiction))
+    except Exception:  # noqa: BLE001 - never break the caller over this slice
+        logger.warning("species status data check failed", exc_info=True)
+        return False
+
+
 def listing_check(
     db: Database, scientific_name: str | None, common_name: str | None
 ) -> bool | None:

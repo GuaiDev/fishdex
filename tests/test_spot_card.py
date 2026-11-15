@@ -40,7 +40,11 @@ def _template_db(tmp_path_factory):
     from src.storage.database import get_db
 
     path = tmp_path_factory.mktemp("card_template") / "template.db"
-    get_db(path).conn.close()
+    template = get_db(path)
+    # A species file with nothing for Ontario withholds every fish (see the
+    # status-missing tests), so the default card database holds one unrelated row.
+    upsert_species_ranges(template, [species_row("Mottled Sculpin", "Cottus bairdii")])
+    template.conn.close()
     return path
 
 
@@ -179,6 +183,7 @@ def walk(value, skip=()):
 
 def test_hook_chain_order_and_the_slot_that_is_not_built_yet():
     assert [r.kind for r in render.HOOK_CHAIN] == [
+        "status_unavailable",
         "protected_species",
         "new_to_you",
         "distinctive",
@@ -862,3 +867,69 @@ def test_card_says_not_looked_up_apart_from_nothing_found(db):
 
     found = junction(getting_there=[ref("parking", 262)])
     assert build_spot_card(db, found).getting_there.coverage == "found"
+
+
+# ── an empty species file fails closed (the S5 gap) ───────────────────────────
+
+
+def test_an_empty_species_file_withholds_every_species_and_says_status_is_missing(tmp_path):
+    from src.storage.database import get_db
+
+    empty = get_db(tmp_path / "empty.db")  # no species_ranges rows at all
+    inat(empty, "Clinostomus elongatus", "Redside Dace", near=ECKARDT)
+    inat(empty, "Semotilus atromaculatus", "Creek Chub", near=ECKARDT)
+
+    card = build_spot_card(empty, eckardt())
+
+    assert card.hook.kind == "status_unavailable"
+    assert "no species status data" in card.hook.text
+    assert card.might_find.species == []
+    assert card.might_find.special_here is None
+    assert card.meta.species_status_missing is True
+    assert card.meta.species_withheld_no_status == 2
+    blob = json.dumps(card.model_dump()).lower()
+    assert "redside" not in blob and "clinostomus" not in blob and "creek chub" not in blob
+
+
+def test_a_species_file_for_another_jurisdiction_does_not_count_as_status_data(tmp_path):
+    from src.storage.database import get_db
+
+    other = get_db(tmp_path / "other.db")
+    upsert_species_ranges(
+        other,
+        [
+            SpeciesRange(
+                species="Largemouth Bass",
+                scientific_name="Micropterus salmoides",
+                native_to_ontario=False,
+                native_to_great_lakes=True,
+                general_range="Michigan",
+                jurisdictions_present=["US-MI"],
+            )
+        ],
+    )
+    inat(other, "Clinostomus elongatus", "Redside Dace", near=ECKARDT)
+    card = build_spot_card(other, eckardt())
+    assert card.meta.species_status_missing is True
+    assert "redside" not in json.dumps(card.model_dump()).lower()
+
+
+def test_a_populated_file_keeps_the_per_species_unknown_behaviour(db):
+    inat(db, "Etheostoma exile", "Iowa Darter")
+    card = build_spot_card(db, junction())
+    assert card.meta.species_status_missing is False
+    assert [s.name for s in card.might_find.species] == ["Iowa Darter"]
+    assert card.meta.species_status_unchecked == 1
+
+
+def test_the_species_filter_and_new_to_me_name_nothing_without_status_data(tmp_path):
+    from src.services.spot_card import new_species_at_spot
+    from src.services.spots import _spots_with_species
+    from src.storage.database import get_db
+
+    empty = get_db(tmp_path / "empty2.db")
+    inat(empty, "Clinostomus elongatus", "Redside Dace", near=ECKARDT)
+    s = eckardt()
+    assert _spots_with_species(empty, [s], "redside") == []
+    assert _spots_with_species(empty, [s], "chub") == []
+    assert new_species_at_spot(empty, s, frozenset()) == []

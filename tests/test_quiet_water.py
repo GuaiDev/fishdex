@@ -27,6 +27,7 @@ from src.services.quiet_water import (
 )
 from src.services.spot_card import build_spot_card
 from src.services.spots import build_spots, spots_geojson
+from src.storage.species_ranges import upsert_species_ranges
 from src.storage.spots import count_spots_of_kind, list_spots
 
 BUILT = "2026-10-14T00:00:00+00:00"
@@ -66,6 +67,15 @@ def reach(ogf, lat, lng, score, name="", measured=True, order=3, **extra):
 
 def write_scores(path, rows):
     pd.DataFrame(rows).astype({"access_is_measured": "boolean"}).to_parquet(path, index=False)
+
+
+@pytest.fixture
+def db(db):
+    """The shared database plus one Ontario species, so the card's species file is not empty."""
+    from tests.test_spot_card import species_row
+
+    upsert_species_ranges(db, [species_row("Mottled Sculpin", "Cottus bairdii")])
+    return db
 
 
 @pytest.fixture
