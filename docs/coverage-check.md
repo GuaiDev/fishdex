@@ -12,12 +12,14 @@ uv run python -m src.cli.main coverage-check --jurisdiction CA-ON --focus home -
   Run before every reseed.
 - **Host mode**: `--hosted-db <copy of the host's file>` or `--api https://… --api-key …`
   adds deploy parity and the deploy rung. `--api` also checks `/health` from outside vantage
-  points (check-host.net) and reads the host's tables through `GET /admin/coverage-probe`.
+  points (check-host.net; if that service is down the `api_reachable` gate fails with the
+  error rather than the check crashing) and reads the host's tables through `GET /admin/coverage-probe`.
 - Reports: JSON and markdown in `--out-dir` (default `data/coverage/reports`).
 - Exit codes: 0 no hard gate failed, 1 a hard gate failed, 2 the check could not run.
 
 Hard gates: API reachable, deploy parity, listing table populated. Focus gates (per-class
-in-scope recall) inform but do not block. The listed-species leak count needs cards and is
+in-scope recall) inform but do not block; a class with nothing in scope (or an empty reference fetch) fails
+its recall gate as "nothing to measure" rather than passing. The listed-species leak count needs cards and is
 reported as not measured.
 
 ## Adding a region
