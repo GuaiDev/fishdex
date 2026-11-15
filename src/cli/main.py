@@ -34,6 +34,7 @@ console = Console()
 
 @app.callback()
 def _cli(
+    ctx: typer.Context,
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Show INFO-level detail from adapters."
     ),
@@ -50,6 +51,7 @@ def _cli(
     """
     import logging
     import os
+    import sys
 
     from rich.logging import RichHandler
 
@@ -70,6 +72,31 @@ def _cli(
     )
     # httpx logs every request at INFO; too noisy even in verbose mode.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    # `get_db()` no longer migrates, so a command opening a fresh or older database
+    # would hit a missing table. Bring it current once, here; when it already is,
+    # this is a read. `migrate` does its own, loudly, and `--help` touches nothing.
+    if ctx.invoked_subcommand not in (None, "migrate") and not ctx.resilient_parsing:
+        if "--help" not in sys.argv:
+            from src.storage.database import migrate as run_migrations
+
+            run_migrations(get_db())
+
+
+@app.command()
+def migrate() -> None:
+    """Bring the database schema up to date (run at deploy; safe to repeat)."""
+    from src.storage.database import MIGRATIONS, get_db
+    from src.storage.database import migrate as run_migrations
+
+    db = get_db()
+    applied = run_migrations(db)
+    for m in applied:
+        console.print(f"applied {m.version:>3}  {m.name}")
+    console.print(
+        f"[green]schema current[/green]: {len(applied)} applied, "
+        f"{len(MIGRATIONS) - len(applied)} already in place."
+    )
 
 
 @app.command()

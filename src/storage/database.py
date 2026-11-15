@@ -2,6 +2,9 @@
 
 import logging
 import os
+import sqlite3
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -13,12 +16,43 @@ DB_PATH = Path(os.environ.get("DATA_DIR", "data")) / "fishing.db"
 logger = logging.getLogger(__name__)
 
 
+BUSY_TIMEOUT_MS = 5000
+
+
 def get_db(path: Path | None = None) -> Database:
+    """Open the database and set this connection's pragmas. Nothing else.
+
+    No schema check and no migrations: those run once, at deploy (`fishbot
+    migrate`) and at startup (the API's lifespan), through `migrate`. This used to
+    run every migration on every call, nine of them writes, so a request failed
+    with "database is locked" whenever anything else held the write lock for
+    longer than the 10 s default wait. Opening is now a read-only act.
+    """
     p = path or DB_PATH
     p.parent.mkdir(parents=True, exist_ok=True)
     db = Database(p)
-    ensure_schema(db)
+    _configure_connection(db)
     return db
+
+
+def _configure_connection(db: Database) -> None:
+    """Per-connection settings. `busy_timeout` goes first so the rest can wait for a lock.
+
+    WAL lets readers carry on while one writer commits, which is the difference
+    between a long ingest slowing a request and failing it. The journal mode is
+    stored in the file, so setting it on an already-WAL database is a no-op;
+    only the first open after the switch needs the file to itself.
+    """
+    conn = db.conn
+    conn.execute(f"PRAGMA busy_timeout = {BUSY_TIMEOUT_MS}")
+    try:
+        conn.execute("PRAGMA journal_mode = WAL")
+    except sqlite3.OperationalError as exc:
+        # Not fatal: the database works in its current mode. But a deploy that
+        # leaves this failing is a database still serving without WAL, so say so.
+        logger.warning("could not switch the database to WAL (%s); `fishbot migrate` retries", exc)
+    conn.execute("PRAGMA synchronous = NORMAL")
+    conn.execute("PRAGMA foreign_keys = ON")
 
 
 def _ensure_fish_surveys(db: Database) -> None:
@@ -395,44 +429,6 @@ def _ensure_bathymetry_contours(db: Database) -> None:
     )
 
 
-def _apply_migrations(db: Database) -> None:
-    """Bring an existing schema up to current. Every step is idempotent.
-
-    Called from ensure_schema so that "the schema exists" and "the schema is
-    current" are the same statement. They used to differ: ensure_schema created
-    tables while the migrations lived in get_db(), so anything constructing a
-    Database directly got a schema with no user_id on stops/sessions — which is
-    precisely why a cross-user data leak in coaching.py was invisible to nine
-    test files at once.
-    """
-    migrate_catches_species_confirmation(db)
-    migrate_catches_biggest_size_cm(db)
-    migrate_catches_caught_at(db)
-    migrate_behavioral_insights(db)
-    migrate_stops(db)
-    migrate_angler_context_multi_user(db)
-    migrate_user_fields(db)
-    migrate_stream_segments_multi_jurisdiction(db)
-    migrate_observations_source(db)
-    migrate_observations_licensing(db)
-    migrate_gbif_licensing(db)
-    migrate_gbif_survey_provenance(db)
-    migrate_observation_position_indexes(db)
-    _ensure_fish_surveys(db)
-    _ensure_fishing_stretches(db)
-    migrate_species_status_provenance(db)
-    migrate_regulation_chunks_zone_name(db)
-    migrate_segment_synthesis_jurisdiction(db)
-    migrate_segment_synthesis_user(db)
-    migrate_dismissed_segments_user(db)
-    migrate_user_patterns(db)
-    migrate_pins(db)
-    migrate_weed_reports(db)
-    migrate_session_conditions_gauge(db)
-    migrate_species_images(db)
-    _ensure_hydro_segments(db)
-
-
 def migrate_session_conditions_gauge(db: Database) -> None:
     """Add the gauge snapshot columns to session_conditions, and repair user_id.
 
@@ -609,7 +605,8 @@ def migrate_behavioral_insights(db: Database) -> None:
             pass
 
 
-def ensure_schema(db: Database) -> None:
+def _create_baseline_schema(db: Database) -> None:
+    """Migration 1: every table the app had before migrations were numbered. Idempotent."""
     if "trips" not in db.table_names():
         db["trips"].create(
             {
@@ -1474,8 +1471,6 @@ def ensure_schema(db: Database) -> None:
             ON map_segments(score_balanced DESC)
     """)
 
-    _apply_migrations(db)
-
 
 def migrate_angler_context_multi_user(db: Database) -> None:
     """Convert singleton angler_context to per-user table. Idempotent."""
@@ -1872,3 +1867,132 @@ def migrate_dismissed_segments_user(db: Database) -> dict[str, int] | None:
 def cleanup_old_gauge_readings(db: Database, days: int = 7) -> None:
     cutoff = (datetime.now() - timedelta(days=days)).isoformat()
     db.execute("DELETE FROM stream_gauge_readings WHERE reading_datetime < ?", [cutoff])
+
+
+@dataclass(frozen=True)
+class Migration:
+    version: int
+    name: str
+    apply: Callable[[Database], None]
+
+
+# The schema's history, in the order it must run. Numbers are permanent: a step
+# that has run on any database is never edited or renumbered, and a change goes in
+# as a new step at the end. Version 1 is everything the app created before
+# migrations were numbered; every step is idempotent, so a database that predates
+# this table simply runs them all once and records that it did.
+MIGRATIONS: tuple[Migration, ...] = (
+    Migration(1, "baseline_schema", _create_baseline_schema),
+    Migration(2, "catches_species_confirmation", migrate_catches_species_confirmation),
+    Migration(3, "catches_biggest_size_cm", migrate_catches_biggest_size_cm),
+    Migration(4, "catches_caught_at", migrate_catches_caught_at),
+    Migration(5, "behavioral_insights", migrate_behavioral_insights),
+    Migration(6, "stops", migrate_stops),
+    Migration(7, "angler_context_multi_user", migrate_angler_context_multi_user),
+    # Adds user_id to the personal tables and backfills NULLs to user 1. This is the
+    # backfill that used to run on every request; as a one-time step it assigns the
+    # rows that predate multi-user and then stops, so a later write that forgets its
+    # user_id stays NULL and visible instead of silently becoming the captain's.
+    Migration(8, "user_fields", migrate_user_fields),
+    Migration(9, "stream_segments_multi_jurisdiction", migrate_stream_segments_multi_jurisdiction),
+    Migration(10, "observations_source", migrate_observations_source),
+    Migration(11, "observations_licensing", migrate_observations_licensing),
+    Migration(12, "gbif_licensing", migrate_gbif_licensing),
+    Migration(13, "gbif_survey_provenance", migrate_gbif_survey_provenance),
+    Migration(14, "observation_position_indexes", migrate_observation_position_indexes),
+    Migration(15, "fish_surveys", _ensure_fish_surveys),
+    Migration(16, "fishing_stretches", _ensure_fishing_stretches),
+    Migration(17, "species_status_provenance", migrate_species_status_provenance),
+    Migration(18, "regulation_chunks_zone_name", migrate_regulation_chunks_zone_name),
+    Migration(19, "segment_synthesis_jurisdiction", migrate_segment_synthesis_jurisdiction),
+    Migration(20, "segment_synthesis_user", migrate_segment_synthesis_user),
+    Migration(21, "dismissed_segments_user", migrate_dismissed_segments_user),
+    Migration(22, "user_patterns", migrate_user_patterns),
+    Migration(23, "pins", migrate_pins),
+    Migration(24, "weed_reports", migrate_weed_reports),
+    Migration(25, "session_conditions_gauge", migrate_session_conditions_gauge),
+    Migration(26, "species_images", migrate_species_images),
+    Migration(27, "hydro_segments", _ensure_hydro_segments),
+)
+
+assert [m.version for m in MIGRATIONS] == list(range(1, len(MIGRATIONS) + 1))
+
+
+def applied_migrations(db: Database) -> set[int]:
+    """Versions recorded as done. Empty for a database that has never been migrated."""
+    if "schema_migrations" not in db.table_names():
+        return set()
+    return {r[0] for r in db.execute("SELECT version FROM schema_migrations").fetchall()}
+
+
+def pending_migrations(db: Database) -> list[Migration]:
+    done = applied_migrations(db)
+    return [m for m in MIGRATIONS if m.version not in done]
+
+
+def migrate(db: Database) -> list[Migration]:
+    """Run every migration this database has not recorded, in order. Returns those it ran.
+
+    The only place the schema changes. Call it once per process start (the API's
+    lifespan, the CLI) or from `fishbot migrate`, never per request. When nothing
+    is pending it only reads, so a caller that is not sure can call it safely.
+
+    Foreign keys are off while it runs: SQLite's rebuild-a-table recipe (rename,
+    create, copy, drop) needs that, and with them on a rename rewrites the
+    foreign keys of every table that points at the one being rebuilt. They go back
+    on afterwards, and a violation found then is logged, not hidden.
+    """
+    done = applied_migrations(db)
+    unknown = sorted(done - {m.version for m in MIGRATIONS})
+    if unknown:
+        logger.warning(
+            "database records migrations this code does not know (%s): it was migrated "
+            "by newer code, so this code may not match its schema",
+            ", ".join(map(str, unknown)),
+        )
+    pending = [m for m in MIGRATIONS if m.version not in done]
+    if not pending:
+        return []
+
+    db.conn.commit()  # PRAGMA foreign_keys is a no-op inside a transaction
+    foreign_keys = db.execute("PRAGMA foreign_keys").fetchone()[0]
+    db.execute("PRAGMA foreign_keys = OFF")
+    ran: list[Migration] = []
+    try:
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS schema_migrations ("
+            "version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)"
+        )
+        for m in pending:
+            logger.info("applying migration %d %s", m.version, m.name)
+            m.apply(db)
+            # Recorded only once the step has finished. A step cut short is re-run
+            # from the top next time, which is safe because every step is idempotent.
+            db.execute(
+                "INSERT OR IGNORE INTO schema_migrations (version, name, applied_at) "
+                "VALUES (?, ?, ?)",
+                [m.version, m.name, datetime.now().isoformat(timespec="seconds")],
+            )
+            db.conn.commit()
+            ran.append(m)
+    finally:
+        if foreign_keys:
+            db.execute("PRAGMA foreign_keys = ON")
+
+    violations = db.execute("PRAGMA foreign_key_check").fetchall()
+    if violations:
+        logger.warning(
+            "%d foreign key violation(s) after migrating (first: %s)",
+            len(violations),
+            violations[0],
+        )
+    return ran
+
+
+def ensure_schema(db: Database) -> None:
+    """Bring `db` up to the current schema; a read-only check when it already is.
+
+    Kept for scripts and tests that open a Database themselves. Request paths
+    do not call it: `get_db()` deliberately does not migrate.
+    """
+    migrate(db)
