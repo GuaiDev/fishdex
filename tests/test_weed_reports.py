@@ -32,7 +32,7 @@ from src.storage import weed_reports as store
 from src.storage.spots import replace_spots
 
 BUILT = "2026-10-01T00:00:00+00:00"
-TODAY = date.today()
+TODAY = date(2026, 10, 15)
 SEEN = "2026-10-04"
 
 # An L-shaped river: west to east along 43.50, then north along -79.60.
@@ -92,6 +92,19 @@ def report(**over):
         observed_on=SEEN,
     )
     return {**base, **over}
+
+
+@pytest.fixture(autouse=True)
+def _frozen_clock(monkeypatch):
+    """Keep the future-date check deterministic however long the suite runs."""
+    import src.models.weed_report as weed_report
+
+    class _FrozenDate(date):
+        @classmethod
+        def today(cls):
+            return TODAY
+
+    monkeypatch.setattr(weed_report, "date", _FrozenDate)
 
 
 @pytest.fixture

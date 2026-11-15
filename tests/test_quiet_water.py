@@ -402,15 +402,15 @@ def client(built, monkeypatch):
     from fastapi.testclient import TestClient
 
     import src.storage.database as database
-    from src.api.main import app, get_current_user
+    from src.api.main import app, get_user_or_demo
 
     db, _ = built
     monkeypatch.setattr(
         database, "DB_PATH", Path(db.conn.execute("PRAGMA database_list").fetchone()[2])
     )
-    app.dependency_overrides[get_current_user] = lambda: {"id": 1}
+    app.dependency_overrides[get_user_or_demo] = lambda: {"id": 1}
     yield TestClient(app)
-    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_user_or_demo, None)
 
 
 def test_the_kind_filter_returns_quiet_water_with_its_caveats(client):

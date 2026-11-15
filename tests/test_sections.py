@@ -759,10 +759,11 @@ def api(tmp_path, monkeypatch, _template_db):
     return Api()
 
 
-def test_both_routes_need_a_login(api):
+def test_both_routes_serve_the_public_demo_but_reject_a_stale_token(api):
+    stale = {"Authorization": "Bearer nope"}
     for path in ("/map/sections", "/map/sections/humber-lower"):
-        assert api.client.get(path).status_code in (401, 403)
-        assert api.client.get(path, headers={"Authorization": "Bearer nope"}).status_code == 401
+        assert api.client.get(path).status_code == 200
+        assert api.client.get(path, headers=stale).status_code == 401
 
 
 def test_the_list_route_serves_the_layer_and_is_never_cached(api):

@@ -424,6 +424,21 @@
               "label_mode": "plain",
               "prominence": 0.35
             },
+            "pier": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "breakwater": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
+            "harbour": {
+              "state": "unseen",
+              "label_mode": "plain",
+              "prominence": 0.35
+            },
             "weed_edge": {
               "state": "unseen",
               "label_mode": "plain",
@@ -435,7 +450,7 @@
               "prominence": 0.35
             }
           },
-          "default_layer_density": 0.4429,
+          "default_layer_density": 0.4353,
           "more_detail_toggle": true,
           "water_body_mix": {
             "lake": 0.3333333333333333,

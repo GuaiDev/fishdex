@@ -389,7 +389,7 @@ def client(tmp_path, monkeypatch, _template_db):
     from fastapi.testclient import TestClient
 
     import src.storage.database as database
-    from src.api.main import app, get_current_user
+    from src.api.main import app, get_user_or_demo
 
     shutil.copy(_template_db, tmp_path / "api.db")
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "api.db")
@@ -406,12 +406,12 @@ def client(tmp_path, monkeypatch, _template_db):
     declare_explorers(api_db)
     inat(api_db, *DARTER)
     who = {"id": ALICE}
-    app.dependency_overrides[get_current_user] = lambda: dict(who)
+    app.dependency_overrides[get_user_or_demo] = lambda: dict(who)
     test_client = TestClient(app)
     test_client.who = who
     test_client.db = api_db
     yield test_client
-    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_user_or_demo, None)
 
 
 def test_the_spot_endpoint_serves_the_hook_for_the_caller_and_is_not_cacheable(client):
