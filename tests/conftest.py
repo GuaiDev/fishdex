@@ -67,3 +67,38 @@ def _no_untapped_cache(monkeypatch, tmp_path):
     from src.services import untapped_potential
 
     monkeypatch.setattr(untapped_potential, "_PARQUET_PATH", tmp_path / "no_untapped.parquet")
+
+
+# `get_db()` only opens the file now; the schema is built by `migrate`, once, at
+# deploy. Tests open a fresh temporary database at nearly every turn and expect
+# the schema to be there, so migrate right after each open, and only when the
+# database is behind (a read when it is not). The patch sits at import time so
+# module-scoped fixtures get it too. A test that needs the bare production
+# behaviour, `get_db()` and nothing else, opts out with `@pytest.mark.raw_db`.
+_auto_migrate = {"on": True}
+
+
+def _install_auto_migrate() -> None:
+    import src.storage.database as database
+
+    real = database._configure_connection
+
+    def configure_then_migrate(db):
+        real(db)
+        if _auto_migrate["on"]:
+            database.migrate(db)
+
+    database._configure_connection = configure_then_migrate
+
+
+_install_auto_migrate()
+
+
+@pytest.fixture(autouse=True)
+def _raw_db_opt_out(request):
+    if request.node.get_closest_marker("raw_db"):
+        _auto_migrate["on"] = False
+        yield
+        _auto_migrate["on"] = True
+    else:
+        yield

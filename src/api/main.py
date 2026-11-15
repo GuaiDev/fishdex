@@ -146,10 +146,13 @@ async def lifespan(app):
     # every INFO message emitted by background ingest tasks.
     logging.getLogger().setLevel(logging.INFO)
 
-    from src.storage.database import ensure_schema, get_db
+    from src.storage.database import get_db, migrate
 
+    # The one place the API changes the schema. Requests only open the database.
     db = get_db()
-    ensure_schema(db)
+    applied = migrate(db)
+    if applied:
+        _log.info("[startup] applied %d migration(s): %s", len(applied), applied[-1].name)
 
     count = db.execute("SELECT COUNT(*) FROM map_segments").fetchone()[0]
     if count == 0:
@@ -487,7 +490,7 @@ def _log_trip_core(
     """
     from src.services.trip_logger import log_session
     from src.services.trip_parser import parse_session_from_text
-    from src.storage.database import ensure_schema, get_db
+    from src.storage.database import get_db
 
     text = text.strip()
     if not text:
@@ -495,7 +498,6 @@ def _log_trip_core(
     started_at, ended_at = _trip_times(started_at, ended_at)
 
     db = get_db()
-    ensure_schema(db)
     parsed = parse_session_from_text(text, db)
     structured_catches = _normalize_structured_catches(catches_json, extra_photos)
 
@@ -1345,11 +1347,6 @@ def _run_national_ingest(
         )
     else:
         _log.info("[%s] National ingest started — no location filter (national scope)", label)
-    from src.storage.database import ensure_schema, get_db
-
-    db = get_db()
-    ensure_schema(db)
-
     _log.info("[%s] DFO SAR range: fetching", label)
     try:
         from src.services.national_ingest import ingest_dfo_sar_range

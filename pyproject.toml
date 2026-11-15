@@ -61,3 +61,6 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "raw_db: get_db() opens the database and nothing else (no test auto-migrate)",
+]
