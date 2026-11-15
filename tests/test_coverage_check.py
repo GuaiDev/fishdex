@@ -551,6 +551,46 @@ def test_api_mode_runs_liveness_and_asks_the_host_for_its_tables(tmp_path):
     assert rep.exit_code == 0
 
 
+def test_liveness_outage_fails_the_gate_instead_of_crashing(tmp_path):
+    build = _build_db(tmp_path, spots=[(43.65, -79.5, "below_dam")], species=1)
+
+    def outside(url, path, required):
+        raise httpx.ConnectError("check-host.net unreachable")
+
+    rep = run_coverage_check(
+        _registry(),
+        "home",
+        build,
+        api_url="https://api.example",
+        fetch=_fetch_one([]),
+        probe_outside=outside,
+    )
+    gate = _gate(rep, "api_reachable")
+    assert not gate.passed and not gate.skipped
+    assert "check-host.net unreachable" in gate.measured
+    assert rep.exit_code != 0
+
+
+def test_empty_reference_fails_the_recall_gate(tmp_path):
+    path = _build_db(tmp_path, spots=[(43.65, -79.5, "below_dam")], species=1)
+    rep = run_coverage_check(_registry(), "home", path, fetch=_fetch_one([]))
+    gates = [g for g in rep.gates if g.name.endswith("_in_scope_recall")]
+    assert gates and all(not g.passed for g in gates)
+
+
+def test_adapter_does_not_cache_an_empty_answer(tmp_path):
+    adapter = _arcgis()
+    calls = []
+
+    def handler(req):
+        calls.append(req)
+        return httpx.Response(200, json={"features": []})
+
+    for _ in range(2):
+        adapter.fetch_reference(_spec(), BOX, cache_dir=tmp_path, client=_client(handler))
+    assert len(calls) == 2
+
+
 def test_api_mode_without_a_key_says_parity_was_skipped(tmp_path):
     from src.models.coverage import LivenessReport, VantageResult
 
@@ -634,18 +674,6 @@ def test_liveness_polls_check_host_until_every_node_answers():
     )
     assert len(polls) == 2 and rep.ok_count == 1 and not rep.ok
     assert rep.prober == "check-host.net"
-
-
-def test_direct_probe_cannot_meet_a_three_point_requirement():
-    from src.services.coverage.liveness import probe_direct
-
-    rep = probe_direct(
-        "https://api.example",
-        "/health",
-        3,
-        client=_client(lambda r: httpx.Response(200, json={"status": "ok"})),
-    )
-    assert rep.ok_count == 1 and not rep.ok and rep.prober == "direct"
 
 
 def test_host_probe_client_sends_the_key_and_reads_the_probe_shape():

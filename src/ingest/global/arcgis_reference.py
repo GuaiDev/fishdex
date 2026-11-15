@@ -179,7 +179,8 @@ def _fetch_raw(
             http.close()
     # A failed cache write raises: a permanently cold cache would otherwise show
     # up only as a slow check and a hammered public service.
-    path.write_text(json.dumps({"service_url": service_url, "features": features}))
+    if features:
+        path.write_text(json.dumps({"service_url": service_url, "features": features}))
     return features, False
 
 

@@ -3,7 +3,7 @@
 One machine's answer proves little: a host can be fine from the developer's network
 and dead from everywhere else (or the reverse, behind a TLS-inspecting proxy). The
 check asks check-host.net, which probes from several outside vantage points and
-needs no account, and falls back to a single direct request, labelled as such.
+needs no account.
 
 This is a live probe by design, so it does not go through the response cache: a
 cached "up" is exactly the wrong answer to "is it up".
@@ -78,26 +78,3 @@ def parse_node(node: str, payload) -> VantageResult:
         return VantageResult(node=node, ok=ok and code == 200, status=code, detail=message)
     except (TypeError, IndexError, ValueError) as exc:
         return VantageResult(node=node, ok=False, detail=f"unreadable answer: {exc}")
-
-
-def probe_direct(
-    base_url: str, path: str, required: int, *, client: httpx.Client | None = None
-) -> LivenessReport:
-    """One request from this machine. Cannot satisfy a multi-point requirement, and says so."""
-    url = base_url.rstrip("/") + "/" + path.lstrip("/")
-    own = client is None
-    http = client or httpx.Client(headers=_HEADERS, timeout=20)
-    try:
-        try:
-            resp = http.get(url)
-            point = VantageResult(
-                node="this machine", ok=resp.status_code == 200, status=resp.status_code
-            )
-        except httpx.HTTPError as exc:
-            point = VantageResult(
-                node="this machine", ok=False, detail=f"{type(exc).__name__}: {exc}"
-            )
-    finally:
-        if own:
-            http.close()
-    return LivenessReport(url=url, required=required, vantage_points=[point], prober="direct")

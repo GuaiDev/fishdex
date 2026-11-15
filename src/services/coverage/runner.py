@@ -16,6 +16,8 @@ import logging
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
+
 from src.models.coverage import (
     ClassReport,
     CoverageRegistry,
@@ -139,11 +141,24 @@ def run_coverage_check(
         )
 
     live: LivenessReport | None = None
+    live_error: str | None = None
     if api_url:
-        live = probe_outside(api_url, registry.liveness.path, registry.liveness.min_vantage_points)
+        try:
+            live = probe_outside(
+                api_url, registry.liveness.path, registry.liveness.min_vantage_points
+            )
+        except (httpx.HTTPError, RuntimeError, ValueError) as exc:
+            live_error = f"{type(exc).__name__}: {exc}"
 
     gates = _decide_gates(
-        registry, classes, parity, listing, live, api_url, hosted_given=hosted is not None
+        registry,
+        classes,
+        parity,
+        listing,
+        live,
+        api_url,
+        hosted_given=hosted is not None,
+        live_error=live_error,
     )
     return CoverageReport(
         jurisdiction=jurisdiction,
@@ -168,6 +183,7 @@ def _decide_gates(
     api_url: str | None,
     *,
     hosted_given: bool,
+    live_error: str | None = None,
 ) -> list[GateResult]:
     gates: list[GateResult] = []
 
@@ -183,6 +199,18 @@ def _decide_gates(
                     f"returned 200 (via {live.prober})"
                 ),
                 threshold=f"{live.required} of {live.required} outside vantage points return 200",
+            )
+        )
+    elif live_error is not None:
+        gates.append(
+            GateResult(
+                name="api_reachable",
+                kind="hard",
+                passed=False,
+                measured=f"could not be measured: check-host.net failed ({live_error})",
+                threshold=(
+                    f"{registry.liveness.min_vantage_points} outside vantage points return 200"
+                ),
             )
         )
     else:
@@ -271,8 +299,10 @@ def _decide_gates(
                 GateResult(
                     name=f"{c.feature_class}_in_scope_recall",
                     kind="focus",
-                    passed=True,
-                    measured=f"0 in scope of {c.reference_total} reference features",
+                    passed=False,
+                    measured=(
+                        f"nothing to measure: {c.reference_total} reference features, 0 in scope"
+                    ),
                     threshold=f">= {c.min_recall:.0%}",
                 )
             )
