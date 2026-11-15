@@ -52,7 +52,6 @@ def _configure_connection(db: Database) -> None:
         # leaves this failing is a database still serving without WAL, so say so.
         logger.warning("could not switch the database to WAL (%s); `fishbot migrate` retries", exc)
     conn.execute("PRAGMA synchronous = NORMAL")
-    conn.execute("PRAGMA foreign_keys = ON")
 
 
 def _ensure_fish_surveys(db: Database) -> None:

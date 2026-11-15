@@ -64,7 +64,7 @@ def test_get_db_sets_the_pragmas(tmp_path):
     assert conn.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
     assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
     assert conn.execute("PRAGMA synchronous").fetchone()[0] == 1  # NORMAL
-    assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+    assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 0
 
 
 @pytest.mark.raw_db
@@ -84,11 +84,13 @@ def test_migrate_records_every_step_and_the_second_run_does_nothing(tmp_path, tr
 
 
 @pytest.mark.raw_db
-def test_migrate_leaves_foreign_keys_on(tmp_path):
+@pytest.mark.parametrize("setting", [0, 1])
+def test_migrate_restores_the_foreign_keys_setting(tmp_path, setting):
     db = get_db(tmp_path / "t.db")
+    db.execute(f"PRAGMA foreign_keys = {setting}")
     migrate(db)
 
-    assert db.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+    assert db.execute("PRAGMA foreign_keys").fetchone()[0] == setting
 
 
 @pytest.mark.raw_db
