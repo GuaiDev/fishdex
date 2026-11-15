@@ -135,9 +135,7 @@ def describe_species(db: Database, name: str) -> SpeciesContext:
         # "so what" and is labelled, because a bare date next to a source reads
         # as the source's date.
         checked = (
-            sr.status_last_checked_at.date().isoformat()
-            if sr.status_last_checked_at
-            else None
+            sr.status_last_checked_at.date().isoformat() if sr.status_last_checked_at else None
         )
         assessed = sr.status_assessed_on
         if assessed:
@@ -145,10 +143,7 @@ def describe_species(db: Database, name: str) -> SpeciesContext:
             if checked:
                 meaning += f"; we last read the registry {checked}"
         elif checked:
-            meaning = (
-                f"the registry did not publish an assessment date; we last "
-                f"read it {checked}"
-            )
+            meaning = f"the registry did not publish an assessment date; we last read it {checked}"
         else:
             meaning = None
 
@@ -188,9 +183,7 @@ def describe_species(db: Database, name: str) -> SpeciesContext:
             if sr.fishing_notes
             else ContextField.empty(EmptyReason.FIELD_NOT_POPULATED_BY_SOURCE)
         ),
-        native_to_ontario=ContextField.inferred(
-            sr.native_to_ontario, meaning=_UNVERIFIED
-        ),
+        native_to_ontario=ContextField.inferred(sr.native_to_ontario, meaning=_UNVERIFIED),
         sar_alert=alert,
         sar_reason=reason,
         targeting_guidance_suppressed=alert,

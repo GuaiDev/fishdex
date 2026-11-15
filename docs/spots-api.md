@@ -341,7 +341,7 @@ GeoJSON `FeatureCollection` of points, light enough to load for a whole viewport
 | `kind` | One or more of `river_mouth`, `creek_junction`, `below_dam`, `public_fishing`, `quiet_water`, comma-separated. Omit for all. `quiet_water` is built from the explore score cache; see [Quiet water](#quiet-water). |
 | `tier` | The highest tier to include, **cumulative**: `1` headline spots only, `2` adds the normal ones (**default**), `3` everything, including junctions of small unnamed creeks that are hidden by default. A sensible mapping is tier 1 at province zoom, 2 at regional zoom, 3 at street zoom. |
 | `jurisdiction` | ISO 3166-2 code such as `CA-ON`. Omit for all. |
-| `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. The records are read around each spot in view, so pass a `bbox`: a province-wide request looks up every spot. |
+| `species` | Scientific/common name; a spot matches when that species has records within 2 km. Listed species (status_known_listed) are never returned. See [Species status availability](#species-status-availability) for the jurisdiction gate. The records are read around each spot in view, so pass a `bbox`: a province-wide request looks up every spot. |
 | `near` | `lat,lon` or `lat,lon,radius_km`; results sorted by distance, nearest first. Radius defaults to 50 km and is capped at 200 km. Each feature then carries `properties.distance_km` (straight-line, one decimal), and `meta.near` says what was applied (see below). |
 | `new_to_me` | `true` keeps only spots with at least one species recorded within 2 km that **the caller** has not caught (see [New to you](#new-to-you)). Per-user, computed for this request, never cached; the response is `Cache-Control: private, no-store`. Combines with every other filter. It reads the records around each spot, so a `bbox` is required: without one the request is rejected with 422 (`new_to_me needs a bbox`). Something unseen is necessary but not enough: the spots are then narrowed to the caller's own pattern (see [New to me follows the angler](#new-to-me-follows-the-angler)). Default `false`. |
 
@@ -1881,7 +1881,7 @@ Every user-facing string is in it, including block titles.
 
 | Block | Field | What it holds |
 |---|---|---|
-| 1. Why it's interesting | `card.hook` | `title`, `kind`, `text`: at most two lines. The first rule with data wins: `protected_species` (a care message that replaces everything else), then `structure` (one plain sentence about the water, only where a record supports it), then `honest_empty` ("No fish records within 2 km, so this is a place to find out."). `kind_description` is used when fish are recorded but nothing above has anything specific to say; it is the kind's one-liner. `new_to_you` is the first hook for a logged-in user who has something new (see [New to you](#new-to-you)); it sits after `protected_species`, so a care message still replaces it, and when it has nothing the chain falls through to `structure` as before. `distinctive` follows `new_to_you`: a species recorded more often here than along the rest of the river (see [Special here](#special-here)). |
+| 1. Why it's interesting | `card.hook` | `title`, `kind`, `text`: at most two lines. The first rule with data wins: `status_unavailable` (see [Species status availability](#species-status-availability)), then `protected_species` (a care message), then `structure` (one plain sentence about the water, only where a record supports it), then `honest_empty` ("No fish records within 2 km, so this is a place to find out."). `kind_description` is used when fish are recorded but nothing above has anything specific to say; it is the kind's one-liner. `new_to_you` is the personalised hook for a logged-in user who has something new (see [New to you](#new-to-you)); it sits after `protected_species`, so a care message still replaces it, and when it has nothing the chain falls through to `structure` as before. `distinctive` follows `new_to_you`: a species recorded more often here than along the rest of the river (see [Special here](#special-here)). |
 | 2. You might find | `card.might_find` | `species[]` (top 5), `more_text`, `caveat` ("Recorded nearby, not a catch guarantee."), `empty_text` (why there is no list), `note` (why some recorded species are left out), `radius_km`. Each species has `name`, `scientific_name`, `source`, `date`, `evidence`, `cite` (`"iNaturalist, 2024-06-03"`, ready to show in brackets) and `note` (`"Older record"` for a record a decade old or more). Standardised surveys (`evidence: "survey"`) come first, then photos and sightings, each most recent first. `special_here` is `null` unless a species stands out; see [Special here](#special-here). |
 | 3. Why fish gather here | `card.why_gather` | `what_it_is` (the kind in plain words), `general` = `{text, label, provenance: "inference"}`: the kind's two sentences, shown with the label "General reasoning, not a record about this spot". Then `facts_title` and `facts[]`: facts about this spot, each `{text, provenance: "record", source}`. They are listed apart from the reasoning on purpose. Every count in a fact agrees with its noun ("1 fish record within 2 km, covering 1 species."). |
 | 4. Getting there | `card.getting_there` | `items[]`: the nearest parking, trailhead, boat launch and public road crossing, each `{kind, label, text, distance_m, details[], source}` (`text` is "Parking about 150 m away"; `details` are mapped tags such as "mapped as free"). `empty_text` when there are none; it says "not looked up yet" rather than "none found" when `coverage` is `not_fetched`. `coverage` is `found`, `none_found`, `not_fetched` or `unknown` (the spot's `getting_there_status`). `crown_land` = `{state, text, source}` where `state` is `mapped`, `none_found` or `not_checked`. `unverified_title` and `unverified[]`: what has not been checked on the ground. |
@@ -1890,9 +1890,10 @@ Also on the card: `new_to_you` (see below; `null` when there is nothing new); `c
 `src/services/terms.py`) for the hard words that appear in this card's own text (for a
 weir, "weir"), to show behind a "What's a weir?" link; and `meta`, counts for a Sources view that are not shown on the card face:
 `species_shown`, `species_withheld_protected` (a number, never names),
-`species_withheld_imprecise`, `species_status_unchecked`, `special_here` (why there is, or is not,
+`species_withheld_imprecise`, `species_status_unchecked`,
+`species_status_missing`, `species_withheld_no_status` (see [Species status availability](#species-status-availability)), `special_here` (why there is, or is not,
 a "recorded more often here" line: `found`, `none_stands_out`, `too_few_records_here`,
-`too_few_records_along_river`, `no_river_section`, or `not_applicable` for quiet water), `cache_key`.
+`too_few_records_along_river`, `no_river_section`, or `not_applicable` for quiet water or missing species status data), `cache_key`.
 
 `GET /map/spots/labels` also carries `terms[]`, the whole term registry (`term_id`,
 `plain`, `technical`, `definition`, `mapped_from`); each kind and shoreline feature
@@ -1903,10 +1904,27 @@ Concern, Threatened, Endangered or Extirpated from any source we hold, verified 
 the hook becomes the care message and that species is not named anywhere on the card:
 not in "You might find", not in a count, not in the facts. The gate reads
 `status_known_listed`, never `sar_alert`, which is true for every fish in the local
-species file. A species the file does not know at all is still shown, and counted in
+species file. When status data is available for the jurisdiction, a species the file does not know
+at all is still shown, and counted in
 `meta.species_status_unchecked`. Records whose location is deliberately fuzzed (about
 22 km) are not "within 2 km", so they are left out and counted in
 `meta.species_withheld_imprecise`.
+
+### Species status availability
+
+If the local species file has no rows for the spot's jurisdiction, or its lookup fails,
+the card names no fish. Rows for another jurisdiction do not count. The hook kind is
+`status_unavailable`, ahead of every other hook, and both its text and
+`might_find.empty_text` explain that species status data is missing.
+`might_find.species` is empty, `might_find.special_here` and `new_to_you` are `null`,
+and no species-based facts are shown. When records are withheld, `might_find.note`
+explains why. `meta.species_status_missing` is `true` and
+`meta.species_withheld_no_status` counts the recorded species withheld, never their
+names; the protected and imprecise withholding counts are zero in this case.
+`meta.species_status_unchecked` still counts records unknown to the species file.
+Both `species=` and `new_to_me` exclude spots without jurisdiction status data.
+With status data available, the missing flag is `false`, the no-status count is zero,
+and the per-species screening rules above apply.
 
 **What a card is built from.** The spot, and `describe(map_tap)` within 2 km: no model
 call, no live lookup, no web search. The response has `Cache-Control: private,
@@ -2732,7 +2750,8 @@ id nobody has used. Their layer and list are simply empty of it.
 
 ### New to you
 
-A per-user hook and block, filled only for the logged-in caller:
+A per-user hook and block, filled only for the logged-in caller, subject to
+[Species status availability](#species-status-availability):
 
     new_species = species recorded within 2 km − the caller's confirmed catches
                   (and never a species with a listing signal)

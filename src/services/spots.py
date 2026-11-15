@@ -1359,8 +1359,9 @@ def _spots_with_species(db: Database, spots: list[Spot], species_l: str) -> list
     of that parent, and the angler's own catches are not read, so another user's
     logged stops can never put a spot into this answer.
 
-    Fails closed in three ways, because this filter must never be a way to ask
+    Fails closed in four ways, because this filter must never be a way to ask
     where a protected fish lives:
+      * a jurisdiction without species status data contributes no spots;
       * a query that names a listed species returns nothing, whatever the records say;
       * a spot is dropped when any record its query matched is listed;
       * a matched record whose name the species file does not know is treated as

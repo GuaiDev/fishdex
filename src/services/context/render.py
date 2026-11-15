@@ -1164,7 +1164,8 @@ def render_spot(
     jurisdiction: no species is named, and the card says the status data is missing.
     `special` is the frequency comparison for the spot's river section
     (context/special.py); it fills the "distinctive" hook and `might_find.special_here`
-    only when it found something, and the protected-species care message still comes first.
+    only when it found something; missing status data and the protected-species care
+    message take precedence.
 
     The card is the same for every user, with one exception. `caught` is the
     match keys of the logged-in user's confirmed catches (`new_to_you.caught_keys`)
