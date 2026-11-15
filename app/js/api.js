@@ -26,8 +26,36 @@ export const getConn = () => conn;
 export const isDemo = () => !conn.token;
 
 export function saveConn(next) {
-  conn = { base: (next.base || DEFAULT_BASE).replace(/\/+$/, ''), token: cleanToken(next.token) };
+  const base = (next.base || DEFAULT_BASE).replace(/\/+$/, '');
+  let token = cleanToken(next.token);
+  // A token belongs to the server that issued it. Never carry it to a different address.
+  if (base !== conn.base && token === conn.token) token = '';
+  conn = { base, token };
   try { localStorage.setItem(KEY, JSON.stringify(conn)); } catch (e) { /* see store.js */ }
+}
+
+// ?api= may only point at the server this build was configured for, or at a local one for development.
+export function isAllowedBase(value) {
+  let u;
+  try { u = new URL(value); } catch (e) { return false; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  if (u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]') return true;
+  try { return u.origin === new URL(DEFAULT_BASE).origin; } catch (e) { return false; }
+}
+
+// Reads ?api=, ?token= and #token= from the link, removes them from the address bar, and
+// returns the token to confirm (or ''). A token from a link is never saved here: the caller
+// shows who it signs in as and saves only if the person agrees.
+export function takeLinkParams(loc = location, hist = history) {
+  const q = new URLSearchParams(loc.search);
+  const f = new URLSearchParams((loc.hash || '').replace(/^#/, ''));
+  if (!q.has('api') && !q.has('token') && !f.has('token')) return { token: '' };
+  const wanted = q.get('api');
+  if (wanted && isAllowedBase(wanted)) saveConn({ base: wanted, token: conn.token });
+  const token = cleanToken(f.get('token') || q.get('token') || '');
+  const hash = f.has('token') ? '' : loc.hash;
+  hist.replaceState(null, '', loc.pathname + hash);
+  return { token };
 }
 
 export function forgetToken() {

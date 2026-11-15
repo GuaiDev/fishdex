@@ -18,15 +18,6 @@ const SCREENS = [
 const $ = (id) => document.getElementById(id);
 const panes = {};
 
-// ?api=http://localhost:8000&token=... in the link saves the connection and is then removed.
-function takeLinkParams() {
-  const q = new URLSearchParams(location.search);
-  if (!q.has('token') && !q.has('api')) return;
-  const cur = api.getConn();
-  api.saveConn({ base: q.get('api') || cur.base, token: q.get('token') || cur.token });
-  history.replaceState(null, '', location.pathname + location.hash);
-}
-
 function buildDemoBanner() {
   $('demo-banner').append(
     h('b', null, 'Demo'), ' — a read-only look at FishDex. Browse the real map and field guide; ',
@@ -78,7 +69,7 @@ function drawPlaceChip() {
 }
 
 // ── connection / sign-in ──────────────────────────────────────────────────
-function showConnect(message) {
+function showConnect(message, linkToken) {
   const dlg = $('connect');
   const conn = api.getConn();
   const err = h('p', { class: 'form-err', role: 'alert' }, message || '');
@@ -96,6 +87,7 @@ function showConnect(message) {
       location.reload();
     } catch (e) { err.textContent = e.status === 401 ? 'That token was not accepted.' : e.message; }
   }
+  if (linkToken) { showConfirmLinkToken(dlg, linkToken, err); return; }
   clear(dlg).append(h('form', { method: 'dialog', class: 'connect-form', onsubmit: (e) => e.preventDefault() },
     h('p', { class: 'kicker' }, 'FishDex'), h('h2', null, 'Connect to your FishDex'),
     h('p', { class: 'muted' }, 'This app talks to your own FishDex server. Start it with ', h('code', null, 'make serve'), ', then:'),
@@ -112,6 +104,32 @@ function showConnect(message) {
         } catch (e) { err.textContent = e.message; }
       } }, 'Sign up')),
     err));
+  if (!dlg.open) dlg.showModal();
+}
+
+// A token that came in through a link: show whose account it is and save only on confirm.
+async function showConfirmLinkToken(dlg, linkToken, err) {
+  const conn = api.getConn();
+  let who = null;
+  try {
+    who = await api.me({ base: conn.base, token: linkToken });
+  } catch (e) {
+    err.textContent = e.status === 401 ? 'The token in that link was not accepted.' : e.message;
+  }
+  const form = h('form', { method: 'dialog', class: 'connect-form', onsubmit: (e) => e.preventDefault() },
+    h('p', { class: 'kicker' }, 'FishDex'), h('h2', null, 'Sign in from a link?'));
+  if (who) {
+    form.append(
+      h('p', null, 'This link signs you in to ', h('b', null, who.display_name || who.username), ' on ', h('code', null, conn.base), '.'),
+      h('p', { class: 'muted' }, 'Only continue if you expected this. Anything you log will go to that account.'),
+      h('button', { class: 'btn primary', type: 'button', onclick: () => {
+        api.saveConn({ base: conn.base, token: linkToken });
+        dlg.close();
+        location.reload();
+      } }, 'Sign in as this account'));
+  }
+  form.append(h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Cancel'), err);
+  clear(dlg).append(form);
   if (!dlg.open) dlg.showModal();
 }
 
@@ -142,7 +160,7 @@ async function start() {
 }
 
 async function init() {
-  takeLinkParams();
+  const { token: linkToken } = api.takeLinkParams();
   buildNav();
   buildDemoBanner();
   store.subscribe(drawPlaceChip);
@@ -150,6 +168,7 @@ async function init() {
   window.addEventListener('hashchange', route);
   api.onAuthNeeded((msg) => showConnect(msg || 'Please sign in again.'));
   setUser(null);
+  if (linkToken) showConnect('', linkToken);
   if (api.isDemo()) { setUser(null); start(); return; }
   try {
     setUser(await api.me());
