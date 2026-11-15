@@ -398,3 +398,34 @@ def test_multipart_gets_a_larger_allowance(env):
     mw = BodySizeLimitMiddleware(None)
     assert mw.multipart_limit > mw.json_limit
     assert mw.multipart_limit >= limits.MAX_PHOTOS * limits.MAX_PHOTO_BYTES
+
+
+@pytest.mark.parametrize("chunked", [False, True])
+@pytest.mark.parametrize(
+    "path,content_type,size,status",
+    [
+        ("/chat", "application/json", 17, 413),
+        ("/log-trip", "application/json", 17, 413),
+        ("/log-trip/photo", "multipart/form-data; boundary=test", 33, 413),
+        ("/log-trip/photo", "multipart/form-data; boundary=test", 17, 200),
+        ("/other", "application/json", 33, 200),
+        ("/log-trip/other", "application/json", 33, 200),
+    ],
+)
+def test_body_limits_only_apply_to_model_routes(chunked, path, content_type, size, status):
+    from fastapi import FastAPI, Request
+
+    application = FastAPI()
+    application.add_middleware(limits.BodySizeLimitMiddleware, json_limit=16, multipart_limit=32)
+
+    @application.post("/{path:path}")
+    async def echo(request: Request):
+        return {"size": len(await request.body())}
+
+    body = b"x" * size
+    content = iter([body[:8], body[8:]]) if chunked else body
+    with TestClient(application, raise_server_exceptions=False) as client:
+        response = client.post(path, content=content, headers={"content-type": content_type})
+    assert response.status_code == status
+    if status == 200:
+        assert response.json() == {"size": size}

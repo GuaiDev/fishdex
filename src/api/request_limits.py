@@ -81,7 +81,11 @@ class BodySizeLimitMiddleware:
         self.multipart_limit = multipart_limit
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope["method"] in ("GET", "HEAD", "OPTIONS"):
+        if (
+            scope["type"] != "http"
+            or scope["method"] in ("GET", "HEAD", "OPTIONS")
+            or scope["path"] not in ("/chat", "/log-trip", "/log-trip/photo")
+        ):
             await self.app(scope, receive, send)
             return
 
