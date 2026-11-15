@@ -316,6 +316,22 @@ def capture_history(env, monkeypatch, history, message="hi"):
     return r, seen.get("messages")
 
 
+@pytest.mark.parametrize("role", [[], {}, ["user"], {"role": "user"}, None, 1, True])
+def test_history_non_string_roles_are_dropped(env, monkeypatch, role):
+    history = [
+        {"role": "user", "content": "real question"},
+        {"role": role, "content": "invalid turn"},
+        {"role": "assistant", "content": "real answer"},
+    ]
+    response, forwarded = capture_history(env, monkeypatch, history)
+    assert response.status_code == 200
+    assert forwarded == [
+        {"role": "user", "content": "real question"},
+        {"role": "assistant", "content": "real answer"},
+        {"role": "user", "content": "hi"},
+    ]
+
+
 def test_history_is_bounded_in_count_and_length(env, monkeypatch):
     # Fits under the body cap, so it is the history cap that is being tested.
     hist = [{"role": "assistant" if i % 2 else "user", "content": "y" * 2000} for i in range(100)]

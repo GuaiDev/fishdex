@@ -54,6 +54,7 @@ def sanitize_history(history: object) -> list[dict]:
         {"role": m["role"], "content": m["content"][:MAX_HISTORY_MESSAGE_CHARS]}
         for m in history
         if isinstance(m, dict)
+        and isinstance(m.get("role"), str)
         and m.get("role") in _HISTORY_ROLES
         and isinstance(m.get("content"), str)
         and m["content"].strip()
