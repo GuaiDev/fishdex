@@ -58,7 +58,15 @@ project is a static build (`buildCommand` + `outputDirectory`).
 11. Put the final Vercel address in `fly.toml` `FISHBOT_CORS_ORIGINS` (default
     `https://fishdex-red.vercel.app`) and `fly deploy` again. Until it matches, browsers block the app
     from calling the API.
+
 12. Open the Vercel URL: it should load the demo with no sign-in. Click "Sign in", paste the token, and try the map and the coach.
+
+Optional spend switch: set `FISHBOT_DAILY_MODEL_CALLS` to a positive integer (for example
+`fly secrets set FISHBOT_DAILY_MODEL_CALLS=300`) to cap the server-wide daily budget in
+[reservation units](../README.md#running-locally-and-hosting), rather than individual
+model calls. A request that fits its account budget but exceeds the remaining server budget
+returns 503 without charging the account. Unset, invalid, zero, or negative values disable
+the server-wide cap; the account budget still applies.
 
 ## Refreshing the map data on the volume
 

@@ -21,6 +21,18 @@ EXIT_COMMANDS = {"/exit", "/quit", "exit", "quit"}
 
 MAX_TURNS_BEFORE_SUMMARY = 10
 
+# Most model calls one question may make while the model keeps asking for tools. Each
+# pass re-sends the whole history, so an unbounded loop is an unbounded bill.
+MAX_AGENT_ITERATIONS = 8
+
+
+def _iteration_cap_reply(tool_rounds: int) -> str:
+    return (
+        f"I stopped after {tool_rounds} rounds of looking things up without reaching an "
+        "answer. Try asking a narrower question, or ask again to continue."
+    )
+
+
 HAIKU = "claude-haiku-4-5-20251001"
 
 # Jurisdiction for users who have no profile of their own (see _prompt_inputs).
@@ -110,7 +122,26 @@ def _run_full_pipeline(
     tools = _tools(profile)
     tool_calls_made: list[str] = []
 
-    while True:
+    def finish(reply: str) -> dict:
+        messages.append({"role": "assistant", "content": reply})
+
+        # Save the last user + assistant turn
+        user_msgs = [
+            m for m in messages if m["role"] == "user" and isinstance(m.get("content"), str)
+        ]
+        if user_msgs:
+            save_turn(db, session_id, "user", user_msgs[-1]["content"], len(user_msgs) - 1)
+        save_turn(db, session_id, "assistant", reply, len(user_msgs))
+
+        # Lazy context update after 15 turns
+        session_row = db["chat_sessions"].get(session_id)
+        if session_row and (session_row.get("turn_count") or 0) >= 15:
+            if not session_row.get("summary"):
+                close_and_update_context(db, session_id, messages, client, user_id=user_id)
+
+        return {"reply": reply, "tool_calls": tool_calls_made, "messages": messages}
+
+    for iteration in range(MAX_AGENT_ITERATIONS):
         messages = _summarize_history(messages, client)
 
         resp = client.messages.create(
@@ -131,6 +162,7 @@ def _run_full_pipeline(
                 "total_tokens": usage.input_tokens + usage.output_tokens,
                 "tool_calls_made": len([b for b in resp.content if b.type == "tool_use"]),
                 "endpoint": "chat",
+                "user_id": user_id,
             }
         )
 
@@ -138,24 +170,12 @@ def _run_full_pipeline(
         tool_use_blocks = [b for b in content_blocks if b.type == "tool_use"]
 
         if not tool_use_blocks:
-            reply = "".join(b.text for b in content_blocks if b.type == "text")
-            messages.append({"role": "assistant", "content": reply})
+            return finish("".join(b.text for b in content_blocks if b.type == "text"))
 
-            # Save the last user + assistant turn
-            user_msgs = [
-                m for m in messages if m["role"] == "user" and isinstance(m.get("content"), str)
-            ]
-            if user_msgs:
-                save_turn(db, session_id, "user", user_msgs[-1]["content"], len(user_msgs) - 1)
-            save_turn(db, session_id, "assistant", reply, len(user_msgs))
-
-            # Lazy context update after 15 turns
-            session_row = db["chat_sessions"].get(session_id)
-            if session_row and (session_row.get("turn_count") or 0) >= 15:
-                if not session_row.get("summary"):
-                    close_and_update_context(db, session_id, messages, client, user_id=user_id)
-
-            return {"reply": reply, "tool_calls": tool_calls_made, "messages": messages}
+        if iteration == MAX_AGENT_ITERATIONS - 1:
+            # The model still wants tools but the budget for this question is spent.
+            # The tool_use blocks are dropped, not left dangling without results.
+            return finish(_iteration_cap_reply(iteration))
 
         assistant_content = [_normalize_block(b) for b in content_blocks]
         messages.append({"role": "assistant", "content": assistant_content})
@@ -179,6 +199,8 @@ def _run_full_pipeline(
             except Exception:
                 pass
         messages.append({"role": "user", "content": tool_results})
+
+    raise AssertionError("unreachable: the last iteration always returns")  # pragma: no cover
 
 
 def run_chat_api(
@@ -227,12 +249,12 @@ def run_chat_api(
             classification["mode"] = mode
             classification["reflex_override"] = named_place
 
-    _log_routing(session_id, mode, classification.get("router_tokens", 0))
+    _log_routing(session_id, mode, classification.get("router_tokens", 0), user_id=user_id)
 
     if mode == "reflex":
         result = handle_reflex(latest_user, classification.get("leading_question"))
         messages.append({"role": "assistant", "content": result["reply"]})
-        _log_mode_usage(session_id, "reflex", result.get("tokens", 0))
+        _log_mode_usage(session_id, "reflex", result.get("tokens", 0), user_id=user_id)
         return {
             "reply": result["reply"],
             "tool_calls": [],
@@ -306,6 +328,7 @@ def run_chat_api(
                     session_id,
                     "synthesis_cache_hit",
                     resp.usage.input_tokens + resp.usage.output_tokens,
+                    user_id=user_id,
                 )
                 return {
                     "reply": reply,
@@ -339,7 +362,7 @@ def run_chat_api(
     return _run_full_pipeline(messages, session_id, mode=mode, user_id=user_id)
 
 
-def _log_routing(session_id: str, mode: str, tokens: int) -> None:
+def _log_routing(session_id: str, mode: str, tokens: int, user_id: int = 1) -> None:
     try:
         db = get_db()
         db["api_usage"].insert(
@@ -351,13 +374,14 @@ def _log_routing(session_id: str, mode: str, tokens: int) -> None:
                 "total_tokens": tokens,
                 "tool_calls_made": 0,
                 "endpoint": f"router:{mode}",
+                "user_id": user_id,
             }
         )
     except Exception:
         pass
 
 
-def _log_mode_usage(session_id: str, mode: str, tokens: int) -> None:
+def _log_mode_usage(session_id: str, mode: str, tokens: int, user_id: int = 1) -> None:
     try:
         db = get_db()
         db["api_usage"].insert(
@@ -369,6 +393,7 @@ def _log_mode_usage(session_id: str, mode: str, tokens: int) -> None:
                 "total_tokens": tokens,
                 "tool_calls_made": 0,
                 "endpoint": f"mode:{mode}",
+                "user_id": user_id,
             }
         )
     except Exception:
@@ -550,7 +575,7 @@ def _agentic_loop(
     """Stream a response, handle tool calls, loop until end_turn."""
     db = get_db()
 
-    while True:
+    for iteration in range(MAX_AGENT_ITERATIONS):
         messages[:] = _summarize_history(messages, client)
 
         content_blocks: list[Any] = []
@@ -577,6 +602,7 @@ def _agentic_loop(
                 "total_tokens": usage.input_tokens + usage.output_tokens,
                 "tool_calls_made": len([b for b in content_blocks if b.type == "tool_use"]),
                 "endpoint": "chat",
+                "user_id": user_id,
             }
         )
 
@@ -587,6 +613,14 @@ def _agentic_loop(
             console.print()
             text = "".join(b.text for b in content_blocks if b.type == "text")
             messages.append({"role": "assistant", "content": text})
+            return
+
+        if iteration == MAX_AGENT_ITERATIONS - 1:
+            console.print()
+            stopped = _iteration_cap_reply(iteration)
+            console.print(stopped, markup=False, highlight=False)
+            console.print()
+            messages.append({"role": "assistant", "content": stopped})
             return
 
         # Tool call detected — execute and continue the loop
