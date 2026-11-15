@@ -2,6 +2,7 @@
 Simple invite-code auth for FishBot beta.
 No email, no OAuth. Generate codes, friends enter them, they get accounts.
 """
+import os
 import secrets
 from datetime import datetime, timedelta
 
@@ -138,16 +139,69 @@ def check_rate_limit(db: Database, user_id: int, limit: int = 50) -> dict:
     return {"allowed": used < limit, "used": used, "limit": limit}
 
 
-def increment_usage(db: Database, user_id: int) -> None:
-    """Increment daily message count for a user."""
-    today = datetime.now().strftime("%Y-%m-%d")
+# daily_usage row that holds the whole server's spend for the day (no real user has id 0).
+GLOBAL_USAGE_USER_ID = 0
+
+
+def global_daily_budget() -> int | None:
+    """FISHBOT_DAILY_MODEL_CALLS: the most spend units the whole server allows per day.
+
+    Unset, empty or not a positive integer means no global switch.
+    """
+    raw = os.environ.get("FISHBOT_DAILY_MODEL_CALLS", "").strip()
     try:
-        db.execute("""
-            INSERT INTO daily_usage (user_id, date, message_count)
-            VALUES (?, ?, 1)
-            ON CONFLICT(user_id, date)
-            DO UPDATE SET message_count = message_count + 1
-        """, [user_id, today])
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _reserve(db: Database, user_id: int, today: str, cost: int, limit: int) -> bool:
+    """Add `cost` to a day's counter if it still fits under `limit`, in one statement.
+
+    The check and the write are the same SQL statement, so two requests cannot both
+    pass the check and then both write (the old check-then-increment race).
+    """
+    if cost > limit:
+        return False
+    cur = db.execute(
+        """
+        INSERT INTO daily_usage (user_id, date, message_count)
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id, date)
+        DO UPDATE SET message_count = message_count + ?
+        WHERE message_count + ? <= ?
+        RETURNING message_count
+        """,
+        [user_id, today, cost, cost, cost, limit],
+    )
+    row = cur.fetchone()
+    db.conn.commit()
+    return row is not None
+
+
+def reserve_usage(db: Database, user_id: int, limit: int, cost: int = 1) -> dict:
+    """Reserve `cost` units of today's model spend BEFORE the model is called.
+
+    The units are spent for good: a request that fails afterwards is not refunded, because
+    the model calls it made were paid for either way. Only a refused reservation costs nothing.
+
+    Returns {"allowed": bool, "reason": None | "user" | "global", "limit": int}.
+    "user" means the person's own daily limit; "global" means the server-wide
+    FISHBOT_DAILY_MODEL_CALLS budget (the caller answers 503, not 429).
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    if not _reserve(db, user_id, today, cost, limit):
+        return {"allowed": False, "reason": "user", "limit": limit}
+
+    budget = global_daily_budget()
+    if budget is not None and not _reserve(db, GLOBAL_USAGE_USER_ID, today, cost, budget):
+        # The person had room; the server did not. Give their units back.
+        db.execute(
+            "UPDATE daily_usage SET message_count = message_count - ? "
+            "WHERE user_id = ? AND date = ?",
+            [cost, user_id, today],
+        )
         db.conn.commit()
-    except Exception:
-        pass
+        return {"allowed": False, "reason": "global", "limit": budget}
+    return {"allowed": True, "reason": None, "limit": limit}

@@ -45,6 +45,16 @@ from fastapi.responses import JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
+from src.api.request_limits import (  # noqa: E402
+    MAX_CATCHES_JSON_CHARS,
+    MAX_LOG_TEXT_CHARS,
+    MAX_MESSAGE_CHARS,
+    MAX_PHOTOS,
+    PHOTO_COST,
+    BodySizeLimitMiddleware,
+    require_text,
+    sanitize_history,
+)
 from src.models.pin import (  # noqa: E402
     PinCreate,
     PinLinkCreate,
@@ -216,6 +226,9 @@ app = FastAPI(
 _cors_raw = os.environ.get("FISHBOT_CORS_ORIGINS", "*")
 _cors_origins = [o.strip().rstrip("/") for o in _cors_raw.split(",") if o.strip()] or ["*"]
 
+# Added before CORS so CORS wraps it and a 413 still reaches the browser readable.
+app.add_middleware(BodySizeLimitMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -334,33 +347,43 @@ def me(user: dict = Depends(get_current_user)):
     }
 
 
+def _reserve_model_spend(user: dict, cost: int = 1) -> None:
+    """Spend `cost` units of today's model budget, or raise 429 (own limit) / 503 (server's).
+
+    Call this after cheap validation (so a malformed request is free) and before any
+    model call. The units are not refunded when the request later fails.
+    """
+    from src.auth.auth import reserve_usage
+    from src.storage.database import get_db
+
+    limit = user.get("daily_message_limit", 50)
+    result = reserve_usage(get_db(), user["id"], limit, cost)
+    if result["allowed"]:
+        return
+    if result["reason"] == "global":
+        raise HTTPException(
+            status_code=503,
+            detail="FishBot has used its model budget for today. Try again tomorrow.",
+        )
+    raise HTTPException(
+        status_code=429,
+        detail=f"Daily message limit reached ({limit} messages/day). Try again tomorrow.",
+    )
+
+
 @app.post("/chat")
 def chat(body: dict, user: dict = Depends(get_current_user)):
     """Send a message to FishBot. Body: {"messages": [{"role": "user", "content": "..."}]}"""
     from src.agent.chat import run_chat_api
-    from src.auth.auth import check_rate_limit, increment_usage
-    from src.storage.database import get_db
 
-    db = get_db()
-    limit = user.get("daily_message_limit", 50)
-    usage = check_rate_limit(db, user["id"], limit)
-    if not usage["allowed"]:
-        raise HTTPException(
-            status_code=429,
-            detail=f"Daily message limit reached ({limit} messages/day). Try again tomorrow.",
-        )
+    message = require_text(body.get("message"), "message", MAX_MESSAGE_CHARS)
+    messages = sanitize_history(body.get("conversation_history"))
+    messages.append({"role": "user", "content": message})
+    session_id = body.get("session_id")
 
+    _reserve_model_spend(user)
     try:
-        message = body.get("message", "").strip()
-        if not message:
-            raise HTTPException(status_code=400, detail="'message' field is required")
-        history = body.get("conversation_history", [])
-        messages = [{"role": m["role"], "content": m["content"]} for m in history]
-        messages.append({"role": "user", "content": message})
-        session_id = body.get("session_id")
-        result = run_chat_api(messages, session_id=session_id, user_id=user["id"])
-        increment_usage(db, user["id"])
-        return result
+        return run_chat_api(messages, session_id=session_id, user_id=user["id"])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -460,6 +483,17 @@ def _trip_times(started_at: str | None, ended_at: str | None) -> tuple[str | Non
         times.started_at.isoformat() if times.started_at else None,
         times.ended_at.isoformat() if times.ended_at else None,
     )
+
+
+def _check_catches_json(catches_json: object) -> None:
+    if catches_json is not None and (
+        not isinstance(catches_json, str) or len(catches_json) > MAX_CATCHES_JSON_CHARS
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="'catches_json' must be a string of at most "
+            f"{MAX_CATCHES_JSON_CHARS:,} characters",
+        )
 
 
 def _log_trip_core(
@@ -623,17 +657,21 @@ def log_trip(body: dict, user: dict = Depends(get_current_user_or_apikey)):
     compatibility with callers that only send EXIF-derived
     metadata. Use POST /log-trip/photo to upload the photo file itself.
     """
+    text = require_text(body.get("text"), "text", MAX_LOG_TEXT_CHARS)
+    started_at, ended_at = _trip_times(body.get("started_at"), body.get("ended_at"))
+    _check_catches_json(body.get("catches_json"))
+    _reserve_model_spend(user)
     try:
         return _log_trip_core(
-            text=body.get("text", ""),
+            text=text,
             user=user,
             photo_lat=body.get("photo_lat"),
             photo_lng=body.get("photo_lng"),
             photo_taken_at=body.get("photo_taken_at"),
             photo_url=body.get("photo_url"),
             catches_json=body.get("catches_json"),
-            started_at=body.get("started_at"),
-            ended_at=body.get("ended_at"),
+            started_at=started_at,
+            ended_at=ended_at,
         )
     except HTTPException:
         raise
@@ -668,7 +706,15 @@ def log_trip_with_photo(
     from src.services.photo_storage import save_photo
 
     # Before any file is written, so a refused request leaves no orphan photo.
+    text = require_text(text, "text", MAX_LOG_TEXT_CHARS)
     started_at, ended_at = _trip_times(started_at, ended_at)
+    _check_catches_json(catches_json)
+    if len(photos or []) + 1 > MAX_PHOTOS:
+        raise HTTPException(
+            status_code=400, detail=f"Too many photos (limit {MAX_PHOTOS} per trip)"
+        )
+    n_photos = 1 + sum(1 for f in photos or [] if f and getattr(f, "filename", ""))
+    _reserve_model_spend(user, cost=1 + PHOTO_COST * n_photos)
     try:
         saved = save_photo(photo)
 
