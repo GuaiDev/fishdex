@@ -40,6 +40,26 @@ def status_known_listed(sr) -> bool:
     return bool({sr.sara_status, sr.ontario_status, sr.cosewic_status} & _LISTED)
 
 
+def has_status_data(db: Database, jurisdiction: str) -> bool:
+    """Does the local species file hold any species for this jurisdiction?
+
+    False means the file cannot tell us about any fish there, not that none are
+    listed. A caller that would otherwise name fish must then fail closed:
+    with an empty file every species reads as "unknown", and an unknown is
+    shown, so a listed fish passes straight through. A lookup error counts as
+    no data for the same reason.
+    """
+    from src.storage.species_ranges import query_species_ranges_for_jurisdiction
+
+    if "species_ranges" not in db.table_names():
+        return False
+    try:
+        return bool(query_species_ranges_for_jurisdiction(db, jurisdiction))
+    except Exception:  # noqa: BLE001 - never break the caller over this slice
+        logger.warning("species status data check failed", exc_info=True)
+        return False
+
+
 def listing_check(
     db: Database, scientific_name: str | None, common_name: str | None
 ) -> bool | None:
@@ -115,9 +135,7 @@ def describe_species(db: Database, name: str) -> SpeciesContext:
         # "so what" and is labelled, because a bare date next to a source reads
         # as the source's date.
         checked = (
-            sr.status_last_checked_at.date().isoformat()
-            if sr.status_last_checked_at
-            else None
+            sr.status_last_checked_at.date().isoformat() if sr.status_last_checked_at else None
         )
         assessed = sr.status_assessed_on
         if assessed:
@@ -125,10 +143,7 @@ def describe_species(db: Database, name: str) -> SpeciesContext:
             if checked:
                 meaning += f"; we last read the registry {checked}"
         elif checked:
-            meaning = (
-                f"the registry did not publish an assessment date; we last "
-                f"read it {checked}"
-            )
+            meaning = f"the registry did not publish an assessment date; we last read it {checked}"
         else:
             meaning = None
 
@@ -168,9 +183,7 @@ def describe_species(db: Database, name: str) -> SpeciesContext:
             if sr.fishing_notes
             else ContextField.empty(EmptyReason.FIELD_NOT_POPULATED_BY_SOURCE)
         ),
-        native_to_ontario=ContextField.inferred(
-            sr.native_to_ontario, meaning=_UNVERIFIED
-        ),
+        native_to_ontario=ContextField.inferred(sr.native_to_ontario, meaning=_UNVERIFIED),
         sar_alert=alert,
         sar_reason=reason,
         targeting_guidance_suppressed=alert,

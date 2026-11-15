@@ -26,6 +26,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 HookKind = Literal[
+    "status_unavailable",
     "protected_species",
     "new_to_you",
     "distinctive",
@@ -196,6 +197,9 @@ class CardMeta(BaseModel):
     species_withheld_protected: int = 0  # a count only; never names
     species_withheld_imprecise: int = 0  # records whose location is fuzzed ~22 km
     species_status_unchecked: int = 0  # not in the local species file
+    # The species file holds nothing for this jurisdiction, so no fish are named.
+    species_status_missing: bool = False
+    species_withheld_no_status: int = 0  # records withheld for that reason; a count only
     # Why there is, or is not, a "recorded more often here" line: a SpecialHereStatus
     # or "not_applicable". "none_stands_out" is a result; "too_few_records_here" is not.
     special_here: str = "not_applicable"

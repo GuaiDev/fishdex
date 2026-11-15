@@ -32,7 +32,7 @@ from src.models.spot_card import SpotCard
 from src.services.context import describe
 from src.services.context.render import new_species_for_user, render_spot
 from src.services.context.special import special_here
-from src.services.context.species import listing_check
+from src.services.context.species import has_status_data, listing_check
 from src.services.new_to_you import caught_keys, caught_species_count
 
 CARD_RADIUS_KM = 2.0
@@ -72,15 +72,19 @@ def build_spot_card(db: Database, spot: Spot, user_id: int | None = None) -> Spo
         caller="map_tap",
         user_id=NO_USER,
     )
+    status_missing = not has_status_data(db, spot.jurisdiction)
     protected, unchecked = screen_species(db, ctx)
     # Quiet water is a reach, not a located structure on a curated river
     # section, so there is nothing to compare it with.
-    special = None if spot.kind == "quiet_water" else special_here(db, spot, protected)
+    special = (
+        None if spot.kind == "quiet_water" or status_missing else special_here(db, spot, protected)
+    )
     return render_spot(
         spot,
         ctx,
         protected=protected,
         unchecked=unchecked,
+        status_missing=status_missing,
         special=special,
         caught=caught,
         caught_species=caught_species,
@@ -93,6 +97,8 @@ def new_species_at_spot(db: Database, spot: Spot, caught: frozenset[str]) -> lis
     Same describe call, same listed-species screen and same ranking as the card,
     so the filter and the card agree by construction.
     """
+    if not has_status_data(db, spot.jurisdiction):
+        return []  # no species may be named here, so none can be new
     ctx = describe(
         db,
         lat=spot.lat,

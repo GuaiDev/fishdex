@@ -607,6 +607,10 @@ NO_RECORDS_TO_CHECK = "We hold no fish records for this area yet."
 FEW_LOOKERS = (
     "That says nothing about whether fish are there; it may only mean few people have looked."
 )
+STATUS_MISSING_MESSAGE = (
+    "We have no species status data for this area yet, so no fish are named here."
+)
+STATUS_MISSING_NOTE = "Fish recorded nearby are not listed until we can check which are protected."
 PROTECTED_NOTE = "Protected species recorded nearby are not listed."
 IMPRECISE_NOTE = "Records with a deliberately fuzzy location are left out."
 FACTS_TITLE = "What our records say about this spot"
@@ -683,6 +687,10 @@ class _CardInputs:
     shown_records: int  # records behind `shown`
     n_protected: int
     n_imprecise: int
+    # True when the species file holds nothing for the jurisdiction: every recorded
+    # species is withheld, `n_no_status` of them, and the card says why.
+    status_missing: bool = False
+    n_no_status: int = 0
     # Species in `shown` the logged-in user has not caught, ranked like `shown`.
     # None for a caller with no user; [] for a user with nothing new.
     new_species: list[CardSpecies] | None = None
@@ -701,6 +709,10 @@ class HookRule(NamedTuple):
 
     kind: str
     build: Callable[[_CardInputs], str | None] | None
+
+
+def _hook_status_missing(c: _CardInputs) -> str | None:
+    return STATUS_MISSING_MESSAGE if c.status_missing else None
 
 
 def _hook_protected(c: _CardInputs) -> str | None:
@@ -807,6 +819,7 @@ def _hook_honest_empty(c: _CardInputs) -> str | None:
 # falls through to "structure". "distinctive" needs
 # the special-here line: frequency here against the rest of the river section.
 HOOK_CHAIN: tuple[HookRule, ...] = (
+    HookRule("status_unavailable", _hook_status_missing),
     HookRule("protected_species", _hook_protected),
     HookRule("new_to_you", _hook_new_to_you),
     HookRule("distinctive", _hook_distinctive),
@@ -888,14 +901,22 @@ def _might_find(c: _CardInputs) -> MightFindBlock:
     empty = None
     if not c.shown:
         reason = c.ctx.records.empty_reason if c.ctx and c.ctx.records else None
-        if c.n_protected:
+        if c.status_missing:
+            empty = STATUS_MISSING_MESSAGE
+        elif c.n_protected:
             empty = NO_OTHER_RECORDS.format(radius=c.radius)
         elif reason is not None and reason.value == "source_does_not_cover_area":
             empty = NO_RECORDS_TO_CHECK
         else:
             empty = f"{NO_RECORDS.format(radius=c.radius)} {FEW_LOOKERS}"
     notes = [
-        n for n, flag in ((PROTECTED_NOTE, c.n_protected), (IMPRECISE_NOTE, c.n_imprecise)) if flag
+        n
+        for n, flag in (
+            (STATUS_MISSING_NOTE, c.n_no_status),
+            (PROTECTED_NOTE, c.n_protected),
+            (IMPRECISE_NOTE, c.n_imprecise),
+        )
+        if flag
     ]
     return MightFindBlock(
         title=CARD_TITLES["might_find"],
@@ -907,7 +928,7 @@ def _might_find(c: _CardInputs) -> MightFindBlock:
         radius_km=c.radius_km,
         # Not shown when the care message is: a protected species nearby replaces
         # everything else on the card, and the share of the rest would only hint at it.
-        special_here=None if c.n_protected else _special_block(c),
+        special_here=None if c.n_protected or c.status_missing else _special_block(c),
     )
 
 
@@ -1128,6 +1149,7 @@ def render_spot(
     caught: frozenset[str] | None = None,
     special: SpecialHere | None = None,
     caught_species: int = 0,
+    status_missing: bool = False,
 ) -> SpotCard:
     """The whole tap card for one spot: four blocks, every string already written.
 
@@ -1138,9 +1160,12 @@ def render_spot(
     with `status_known_listed`, never `sar_alert`. Those species are not named
     anywhere in the card, are not counted, and turn the hook into a care message.
     `unchecked` is how many recorded species were not in the species file.
+    `status_missing` is True when the species file holds nothing for the spot's
+    jurisdiction: no species is named, and the card says the status data is missing.
     `special` is the frequency comparison for the spot's river section
     (context/special.py); it fills the "distinctive" hook and `might_find.special_here`
-    only when it found something, and the protected-species care message still comes first.
+    only when it found something; missing status data and the protected-species care
+    message take precedence.
 
     The card is the same for every user, with one exception. `caught` is the
     match keys of the logged-in user's confirmed catches (`new_to_you.caught_keys`)
@@ -1151,6 +1176,11 @@ def render_spot(
     """
     radius = ctx.place.radius_km if ctx else 2.0
     ranked, n_protected, n_imprecise = _rank_recorded(ctx, protected)
+    n_no_status = 0
+    if status_missing:
+        # The species file knows nothing here, so no recorded fish may be named.
+        n_no_status = len(ctx.records.species) if ctx and ctx.records else 0
+        ranked, n_protected, n_imprecise = [], 0, 0
     new_species = (
         [r.line for r in ranked if not is_caught(caught, r.scientific, r.common)]
         if caught is not None
@@ -1164,6 +1194,8 @@ def render_spot(
         shown_records=sum(r.count for r in ranked),
         n_protected=n_protected,
         n_imprecise=n_imprecise,
+        status_missing=status_missing,
+        n_no_status=n_no_status,
         new_species=new_species,
         caught_species=caught_species,
         special=special,
@@ -1186,6 +1218,8 @@ def render_spot(
             species_withheld_protected=n_protected,
             species_withheld_imprecise=n_imprecise,
             species_status_unchecked=unchecked,
+            species_status_missing=status_missing,
+            species_withheld_no_status=n_no_status,
             special_here=special.status if special else "not_applicable",
             cache_key=f"{spot.spot_id}@{spot.built_at}",
         ),
