@@ -15,7 +15,7 @@ or invite code. Set `FISHBOT_PUBLIC_DEMO=0` (e.g. in `fly.toml` env) to close th
 
 The Vercel build copies `app/` and `design/lavish/` into `dist/` and writes `dist/app/config.js`
 with the API address (`FISHDEX_API_URL`, default `https://fishdex-api-jason.fly.dev`). The app uses that
-as its default; the connect dialog and `?api=` still override it.
+as its default; the connect dialog still overrides it. `?api=` is accepted only for localhost or that same origin (see `app/README.md`).
 
 `vercel.json` sets `"framework": null` on purpose. The repo has a FastAPI backend at its root, so
 without it Vercel auto-detects FastAPI and tries to build the Python app, and the deploy fails. This

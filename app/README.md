@@ -21,8 +21,10 @@ make app                                     # this app, http://localhost:8765/a
 ```
 
 Open http://localhost:8765/app/ and paste the token (or a friend's invite code). The address and token
-are kept in the browser. A link like `http://localhost:8765/app/?token=...` also connects, then removes
-the token from the address bar.
+are kept in the browser. A link like `http://localhost:8765/app/?token=...` (or `#token=...`) is removed
+from the address bar, then the app shows which account the token belongs to and signs in only if you
+confirm. `?api=` is honoured only for `localhost` or the server this build was configured for, and a
+saved token is dropped if the server address changes.
 
 The coach needs `ANTHROPIC_API_KEY` in `.env`, as for `make run`. Without it the coach shows the
 server's own message as an error.
