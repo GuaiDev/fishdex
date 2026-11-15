@@ -1,0 +1,59 @@
+# Coverage-check reference registry: Ontario (CA-ON).
+#
+# A region is a registry file like this one plus a jurisdiction code. Nothing in
+# src/services/coverage/ knows about Ontario; every layer URL, field name, filter
+# and radius comes from here. A new province or state is a new file with the same
+# shape (see docs/coverage-check.md).
+#
+# Reference layers are the authority the map is measured against, so each says
+# whether it is independent of the map's own sources. A layer that later becomes
+# a map source stops being independent and must be swapped for another reference
+# (report section 1.6), or the check becomes self-agreement.
+
+version = 1
+jurisdiction = "CA-ON"
+
+# Focus areas: `--focus home` reads the box below. Hamilton to Pickering, north to Caledon.
+[focus.home]
+bbox = [-80.25, 43.25, -79.0, 43.95]
+
+[[references]]
+feature_class = "dams"
+label = "Ontario Dam Inventory (LIO)"
+service_url = "https://ws.lioservices.lrc.gov.on.ca/arcgis2/rest/services/LIO_OPEN_DATA/LIO_Open04/MapServer/0"
+id_field = "OGF_ID"
+name_field = "DAM_NAME"
+where = "1=1"
+licence = "Open Government Licence - Ontario"
+independent = true
+# The inventory includes stormwater and farm-pond dams. Only dams on or near
+# curated water are in scope; the rest are counted and reported as filtered out.
+scope_m = 150
+anchor_m = 150
+spot_m = 300
+anchor_types = ["dam", "tailwater"]
+spot_kinds = ["below_dam"]
+min_recall = 0.90
+
+# Tables the map reads. The host must hold every row the build produced. This is
+# every table `build-spots` and `build-anchors` write, plus the lake and bathymetry
+# tables the map draws from.
+[parity]
+tables = [
+  "spots",
+  "stretch_anchors",
+  "stretch_segment_lines",
+  "stretch_osm_coverage",
+  "water_bodies",
+  "shoreline_features",
+  "bathymetry_contours",
+]
+
+# The protection gate reads this table. Zero rows for the jurisdiction means the
+# gate cannot refuse anything.
+[listing]
+table = "species_ranges"
+
+[liveness]
+path = "/health"
+min_vantage_points = 3

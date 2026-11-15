@@ -1038,6 +1038,37 @@ def get_db_stats(_: None = Depends(verify_api_key)):
     }
 
 
+@app.get("/admin/coverage-probe")
+def coverage_probe(
+    tables: str,
+    jurisdiction: str,
+    listing_table: str = "species_ranges",
+    kinds: str | None = None,
+    bbox: str | None = None,
+    _: None = Depends(verify_api_key),
+):
+    """What this host's database holds, for `coverage-check --api`: row counts for the
+    named tables, the listing table's rows for the jurisdiction, and the spot ids of the
+    named kinds. Read-only, and reports on the file the app actually serves."""
+    from src.services.coverage.probe import open_readonly, probe_connection
+    from src.storage.database import DB_PATH
+
+    box = _parse_bbox(bbox)
+    conn = open_readonly(DB_PATH)
+    try:
+        return probe_connection(
+            conn,
+            source="host",
+            tables=[t for t in tables.split(",") if t],
+            listing_table=listing_table,
+            jurisdiction=jurisdiction,
+            spot_kinds=[k for k in (kinds or "").split(",") if k] or None,
+            bbox=box,
+        )
+    finally:
+        conn.close()
+
+
 @app.get("/admin/dashboard")
 def admin_dashboard(_: None = Depends(verify_api_key)):
     """Admin usage dashboard: users, message volume, top queried locations,

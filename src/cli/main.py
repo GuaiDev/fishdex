@@ -1617,6 +1617,98 @@ def build_anchors_cmd(
     _print_spot_report(_build_spots(db, Path(curation)))
 
 
+@app.command(name="coverage-check")
+def coverage_check_cmd(
+    jurisdiction: str = typer.Option("CA-ON", "--jurisdiction", "-j", help="ISO 3166-2 code."),
+    focus: str = typer.Option("home", "--focus", help="Focus area named in the registry."),
+    db: str = typer.Option("data/fishing.db", "--db", help="The build database to check."),
+    registry: str = typer.Option(
+        "", "--registry", help="Registry file. Default: data/coverage/references_<code>.toml."
+    ),
+    hosted_db: str = typer.Option(
+        "", "--hosted-db", help="A copy of the hosted database, for deploy parity."
+    ),
+    api: str = typer.Option(
+        "", "--api", help="Hosted API base URL: adds liveness and reads the host's tables."
+    ),
+    api_key: str = typer.Option(
+        "", "--api-key", envvar="FISHBOT_API_KEY", help="Admin key for the host's probe endpoint."
+    ),
+    out_dir: str = typer.Option(
+        "data/coverage/reports", "--out-dir", help="Where the JSON and markdown reports go."
+    ),
+) -> None:
+    """Check the map against authoritative reference layers, for any region.
+
+    Compares the build database with the registry's reference layers (dams so far),
+    puts every miss on the cause ladder, and applies the ship gates. Without --api it
+    checks the build file alone; run it before every reseed. With --hosted-db or --api
+    it also compares the host. Writes JSON and markdown reports and exits 1 when a
+    hard gate fails, 2 when the check itself could not run.
+    """
+    from pathlib import Path
+
+    from src.services.coverage import (
+        load_registry,
+        registry_path,
+        run_coverage_check,
+        write_reports,
+    )
+
+    try:
+        reg = load_registry(Path(registry) if registry else registry_path(jurisdiction))
+        if reg.jurisdiction != jurisdiction:
+            raise ValueError(
+                f"registry is for {reg.jurisdiction}, but --jurisdiction is {jurisdiction}"
+            )
+        report = run_coverage_check(
+            reg,
+            focus,
+            Path(db),
+            hosted_db=Path(hosted_db) if hosted_db else None,
+            api_url=api or None,
+            api_key=api_key or None,
+        )
+    except Exception as exc:  # noqa: BLE001 - the check could not run; say why, exit 2
+        console.print(f"[bold red]coverage-check could not run:[/bold red] {exc}")
+        raise typer.Exit(2) from exc
+
+    json_path, md_path = write_reports(report, Path(out_dir))
+    _print_coverage_report(report)
+    console.print(f"Reports: {md_path} and {json_path}")
+    raise typer.Exit(report.exit_code)
+
+
+def _print_coverage_report(report) -> None:
+    table = Table(title=f"Coverage check: {report.jurisdiction}, focus {report.focus}")
+    table.add_column("gate")
+    table.add_column("kind")
+    table.add_column("result")
+    table.add_column("measured")
+    for g in report.gates:
+        if g.skipped:
+            result = "[dim]skipped[/dim]"
+        else:
+            result = "[green]pass[/green]" if g.passed else "[bold red]FAIL[/bold red]"
+        table.add_row(g.name, g.kind, result, g.measured)
+    console.print(table)
+    for c in report.classes:
+        if c.unmeasured_reason:
+            console.print(f"[yellow]{c.feature_class}: {c.unmeasured_reason}[/yellow]")
+            continue
+        recall = "n/a" if c.recall is None else f"{c.recall:.0%}"
+        causes = ", ".join(f"{k} {v}" for k, v in sorted(c.by_cause.items()))
+        console.print(
+            f"{c.feature_class}: {c.matched} of {c.in_scope} in scope on the map ({recall}); "
+            f"{c.out_of_scope} of {c.reference_total} reference features not near curated "
+            f"water. ({causes})"
+        )
+    for note in report.notes:
+        console.print(f"[yellow]{note}[/yellow]")
+    if report.hard_failures:
+        console.print("[bold red]Hard gate failed: do not ship this region or demo.[/bold red]")
+
+
 @app.command(name="build-spots")
 def build_spots_cmd(
     curation: str = typer.Option(
