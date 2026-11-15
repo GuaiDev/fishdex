@@ -373,7 +373,7 @@ def _reserve_model_spend(user: dict, cost: int = 1) -> None:
 
 @app.post("/chat")
 def chat(body: dict, user: dict = Depends(get_current_user)):
-    """Send a message to FishBot. Body: {"messages": [{"role": "user", "content": "..."}]}"""
+    """Send a message to FishBot; see README.md for the request and limit contract."""
     from src.agent.chat import run_chat_api
 
     message = require_text(body.get("message"), "message", MAX_MESSAGE_CHARS)

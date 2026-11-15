@@ -172,6 +172,25 @@ The API's admin endpoints (`POST /admin/token`, `/admin/dashboard`, `/ingest/dat
 
 `make serve` runs the FastAPI backend on `127.0.0.1:8000` against the local database at `data/fishing.db`; set `DATA_DIR` to keep the database and catch photos somewhere else. `SERVE_HOST=0.0.0.0 make serve` makes it reachable from a phone on the same network.
 
+`POST /chat` takes `message`, optional `conversation_history` (a list of `role`/`content`
+objects), and optional `session_id`. Only non-empty plain-text user and assistant history
+turns survive; malformed turns are dropped, older turns are removed, long history content
+is truncated, and leading assistant turns are dropped. Invalid or overlong current messages,
+trip text, or `catches_json` fields return 400. Oversized bodies on `/chat`, `/log-trip`, and
+`/log-trip/photo` return 413; photo submissions also have a per-trip photo count cap.
+The authoritative size and history caps are in
+[`src/api/request_limits.py`](src/api/request_limits.py).
+
+These three routes share each account's daily budget: a chat or text trip submission costs
+one unit, and a photo trip costs one plus `PHOTO_COST` per uploaded photo (defined in
+[`src/api/request_limits.py`](src/api/request_limits.py)). Units are reserved atomically
+after initial validation and before model work; later failures do not refund them.
+Insufficient account budget returns 429. Budgets reset on the server's next calendar day.
+The optional server-wide budget and its configuration are documented in
+[`deploy/README.md`](deploy/README.md). Both API and terminal chat stop repeated tool
+lookups at `MAX_AGENT_ITERATIONS` in [`src/agent/chat.py`](src/agent/chat.py), asking you
+to narrow the question or ask again if the cap is reached.
+
 A public deployment is prepared but not live until the steps are run: the static app (`app/`) on Vercel and the API on Fly.io with the database on a volume. Anyone with the link gets a read-only demo with no sign-in (tier 1 spots in a capped map area, a saved example in place of the live coach, nothing saved); everything else needs a token or invite code. Set `FISHBOT_PUBLIC_DEMO=0` to turn the demo off. `FISHBOT_CORS_ORIGINS` limits which sites a browser lets call the API. The setup, what to seed versus re-ingest, and the login and secret steps are in [`deploy/README.md`](deploy/README.md).
 
 The weekly data refresh is `make weekly-ingest`. It reads the list of areas (label, jurisdiction, lat, lng, radius and which source bundles to run) from `data/ingest_areas.json` and runs each one through the same service code as the `/ingest/data*` endpoints, one after another, then prints what each dataset stored and what failed. Edit that file to add or drop an area. To preview without fetching anything:

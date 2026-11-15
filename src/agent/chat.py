@@ -32,6 +32,7 @@ def _iteration_cap_reply(tool_rounds: int) -> str:
         "answer. Try asking a narrower question, or ask again to continue."
     )
 
+
 HAIKU = "claude-haiku-4-5-20251001"
 
 # Jurisdiction for users who have no profile of their own (see _prompt_inputs).
