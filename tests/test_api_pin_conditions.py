@@ -67,10 +67,19 @@ def _gauge(observed: datetime) -> NearestGauge:
 
 @pytest.fixture(autouse=True)
 def _isolated(tmp_path, monkeypatch):
+    import src.services.pins.conditions as conditions
     import src.storage.database as database
 
+    now = datetime.now(UTC).replace(second=0, microsecond=0)
+
+    class _FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now.astimezone(tz) if tz else now.replace(tzinfo=None)
+
+    monkeypatch.setattr(conditions, "datetime", _FrozenDateTime)
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "test_fishing.db")
-    fresh = datetime.now(UTC) - timedelta(minutes=10)
+    fresh = now - timedelta(minutes=10)
     monkeypatch.setattr(
         "src.services.weather.get_conditions_for_agent",
         lambda **kw: json.dumps(
@@ -86,7 +95,7 @@ def _isolated(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(
         "src.services.stream_gauge.nearest_gauge",
-        lambda *a, **k: _gauge(datetime.now(UTC) - timedelta(minutes=5)),
+        lambda *a, **k: _gauge(now - timedelta(minutes=5)),
     )
 
 

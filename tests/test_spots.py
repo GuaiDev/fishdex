@@ -38,6 +38,15 @@ SEASON_OR_GEAR = re.compile(
 )
 
 
+@pytest.fixture(autouse=True)
+def _no_override_leaks():
+    """A dependency override here must never decide how a later test authenticates."""
+    from src.api.main import app
+
+    yield
+    app.dependency_overrides.clear()
+
+
 def stretch(sid="credit-lower", name="Lower Credit", river="Credit River", region=None):
     return FishingStretch(
         stretch_id=sid,
@@ -982,7 +991,7 @@ def test_labels_endpoint_serves_the_vocabulary_and_wins_the_route_over_spot_ids(
     ]
 
 
-def test_spots_endpoints_require_auth(tmp_path, monkeypatch):
+def test_spots_endpoints_serve_the_public_demo_but_reject_a_stale_token(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
 
     import src.storage.database as database
@@ -990,8 +999,13 @@ def test_spots_endpoints_require_auth(tmp_path, monkeypatch):
 
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "api.db")
     client = TestClient(app)
-    for path in ("/map/spots", "/map/spots/labels", "/map/spots/creek_junction:n1_1"):
-        assert client.get(path).status_code in (401, 403)
+    stale = {"Authorization": "Bearer nope"}
+    for path in ("/map/spots", "/map/spots/labels"):
+        assert client.get(path).status_code == 200
+        assert client.get(path, headers=stale).status_code == 401
+    # An unknown spot is a 404 to the demo, not a login wall.
+    assert client.get("/map/spots/creek_junction:n1_1").status_code == 404
+    assert client.get("/map/spots/creek_junction:n1_1", headers=stale).status_code == 401
 
 
 # ── the fixture other tools build against ────────────────────────────────────

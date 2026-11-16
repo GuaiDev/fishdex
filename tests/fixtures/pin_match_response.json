@@ -49,14 +49,14 @@
     },
     {
       "field": "flow_cms",
-      "label": "River flow",
+      "label": "Flow",
       "unit": "m³/s",
       "current": 18.3,
       "low": 18.0,
       "high": 18.0,
       "trips": 3,
       "position": "near",
-      "text": "River flow: 18 m³/s on those trips, 18.3 m³/s now (close to that range)."
+      "text": "Flow: 18 m³/s on those trips, 18.3 m³/s now (close to that range)."
     },
     {
       "field": "level_m",
@@ -94,5 +94,5 @@
     }
   ],
   "headline": "Today looks like your best trips here: 5 of 5 conditions compared are in their range.",
-  "reason": "Your 3 best trips here were in April. Air temperature: 8–12°C on those trips, 10°C now (inside that range). Wind: 14 km/h on those trips, 14 km/h now (inside that range). Air pressure: 1011 hPa on those trips, 1011 hPa now (inside that range). River flow: 18 m³/s on those trips, 18.3 m³/s now (close to that range). Water level: 0.5 m on those trips, 0.52 m now (close to that range). Today looks like your best trips here: 5 of 5 conditions compared are in their range. Not compared: Water temperature (no current reading), Dissolved oxygen (no current reading), pH (no current reading)."
+  "reason": "Your 3 best trips here were in April. Air temperature: 8–12°C on those trips, 10°C now (inside that range). Wind: 14 km/h on those trips, 14 km/h now (inside that range). Air pressure: 1011 hPa on those trips, 1011 hPa now (inside that range). Flow: 18 m³/s on those trips, 18.3 m³/s now (close to that range). Water level: 0.5 m on those trips, 0.52 m now (close to that range). Today looks like your best trips here: 5 of 5 conditions compared are in their range. Not compared: Water temperature (no current reading), Dissolved oxygen (no current reading), pH (no current reading)."
 }
