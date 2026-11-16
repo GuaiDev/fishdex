@@ -17,6 +17,8 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
 
+from rich.logging import RichHandler
+
 # Configure stdout logging before any other module runs.
 # basicConfig is a no-op if handlers are already attached (e.g. a parent process
 # configured logging); the explicit setLevel always runs and prevents the root
@@ -46,7 +48,12 @@ class _JsonFormatter(logging.Formatter):
         return json.dumps(payload, separators=(",", ":"), default=str)
 
 
-for _handler in logging.getLogger().handlers:
+for _handler in logging.getLogger().handlers[:]:
+    if isinstance(_handler, RichHandler):
+        logging.getLogger().removeHandler(_handler)
+        _handler.close()
+        _handler = logging.StreamHandler(sys.stdout)
+        logging.getLogger().addHandler(_handler)
     # Keep test and host-provided capture handlers' formatters intact. They
     # may inspect LogRecord.message, which Formatter.format() populates.
     if isinstance(_handler, logging.StreamHandler) and _handler.stream is sys.stdout:
