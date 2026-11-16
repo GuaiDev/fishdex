@@ -187,7 +187,7 @@ def test_untapped_formula_low_pressure_remote_scores_highest(tmp_path: Path, mon
     monkeypatch.setattr(up_mod, "_PARQUET_PATH", up_path)
     monkeypatch.setattr(up_mod, "_FEATURE_MATRIX_PATH", tmp_path / "fm.parquet")
 
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(5)
     fm["observation_density_25km"] = [0.0, 5.0, 5.0, 5.0, 5.0]
 
@@ -213,7 +213,7 @@ def test_untapped_sorted_descending(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(up_mod, "_PARQUET_PATH", tmp_path / "u.parquet")
     monkeypatch.setattr(up_mod, "_FEATURE_MATRIX_PATH", tmp_path / "fm.parquet")
 
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(10)
     fm["observation_density_25km"] = np.linspace(0, 9, 10)
 
@@ -238,7 +238,7 @@ def test_untapped_ignores_sdm_predictions_entirely(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(up_mod, "_PARQUET_PATH", tmp_path / "u.parquet")
     monkeypatch.setattr(up_mod, "_FEATURE_MATRIX_PATH", tmp_path / "fm.parquet")
 
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(5)
     fm["observation_density_25km"] = 0.0
     _insert_access_scores(tmp_path, {i: 1.0 for i in range(1, 6)})
@@ -373,7 +373,7 @@ def _setup_full_env(tmp_path, monkeypatch):
     monkeypatch.setattr(up_mod, "_PARQUET_PATH", tmp_path / "u.parquet")
     monkeypatch.setattr(up_mod, "_FEATURE_MATRIX_PATH", tmp_path / "fm.parquet")
 
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_fm_with_centroids(tmp_path)
     _insert_predictions(db, "Sp", {i: 0.6 for i in range(1, 5)})
     _insert_access_scores(tmp_path, {i: 0.7 for i in range(1, 5)})
@@ -391,8 +391,7 @@ def test_dismiss_tool_inserts_record(tmp_path, monkeypatch):
     import src.storage.database as db_mod
     monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
 
-    db = get_db(tmp_path / "test.db")
-
+    db = fast_db
     # Call the tool dispatch directly
     import json as _json
 

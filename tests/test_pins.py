@@ -33,10 +33,8 @@ def _no_enrichment(monkeypatch):
 
 
 @pytest.fixture()
-def db(tmp_path):
-    return get_db(tmp_path / "test.db")
-
-
+def db(fast_db):
+    return fast_db
 def _stop(point=None, photo=None, species=None, name="Bronte Creek") -> dict:
     stop = {"location_text": name, "location_name": name, "species_caught": species or []}
     if point:
@@ -413,7 +411,7 @@ def test_map_payload_lists_unpinned_stops_with_their_candidates(db):
 
 
 def test_migration_is_idempotent(tmp_path):
-    db = get_db(tmp_path / "again.db")
+    db = fast_db
     store.ensure_tables(db)
     store.ensure_tables(db)
     columns = {c.name for c in db["sessions"].columns}

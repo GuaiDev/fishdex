@@ -10,6 +10,8 @@ import json
 import types
 from datetime import date
 
+import shutil
+
 import pytest
 
 from src.models.behavioral_insight import BehavioralInsight
@@ -33,10 +35,8 @@ LAT, LNG = 43.5, -79.7
 
 
 @pytest.fixture()
-def db(tmp_path):
-    return get_db(tmp_path / "test.db")
-
-
+def db(fast_db):
+    return fast_db
 def _insight(user_id: int, species: str = "Smallmouth Bass", **kw) -> BehavioralInsight:
     base = dict(
         species=species,
@@ -101,9 +101,8 @@ def test_agent_record_tool_writes_and_reads_per_user(tmp_path, monkeypatch):
     from src.agent.tools import execute_tool
 
     monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
-    monkeypatch.setattr(svc, "get_db", lambda: get_db(tmp_path / "test.db"))
-    db = get_db(tmp_path / "test.db")
-
+    path = tmp_path / "test.db"; shutil.copy(migrated_template_db, path); monkeypatch.setattr(svc, "get_db", lambda p=path: get_db(p))
+    db = fast_db
     inputs = dict(
         species="Rock Bass",
         condition_type="habitat",
@@ -132,8 +131,8 @@ def test_agent_record_tool_writes_and_reads_per_user(tmp_path, monkeypatch):
 def test_refinement_keeps_the_owner_and_never_crosses_users(tmp_path, monkeypatch):
     import src.services.insights as svc
 
-    monkeypatch.setattr(svc, "get_db", lambda: get_db(tmp_path / "test.db"))
-    db = get_db(tmp_path / "test.db")
+    path = tmp_path / "test.db"; shutil.copy(migrated_template_db, path); monkeypatch.setattr(svc, "get_db", lambda p=path: get_db(p))
+    db = fast_db
     old1 = insert_insight(db, _insight(1, confidence="low"))
     old2 = insert_insight(db, _insight(2, confidence="low"))
 
@@ -166,8 +165,8 @@ def test_reported_id_is_the_refined_row_even_if_another_user_inserts_later(tmp_p
     import src.services.insights as svc
     import src.storage.insights as store
 
-    monkeypatch.setattr(svc, "get_db", lambda: get_db(tmp_path / "test.db"))
-    db = get_db(tmp_path / "test.db")
+    path = tmp_path / "test.db"; shutil.copy(migrated_template_db, path); monkeypatch.setattr(svc, "get_db", lambda p=path: get_db(p))
+    db = fast_db
     old = insert_insight(db, _insight(1))
 
     real_refine = store.refine_insight
@@ -216,7 +215,7 @@ def test_trip_log_insights_belong_to_the_logging_user(db):
 def test_existing_rows_without_an_owner_stay_user_1(tmp_path):
     from src.storage.database import migrate_user_fields
 
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     insert_insight(db, _insight(1))
     db.execute("UPDATE behavioral_insights SET user_id = NULL")
     db.conn.commit()

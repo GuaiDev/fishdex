@@ -13,10 +13,8 @@ from src.storage.species_ranges import (
 )
 
 
-def _make_db(tmp_path):
-    return get_db(tmp_path / "test.db")
-
-
+def _make_db(fast_db):
+    return fast_db
 def _sample_ranges() -> list[SpeciesRange]:
     return [
         SpeciesRange(

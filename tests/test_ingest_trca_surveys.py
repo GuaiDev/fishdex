@@ -130,7 +130,7 @@ def test_records_actually_land_in_the_table(tmp_path: Path):
     vanished without an error. The ingest reported "stored 420" because it was
     echoing len(records) rather than reading anything back.
     """
-    db = get_db(tmp_path / "t.db")
+    db = fast_db
     recs = _records()
     written = upsert_fish_surveys(db, recs)
 
@@ -139,7 +139,7 @@ def test_records_actually_land_in_the_table(tmp_path: Path):
 
 
 def test_reingest_is_idempotent(tmp_path: Path):
-    db = get_db(tmp_path / "t.db")
+    db = fast_db
     recs = _records()
     upsert_fish_surveys(db, recs)
     first = db["fish_surveys"].count
@@ -149,14 +149,14 @@ def test_reingest_is_idempotent(tmp_path: Path):
 
 
 def test_empty_input_writes_nothing(tmp_path: Path):
-    db = get_db(tmp_path / "t.db")
+    db = fast_db
     assert upsert_fish_surveys(db, []) == 0
 
 
 def test_events_group_by_station_visit(tmp_path: Path):
     """A station visit with its full species list is what makes an absence
     readable: the species not in the list were not caught at known effort."""
-    db = get_db(tmp_path / "t.db")
+    db = fast_db
     recs = _records()
     upsert_fish_surveys(db, recs)
 

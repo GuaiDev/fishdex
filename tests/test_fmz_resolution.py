@@ -17,10 +17,8 @@ OAKVILLE = (43.4675, -79.6877)
 
 
 @pytest.fixture
-def db(tmp_path):
-    return get_db(tmp_path / "fmz.db")
-
-
+def db(fast_db):
+    return fast_db
 def _add_zone(db, zone, name, minx, miny, maxx, maxy):
     db["fmz_boundaries"].upsert({
         "zone": zone, "zone_name": name, "jurisdiction": "CA-ON",

@@ -18,10 +18,8 @@ from src.storage.species_ranges import upsert_species_ranges
 
 
 @pytest.fixture
-def db(tmp_path):
-    return get_db(tmp_path / "sr.db")
-
-
+def db(fast_db):
+    return fast_db
 def _species(**overrides) -> SpeciesRange:
     base = dict(
         species="Least Darter",

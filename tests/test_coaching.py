@@ -15,11 +15,9 @@ from src.storage.database import get_db
 
 
 @pytest.fixture
-def db_conn(tmp_path):
-    # get_db() applies ensure_schema + every migration, matching production.
-    # ensure_schema() alone omits user_id on stops/sessions, which hid the
-    # cross-user data leak these tests now cover.
-    return get_db(tmp_path / "test.db")
+def db_conn(fast_db):
+    # fast_db is a migrated, fast-pragmas copy; matches production schema.
+    return fast_db
 
 
 @pytest.fixture

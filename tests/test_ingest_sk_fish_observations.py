@@ -103,7 +103,7 @@ def test_sk_and_bc_rows_with_same_raw_id_both_survive(tmp_path):
     raw_id = sk.observation_id - fish_observations.SK_OBSERVATION_ID_OFFSET
     bc = sk.model_copy(update={"observation_id": raw_id, "jurisdiction": "CA-BC", "source": "FISS"})
 
-    db = get_db(tmp_path / "t.db")
+    db = fast_db
     upsert_observations(db, [bc])
     upsert_observations(db, sk_obs)
 

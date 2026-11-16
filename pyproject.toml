@@ -49,6 +49,7 @@ build-backend = "hatchling.build"
 dev = [
     "pytest>=9.0.3",
     "pytest-timeout>=2.4.0",
+    "pytest-xdist>=3.6.1",
     "ruff>=0.15.13",
 ]
 
@@ -63,4 +64,5 @@ select = ["E", "F", "I", "UP"]
 testpaths = ["tests"]
 markers = [
     "raw_db: get_db() opens the database and nothing else (no test auto-migrate)",
+    "network: hits the network or external services (excluded by default)",
 ]

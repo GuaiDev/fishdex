@@ -452,7 +452,9 @@ def db(tmp_path_factory):
     build replaces the CA-ON set wholesale, so tests cannot see each other."""
     from src.storage.database import get_db
 
-    return get_db(tmp_path_factory.mktemp("stretches") / "test.db")
+    path = tmp_path_factory.mktemp("stretches") / "test.db"
+    get_db(path)
+    return get_db(path)
 
 
 def _build(db, tmp_path, body):

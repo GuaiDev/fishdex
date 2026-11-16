@@ -285,7 +285,7 @@ def test_survey_fields_round_trip_through_storage(tmp_path: Path):
         upsert_gbif_observations,
     )
 
-    db = get_db(tmp_path / "t.db")
+    db = fast_db
     obs = [_parse_observation(r) for r in _survey_records()]
     upsert_gbif_observations(db, obs)
 

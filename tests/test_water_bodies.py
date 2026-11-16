@@ -1294,7 +1294,7 @@ def test_bbox_still_uses_the_real_outline_when_geometry_is_not_sent(tmp_path, _t
     from src.storage.water_bodies import write_water_bodies
 
     shutil.copy(_template_db, tmp_path / "l.db")
-    db = get_db(tmp_path / "l.db")
+    db = fast_db
     # An L-shaped river: its box covers the corner nobody can fish.
     l_shape = {"type": "LineString", "coordinates": [[-80.0, 44.0], [-80.0, 43.0], [-79.0, 43.0]]}
     write_water_bodies(

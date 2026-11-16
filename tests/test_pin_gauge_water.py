@@ -8,6 +8,8 @@ import importlib
 import json
 from datetime import UTC, datetime, timedelta
 
+import shutil
+
 import pytest
 
 from src.models.stream_gauge import StreamGaugeReading
@@ -171,7 +173,7 @@ def _segment(db, ogf_id, name, lat, lng, dlat=0.0005):
 
 @pytest.fixture
 def db(tmp_path):
-    db = get_db(tmp_path / "gauge.db")
+    db = fast_db
     _segment(db, 1, "Credit River", MOUTH[0], MOUTH[1])
     _segment(db, 2, "Far Creek", MOUTH[0] + 0.02, MOUTH[1])  # about 2.2 km away
     _segment(db, 3, None, MOUTH[0], MOUTH[1])  # unnamed water has no identity to match
@@ -192,8 +194,10 @@ def test_the_pins_river_is_found_however_many_other_segments_surround_it(db):
     assert place_mod.water_names_at(db, place, ["Credit River"]) == ["Credit River"]
 
 
-def test_no_hydro_table_means_no_names_not_an_error(tmp_path):
-    empty = get_db(tmp_path / "empty.db")
+def test_no_hydro_table_means_no_names_not_an_error(tmp_path, migrated_template_db):
+    path = tmp_path / "empty.db"
+    shutil.copy(migrated_template_db, path)
+    empty = get_db(path)
     place = place_mod.resolve(empty, lat=MOUTH[0], lng=MOUTH[1])
     assert place_mod.water_names_at(empty, place, ['Credit River']) is None
 
@@ -259,7 +263,9 @@ def test_a_pin_with_no_gauge_on_its_river_says_whose_water_the_row_is(db, panel)
 def test_a_pin_whose_water_is_unknown_gets_the_nearest_gauge_named_for_its_own_water(
     tmp_path, network, monkeypatch
 ):
-    bare = get_db(tmp_path / "bare.db")
+    path = tmp_path / "bare.db"
+    shutil.copy(migrated_template_db, path)
+    bare = get_db(path)
     monkeypatch.setattr("src.services.weather.get_conditions_for_agent", lambda **kw: _weather())
     ctx = describe(bare, lat=MOUTH[0], lng=MOUTH[1], caller="pin_panel")
     prov = ctx.conditions.flow_cms.provenance

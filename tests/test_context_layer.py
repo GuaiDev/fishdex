@@ -22,10 +22,8 @@ from src.storage.database import get_db
 
 
 @pytest.fixture
-def db(tmp_path):
-    return get_db(tmp_path / "ctx.db")
-
-
+def db(fast_db):
+    return fast_db
 def _add_stop(
     db,
     *,

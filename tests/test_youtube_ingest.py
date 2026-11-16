@@ -77,8 +77,8 @@ def test_fetch_transcript_no_transcript(monkeypatch):
 
 
 @pytest.fixture
-def tmp_db(tmp_path: Path):
-    return get_db(tmp_path / "test.db")
+def tmp_db(fast_db):
+    return fast_db
 
 
 def test_ingest_deduplication(tmp_db, monkeypatch):

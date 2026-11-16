@@ -23,10 +23,8 @@ LAT, LNG = 43.5, -79.7
 
 
 @pytest.fixture()
-def db(tmp_path):
-    return get_db(tmp_path / "test.db")
-
-
+def db(fast_db):
+    return fast_db
 # ── synthesis cache ──────────────────────────────────────────────────────────
 
 
@@ -71,7 +69,7 @@ def test_legacy_rows_without_a_user_are_never_served(db):
 
 
 def test_synthesis_migration_adds_user_id_to_old_table(tmp_path):
-    db = get_db(tmp_path / "old.db")
+    db = fast_db
     db.execute("DROP TABLE segment_synthesis")
     db.execute(
         "CREATE TABLE segment_synthesis (id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -96,7 +94,7 @@ def test_chat_web_path_never_serves_another_users_cache(tmp_path, monkeypatch):
     import src.storage.database as db_mod
 
     monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     store_synthesis(db, "A's catches", user_id=1, lat=LAT, lng=LNG)
 
     pipeline_users = []
@@ -134,7 +132,7 @@ def test_chat_web_path_cache_hit_serves_only_the_askers_own_reply(tmp_path, monk
     import src.storage.database as db_mod
 
     monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     store_synthesis(db, "A's catches", user_id=1, lat=LAT, lng=LNG)
 
     pipeline_users = []
@@ -189,7 +187,7 @@ def test_dismiss_tool_is_per_user(tmp_path, monkeypatch):
     import src.storage.database as db_mod
 
     monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     out = json.loads(execute_tool("dismiss_segment", {"ogf_id": 42}, user_id=1))
     assert out["success"] is True
     assert 42 in _seen_segment_ids(db, user_id=1)

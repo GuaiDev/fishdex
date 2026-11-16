@@ -13,7 +13,7 @@ from src.storage.species_ranges import (
 
 
 def _seed_db(tmp_path):
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     ranges = [
         SpeciesRange(
             species="Brook Trout",

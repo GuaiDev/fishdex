@@ -70,7 +70,7 @@ def test_unknown_status_is_rejected():
 
 
 def test_table_exists_after_schema_setup_and_round_trips(tmp_path):
-    db = get_db(tmp_path / "t.db")
+    db = fast_db
     assert store.get_species_images(db) == {}
 
     store.replace_species_images(db, [_approved()])
@@ -79,7 +79,7 @@ def test_table_exists_after_schema_setup_and_round_trips(tmp_path):
 
 
 def test_replace_drops_species_no_longer_listed(tmp_path):
-    db = get_db(tmp_path / "t.db")
+    db = fast_db
     store.replace_species_images(db, [_approved(), _approved(species_id="Esox lucius")])
     store.replace_species_images(db, [_approved()])
 
@@ -87,7 +87,7 @@ def test_replace_drops_species_no_longer_listed(tmp_path):
 
 
 def test_images_by_id_resyncs_a_stale_table(tmp_path):
-    db = get_db(tmp_path / "t.db")
+    db = fast_db
     store.replace_species_images(db, [_approved(species_id="Esox lucius")])
 
     served = service.images_by_id(db)

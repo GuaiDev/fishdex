@@ -345,8 +345,7 @@ def test_build_feature_matrix_integration(tmp_path: Path):
 
     from src.storage.database import get_db
 
-    db = get_db(tmp_path / "test.db")
-
+    db = fast_db
     edges = _y_network()
     for start, end, ogf_id, length, clat, clng in edges:
         db["stream_segments"].insert(
@@ -645,7 +644,7 @@ def test_waterbody_proximity(tmp_path):
     """Segment within 200m of a pond gets connected_to_waterbody=True."""
     from src.storage.database import get_db
 
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     if "water_features" not in db.table_names():
         db["water_features"].create(
             {

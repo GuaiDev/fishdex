@@ -6,10 +6,8 @@ from src.services.admin_dashboard import build_dashboard
 from src.storage.database import get_db
 
 
-def _make_db(tmp_path):
-    return get_db(tmp_path / "test.db")
-
-
+def _make_db(fast_db):
+    return fast_db
 def _seed_users(db, n=2):
     """Adds n *additional* users on top of the default user (id=1, 'jason')
     get_db()'s ensure_schema always seeds — start at id=2 to avoid colliding."""

@@ -16,10 +16,8 @@ from src.storage.database import get_db
 
 
 @pytest.fixture
-def db(tmp_path):
-    return get_db(tmp_path / "patterns.db")
-
-
+def db(fast_db):
+    return fast_db
 def _add_stop(db, *, user_id=1, species=("creek chub",), productive=True, clarity=None):
     db["sessions"].insert({"date": "2025-06-14", "overall_notes": None, "user_id": user_id})
     session_id = db.execute("SELECT MAX(id) FROM sessions").fetchone()[0]

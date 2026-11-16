@@ -18,7 +18,7 @@ from src.storage.database import get_db
 @pytest.fixture
 def db(tmp_path):
     _known_place_names.cache_clear()
-    database = get_db(tmp_path / "router.db")
+    database = fast_db
     database["stream_segments"].insert(
         {
             "ogf_id": 1,

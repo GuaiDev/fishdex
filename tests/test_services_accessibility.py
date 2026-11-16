@@ -120,14 +120,14 @@ def test_park_modifier_values():
 
 
 def test_park_index_empty_db(tmp_path: Path):
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     tree, data = _build_park_index(db)
     assert tree is None
     assert data == []
 
 
 def test_park_containment_recreational(tmp_path: Path):
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # Segment inside a Recreational park
     seg_lat, seg_lng = 43.65, -79.38
     _insert_park(db, "park_rec", "Recreational", seg_lat, seg_lng)
@@ -139,7 +139,7 @@ def test_park_containment_recreational(tmp_path: Path):
 
 
 def test_park_containment_wilderness(tmp_path: Path):
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     seg_lat, seg_lng = 43.70, -79.40
     _insert_park(db, "park_wild", "Wilderness", seg_lat, seg_lng)
 
@@ -150,7 +150,7 @@ def test_park_containment_wilderness(tmp_path: Path):
 
 
 def test_park_outside_polygon_gets_zero(tmp_path: Path):
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # Park far from segment
     _insert_park(db, "park_far", "Recreational", 45.0, -75.0)
 
@@ -228,7 +228,7 @@ def test_compute_access_scores_output_range(tmp_path: Path, monkeypatch):
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(30)
     scores = compute_access_scores(db, fm)
     assert len(scores) == 30
@@ -240,7 +240,7 @@ def test_compute_access_scores_fishing_spot_beats_no_access(tmp_path: Path, monk
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(10)
 
     # Put a fishing spot right next to segment 1 (43.5, -80.0)
@@ -256,7 +256,7 @@ def test_compute_access_scores_nature_reserve_penalizes(tmp_path: Path, monkeypa
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(5)
 
     seg0_lat, seg0_lng = fm.iloc[0]["centroid_lat"], fm.iloc[0]["centroid_lng"]
@@ -275,7 +275,7 @@ def test_compute_access_scores_writes_parquet(tmp_path: Path, monkeypatch):
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(5)
     compute_access_scores(db, fm)
     assert (tmp_path / "access_scores.parquet").exists()
@@ -325,7 +325,7 @@ def _insert_crown_land(db, crown_id: str, lat: float, lng: float) -> None:
 
 def test_crown_land_pip(tmp_path: Path):
     """Segment centroid inside a crown land polygon gets is_crown_land=True."""
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     inside_lat, inside_lng = 43.75, -79.75
     outside_lat, outside_lng = 43.50, -79.50
     _insert_crown_land(db, "cl_1", inside_lat, inside_lng)

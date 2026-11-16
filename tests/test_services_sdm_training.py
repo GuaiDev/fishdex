@@ -170,7 +170,7 @@ def _coords_at(df: pd.DataFrame, indices: list[int]) -> list[tuple[float, float]
 
 def test_prepare_species_data_loads_presence_records(tmp_path: Path):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     _add_obs(db, "Semotilus atromaculatus", _coords_at(df, range(5, 15)))
 
     X, y = prepare_species_data("Semotilus atromaculatus", db, df)
@@ -183,7 +183,7 @@ def test_prepare_species_data_loads_presence_records(tmp_path: Path):
 
 def test_prepare_species_data_combines_inat_and_gbif(tmp_path: Path):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     _add_obs(db, "Perca flavescens", _coords_at(df, range(5, 10)))  # 5 iNat
     _add_gbif(db, "Perca flavescens", _coords_at(df, range(20, 25)))  # 5 GBIF
 
@@ -202,8 +202,7 @@ def test_prepare_species_data_includes_trip_log_only_species(tmp_path: Path):
     result, so an empty X means the handoff is broken rather than the query.
     """
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
-
+    db = fast_db
     caught_at = [30, 31, 32]
     for lat, lng in _coords_at(df, caught_at):
         _add_trip_log_stop(db, ["creek chub"], lat, lng)
@@ -233,8 +232,7 @@ def test_prepare_species_data_includes_trip_log_only_species(tmp_path: Path):
 def test_prepare_species_data_stocking_exclusion(tmp_path: Path):
     df = _make_features().copy()
     df.loc[df["ogf_id"] <= 15, "is_stocked_within_5yr"] = True
-    db = get_db(tmp_path / "test.db")
-
+    db = fast_db
     # Observations on stocked segments + clean segments
     stocked_coords = _coords_at(df, range(0, 8))
     clean_coords = _coords_at(df, range(30, 38))
@@ -251,8 +249,7 @@ def test_prepare_species_data_stocking_exclusion(tmp_path: Path):
 
 def test_prepare_species_data_no_records_returns_empty(tmp_path: Path):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
-
+    db = fast_db
     X, y = prepare_species_data("Ghost fish", db, df)
 
     assert len(X) == 0
@@ -261,7 +258,7 @@ def test_prepare_species_data_no_records_returns_empty(tmp_path: Path):
 
 def test_prepare_species_data_bass_pooling(tmp_path: Path):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # Add records for both Micropterus species
     _add_obs(db, "Micropterus nigricans", _coords_at(df, range(5, 10)))
     _add_obs(db, "Micropterus salmoides", _coords_at(df, range(20, 25)))
@@ -278,7 +275,7 @@ def test_prepare_species_data_bass_pooling(tmp_path: Path):
 
 def test_generate_pseudo_absences_ratio(tmp_path: Path):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # Background observations on many segments
     _add_obs(db, "Other fish", _coords_at(df, range(0, _N)))
 
@@ -292,7 +289,7 @@ def test_generate_pseudo_absences_ratio(tmp_path: Path):
 
 def test_generate_pseudo_absences_no_target_species_overlap(tmp_path: Path):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     _add_obs(db, "Background fish", _coords_at(df, range(0, 40)))
 
     presence_ids = [1, 2, 3, 4, 5]
@@ -304,7 +301,7 @@ def test_generate_pseudo_absences_no_target_species_overlap(tmp_path: Path):
 
 def test_generate_pseudo_absences_min_distance_buffer(tmp_path: Path):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # Background observations across all segments
     _add_obs(db, "Background", _coords_at(df, range(0, _N)))
 
@@ -325,7 +322,7 @@ def test_generate_pseudo_absences_min_distance_buffer(tmp_path: Path):
 
 def test_generate_pseudo_absences_no_background_returns_empty(tmp_path: Path):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # No background observations at all
     presence_ids = [1, 2, 3]
     absences = generate_pseudo_absences(presence_ids, df, db)
@@ -337,7 +334,7 @@ def test_generate_pseudo_absences_no_background_returns_empty(tmp_path: Path):
 
 def _setup_smoke_db(tmp_path: Path, df: pd.DataFrame, species: str) -> object:
     """Create a test DB with 20 presence records and a background population."""
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # 20 presence records for target species
     _add_obs(db, species, _coords_at(df, range(10, 30)))
     # Background observations (many other species + locations)
@@ -393,7 +390,7 @@ def test_train_species_model_feature_importances_sum_to_one(tmp_path: Path):
 
 def test_train_species_model_raises_on_insufficient_data(tmp_path: Path):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # Only 3 presence records — below threshold
     _add_obs(db, "Rare fish", _coords_at(df, range(5, 8)))
 

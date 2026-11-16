@@ -43,7 +43,7 @@ def _make_post(
 
 @pytest.fixture()
 def populated_db(tmp_path):
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     posts = [
         _make_post(
             "p1",

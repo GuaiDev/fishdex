@@ -872,10 +872,12 @@ def test_card_says_not_looked_up_apart_from_nothing_found(db):
 # ── an empty species file fails closed (the S5 gap) ───────────────────────────
 
 
-def test_an_empty_species_file_withholds_every_species_and_says_status_is_missing(tmp_path):
+def test_an_empty_species_file_withholds_every_species_and_says_status_is_missing(tmp_path, migrated_template_db):
     from src.storage.database import get_db
 
-    empty = get_db(tmp_path / "empty.db")  # no species_ranges rows at all
+    path = tmp_path / "empty.db"
+    shutil.copy(migrated_template_db, path)
+    empty = get_db(path)  # no species_ranges rows at all
     inat(empty, "Clinostomus elongatus", "Redside Dace", near=ECKARDT)
     inat(empty, "Semotilus atromaculatus", "Creek Chub", near=ECKARDT)
 
@@ -891,10 +893,12 @@ def test_an_empty_species_file_withholds_every_species_and_says_status_is_missin
     assert "redside" not in blob and "clinostomus" not in blob and "creek chub" not in blob
 
 
-def test_a_species_file_for_another_jurisdiction_does_not_count_as_status_data(tmp_path):
+def test_a_species_file_for_another_jurisdiction_does_not_count_as_status_data(tmp_path, migrated_template_db):
     from src.storage.database import get_db
 
-    other = get_db(tmp_path / "other.db")
+    path = tmp_path / "other.db"
+    shutil.copy(migrated_template_db, path)
+    other = get_db(path)
     upsert_species_ranges(
         other,
         [
@@ -922,12 +926,14 @@ def test_a_populated_file_keeps_the_per_species_unknown_behaviour(db):
     assert card.meta.species_status_unchecked == 1
 
 
-def test_the_species_filter_and_new_to_me_name_nothing_without_status_data(tmp_path):
+def test_the_species_filter_and_new_to_me_name_nothing_without_status_data(tmp_path, migrated_template_db):
     from src.services.spot_card import new_species_at_spot
     from src.services.spots import _spots_with_species
     from src.storage.database import get_db
 
-    empty = get_db(tmp_path / "empty2.db")
+    path = tmp_path / "empty2.db"
+    shutil.copy(migrated_template_db, path)
+    empty = get_db(path)
     inat(empty, "Clinostomus elongatus", "Redside Dace", near=ECKARDT)
     s = eckardt()
     assert _spots_with_species(empty, [s], "redside") == []

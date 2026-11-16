@@ -20,7 +20,7 @@ class _Profile:
 def db(tmp_path, monkeypatch):
     from src.storage.database import get_db
 
-    database = get_db(tmp_path / "tools.db")
+    database = fast_db
     monkeypatch.setattr(tools, "get_db", lambda: database)
     # describe_place must never fire a live search or a live weather fetch.
     from src.models.context import EmptyReason
