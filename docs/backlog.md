@@ -224,7 +224,7 @@ Maritime province stubs added in two sessions June 28 2026.
   - `fish_observations.py` (FISS fish observations via DataBC WFS) — ~4,200 obs per 10km radius
   - `water_quality.py` (BC EnMoDS results) — current-tier file streamed and filtered by radius (see below)
 - `src/services/bc_ingest.py` — BC service layer
-- `/ingest/data-bc` endpoint — X-Api-Key protected, returns 202 (background task)
+- Refresh commands: see [README.md](../README.md#running-locally-and-hosting).
 - Model additions: `stream_order` + `segment_source` on StreamSegment; `source` on Observation
 - DB migrations: idempotent column additions, jurisdiction-scoped deletes on ingest
 
@@ -346,11 +346,7 @@ Test suite updated to match new signatures (35 tests pass).
 - `src/services/national_ingest.py` — DFO critical habitat, DataStream water quality
 - `src/services/tidal.py` — agent tool: `get_tidal_conditions_for_agent(lat, lng)`
 
-**New API endpoints** (all X-Api-Key protected, BackgroundTask, return 202):
-- `POST /ingest/data-ab` — Alberta-specific adapters
-- `POST /ingest/data-qc` — Quebec-specific adapters
-- `POST /ingest/data-national` — DFO critical habitat + DataStream water quality
-- `POST /ingest/data-tidal` — CHS tidal predictions
+**Refresh commands**: see [README.md](../README.md#running-locally-and-hosting).
 
 **Jurisdiction config** (`config.py`): CA-AB, CA-QC, CA-MB, CA-SK, CA-NS, CA-NB, CA-PE
 registered with cron areas and data_sources dicts. CA-BC updated with
@@ -507,7 +503,7 @@ Regulations now implemented (10 watershed-unit chunks, not the ~100-WMU scheme
 originally assumed).
 Hydro network: FWMIS Simplified Hydro Arcs live 2026-10-09 (full implementation,
 see Phase 2 — AB above). Water quality still stubbed (no machine-readable source).
-DataStream covers some AB watersheds via /ingest/data-national.
+DataStream covers some AB watersheds through the national ingest service.
 
 ### Quebec 🔨 (June 28 2026; species_ranges fixed July 17 2026)
 4 cron areas (St. Lawrence/Montreal, Saint-Maurice, Saguenay, Gatineau).
@@ -675,13 +671,9 @@ with fetched_at >= 30 days ago. If found, returns DB counts immediately without
 hitting Overpass. First weekly run fetches; all subsequent runs that week skip.
 File: src/services/osm.py.
 
-### /ingest/data days_back parameter ✅ (June 29 2026)
-Added optional days_back body param (default 90). days_back=0 or null removes
-the d1 date filter from the iNat API call, pulling all historical observations.
-Useful for sparse areas (MB, SK, prairies) where the 90-day window returns 0.
-Passes through: endpoint → _run_global_ingest → fetch_and_store → fetch_observations.
-To run a historical backfill:
-  POST /ingest/data {"lat":49.90,"lng":-97.14,"radius_km":50,"days_back":0,"label":"winnipeg-historical"}
+### Historical iNaturalist backfill
+Use the weekly CLI with `--days 0` to remove the date filter, optionally selecting
+an area with `--only`. See [refresh usage](../README.md#running-locally-and-hosting).
 
 ### iNat API pagination cap — known limit (June 29 2026)
 The iNat v1 API serves at most 10,000 records per query regardless of total_results.
@@ -696,20 +688,9 @@ File: src/ingest/global/inaturalist.py.
 ChatRequest Pydantic model (src/api/main.py:154) is unused — endpoint takes
 body: dict directly. Harmless but should be cleaned up or wired in.
 
-### GitHub Actions weekly ingest ✅
-Sunday 6am UTC. 25 cron areas total (June 28 2026):
-- 4 ON — hit /ingest/data
-- 4 BC — hit /ingest/data + /ingest/data-bc
-- 3 AB — hit /ingest/data + /ingest/data-ab
-- 4 QC — hit /ingest/data + /ingest/data-qc
-- 3 MB + 3 SK — hit /ingest/data only
-- 4 Maritimes (Miramichi NB, Saint John NB, Annapolis NS, Margaree NS) — hit /ingest/data
-- 2 tidal (Miramichi NB, Annapolis NS) — additionally hit /ingest/data-tidal
-
-### Ingest background tasks ✅ (June 28 2026)
-Both /ingest/data and /ingest/data-bc return 202 immediately via FastAPI BackgroundTasks.
-Prevents Railway from killing the connection during long ingest runs.
-Each source logs start, record count, and full traceback on error (logger.exception).
+### Weekly ingest
+See [README.md](../README.md#running-locally-and-hosting) for the current refresh
+workflow, scheduling, and retired API route behavior.
 
 ### Railway logging root cause fixed ✅ (June 28 2026)
 Background task INFO messages were silently dropped — uvicorn's dictConfig leaves the

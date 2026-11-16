@@ -1,10 +1,9 @@
-"""Per-area ingest bundles — the one code path behind /ingest/data* and `weekly-ingest`.
+"""Per-area ingest bundles used by `weekly-ingest`.
 
 Each `run_*_ingest` function runs every dataset in its bundle for one area,
 isolating failures so one flaky source does not stop the rest, and returns an
-`AreaIngestResult` saying what was stored and what failed. The API endpoints
-run them as background tasks; the `weekly-ingest` CLI command runs them in
-sequence over the areas listed in `data/ingest_areas.json`.
+`AreaIngestResult` saying what was stored and what failed. See README.md for
+refresh commands and area configuration.
 """
 
 import json

@@ -21,8 +21,9 @@ These global sources work for any lat/lng without any jurisdiction-specific code
 | Open-Meteo weather | Live weather + barometric pressure | `src/ingest/global/weather.py` |
 | CABIN benthic | Federal macroinvertebrate data (all Canada) | `src/ingest/jurisdictions/ca_on/benthic.py` |
 
-The CLI `make ingest` and the `/ingest/data` API endpoint already call all of
-these for any location. No changes needed for global sources.
+For CLI ingestion and regional refresh commands, see
+[README.md](../../../README.md#running-locally-and-hosting). No API ingest
+endpoint runs adapters.
 
 ---
 
