@@ -93,6 +93,10 @@ def get_user_from_token(db: Database, token: str) -> dict | None:
     """
     Validate a session token and return the user dict.
     Returns None if token is invalid or expired.
+
+    Activity timestamps are best-effort and throttled to once per five minutes
+    per session. The conditional session update arbitrates concurrent stale
+    readers; only its winner updates users.last_seen_at in the same transaction.
     """
     if not token:
         return None
@@ -119,12 +123,32 @@ def get_user_from_token(db: Database, token: str) -> dict | None:
     if not user:
         return None
 
-    try:
-        db["user_sessions"].update(session["id"], {"last_used_at": datetime.now().isoformat()})
-        db["users"].update(user["id"], {"last_seen_at": datetime.now().isoformat()})
-        db.conn.commit()
-    except Exception:
-        pass
+    now = datetime.now()
+    should_touch = True
+    last_used = session.get("last_used_at")
+    if last_used:
+        try:
+            last_used_dt = datetime.fromisoformat(last_used)
+            if now - last_used_dt < timedelta(minutes=5):
+                should_touch = False
+        except Exception:
+            should_touch = True
+
+    if should_touch:
+        try:
+            with db.conn:
+                updated = db.execute(
+                    "UPDATE user_sessions SET last_used_at = ? "
+                    "WHERE id = ? AND (last_used_at IS NULL OR last_used_at < ?)",
+                    [now.isoformat(), session["id"], (now - timedelta(minutes=5)).isoformat()],
+                )
+                if updated.rowcount:
+                    db.execute(
+                        "UPDATE users SET last_seen_at = ? WHERE id = ?",
+                        [now.isoformat(), user["id"]],
+                    )
+        except Exception:
+            pass
 
     return user
 
