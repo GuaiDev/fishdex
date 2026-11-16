@@ -84,9 +84,7 @@ def _top_locations(db: Database, limit: int = 10) -> list[dict[str, Any]]:
     if "segment_synthesis" not in db.table_names():
         return []
 
-    rows = db.execute(
-        "SELECT lat, lng, location_name, hit_count FROM segment_synthesis"
-    ).fetchall()
+    rows = db.execute("SELECT lat, lng, location_name, hit_count FROM segment_synthesis").fetchall()
 
     clusters: dict[tuple, dict[str, Any]] = {}
     for lat, lng, location_name, hit_count in rows:
@@ -98,13 +96,16 @@ def _top_locations(db: Database, limit: int = 10) -> list[dict[str, Any]]:
         else:
             continue
 
-        entry = clusters.setdefault(key, {
-            "lat": round(lat, _CLUSTER_DECIMALS) if lat is not None else None,
-            "lng": round(lng, _CLUSTER_DECIMALS) if lng is not None else None,
-            "query_count": 0,
-            "distinct_cache_entries": 0,
-            "sample_location_name": location_name,
-        })
+        entry = clusters.setdefault(
+            key,
+            {
+                "lat": round(lat, _CLUSTER_DECIMALS) if lat is not None else None,
+                "lng": round(lng, _CLUSTER_DECIMALS) if lng is not None else None,
+                "query_count": 0,
+                "distinct_cache_entries": 0,
+                "sample_location_name": location_name,
+            },
+        )
         entry["query_count"] += queries
         entry["distinct_cache_entries"] += 1
         if location_name and not entry["sample_location_name"]:
@@ -126,11 +127,10 @@ def _tool_usage(db: Database) -> list[dict[str, Any]]:
 
 
 def _ingest_status(db: Database) -> dict[str, Any]:
-    """Record counts by source and jurisdiction, from observations and
-    gbif_observations — the two tables the task calls out explicitly.
-    Other ingest tables (stocking_records, salmon_escapement, regulation_chunks,
-    species_ranges, water_quality_readings, ...) aren't included; add here if
-    a fuller ingest-coverage view is needed later.
+    """Combine recent run diagnostics with observation coverage.
+
+    Coverage counts include only observations and gbif_observations; the run
+    ledger covers additional sources without scanning their stored datasets.
     """
     status: dict[str, Any] = {"observations": [], "gbif_observations": [], "runs": []}
 
@@ -142,10 +142,19 @@ def _ingest_status(db: Database) -> dict[str, Any]:
         ).fetchall()
         status["runs"] = [
             {
-                "id": r[0], "source": r[1], "jurisdiction": r[2], "area": r[3],
-                "started_at": r[4], "finished_at": r[5], "fetched": r[6],
-                "stored": r[7], "skipped": r[8], "empty_count": r[9],
-                "empty_share": r[10], "status": r[11], "error": r[12],
+                "id": r[0],
+                "source": r[1],
+                "jurisdiction": r[2],
+                "area": r[3],
+                "started_at": r[4],
+                "finished_at": r[5],
+                "fetched": r[6],
+                "stored": r[7],
+                "skipped": r[8],
+                "empty_count": r[9],
+                "empty_share": r[10],
+                "status": r[11],
+                "error": r[12],
             }
             for r in rows
         ]
@@ -221,9 +230,7 @@ def _catch_stats(db: Database, species_limit: int = 10, pb_limit: int = 10) -> d
             "ORDER BY pb.best_size_cm DESC LIMIT ?",
             [pb_limit],
         ).fetchall()
-        top_largest = [
-            {"species": r[0], "biggest_size_cm": r[1], "username": r[2]} for r in rows
-        ]
+        top_largest = [{"species": r[0], "biggest_size_cm": r[1], "username": r[2]} for r in rows]
 
     total_sessions = (
         db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
@@ -276,24 +283,28 @@ def _api_cost_estimate(db: Database) -> dict[str, Any]:
             rates = _rate_for_model(model)
             if rates is None:
                 unpriced_calls += calls
-                by_model.append({
-                    "model": model,
-                    "calls": calls,
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
-                    "estimated_usd": None,
-                })
+                by_model.append(
+                    {
+                        "model": model,
+                        "calls": calls,
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "estimated_usd": None,
+                    }
+                )
                 continue
             in_rate, out_rate = rates
             cost = (input_tokens / 1_000_000 * in_rate) + (output_tokens / 1_000_000 * out_rate)
             total_usd += cost
-            by_model.append({
-                "model": model,
-                "calls": calls,
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "estimated_usd": round(cost, 4),
-            })
+            by_model.append(
+                {
+                    "model": model,
+                    "calls": calls,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "estimated_usd": round(cost, 4),
+                }
+            )
         result[window_name] = {
             "by_model": sorted(by_model, key=lambda m: m["calls"], reverse=True),
             "total_usd": round(total_usd, 4),

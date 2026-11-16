@@ -37,10 +37,7 @@ from shapely.geometry import MultiLineString, Point, shape
 from src.models.hydrology import StreamSegment
 from src.services.ingest_runs import record_counts, record_error
 
-_WFS_URL = (
-    "https://openmaps.gov.bc.ca/geo/pub/"
-    "WHSE_BASEMAPPING.FWA_STREAM_NETWORKS_SP/ows"
-)
+_WFS_URL = "https://openmaps.gov.bc.ca/geo/pub/WHSE_BASEMAPPING.FWA_STREAM_NETWORKS_SP/ows"
 _TYPE_NAME = "pub:WHSE_BASEMAPPING.FWA_STREAM_NETWORKS_SP"
 _PAGE_SIZE = 1000
 _CACHE_DIR = Path("data/cache/fwa")
@@ -123,6 +120,7 @@ def _wfs_paginate(url: str, base_params: dict) -> list[dict]:
     while True:
         params = {**base_params, "startIndex": start, "count": _PAGE_SIZE}
         import urllib.parse
+
         full_url = url + "?" + urllib.parse.urlencode(params)
         logger.info("FWA WFS request: %s", full_url)
         record_counts(fetched=1)
@@ -137,7 +135,9 @@ def _wfs_paginate(url: str, base_params: dict) -> list[dict]:
         record_counts(empty=int(not page))
         logger.info(
             "FWA WFS startIndex=%d: %d features on page (totalFeatures=%s)",
-            start, len(page), data.get("totalFeatures"),
+            start,
+            len(page),
+            data.get("totalFeatures"),
         )
         features.extend(page)
         if len(page) < _PAGE_SIZE:
@@ -179,16 +179,14 @@ def _parse_segment(
     if len(coords) < 2:
         return None
 
-    start_coord = coords[0]   # (lon, lat)
+    start_coord = coords[0]  # (lon, lat)
     end_coord = coords[-1]
 
     centroid = geom_obj.centroid
     if home_lat is not None and home_lon is not None:
         dist_km = _haversine_km(home_lat, home_lon, centroid.y, centroid.x)
         geom_wkt = (
-            Point(centroid.x, centroid.y).wkt
-            if dist_km > _SIMPLIFY_BEYOND_KM
-            else geom_obj.wkt
+            Point(centroid.x, centroid.y).wkt if dist_km > _SIMPLIFY_BEYOND_KM else geom_obj.wkt
         )
     else:
         geom_wkt = geom_obj.wkt

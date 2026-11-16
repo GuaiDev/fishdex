@@ -154,19 +154,21 @@ def _parse_predictions(station: dict, predictions: list[dict]) -> list[dict]:
         else:
             tide_type = None
         record_id = f"{station['id']}_{iso_dt}"
-        rows.append({
-            "record_id": record_id,
-            "station_id": station["id"],
-            "station_name": station["name"],
-            "lat": station["lat"],
-            "lng": station["lng"],
-            "jurisdiction": jur,
-            "prediction_datetime": iso_dt,
-            "water_level_m": level,
-            "data_type": "prediction",
-            "tide_type": tide_type,
-            "fetched_at": now,
-        })
+        rows.append(
+            {
+                "record_id": record_id,
+                "station_id": station["id"],
+                "station_name": station["name"],
+                "lat": station["lat"],
+                "lng": station["lng"],
+                "jurisdiction": jur,
+                "prediction_datetime": iso_dt,
+                "water_level_m": level,
+                "data_type": "prediction",
+                "tide_type": tide_type,
+                "fetched_at": now,
+            }
+        )
     return rows
 
 
