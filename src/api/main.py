@@ -85,6 +85,16 @@ def verify_api_key(x_api_key: str = Header(None)) -> None:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
+def require_server_ingest_enabled(_: None = Depends(verify_api_key)) -> None:
+    """Keep legacy server-side ingest routes disabled unless explicitly enabled."""
+    enabled = os.environ.get("FISHBOT_ALLOW_SERVER_INGEST", "0").strip().lower()
+    if enabled not in {"1", "true", "yes", "on"}:
+        raise HTTPException(
+            status_code=404,
+            detail="Server-side ingest is disabled; run `fishbot weekly-ingest` instead.",
+        )
+
+
 def get_current_user(authorization: str = Header(None)) -> dict:
     """Extract and validate user from Authorization: Bearer <token> header."""
     from src.auth.auth import get_user_from_token
@@ -241,8 +251,6 @@ app.add_middleware(
 _static_dir = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(_static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
-
-from src.services import area_ingest  # noqa: E402
 
 # Catch photos, saved under DATA_DIR/photos by src/services/photo_storage.py
 from src.services.photo_storage import PHOTOS_DIR  # noqa: E402
@@ -1191,7 +1199,7 @@ def list_users(user: dict = Depends(get_current_user)):
 
 
 @app.post("/ingest")
-def ingest(body: dict, _: None = Depends(verify_api_key)):
+def ingest(body: dict, _: None = Depends(require_server_ingest_enabled)):
     """Ingest YouTube content for a search query.
 
     Body: {"query": "channel catfish Grand River", "max_videos": 10}
@@ -1219,7 +1227,7 @@ def ingest(body: dict, _: None = Depends(verify_api_key)):
 def ingest_data(
     body: dict,
     background_tasks: BackgroundTasks,
-    _: None = Depends(verify_api_key),
+    _: None = Depends(require_server_ingest_enabled),
 ):
     """Trigger global data ingest for a location (runs in background).
 
@@ -1243,6 +1251,8 @@ def ingest_data(
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
 
+    from src.services import area_ingest
+
     background_tasks.add_task(area_ingest.run_global_ingest, lat, lng, radius_km, label, days_back)
 
     return JSONResponse(
@@ -1259,7 +1269,7 @@ def ingest_data(
 def ingest_data_bc(
     body: dict,
     background_tasks: BackgroundTasks,
-    _: None = Depends(verify_api_key),
+    _: None = Depends(require_server_ingest_enabled),
 ):
     """Trigger BC-specific data ingest for a location (runs in background).
 
@@ -1282,6 +1292,8 @@ def ingest_data_bc(
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
 
+    from src.services import area_ingest
+
     background_tasks.add_task(area_ingest.run_bc_ingest, lat, lng, radius_km, label)
 
     return JSONResponse(
@@ -1298,7 +1310,7 @@ def ingest_data_bc(
 def ingest_data_ab(
     body: dict,
     background_tasks: BackgroundTasks,
-    _: None = Depends(verify_api_key),
+    _: None = Depends(require_server_ingest_enabled),
 ):
     """Trigger Alberta-specific data ingest for a location (runs in background).
 
@@ -1312,6 +1324,8 @@ def ingest_data_ab(
     label = body.get("label", f"{lat},{lng}")
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
+    from src.services import area_ingest
+
     background_tasks.add_task(area_ingest.run_ab_ingest, lat, lng, radius_km, label)
     return JSONResponse(
         status_code=202,
@@ -1327,7 +1341,7 @@ def ingest_data_ab(
 def ingest_data_qc(
     body: dict,
     background_tasks: BackgroundTasks,
-    _: None = Depends(verify_api_key),
+    _: None = Depends(require_server_ingest_enabled),
 ):
     """Trigger Quebec-specific data ingest for a location (runs in background).
 
@@ -1341,6 +1355,8 @@ def ingest_data_qc(
     label = body.get("label", f"{lat},{lng}")
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
+    from src.services import area_ingest
+
     background_tasks.add_task(area_ingest.run_qc_ingest, lat, lng, radius_km, label)
     return JSONResponse(
         status_code=202,
@@ -1356,7 +1372,7 @@ def ingest_data_qc(
 def ingest_data_mb(
     body: dict,
     background_tasks: BackgroundTasks,
-    _: None = Depends(verify_api_key),
+    _: None = Depends(require_server_ingest_enabled),
 ):
     """Trigger Manitoba-specific data ingest for a location (runs in background).
 
@@ -1370,6 +1386,8 @@ def ingest_data_mb(
     label = body.get("label", f"{lat},{lng}")
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
+    from src.services import area_ingest
+
     background_tasks.add_task(area_ingest.run_mb_ingest, lat, lng, radius_km, label)
     return JSONResponse(
         status_code=202,
@@ -1385,7 +1403,7 @@ def ingest_data_mb(
 def ingest_data_sk(
     body: dict,
     background_tasks: BackgroundTasks,
-    _: None = Depends(verify_api_key),
+    _: None = Depends(require_server_ingest_enabled),
 ):
     """Trigger Saskatchewan-specific data ingest for a location (runs in background).
 
@@ -1399,6 +1417,8 @@ def ingest_data_sk(
     label = body.get("label", f"{lat},{lng}")
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
+    from src.services import area_ingest
+
     background_tasks.add_task(area_ingest.run_sk_ingest, lat, lng, radius_km, label)
     return JSONResponse(
         status_code=202,
@@ -1468,7 +1488,7 @@ def _run_national_ingest(
 def ingest_data_national(
     body: dict,
     background_tasks: BackgroundTasks,
-    _: None = Depends(verify_api_key),
+    _: None = Depends(require_server_ingest_enabled),
 ):
     """Trigger national/federal data ingest (runs in background).
 
@@ -1497,7 +1517,7 @@ def ingest_data_national(
 def ingest_data_tidal(
     body: dict,
     background_tasks: BackgroundTasks,
-    _: None = Depends(verify_api_key),
+    _: None = Depends(require_server_ingest_enabled),
 ):
     """Trigger CHS tidal predictions ingest for a coastal location (runs in background).
 
@@ -1513,6 +1533,8 @@ def ingest_data_tidal(
     label = body.get("label", f"{lat},{lng}")
     if lat is None or lng is None:
         raise HTTPException(status_code=400, detail="lat and lng are required")
+    from src.services import area_ingest
+
     background_tasks.add_task(area_ingest.run_tidal_ingest, lat, lng, radius_km, label)
     return JSONResponse(
         status_code=202,

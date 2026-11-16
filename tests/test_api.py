@@ -100,6 +100,7 @@ def test_log_trip_endpoint():
 def test_ingest_data_requires_lat_lng(monkeypatch):
     """Missing lat/lng returns 400."""
     monkeypatch.setenv("FISHBOT_API_KEY", "test-key")
+    monkeypatch.setenv("FISHBOT_ALLOW_SERVER_INGEST", "1")
     response = client.post(
         "/ingest/data",
         json={"label": "test"},
@@ -140,6 +141,7 @@ def test_api_key_wrong_refuses(monkeypatch):
 
 def test_api_key_right_passes(monkeypatch):
     monkeypatch.setenv("FISHBOT_API_KEY", "right-key")
+    monkeypatch.setenv("FISHBOT_ALLOW_SERVER_INGEST", "1")
     response = client.post(
         "/ingest/data",
         json={"label": "test"},
@@ -147,6 +149,28 @@ def test_api_key_right_passes(monkeypatch):
     )
     # Past the key check: the body is rejected by validation, not by auth.
     assert response.status_code in (400, 422)
+
+
+def test_server_ingest_routes_are_disabled_by_default(monkeypatch):
+    """The API process does not run ingest work unless explicitly opted in."""
+    monkeypatch.setenv("FISHBOT_API_KEY", "test-key")
+    monkeypatch.delenv("FISHBOT_ALLOW_SERVER_INGEST", raising=False)
+    headers = {"X-Api-Key": "test-key"}
+    body = {"query": "trout", "lat": 43.45, "lng": -79.72}
+
+    for path in (
+        "/ingest",
+        "/ingest/data",
+        "/ingest/data-bc",
+        "/ingest/data-ab",
+        "/ingest/data-qc",
+        "/ingest/data-mb",
+        "/ingest/data-sk",
+        "/ingest/data-national",
+        "/ingest/data-tidal",
+    ):
+        response = client.post(path, json=body, headers=headers)
+        assert response.status_code == 404, (path, response.status_code, response.text)
 
 
 def test_admin_token_refuses_without_key(monkeypatch):
