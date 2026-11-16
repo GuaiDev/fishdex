@@ -47,7 +47,10 @@ class _JsonFormatter(logging.Formatter):
 
 
 for _handler in logging.getLogger().handlers:
-    _handler.setFormatter(_JsonFormatter())
+    # Keep test and host-provided capture handlers' formatters intact. They
+    # may inspect LogRecord.message, which Formatter.format() populates.
+    if isinstance(_handler, logging.StreamHandler) and _handler.stream is sys.stdout:
+        _handler.setFormatter(_JsonFormatter())
 
 # These sit below basicConfig on purpose — see the comment above. Importing
 # FastAPI first lets it attach handlers to the root logger, after which
