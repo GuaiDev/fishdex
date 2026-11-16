@@ -189,3 +189,23 @@ def test_jurisdiction_without_a_home_is_per_user(db):
     assert jurisdiction.code == "CA-BC"
     assert trips == []
     assert place_mod._home_point(db, 2) is None
+
+
+@pytest.mark.parametrize("initial_home", [None, OAKVILLE])
+def test_profile_edit_persists_jurisdiction_without_coordinates(db, monkeypatch, initial_home):
+    import src.cli.main as cli
+
+    _user(db, 1, "jason")
+    set_user_home(db, 1, initial_home, "CA-ON")
+    monkeypatch.setattr(cli, "get_db", lambda: db)
+    monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: True)
+    answers = iter(["CA-BC", "", "", "", "trout", "fly fishing", "exploration"])
+    monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: next(answers))
+
+    cli.profile()
+
+    assert get_user_home(db, 1) == (None, "CA-BC")
+    profile, _, jurisdiction = chat._prompt_inputs(db, 1)
+    assert profile.home_location is None
+    assert profile.home_jurisdiction == "CA-BC"
+    assert jurisdiction.code == "CA-BC"
