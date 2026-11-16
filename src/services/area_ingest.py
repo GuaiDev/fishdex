@@ -51,17 +51,29 @@ def load_areas(path: Path | None = None) -> list[IngestArea]:
 
 def _attempt(result: AreaIngestResult, name: str, fn: Callable[[], object]) -> None:
     """Run one dataset; record its count, or its error, on `result`."""
-    try:
-        value = fn()
-    except Exception as exc:  # noqa: BLE001 - isolation is the point
-        _log.exception("[%s] %s fetch failed", result.label, name)
-        result.failed[name] = f"{type(exc).__name__}: {exc}"
-        return
-    if isinstance(value, dict):
-        result.stored.update(value)
-    else:
-        result.stored[name] = int(value or 0)
-    _log.info("[%s] %s: %s", result.label, name, value)
+    from src.services.ingest_runs import ingest_run
+
+    jurisdiction = {
+        IngestSource.GLOBAL: "CA-ON", IngestSource.BC: "CA-BC",
+        IngestSource.AB: "CA-AB", IngestSource.QC: "CA-QC",
+        IngestSource.MB: "CA-MB", IngestSource.SK: "CA-SK",
+    }.get(result.source)
+    with ingest_run(name, jurisdiction=jurisdiction, area=result.label) as run:
+        try:
+            value = fn()
+        except Exception as exc:  # noqa: BLE001 - isolation is the point
+            _log.exception("[%s] %s fetch failed", result.label, name)
+            result.failed[name] = f"{type(exc).__name__}: {exc}"
+            run.error = result.failed[name]
+            return
+        if isinstance(value, dict):
+            result.stored.update(value)
+            count = sum(int(n or 0) for n in value.values())
+        else:
+            count = int(value or 0)
+            result.stored[name] = count
+        run.record(fetched=max(count, 1), stored=count, empty=1 if not count else 0)
+        _log.info("[%s] %s: %s", result.label, name, value)
 
 
 def run_global_ingest(

@@ -1703,6 +1703,32 @@ def migrate_observation_position_indexes(db: Database) -> None:
     db.conn.commit()
 
 
+def migrate_ingest_runs(db: Database) -> None:
+    """Create the durable ledger for individual ingest source runs."""
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS ingest_runs (
+            id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+            source              TEXT NOT NULL,
+            jurisdiction        TEXT,
+            area                TEXT,
+            started_at          TEXT NOT NULL,
+            finished_at         TEXT,
+            fetched             INTEGER NOT NULL DEFAULT 0,
+            stored              INTEGER NOT NULL DEFAULT 0,
+            skipped             INTEGER NOT NULL DEFAULT 0,
+            empty_count         INTEGER NOT NULL DEFAULT 0,
+            empty_share         REAL NOT NULL DEFAULT 0,
+            status              TEXT NOT NULL,
+            error               TEXT
+        )
+    """)
+    db.execute("CREATE INDEX IF NOT EXISTS idx_ingest_runs_started ON ingest_runs(started_at DESC)")
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ingest_runs_source ON ingest_runs(source, jurisdiction)"
+    )
+    db.conn.commit()
+
+
 def migrate_gbif_survey_provenance(db: Database) -> None:
     """Add survey-provenance columns to gbif_observations. Idempotent.
 
@@ -1919,6 +1945,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(26, "species_images", migrate_species_images),
     Migration(27, "hydro_segments", _ensure_hydro_segments),
     Migration(28, "llm_usage", _ensure_llm_usage),
+    Migration(29, "ingest_runs", migrate_ingest_runs),
 )
 
 assert [m.version for m in MIGRATIONS] == list(range(1, len(MIGRATIONS) + 1))
