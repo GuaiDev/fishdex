@@ -4,13 +4,20 @@ Exposes the chat agent over HTTP for mobile and web clients.
 Start with: uv run fishbot serve
 """
 
+import hashlib
 import json
 import logging
 import math
 import os
 import secrets
 import sys
+import time
+import uuid
 from contextlib import asynccontextmanager
+from functools import lru_cache
+from pathlib import Path
+
+from rich.logging import RichHandler
 
 # Configure stdout logging before any other module runs.
 # basicConfig is a no-op if handlers are already attached (e.g. a parent process
@@ -24,6 +31,34 @@ logging.basicConfig(
 )
 logging.getLogger().setLevel(logging.INFO)
 
+
+class _JsonFormatter(logging.Formatter):
+    """Emit one JSON object per log record for hosted log ingestion."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        payload.update(getattr(record, "fields", {}))
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, separators=(",", ":"), default=str)
+
+
+for _handler in logging.getLogger().handlers[:]:
+    if isinstance(_handler, RichHandler):
+        logging.getLogger().removeHandler(_handler)
+        _handler.close()
+        _handler = logging.StreamHandler(sys.stdout)
+        logging.getLogger().addHandler(_handler)
+    # Keep test and host-provided capture handlers' formatters intact. They
+    # may inspect LogRecord.message, which Formatter.format() populates.
+    if isinstance(_handler, logging.StreamHandler) and _handler.stream is sys.stdout:
+        _handler.setFormatter(_JsonFormatter())
+
 # These sit below basicConfig on purpose — see the comment above. Importing
 # FastAPI first lets it attach handlers to the root logger, after which
 # basicConfig becomes a no-op and background-task INFO messages vanish on
@@ -36,10 +71,12 @@ from fastapi import (  # noqa: E402
     Header,
     HTTPException,
     Query,
+    Request,
     Response,
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
@@ -83,7 +120,7 @@ def verify_api_key(x_api_key: str = Header(None)) -> None:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
-def get_current_user(authorization: str = Header(None)) -> dict:
+def get_current_user(authorization: str = Header(None), request: Request = None) -> dict:
     """Extract and validate user from Authorization: Bearer <token> header."""
     from src.auth.auth import get_user_from_token
     from src.storage.database import get_db
@@ -95,6 +132,8 @@ def get_current_user(authorization: str = Header(None)) -> dict:
     user = get_user_from_token(db, token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if request is not None:
+        request.state.user_id = user.get("id")
     return user
 
 
@@ -108,7 +147,7 @@ def public_demo_enabled() -> bool:
     }
 
 
-def get_user_or_demo(authorization: str = Header(None)) -> dict:
+def get_user_or_demo(authorization: str = Header(None), request: Request = None) -> dict:
     """Read-only routes the public demo shows: a real user if a token is sent, else the demo.
 
     A request with no Authorization header is the demo caller: `id` is None, so every
@@ -118,15 +157,18 @@ def get_user_or_demo(authorization: str = Header(None)) -> dict:
     writes, calls the model, or is not meant for the public.
     """
     if authorization:
-        return get_current_user(authorization)
+        return get_current_user(authorization, request)
     if not public_demo_enabled():
         raise HTTPException(status_code=401, detail="Not authenticated")
+    if request is not None:
+        request.state.user_id = None
     return {"id": None, "username": "demo", "display_name": "Demo", "role": "demo", "demo": True}
 
 
 def get_current_user_or_apikey(
     authorization: str = Header(None),
     x_api_key: str = Header(None),
+    request: Request = None,
 ) -> dict:
     """Accept either Bearer token (users) or X-Api-Key (admin fallback)."""
     from src.auth.auth import get_user_from_token
@@ -137,10 +179,15 @@ def get_current_user_or_apikey(
         db = get_db()
         user = get_user_from_token(db, token)
         if user:
+            if request is not None:
+                request.state.user_id = user.get("id")
             return user
     expected = os.environ.get("FISHBOT_API_KEY")
     if expected and x_api_key and secrets.compare_digest(x_api_key.encode(), expected.encode()):
-        return {"id": 1, "username": "jason", "role": "admin", "daily_message_limit": 9999}
+        user = {"id": 1, "username": "jason", "role": "admin", "daily_message_limit": 9999}
+        if request is not None:
+            request.state.user_id = user["id"]
+        return user
     raise HTTPException(status_code=401, detail="Not authenticated")
 
 
@@ -218,6 +265,46 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+@app.middleware("http")
+async def request_observability(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID", "").strip()
+    if (
+        not request_id
+        or len(request_id) > 128
+        or any(ord(char) < 33 or ord(char) > 126 for char in request_id)
+    ):
+        request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+    started = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        response.headers["X-Request-ID"] = request_id
+        return response
+    finally:
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        route = request.scope.get("route")
+        route_name = getattr(route, "path", request.url.path)
+        user_id = getattr(request.state, "user_id", None)
+        user_hash = (
+            hashlib.sha256(str(user_id).encode()).hexdigest()[:16] if user_id is not None else None
+        )
+        _log.info(
+            "http_request",
+            extra={
+                "fields": {
+                    "request_id": request_id,
+                    "route": route_name,
+                    "status": status_code,
+                    "latency_ms": round(elapsed_ms, 2),
+                    "user_hash": user_hash,
+                }
+            },
+        )
+
+
 # CORS: FISHBOT_CORS_ORIGINS is a comma-separated list of origins allowed to call the API from
 # a browser (the hosted app's address). Unset keeps the local default of "any origin", which is
 # fine on localhost. Auth is a Bearer header, never a cookie, so credentials stay off.
@@ -284,6 +371,75 @@ class ChatResponse(BaseModel):
 
 
 # --- Endpoints ---
+
+
+@lru_cache(maxsize=1)
+def _map_artifact_info() -> tuple[str | None, int | None]:
+    """Return the baked map artifact digest and its declared segment count."""
+    map_file = Path("data/processed/map_data.json")
+    try:
+        content = map_file.read_bytes()
+        metadata = json.loads(content).get("metadata", {})
+        return hashlib.sha256(content).hexdigest(), int(metadata["segment_count"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None, None
+
+
+@app.get("/health/live")
+def health_live():
+    """Process liveness; deliberately independent of database and map availability."""
+    return {"status": "ok"}
+
+
+@app.get("/health/ready")
+def health_ready():
+    """Check schema and map artifact row counts, not loaded content identity.
+
+    Same-count artifact content changes are not detected; use the reseed procedure.
+    """
+    from src.storage.database import MIGRATIONS, get_db
+
+    checks: dict[str, bool] = {}
+    details: dict[str, object] = {}
+    try:
+        db = get_db()
+        db.execute("SELECT 1").fetchone()
+        checks["db_opens"] = True
+        tables = set(db.table_names())
+        schema_version = None
+        if "schema_migrations" in tables:
+            row = db.execute("SELECT MAX(version) FROM schema_migrations").fetchone()
+            schema_version = row[0]
+        details["schema_version"] = schema_version
+        details["schema_version_expected"] = len(MIGRATIONS)
+        checks["schema_version"] = schema_version == len(MIGRATIONS)
+
+        map_digest, segment_floor = _map_artifact_info()
+        details["map_artifact_digest"] = map_digest
+        details["row_floors"] = {"map_segments": segment_floor}
+        if "map_segments" in tables:
+            map_rows = db.execute("SELECT COUNT(*) FROM map_segments").fetchone()[0]
+        else:
+            map_rows = 0
+        details["map_rows"] = {"map_segments": map_rows}
+        checks["map_artifact_consistent"] = (
+            map_digest is not None and map_rows > 0 and map_rows == segment_floor
+        )
+        checks["map_row_floors"] = segment_floor is not None and map_rows >= segment_floor
+    except Exception:
+        checks.setdefault("db_opens", False)
+        checks["schema_version"] = False
+        checks["map_artifact_consistent"] = False
+        checks["map_row_floors"] = False
+    finally:
+        if "db" in locals():
+            db.conn.close()
+
+    ready = all(checks.values())
+    return JSONResponse(
+        status_code=200 if ready else 503,
+        content={"status": "ready" if ready else "not_ready", "checks": checks, **details},
+    )
 
 
 @app.get("/health")

@@ -47,6 +47,46 @@ def test_health_no_auth_required():
     assert response.status_code == 200
 
 
+def test_health_live_and_request_id():
+    response = client.get("/health/live", headers={"X-Request-ID": "health-check-17"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.headers["X-Request-ID"] == "health-check-17"
+
+
+def test_readiness_fails_when_map_database_is_empty():
+    response = client.get("/health/ready")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "not_ready"
+    assert body["checks"]["db_opens"] is True
+    assert body["checks"]["map_row_floors"] is False
+    assert body["row_floors"]["map_segments"] > 0
+
+
+@pytest.mark.parametrize("map_count, expected_count", [(0, 0), (2, 0), (2, 1), (2, 2), (2, 3)])
+def test_readiness_requires_matching_nonempty_map(map_count, expected_count, monkeypatch):
+    from src.api import main
+    from src.storage.database import get_db
+
+    monkeypatch.setattr(main, "_map_artifact_info", lambda: ("artifact-digest", expected_count))
+    db = get_db()
+    db.conn.executemany(
+        "INSERT INTO map_segments (ogf_id, lat, lng) VALUES (?, 45, -79)",
+        [(index,) for index in range(map_count)],
+    )
+    db.conn.commit()
+    db.conn.close()
+
+    response = client.get("/health/ready")
+    body = response.json()
+    consistent = map_count > 0 and map_count == expected_count
+    assert response.status_code == (200 if consistent else 503)
+    assert body["checks"]["map_artifact_consistent"] is consistent
+    assert body["map_artifact_digest"] == "artifact-digest"
+    assert body["map_rows"]["map_segments"] == map_count
+
+
 @REQUIRES_API
 def test_chat_basic():
     response = client.post(
