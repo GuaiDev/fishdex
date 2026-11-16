@@ -219,10 +219,8 @@ These replace the corresponding prompts in the original Getting Started doc.
 > - Use typer for the CLI with commands: chat, log (log a trip), recent (show recent trips), profile (view/edit user profile).
 > - Use the Anthropic SDK with claude-sonnet-4-6 by default, env-var overridable.
 > 
-> - User profile JSON schema at data/user_profile.json:
->   - home_jurisdiction (ISO 3166-2, e.g., "CA-ON")
+> - For home and jurisdiction storage, see [README usage](../../README.md#how-to-run). Remaining legacy profile fields:
 >   - frequented_jurisdictions (list of ISO codes)
->   - home_location (lat/lng + name)
 >   - target_species (list)
 >   - gear (list of dicts)
 >   - budget (annual)

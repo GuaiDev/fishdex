@@ -118,9 +118,10 @@ def serve(
 
 
 def _home_profile(db) -> UserProfile:
-    if "users" not in db.table_names() or db.execute(
-        "SELECT 1 FROM users WHERE id = ?", [1]
-    ).fetchone() is None:
+    if (
+        "users" not in db.table_names()
+        or db.execute("SELECT 1 FROM users WHERE id = ?", [1]).fetchone() is None
+    ):
         return load_profile()
     stored = get_user_home(db, 1)
     home, jurisdiction = stored if stored is not None else (None, None)

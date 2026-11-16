@@ -93,10 +93,12 @@ def _prompt_inputs(db: Any, user_id: int) -> tuple[Any, list, Any]:
     The profile file (data/user_profile.json) and the legacy `trips` table have
     no user_id: they are user 1's. Any other user gets neither. Home and
     jurisdiction are per user and live in the database: a stored home overrides
-    the file's for user 1, and anyone else with a home gets a profile carrying
-    only that. A user with no home falls back to the app default jurisdiction,
-    never user 1's home, so nothing in their prompt (or in the tool descriptions
-    built from the profile) is derived from someone else's data.
+    the file's for user 1, and anyone else with stored home or jurisdiction gets
+    a profile carrying only those. A jurisdiction does not require coordinates.
+    Users without a stored jurisdiction use the app default (user 1 retains the
+    legacy file fallback), never another user's home, so nothing in their prompt
+    (or in the tool descriptions built from the profile) is derived from someone
+    else's data.
     """
     stored = get_user_home(db, user_id)
     if user_id == 1:
