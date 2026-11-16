@@ -132,9 +132,17 @@ def get_user_from_token(db: Database, token: str) -> dict | None:
 
     if should_touch:
         try:
-            db["user_sessions"].update(session["id"], {"last_used_at": now.isoformat()})
-            db["users"].update(user["id"], {"last_seen_at": now.isoformat()})
-            db.conn.commit()
+            with db.conn:
+                updated = db.execute(
+                    "UPDATE user_sessions SET last_used_at = ? "
+                    "WHERE id = ? AND (last_used_at IS NULL OR last_used_at < ?)",
+                    [now.isoformat(), session["id"], (now - timedelta(minutes=5)).isoformat()],
+                )
+                if updated.rowcount:
+                    db.execute(
+                        "UPDATE users SET last_seen_at = ? WHERE id = ?",
+                        [now.isoformat(), user["id"]],
+                    )
         except Exception:
             pass
 
