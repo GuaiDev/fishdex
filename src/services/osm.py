@@ -223,7 +223,7 @@ def fetch_and_store(lat: float, lng: float) -> tuple[int, int]:
     memory pressure that causes Railway OOM when multiple ingests overlap.
     Returns (0, 0) if Overpass is unavailable.
     """
-    from src.services.ingest_runs import record_counts
+    from src.services.ingest_runs import record_counts, record_error
 
     db = get_db()
 
@@ -267,6 +267,7 @@ def fetch_and_store(lat: float, lng: float) -> tuple[int, int]:
         points = _osm.fetch_access_points(lat, lng, radius_km=25)
         record_counts(fetched=1, empty=int(not points))
     except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError) as e:
+        record_error(e)
         warnings.warn(f"OSM ingest failed after all retries — skipping: {e}", stacklevel=2)
         return 0, 0
 

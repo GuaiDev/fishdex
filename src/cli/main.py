@@ -304,15 +304,6 @@ def _run_source(
             run.error = results[-1].error
             return None
 
-        if isinstance(value, dict):
-            count = sum(value.values())
-        elif isinstance(value, tuple):
-            count = sum(value)
-        else:
-            count = value
-        if isinstance(count, (int, float)):
-            if not run.fetched and not run.skipped:
-                run.record(stored=int(count or 0))
         results.append(_SourceResult(name, True, detail=_describe_result(value)))
         return value
 
@@ -693,9 +684,8 @@ def ingest_hydat() -> None:
     _hydat = importlib.import_module("src.ingest.global.hydat_temperature")
     from src.services.ingest_runs import ingest_run
 
-    with ingest_run("HydAT temperature", jurisdiction="CA") as run:
+    with ingest_run("HydAT temperature", jurisdiction="CA"):
         count = _hydat.derive_from_pwqmn(get_db())
-        run.record(stored=count)
     console.print(f"Derived thermal regime for {count} stations from PWQMN water quality data")
 
 
@@ -941,9 +931,8 @@ def ingest_fmz() -> None:
     console.print("[dim]Downloading Ontario FMZ boundary polygons…[/dim]")
     from src.services.ingest_runs import ingest_run
 
-    with ingest_run("FMZ boundaries", jurisdiction="CA-ON") as run:
+    with ingest_run("FMZ boundaries", jurisdiction="CA-ON"):
         n = ingest_fmz_boundaries()
-        run.record(stored=n)
     if n:
         console.print(f"[green]FMZ boundaries stored: {n} zones[/green]")
     else:

@@ -5,6 +5,7 @@ import logging
 from datetime import date
 from statistics import median
 
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 from src.storage.water_quality import query_water_quality, upsert_water_quality_readings
 
@@ -23,18 +24,23 @@ def ingest_water_quality_data() -> int:
     stations = load_stations()
     resources = _get_field_data_resources()
     if not resources:
+        record_counts(fetched=1, empty=1)
         logger.warning("No PWQMN field data resources discovered — check CKAN API")
         return 0
 
     db = get_db()
     total = 0
     for res in resources:
+        record_counts(fetched=1)
         csv_path = download_field_data(res["name"], res["url"])
         if csv_path is None:
+            record_counts(skipped=1)
             continue
         records = parse_field_data(csv_path, stations)
+        record_counts(empty=int(not records))
         if records:
             upsert_water_quality_readings(db, records)
+            record_counts(stored=len(records))
             total += len(records)
             logger.info("Upserted %d records from '%s'", len(records), res["name"])
     return total

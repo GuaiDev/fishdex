@@ -31,7 +31,10 @@ def derive_from_pwqmn(db: Database) -> int:
     Requires at least 3 July+August temp_c readings per station. Returns the count
     of station summaries upserted into stream_temperature_summaries.
     """
+    from src.services.ingest_runs import record_counts
+
     if "water_quality_readings" not in db.table_names():
+        record_counts(fetched=1, empty=1)
         return 0
 
     rows = db.execute(
@@ -52,6 +55,7 @@ def derive_from_pwqmn(db: Database) -> int:
         """
     ).fetchall()
 
+    record_counts(fetched=len(rows) or 1, empty=int(not rows))
     summaries: list[StreamTemperatureSummary] = []
     for station_id, station_name, lat, lng, summer_mean_c, summer_max_c, years_of_data in rows:
         mean = round(summer_mean_c, 2) if summer_mean_c is not None else None
@@ -74,6 +78,7 @@ def derive_from_pwqmn(db: Database) -> int:
 
     if summaries:
         upsert_temperature_summaries(db, summaries)
+    record_counts(stored=len(summaries))
     return len(summaries)
 
 

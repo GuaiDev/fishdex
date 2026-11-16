@@ -313,10 +313,15 @@ def load_geology(
         len(all_tiles),
     )
 
+    from src.services.ingest_runs import record_counts
+
+    if not relevant:
+        record_counts(fetched=1, empty=1)
     all_units: list[GeologyUnit] = []
     for tid, _bbox, href in relevant:
         kmz_path = download_tile(tid, href)
         units = _parse_tile(kmz_path, tid)
+        record_counts(fetched=1, empty=int(not units))
         logger.info("  tile %s: %d units", tid, len(units))
         all_units.extend(units)
 

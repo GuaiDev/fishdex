@@ -24,6 +24,12 @@ def record_counts(**counts: int) -> None:
         run.record(**counts)
 
 
+def record_error(exc: Exception) -> None:
+    run = _active_run.get()
+    if run is not None:
+        run.error = f"{type(exc).__name__}: {exc}"
+
+
 class IngestRun:
     """Mutable counts for one source invocation, persisted by the context manager."""
 

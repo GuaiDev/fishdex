@@ -4,6 +4,7 @@ import json
 import logging
 import re
 
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 from src.storage.regulations import (
     count_regulation_chunks,
@@ -35,10 +36,12 @@ def ingest_regulations() -> int:
 
     pdf_path = download_regulations_pdf()
     chunks = extract_zone_chunks(pdf_path)
+    record_counts(fetched=1, empty=int(not chunks))
     if not chunks:
         return 0
     db = get_db()
     upsert_regulation_chunks(db, chunks)
+    record_counts(stored=len(chunks))
     return len(chunks)
 
 
@@ -48,10 +51,13 @@ def ingest_fmz_boundaries() -> int:
     from src.storage.fmz_boundaries import upsert_fmz_boundaries
 
     rows = fetch_fmz_boundaries()
+    record_counts(fetched=1, empty=int(not rows))
     if not rows:
         logger.error("No FMZ boundaries fetched — zone resolution will fail closed")
         return 0
-    return upsert_fmz_boundaries(get_db(), rows)
+    written = upsert_fmz_boundaries(get_db(), rows)
+    record_counts(stored=written, skipped=len(rows) - written)
+    return written
 
 
 def get_regulations_for_agent(
@@ -169,13 +175,15 @@ def _province_wide_sections(db, species: str | None) -> list[dict]:
                 extracted, truncated = text[:_MAX_OVERVIEW], len(text) > _MAX_OVERVIEW
         else:
             extracted, truncated = text[:_MAX_OVERVIEW], len(text) > _MAX_OVERVIEW
-        out.append({
-            "section": row.get("section"),
-            "applies": "all of Ontario",
-            "text": extracted,
-            "truncated": truncated,
-            "char_count": row.get("char_count"),
-        })
+        out.append(
+            {
+                "section": row.get("section"),
+                "applies": "all of Ontario",
+                "text": extracted,
+                "truncated": truncated,
+                "char_count": row.get("char_count"),
+            }
+        )
     return out
 
 

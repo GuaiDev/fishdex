@@ -71,11 +71,15 @@ def fetch_crown_land_near(lat: float, lng: float, radius_km: float = 100.0) -> l
 
 def fetch_and_store(db, lat: float, lng: float, radius_km: float = 100.0) -> int:
     """Fetch crown land polygons and upsert into the crown_land table. Returns count stored."""
+    from src.services.ingest_runs import record_counts
+
     parcels = fetch_crown_land_near(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not parcels))
     if not parcels:
         return 0
     _ensure_table(db)
     db["crown_land"].upsert_all(parcels, pk="crown_id")
+    record_counts(stored=len(parcels))
     return len(parcels)
 
 

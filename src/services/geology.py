@@ -3,6 +3,7 @@
 import json
 import logging
 
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 from src.storage.geology import query_substrate_area, query_substrate_at_point, upsert_geology_units
 
@@ -49,6 +50,7 @@ def ingest_geology_data(lat: float, lng: float, radius_km: float = 50.0) -> int:
     units = load_geology(lat, lng, radius_km)
     if units:
         upsert_geology_units(get_db(), units)
+    record_counts(stored=len(units))
     return len(units)
 
 

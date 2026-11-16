@@ -4,6 +4,7 @@ import json
 from collections import defaultdict
 from datetime import datetime
 
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 from src.storage.stocking import query_stocking, upsert_stocking_records
 
@@ -23,10 +24,12 @@ def ingest_stocking_data() -> int:
 
     csv_path = download_stocking_data()
     records = parse_stocking_records(csv_path)
+    record_counts(fetched=1, empty=int(not records))
     if not records:
         return 0
     db = get_db()
     upsert_stocking_records(db, records)
+    record_counts(stored=len(records))
     return len(records)
 
 
