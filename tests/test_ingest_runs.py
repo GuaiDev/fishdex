@@ -361,3 +361,70 @@ def test_ebird_request_diagnostics_reach_ledger(db, monkeypatch, failure):
             assert row[5].startswith("HTTPStatusError:" if failure == "http" else "ReadTimeout:")
             if stored:
                 assert db.execute("SELECT COUNT(*) FROM bird_observations").fetchone() == (4,)
+
+
+@pytest.mark.parametrize("wrapper", ["area", "cli"])
+@pytest.mark.parametrize("outcome", ["first_refused", "later_refused", "success", "empty"])
+def test_inaturalist_page_diagnostics_reach_ledger(db, monkeypatch, tmp_path, wrapper, outcome):
+    import httpx
+
+    from src.cli.main import _run_source
+    from src.models.ingest_area import AreaIngestResult, IngestSource
+    from src.services import area_ingest, ingest_runs, observations
+
+    monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
+    monkeypatch.setattr(observations, "get_db", lambda: db)
+    adapter = observations._inat
+    monkeypatch.setattr(adapter, "_CACHE_DIR", tmp_path / "inat-cache")
+    monkeypatch.setattr(adapter.time, "sleep", lambda seconds: None)
+    pages = []
+    valid = {"id": 1, "location": "45,-65", "observed_on": "2026-11-16"}
+
+    def response(url, params, **kwargs):
+        page = params["page"]
+        pages.append(page)
+        refused = outcome == "first_refused" or (outcome == "later_refused" and page == 2)
+        if refused:
+            return httpx.Response(503, request=httpx.Request("GET", url))
+        if outcome == "empty":
+            payload = {"total_results": 0, "results": []}
+        elif page == 1:
+            payload = {
+                "total_results": 4,
+                "results": [
+                    valid,
+                    {**valid, "id": 3, "location": None},
+                    {**valid, "id": 4, "observed_on": None},
+                ],
+            }
+        else:
+            payload = {"total_results": 4, "results": [{**valid, "id": 2}]}
+        return httpx.Response(200, json=payload, request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(adapter.httpx, "get", response)
+    expected = {
+        "first_refused": (1, 0, 1, 0, "failed"),
+        "later_refused": (2, 1, 3, 0, "failed"),
+        "success": (2, 2, 2, 0, "success"),
+        "empty": (1, 0, 0, 1, "success"),
+    }[outcome]
+    if wrapper == "area":
+        result = AreaIngestResult(label="Coast", source=IngestSource.GLOBAL)
+        area_ingest._attempt(result, "iNaturalist", lambda: observations.fetch_and_store(45, -65))
+        assert result.stored == {"iNaturalist": expected[1]}
+    else:
+        assert (
+            _run_source([], "iNaturalist", "fetching", observations.fetch_and_store, 45, -65)
+            == expected[1]
+        )
+    assert pages == ([1, 2] if expected[0] == 2 else [1])
+    row = db.execute(
+        "SELECT fetched, stored, skipped, empty_count, status, error FROM ingest_runs"
+    ).fetchone()
+    assert row[:5] == expected
+    if expected[4] == "failed":
+        assert row[5].startswith("HTTPStatusError:")
+        assert "503" in row[5]
+    else:
+        assert row[5] is None
+    assert db.execute("SELECT COUNT(*) FROM observations").fetchone() == (expected[1],)
