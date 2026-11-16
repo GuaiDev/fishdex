@@ -32,6 +32,7 @@ def _isolated_db(tmp_path, monkeypatch):
     must never touch real user data.
     """
     import src.storage.database as database
+
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "test_fishing.db")
 
 
@@ -97,18 +98,6 @@ def test_log_trip_endpoint():
     assert "session_id" in data
 
 
-def test_ingest_data_requires_lat_lng(monkeypatch):
-    """Missing lat/lng returns 400."""
-    monkeypatch.setenv("FISHBOT_API_KEY", "test-key")
-    response = client.post(
-        "/ingest/data",
-        json={"label": "test"},
-        headers={"X-Api-Key": "test-key"},
-    )
-    # Either 400 (missing lat/lng), 401 (wrong key), or 422 (validation) — all acceptable
-    assert response.status_code in (400, 401, 422)
-
-
 def test_api_key_unset_refuses(monkeypatch):
     """With FISHBOT_API_KEY unset, protected endpoints refuse (503), even with a header."""
     monkeypatch.delenv("FISHBOT_API_KEY", raising=False)
@@ -138,15 +127,26 @@ def test_api_key_wrong_refuses(monkeypatch):
     assert response.status_code == 401
 
 
-def test_api_key_right_passes(monkeypatch):
-    monkeypatch.setenv("FISHBOT_API_KEY", "right-key")
-    response = client.post(
+@pytest.mark.parametrize("body", [{}, {"query": "trout", "lat": 43.45, "lng": -79.72}])
+def test_server_ingest_routes_refuse_with_cli_directions(monkeypatch, body):
+    monkeypatch.setenv("FISHBOT_API_KEY", "test-key")
+    headers = {"X-Api-Key": "test-key"}
+
+    for path in (
+        "/ingest",
         "/ingest/data",
-        json={"label": "test"},
-        headers={"X-Api-Key": "right-key"},
-    )
-    # Past the key check: the body is rejected by validation, not by auth.
-    assert response.status_code in (400, 422)
+        "/ingest/data-bc",
+        "/ingest/data-ab",
+        "/ingest/data-qc",
+        "/ingest/data-mb",
+        "/ingest/data-sk",
+        "/ingest/data-national",
+        "/ingest/data-tidal",
+    ):
+        response = client.post(path, json=body, headers=headers)
+        assert response.status_code == 410, (path, response.status_code, response.text)
+        assert "fishbot weekly-ingest" in response.json()["detail"]
+        assert "fishbot ingest" in response.json()["detail"]
 
 
 def test_admin_token_refuses_without_key(monkeypatch):
@@ -205,10 +205,12 @@ def test_log_trip_photo_saves_file_and_logs_session(monkeypatch, tmp_path):
 
     canned_parse = {
         "date": "2026-06-01",
-        "stops": [{
-            "location_text": "Bronte Creek",
-            "species_caught": ["creek chub"],
-        }],
+        "stops": [
+            {
+                "location_text": "Bronte Creek",
+                "species_caught": ["creek chub"],
+            }
+        ],
     }
     with patch("src.services.trip_parser.parse_session_from_text", return_value=canned_parse):
         response = client.post(
@@ -254,14 +256,23 @@ def test_log_trip_json_with_catches_json_persists_structured_fields(monkeypatch)
 
     canned_parse = {
         "date": "2026-06-01",
-        "stops": [{
-            "location_text": "Bronte Creek",
-            "species_caught": ["smallmouth bass", "rock bass"],
-        }],
+        "stops": [
+            {
+                "location_text": "Bronte Creek",
+                "species_caught": ["smallmouth bass", "rock bass"],
+            }
+        ],
     }
-    catches_json = json.dumps([
-        {"species": "smallmouth bass", "count": 2, "biggest_size_cm": 35.0, "bait": "spinnerbait"},
-    ])
+    catches_json = json.dumps(
+        [
+            {
+                "species": "smallmouth bass",
+                "count": 2,
+                "biggest_size_cm": 35.0,
+                "bait": "spinnerbait",
+            },
+        ]
+    )
     headers = _apikey_headers(monkeypatch)
     with patch("src.services.trip_parser.parse_session_from_text", return_value=canned_parse):
         response = client.post(
@@ -299,9 +310,11 @@ def test_log_trip_json_with_fast_tally_catch_persists_as_unidentified(monkeypatc
         "date": "2026-07-19",
         "stops": [{"location_text": "Sixteen Mile Creek", "species_caught": []}],
     }
-    catches_json = json.dumps([
-        {"source": "fast_tally", "count": 1, "caught_at": "2026-07-19T14:03:00"},
-    ])
+    catches_json = json.dumps(
+        [
+            {"source": "fast_tally", "count": 1, "caught_at": "2026-07-19T14:03:00"},
+        ]
+    )
     headers = _apikey_headers(monkeypatch)
     with patch("src.services.trip_parser.parse_session_from_text", return_value=canned_parse):
         response = client.post(
@@ -330,16 +343,25 @@ def test_log_trip_response_includes_summary_card_fields(monkeypatch):
 
     canned_parse = {
         "date": "2026-07-20",
-        "stops": [{
-            "location_text": "Sixteen Mile Creek",
-            "location_name": "Sixteen Mile Creek",
-            "species_caught": [],
-        }],
+        "stops": [
+            {
+                "location_text": "Sixteen Mile Creek",
+                "location_name": "Sixteen Mile Creek",
+                "species_caught": [],
+            }
+        ],
     }
-    catches_json = json.dumps([
-        {"species": "smallmouth bass", "count": 1, "biggest_size_cm": 35.0, "bait": "spinnerbait"},
-        {"source": "fast_tally", "count": 1, "caught_at": "2026-07-20T14:00:00"},
-    ])
+    catches_json = json.dumps(
+        [
+            {
+                "species": "smallmouth bass",
+                "count": 1,
+                "biggest_size_cm": 35.0,
+                "bait": "spinnerbait",
+            },
+            {"source": "fast_tally", "count": 1, "caught_at": "2026-07-20T14:00:00"},
+        ]
+    )
     headers = _apikey_headers(monkeypatch)
     with patch("src.services.trip_parser.parse_session_from_text", return_value=canned_parse):
         response = client.post(
@@ -389,11 +411,18 @@ def test_confirm_species_endpoint_returns_is_new_pb(monkeypatch, tmp_path):
         "date": "2026-07-20",
         "stops": [{"location_text": "Sixteen Mile Creek", "species_caught": []}],
     }
-    with patch("src.services.trip_parser.parse_session_from_text", return_value=canned_parse), \
-         patch("src.services.trip_logger._photo_species_candidates", return_value={
-             "screened": True, "unresolved": False, "note": None,
-             "candidates": [{"species": "warmouth", "confidence": "medium"}],
-         }):
+    with (
+        patch("src.services.trip_parser.parse_session_from_text", return_value=canned_parse),
+        patch(
+            "src.services.trip_logger._photo_species_candidates",
+            return_value={
+                "screened": True,
+                "unresolved": False,
+                "note": None,
+                "candidates": [{"species": "warmouth", "confidence": "medium"}],
+            },
+        ),
+    ):
         response = client.post(
             "/log-trip/photo",
             data={"text": "Sixteen Mile Creek.", "catches_json": '[{"biggest_size_cm": 40.0}]'},

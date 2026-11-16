@@ -559,8 +559,8 @@ def weekly_ingest(
     """Ingest every area in data/ingest_areas.json, one after another.
 
     Replaces the old weekly GitHub Action that POSTed each area to a hosted
-    server. Runs the same service code as the /ingest/data* endpoints, against
-    the local database. Exits non-zero if any dataset failed, so a cron job's
+    server. Runs ingest services against the local database in this CLI process.
+    Exits non-zero if any dataset failed, so a cron job's
     mail or log shows it.
     """
     from pathlib import Path
