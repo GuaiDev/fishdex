@@ -101,6 +101,7 @@ def test_screen_segment_golf_course(monkeypatch):
 
 def test_screen_segment_satellite_unavailable(monkeypatch):
     """Failed Mapbox fetch → screened=False, verdict=unverified."""
+
     def _raise(*a, **kw):
         raise Exception("timeout")
 

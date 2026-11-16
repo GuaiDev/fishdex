@@ -75,7 +75,7 @@ def test_coordinates_count_as_a_place(db):
 
 
 def test_a_users_own_spot_name_counts_even_if_no_gazetteer_has_it(db):
-    """"the back dam" is a place to the person who fished it six times."""
+    """ "the back dam" is a place to the person who fished it six times."""
     db["sessions"].insert({"date": "2025-06-14", "user_id": 1}, alter=True)
     db["stops"].insert(
         {

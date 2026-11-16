@@ -61,9 +61,7 @@ def _insert_stop(
     lng: float | None = None,
     **extra,
 ) -> None:
-    db["sessions"].insert(
-        {"date": "2025-06-14", "overall_notes": None, "user_id": user_id}
-    )
+    db["sessions"].insert({"date": "2025-06-14", "overall_notes": None, "user_id": user_id})
     session_id = db.execute("SELECT MAX(id) FROM sessions").fetchone()[0]
     row = {
         "session_id": session_id,
@@ -102,9 +100,7 @@ def test_unresolvable_location_does_not_call_the_model_at_all(db_conn, captured)
     assert "prompt" not in captured
 
 
-def test_location_coaching_reaches_the_corpus_when_the_user_has_no_history(
-    db_conn, captured
-):
+def test_location_coaching_reaches_the_corpus_when_the_user_has_no_history(db_conn, captured):
     """Never having fished somewhere is not a reason to refuse the question.
 
     The old version returned "No logged trips found" and stopped, discarding
@@ -142,8 +138,12 @@ def test_location_coaching_excludes_other_users(db_conn, captured):
     from src.services.coaching import get_location_coaching
 
     _insert_stop(
-        db_conn, user_id=2, location="Byng Island", species=["channel catfish"],
-        lat=42.9, lng=-79.6,
+        db_conn,
+        user_id=2,
+        location="Byng Island",
+        species=["channel catfish"],
+        lat=42.9,
+        lng=-79.6,
     )
 
     result = get_location_coaching(db_conn, "Byng Island", user_id=1)
@@ -156,9 +156,7 @@ def test_species_coaching_excludes_other_users(db_conn, captured):
     """Another user's catches must not reach the coaching prompt."""
     from src.services.coaching import get_species_coaching
 
-    _insert_stop(
-        db_conn, user_id=2, location="Byng Island", species=["channel catfish"]
-    )
+    _insert_stop(db_conn, user_id=2, location="Byng Island", species=["channel catfish"])
 
     get_species_coaching(db_conn, "channel catfish", user_id=1)
     prompt = captured["prompt"]
@@ -196,9 +194,7 @@ def test_stored_insights_arrive_with_their_source(db_conn, captured):
     """An insight the assistant invented must not read like a survey finding."""
     from src.services.coaching import get_species_coaching
 
-    _insert_stop(
-        db_conn, user_id=1, location="Byng Island", species=["channel catfish"]
-    )
+    _insert_stop(db_conn, user_id=1, location="Byng Island", species=["channel catfish"])
     db_conn["behavioral_insights"].insert(
         {
             "species": "channel catfish",

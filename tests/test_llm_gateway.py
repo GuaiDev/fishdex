@@ -105,15 +105,15 @@ def test_ledger_failure_does_not_fail_the_request(monkeypatch):
     assert ledger.write_failures == before + 1
 
 
-
-@pytest.mark.parametrize("role,variable", [
-    ("router", "FISHDEX_MODEL_ROUTER"),
-    ("chat", "FISHDEX_MODEL_CHAT"),
-    ("chat", "CLAUDE_MODEL"),
-])
-def test_dotenv_override_used_on_first_call(
-    ledger_db, monkeypatch, tmp_path, role, variable
-):
+@pytest.mark.parametrize(
+    "role,variable",
+    [
+        ("router", "FISHDEX_MODEL_ROUTER"),
+        ("chat", "FISHDEX_MODEL_CHAT"),
+        ("chat", "CLAUDE_MODEL"),
+    ],
+)
+def test_dotenv_override_used_on_first_call(ledger_db, monkeypatch, tmp_path, role, variable):
     from dotenv import load_dotenv
 
     env_file = tmp_path / ".env"
@@ -134,12 +134,18 @@ def test_usage_displays_unpriced_calls(ledger_db, monkeypatch):
     from io import StringIO
 
     from rich.console import Console
+
     from src.cli import main
 
     for caller, price in [("unknown", None), ("mixed", None), ("mixed", 0.25)]:
-        ledger_db["llm_usage"].insert({
-            "caller": caller, "role": "router", "model": "test", "est_usd": price,
-        })
+        ledger_db["llm_usage"].insert(
+            {
+                "caller": caller,
+                "role": "router",
+                "model": "test",
+                "est_usd": price,
+            }
+        )
     output = StringIO()
     monkeypatch.setattr(main, "get_db", lambda: ledger_db)
     monkeypatch.setattr(main, "console", Console(file=output, width=160))

@@ -63,7 +63,7 @@ def test_the_anglers_observations_do_reach_it():
 
 
 def test_unrecorded_is_stated_not_omitted():
-    """"we didn't write it down" and "it wasn't the case" are different facts."""
+    """ "we didn't write it down" and "it wasn't the case" are different facts."""
     out = render_logged_stop(_ROW)
     assert "water level unrecorded" in out
     assert "weather unrecorded" in out
@@ -97,9 +97,7 @@ def test_agent_synthesis_renders_as_reasoning():
 
 
 def test_a_survey_finding_does_not_render_as_reasoning():
-    out = render_recorded_insight(
-        as_recorded_insight(_Insight("mnrf_survey", "BsM 2019"))
-    )
+    out = render_recorded_insight(as_recorded_insight(_Insight("mnrf_survey", "BsM 2019")))
     assert "reasoning, no source" not in out
     assert "BsM 2019" in out
 

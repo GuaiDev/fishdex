@@ -140,9 +140,7 @@ def test_malformed_request_is_free(env):
 def test_api_usage_is_attributed_to_the_caller(env, monkeypatch):
     use_stub(monkeypatch, StubClient(text_reply))
     env.client.post("/chat", headers=auth(env, 2), json={"message": "hi", "session_id": "s4"})
-    rows = env.db.execute(
-        "SELECT user_id FROM llm_usage"
-    ).fetchall()
+    rows = env.db.execute("SELECT user_id FROM llm_usage").fetchall()
     assert rows and {r[0] for r in rows} == {2}
 
 

@@ -263,9 +263,7 @@ def test_resolve_location_unresolved(mock_geo, db_conn):
 @patch("src.services.trip_parser.snap_to_segment")
 @patch("src.services.trip_parser.resolve_location")
 @patch("src.llm.client.get_client")
-def test_parse_trip_with_fuzzy_location(
-    mock_get_client, mock_resolve, mock_snap, db_conn
-):
+def test_parse_trip_with_fuzzy_location(mock_get_client, mock_resolve, mock_snap, db_conn):
     """Location without Claude-inferred coords falls through to resolve_location."""
     mock_get_client.return_value = _mock_client(
         _api_payload(

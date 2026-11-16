@@ -54,9 +54,9 @@ def test_api_usage_table_exists(tmp_path: Path):
 
     db = Database(tmp_path / "test.db")
     ensure_schema(db)
-    tables = [r[0] for r in db.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    ).fetchall()]
+    tables = [
+        r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    ]
     assert "api_usage" in tables
 
 
@@ -67,8 +67,15 @@ def test_api_usage_table_columns(tmp_path: Path):
     db = Database(tmp_path / "test.db")
     ensure_schema(db)
     cols = {c.name for c in db["api_usage"].columns}
-    assert {"session_id", "model", "input_tokens", "output_tokens", "total_tokens",
-            "tool_calls_made", "endpoint"}.issubset(cols)
+    assert {
+        "session_id",
+        "model",
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "tool_calls_made",
+        "endpoint",
+    }.issubset(cols)
 
 
 def test_system_prompt_loads():
