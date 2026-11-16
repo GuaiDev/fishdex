@@ -27,6 +27,7 @@ from pathlib import Path
 import httpx
 
 from src.models.observation import Observation
+from src.services.ingest_runs import record_counts, record_error
 
 _WFS_URL = (
     "https://openmaps.gov.bc.ca/geo/pub/"
@@ -95,12 +96,16 @@ def _wfs_paginate(url: str, base_params: dict) -> list[dict]:
     start = 0
     while True:
         params = {**base_params, "startIndex": start, "count": _PAGE_SIZE}
+        record_counts(fetched=1)
         try:
             data = _cached_get(url, params)
         except Exception as exc:
+            record_counts(skipped=1)
+            record_error(exc)
             logger.error("FISS WFS request failed at startIndex=%d: %s", start, exc)
             break
         page = data.get("features", [])
+        record_counts(empty=int(not page))
         features.extend(page)
         logger.debug("FISS WFS startIndex=%d: %d features on page", start, len(page))
         if len(page) < _PAGE_SIZE:
