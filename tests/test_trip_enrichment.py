@@ -196,7 +196,7 @@ def test_confidence_escalation(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(evidence_count=1))  # one away from threshold
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=True, stop={}, client=None)
+    updated = update_insight_confidence(db, insight, was_productive=True, stop={}, use_llm=False)
     assert updated.confidence == "medium"
 
 
@@ -207,7 +207,7 @@ def test_confidence_escalation_not_yet(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(evidence_count=0))
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=True, stop={}, client=None)
+    updated = update_insight_confidence(db, insight, was_productive=True, stop={}, use_llm=False)
     assert updated.confidence == "low"  # not yet at threshold
     assert updated.evidence_count == 1
 
@@ -219,7 +219,7 @@ def test_contradiction_does_not_immediately_change_confidence(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(confidence="high", evidence_count=5))
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, client=None)
+    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, use_llm=False)
     assert updated.confidence == "high"  # one contradiction doesn't drop confidence
 
 
@@ -230,7 +230,7 @@ def test_contradiction_appends_note(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(source_detail="original detail"))
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, client=None)
+    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, use_llm=False)
     assert "[contradicted" in (updated.source_detail or "")
 
 
@@ -245,7 +245,7 @@ def test_second_contradiction_triggers_refinement(tmp_path):
     ))
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, client=None)
+    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, use_llm=False)
     # After second contradiction: refinement fires, is_current flips, new record has confidence=low
     assert updated.confidence == "low"
     # Old insight should now be non-current
@@ -294,7 +294,7 @@ def test_enrich_session_returns_question_for_known_spot(tmp_path):
         "notes": None,
     })
 
-    result = enrich_session(db, session_id, client=None)
+    result = enrich_session(db, session_id, use_llm=False)
     questions = result["followup_questions"]
     assert len(questions) == 1
     q = questions[0]["question"]
@@ -355,7 +355,7 @@ def test_enrich_session_no_match_returns_empty(tmp_path):
         "notes": None,
     })
 
-    result = enrich_session(db, session_id, client=None)
+    result = enrich_session(db, session_id, use_llm=False)
     assert result["followup_questions"] == []
 
 

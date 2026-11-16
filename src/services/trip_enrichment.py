@@ -8,6 +8,7 @@ from datetime import datetime
 
 from sqlite_utils import Database
 
+from src import llm
 from src.models.behavioral_insight import BehavioralInsight
 from src.storage.insights import (
     _haversine_km,
@@ -185,7 +186,7 @@ def update_insight_confidence(
     insight: BehavioralInsight,
     was_productive: bool,
     stop: dict,
-    client,
+    use_llm: bool,
     user_id: int = 1,
 ) -> BehavioralInsight:
     """Update insight confidence based on whether the trip confirmed or contradicted it.
@@ -226,7 +227,7 @@ def update_insight_confidence(
         contradiction_count = current_detail.count("[contradicted")
 
         if contradiction_count + 1 >= CONTRADICTIONS_TO_REFINE:
-            new_conclusion = _synthesize_nuanced_conclusion(insight, stop, client)
+            new_conclusion = _synthesize_nuanced_conclusion(insight, stop, use_llm, user_id)
             new_insight = BehavioralInsight(
                 species=insight.species,
                 condition_type=insight.condition_type,
@@ -257,7 +258,8 @@ def update_insight_confidence(
 def _synthesize_nuanced_conclusion(
     insight: BehavioralInsight,
     contradicting_stop: dict,
-    client,
+    use_llm: bool,
+    user_id: int,
 ) -> str:
     """Use Haiku to synthesize a more nuanced conclusion after contradictions.
 
@@ -272,7 +274,7 @@ def _synthesize_nuanced_conclusion(
     rewritten may itself have been agent_synthesis, or may have come from a
     survey, and those are not the same claim to be revising.
     """
-    if client is None:
+    if not use_llm:
         return insight.conclusion + " (contradicted — conditions may matter)"
 
     from src.services.context.render import render_logged_stop, render_recorded_insight
@@ -289,8 +291,10 @@ def _synthesize_nuanced_conclusion(
         f"evidence that the condition was absent.\n\n"
         f"Write ONLY the revised conclusion, no preamble."
     )
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    response = llm.complete(
+        "insight_revision",
+        caller="trip_enrichment._synthesize_nuanced_conclusion",
+        user_id=user_id,
         max_tokens=200,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -300,7 +304,7 @@ def _synthesize_nuanced_conclusion(
 def enrich_session(
     db: Database,
     session_id: int,
-    client,
+    use_llm: bool,
     user_id: int = 1,
 ) -> dict:
     """Main entry point. Called after a session is logged.
@@ -320,7 +324,7 @@ def enrich_session(
 
         for match in matched:
             insight = match["insight"]
-            update_insight_confidence(db, insight, was_productive, stop, client, user_id=user_id)
+            update_insight_confidence(db, insight, was_productive, stop, use_llm, user_id=user_id)
 
             gaps = identify_condition_gaps(stop, insight)
             question = build_followup_question(stop, insight, gaps, was_productive)

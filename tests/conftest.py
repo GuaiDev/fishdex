@@ -102,3 +102,19 @@ def _raw_db_opt_out(request):
         _auto_migrate["on"] = True
     else:
         yield
+
+
+@pytest.fixture(autouse=True)
+def _llm_ledger_in_tmp(monkeypatch, tmp_path):
+    """The gateway writes an `llm_usage` row per call; it must never reach the real database."""
+    from src.llm import ledger
+    from src.storage.database import get_db
+
+    path = tmp_path / "llm_ledger.db"
+
+    def _open():
+        db = get_db(path)
+        ledger.create_table(db)
+        return db
+
+    monkeypatch.setattr(ledger, "_open_db", _open)

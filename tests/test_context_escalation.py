@@ -6,6 +6,7 @@ back — not that a string was produced.
 """
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -33,13 +34,14 @@ class _FakeClient:
 
 
 def _call(client, **kwargs):
-    return escalate_records(
-        place_name="Sixteen Mile Creek",
-        lat=43.4675,
-        lng=-79.6877,
-        client=client,
-        **kwargs,
-    )
+    with patch("src.llm.client.get_client", return_value=client):
+        return escalate_records(
+            place_name="Sixteen Mile Creek",
+            lat=43.4675,
+            lng=-79.6877,
+            user_id=1,
+            **kwargs,
+        )
 
 
 # -- the blocklist -------------------------------------------------------------

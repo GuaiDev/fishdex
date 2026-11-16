@@ -20,6 +20,8 @@ otherwise is worse than an honest gap.
 import logging
 from urllib.parse import urlparse
 
+from src import llm
+
 logger = logging.getLogger(__name__)
 
 # Sources the project will not consume, per its ethics rules: ToS violations
@@ -78,8 +80,6 @@ def filter_web_results(results: list[dict]) -> list[dict]:
 
 _SEARCH_TOOL = {"type": "web_search_20250305", "name": "web_search", "max_uses": 3}
 
-_EXTRACTION_MODEL = "claude-haiku-4-5-20251001"
-
 _EXTRACTION_PROMPT = """Search the web for records of fish species observed at or near \
 {place}{species_clause}.
 
@@ -101,7 +101,8 @@ def escalate_records(
     lat: float,
     lng: float,
     species_filter: str | None = None,
-    client=None,
+    *,
+    user_id: int | None,
     max_results: int = 10,
 ):
     """The rung between the corpus and an honest empty.
@@ -121,12 +122,10 @@ def escalate_records(
     prompt = _EXTRACTION_PROMPT.format(place=where, species_clause=species_clause)
 
     try:
-        if client is None:
-            from src.agent.client import get_client
-
-            client = get_client()
-        resp = client.messages.create(
-            model=_EXTRACTION_MODEL,
+        resp = llm.complete(
+            "web_escalation",
+            caller="escalation.escalate_records",
+            user_id=user_id,
             max_tokens=1500,
             messages=[{"role": "user", "content": prompt}],
             tools=[_SEARCH_TOOL],

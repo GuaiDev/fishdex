@@ -19,7 +19,7 @@ from typing import Any
 
 import numpy as np
 
-from src.agent.client import get_client, get_model
+from src import llm
 
 logger = logging.getLogger(__name__)
 
@@ -555,18 +555,17 @@ TIME OF DAY:
 # ── main entry points ─────────────────────────────────────────────────────────
 
 
-def parse_session_from_text(text: str, db_conn: Any) -> dict:
+def parse_session_from_text(text: str, db_conn: Any, *, user_id: int | None) -> dict:
     """Parse a natural-language fishing session description into structured data.
 
     Calls Claude to extract a session with one or more stops, validates species
     for each stop, and resolves location for each stop independently.
     Never blocks — unresolvable locations use method="text_only".
     """
-    client = get_client()
-    model = get_model()
-
-    response = client.messages.create(
-        model=model,
+    response = llm.complete(
+        "trip_parse",
+        caller="trip_parser.parse_session_from_text",
+        user_id=user_id,
         max_tokens=2048,
         system=_SESSION_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": text}],
@@ -602,16 +601,17 @@ def parse_trip_from_text(
     user_lat: float | None = None,
     user_lng: float | None = None,
     db: Any = None,
+    *,
+    user_id: int | None = 1,
 ) -> dict:
     """DEPRECATED — use parse_session_from_text instead.
 
     Calls Claude to extract structured trip data, resolves location, snaps to OHN segment.
     """
-    client = get_client()
-    model = get_model()
-
-    response = client.messages.create(
-        model=model,
+    response = llm.complete(
+        "trip_parse",
+        caller="trip_parser.parse_trip_from_text",
+        user_id=user_id,
         max_tokens=1024,
         system=_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": _USER_PROMPT_TEMPLATE.format(text=text)}],

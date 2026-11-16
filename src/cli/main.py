@@ -1105,52 +1105,31 @@ def history(
 
 @app.command()
 def usage(days: int = typer.Option(7, "--days", "-d", help="Number of days to show")) -> None:
-    """Show API usage summary for the last N days."""
+    """Show model usage and estimated cost for the last N days, from the llm_usage ledger."""
     db = get_db()
-    rows = list(
-        db.execute(f"""
-        SELECT
-            DATE(timestamp) as day,
-            SUM(input_tokens) as input_tokens,
-            SUM(output_tokens) as output_tokens,
-            SUM(total_tokens) as total_tokens,
-            COUNT(*) as api_calls,
-            SUM(tool_calls_made) as tool_calls,
-            ROUND(AVG(tool_calls_made), 1) as avg_tools_per_turn
-        FROM api_usage
-        WHERE timestamp >= DATE('now', '-{days} days')
-        GROUP BY DATE(timestamp)
-        ORDER BY day DESC
+    window = f"ts >= DATE('now', '-{days} days')"
+    rows = db.execute(f"""
+        SELECT DATE(ts), SUM(input_tokens), SUM(output_tokens), COUNT(*), SUM(est_usd)
+        FROM llm_usage WHERE {window} GROUP BY DATE(ts) ORDER BY 1 DESC
     """).fetchall()
-    )
 
     if not rows:
         console.print("No usage data yet.")
         return
 
-    console.print(f"\nAPI Usage — last {days} days\n")
-    console.print(
-        f"{'Day':<12} {'Input':>8} {'Output':>8} {'Total':>8} "
-        f"{'Calls':>6} {'Tools':>6} {'Avg Tools':>10}"
-    )
-    console.print("-" * 65)
-    for r in rows:
-        console.print(f"{r[0]:<12} {r[1]:>8,} {r[2]:>8,} {r[3]:>8,} {r[4]:>6} {r[5]:>6} {r[6]:>10}")
+    console.print(f"\nModel usage — last {days} days\n")
+    console.print(f"{'Day':<12} {'Input':>10} {'Output':>10} {'Calls':>6} {'Est. USD':>10}")
+    console.print("-" * 52)
+    for day, inp, out, calls, usd in rows:
+        console.print(f"{day:<12} {inp:>10,} {out:>10,} {calls:>6} {usd or 0:>10.4f}")
 
-    totals = db.execute(f"""
-        SELECT SUM(input_tokens), SUM(output_tokens), SUM(total_tokens), COUNT(*)
-        FROM api_usage
-        WHERE timestamp >= DATE('now', '-{days} days')
-    """).fetchone()
-    console.print("-" * 65)
-    console.print(f"{'TOTAL':<12} {totals[0]:>8,} {totals[1]:>8,} {totals[2]:>8,} {totals[3]:>6}")
-
-    # $3 per 1M input tokens, $15 per 1M output tokens (Claude Sonnet pricing)
-    est_cost = (totals[0] / 1_000_000 * 3) + (totals[1] / 1_000_000 * 15)
-    console.print(f"\nEstimated cost: ${est_cost:.4f} USD")
-    console.print(
-        "(Based on Claude Sonnet pricing — verify current rates at console.anthropic.com)"
-    )
+    console.print("\nBy caller:")
+    for caller, calls, usd in db.execute(f"""
+        SELECT caller, COUNT(*), SUM(est_usd) FROM llm_usage WHERE {window}
+        GROUP BY caller ORDER BY SUM(est_usd) DESC
+    """).fetchall():
+        console.print(f"  {caller:<44} {calls:>6} {usd or 0:>10.4f}")
+    console.print("\n(Estimates priced per call at write time — Anthropic's console is the bill.)")
 
 
 @app.command(name="cache-status")

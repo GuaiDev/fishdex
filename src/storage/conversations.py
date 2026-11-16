@@ -4,6 +4,8 @@ from datetime import datetime
 
 from sqlite_utils import Database
 
+from src import llm
+
 
 def start_session(db: Database, session_id: str) -> None:
     """Create a new session record (no-op if already exists)."""
@@ -39,7 +41,9 @@ def end_session(db: Database, session_id: str, summary: str | None = None) -> No
     })
 
 
-def generate_session_summary(messages: list[dict], client) -> str:
+def generate_session_summary(
+    messages: list[dict], user_id: int = 1, session_id: str | None = None
+) -> str:
     """Generate a compact summary of the session using Haiku."""
     text_messages = [
         m for m in messages
@@ -60,8 +64,11 @@ def generate_session_summary(messages: list[dict], client) -> str:
         )
     )
 
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    response = llm.complete(
+        "session_summary",
+        caller="conversations.generate_session_summary",
+        user_id=user_id,
+        session_id=session_id,
         max_tokens=400,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -72,7 +79,6 @@ def close_and_update_context(
     db: Database,
     session_id: str,
     messages: list[dict],
-    client,
     user_id: int = 1,
 ) -> None:
     """End a session: generate summary, merge into rolling angler context, mark ended.
@@ -90,9 +96,9 @@ def close_and_update_context(
         end_session(db, session_id)
         return
 
-    summary = generate_session_summary(messages, client)
+    summary = generate_session_summary(messages, user_id=user_id, session_id=session_id)
 
     if summary and len(summary.strip()) > 100:
-        update_context(db, summary, client, user_id=user_id)
+        update_context(db, summary, user_id=user_id)
 
     end_session(db, session_id, summary)

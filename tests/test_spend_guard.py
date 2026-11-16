@@ -25,6 +25,7 @@ def env(tmp_path, monkeypatch):
     from src.auth.auth import _create_token
 
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "spend.db")
+    monkeypatch.setattr("src.llm.ledger._open_db", lambda: database.get_db())
     monkeypatch.delenv("FISHBOT_DAILY_MODEL_CALLS", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     db = database.get_db()
@@ -88,8 +89,7 @@ def tool_reply(n, _kw):
 
 
 def use_stub(monkeypatch, stub):
-    monkeypatch.setattr(chat_module, "get_client", lambda: stub)
-    monkeypatch.setattr(chat_module, "get_model", lambda: "stub")
+    monkeypatch.setattr("src.llm.client.get_client", lambda: stub)
     monkeypatch.setattr(router, "classify_message", lambda *a, **k: {"mode": "memory"})
 
 
@@ -141,7 +141,7 @@ def test_api_usage_is_attributed_to_the_caller(env, monkeypatch):
     use_stub(monkeypatch, StubClient(text_reply))
     env.client.post("/chat", headers=auth(env, 2), json={"message": "hi", "session_id": "s4"})
     rows = env.db.execute(
-        "SELECT user_id FROM api_usage WHERE endpoint IN ('chat') OR endpoint LIKE 'router:%'"
+        "SELECT user_id FROM llm_usage"
     ).fetchall()
     assert rows and {r[0] for r in rows} == {2}
 
@@ -217,7 +217,9 @@ def stub_trip(monkeypatch):
 
     calls = []
     monkeypatch.setattr(
-        tp, "parse_session_from_text", lambda text, db: calls.append(len(text)) or {"stops": []}
+        tp,
+        "parse_session_from_text",
+        lambda text, db, **k: calls.append(len(text)) or {"stops": []},
     )
     monkeypatch.setattr(
         tl, "log_session", lambda parsed, db, **k: {"session_id": 0, "stops_logged": 0}

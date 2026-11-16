@@ -74,13 +74,13 @@ def test_empty_string_returns_none(tmp_path: Path):
 
 
 def test_close_and_update_skips_empty_session(tmp_path: Path):
-    """Sessions with no turns don't trigger context update or crash with client=None."""
+    """Sessions with no turns don't trigger context update or crash."""
     from src.storage.angler_context import load_context
     from src.storage.conversations import close_and_update_context, start_session
 
     db = _make_db(tmp_path)
     start_session(db, "empty-session")
-    close_and_update_context(db, "empty-session", [], client=None)
+    close_and_update_context(db, "empty-session", [])
     assert load_context(db) is None
 
 

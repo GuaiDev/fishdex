@@ -1868,6 +1868,12 @@ def cleanup_old_gauge_readings(db: Database, days: int = 7) -> None:
     db.execute("DELETE FROM stream_gauge_readings WHERE reading_datetime < ?", [cutoff])
 
 
+def _ensure_llm_usage(db: Database) -> None:
+    from src.llm.ledger import create_table
+
+    create_table(db)
+
+
 @dataclass(frozen=True)
 class Migration:
     version: int
@@ -1912,6 +1918,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(25, "session_conditions_gauge", migrate_session_conditions_gauge),
     Migration(26, "species_images", migrate_species_images),
     Migration(27, "hydro_segments", _ensure_hydro_segments),
+    Migration(28, "llm_usage", _ensure_llm_usage),
 )
 
 assert [m.version for m in MIGRATIONS] == list(range(1, len(MIGRATIONS) + 1))

@@ -1,0 +1,118 @@
+"""The LLM gateway: one ledger row per call, attributed to the right user."""
+
+import re
+import types
+from pathlib import Path
+
+import pytest
+
+from src import llm
+from src.llm import ledger
+from src.llm.pricing import estimate_usd
+from src.storage.database import get_db
+
+
+class _Messages:
+    def __init__(self, fail=False):
+        self.fail = fail
+        self.kwargs = None
+
+    def create(self, **kwargs):
+        self.kwargs = kwargs
+        if self.fail:
+            raise RuntimeError("upstream exploded")
+        usage = types.SimpleNamespace(
+            input_tokens=1000,
+            output_tokens=200,
+            cache_creation_input_tokens=0,
+            cache_read_input_tokens=500,
+            server_tool_use=types.SimpleNamespace(web_search_requests=2),
+        )
+        return types.SimpleNamespace(model=kwargs["model"], usage=usage, content=[])
+
+
+@pytest.fixture
+def ledger_db(tmp_path, monkeypatch):
+    path = tmp_path / "ledger.db"
+    monkeypatch.setattr(ledger, "_open_db", lambda: get_db(path))
+    return get_db(path)
+
+
+def _use(monkeypatch, messages):
+    monkeypatch.setattr(
+        "src.llm.client.get_client", lambda: types.SimpleNamespace(messages=messages)
+    )
+
+
+def _rows(db):
+    return list(db["llm_usage"].rows)
+
+
+def test_complete_writes_one_row_for_the_asking_user(ledger_db, monkeypatch):
+    msgs = _Messages()
+    _use(monkeypatch, msgs)
+    llm.complete("router", caller="t.router", user_id=7, session_id="s", max_tokens=5)
+    (row,) = _rows(ledger_db)
+    assert (row["user_id"], row["caller"], row["role"], row["status"]) == (
+        7,
+        "t.router",
+        "router",
+        "ok",
+    )
+    assert row["model"] == msgs.kwargs["model"] == llm.model_for("router")
+    assert (row["input_tokens"], row["output_tokens"], row["cache_read_tokens"]) == (1000, 200, 500)
+    assert row["web_searches"] == 2
+    assert row["est_usd"] == pytest.approx(estimate_usd(row["model"], 1000, 200, 0, 500, 2))
+    assert row["latency_ms"] >= 0
+
+
+def test_a_failed_call_writes_an_error_row_and_reraises(ledger_db, monkeypatch):
+    _use(monkeypatch, _Messages(fail=True))
+    with pytest.raises(RuntimeError):
+        llm.complete("coaching", caller="t.coach", user_id=3, max_tokens=5)
+    (row,) = _rows(ledger_db)
+    assert (row["user_id"], row["status"]) == (3, "error")
+    assert "upstream exploded" in row["error"]
+
+
+def test_background_work_is_recorded_with_no_user(ledger_db, monkeypatch):
+    _use(monkeypatch, _Messages())
+    llm.complete("router", caller="t.batch", user_id=None, max_tokens=5)
+    assert _rows(ledger_db)[0]["user_id"] is None
+
+
+def test_unknown_role_raises():
+    with pytest.raises(KeyError):
+        llm.model_for("no_such_role")
+
+
+def test_role_override_from_environment(monkeypatch):
+    monkeypatch.setenv("FISHDEX_MODEL_ROUTER", "claude-test-model")
+    assert llm.model_for("router") == "claude-test-model"
+
+
+def test_unpriced_model_is_null_not_free():
+    assert estimate_usd("mystery-model", 10, 10) is None
+
+
+def test_ledger_failure_does_not_fail_the_request(monkeypatch):
+    _use(monkeypatch, _Messages())
+
+    def boom():
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(ledger, "_open_db", boom)
+    before = ledger.write_failures
+    llm.complete("router", caller="t", user_id=1, max_tokens=5)
+    assert ledger.write_failures == before + 1
+
+
+def test_no_model_call_outside_the_gateway():
+    src = Path(__file__).resolve().parents[1] / "src"
+    offenders = [
+        str(p.relative_to(src))
+        for p in src.rglob("*.py")
+        if "llm" not in p.relative_to(src).parts[:1]
+        and re.search(r"messages\.(create|stream)\(", p.read_text())
+    ]
+    assert offenders == []

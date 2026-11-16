@@ -29,7 +29,7 @@ def _mock_vision(monkeypatch, text: str):
     resp = _Response()
     resp.content = [obj]
 
-    monkeypatch.setattr(vs_mod.client.messages, "create", lambda **kw: resp)
+    monkeypatch.setattr(vs_mod.llm, "complete", lambda *a, **kw: resp)
 
 
 # ── screen_segment tests ──────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ def test_screen_segment_no_water(monkeypatch):
         "4. STRUCTURE: none visible\n5. VERDICT: no",
     )
 
-    result = vs_mod.screen_segment(43.5, -79.5, 2, "Test Creek", False)
+    result = vs_mod.screen_segment(43.5, -79.5, 2, "Test Creek", False, user_id=1)
 
     assert result["screened"] is True
     assert result["verdict"] == "unlikely"
@@ -59,7 +59,7 @@ def test_screen_segment_culvert(monkeypatch):
         "4. STRUCTURE: culvert crossing visible under road\n5. VERDICT: maybe",
     )
 
-    result = vs_mod.screen_segment(43.5, -79.5, 3, None, False)
+    result = vs_mod.screen_segment(43.5, -79.5, 3, None, False, user_id=1)
 
     assert result["screened"] is True
     assert result["is_culvert_crossing"] is True
@@ -75,7 +75,7 @@ def test_screen_segment_houses(monkeypatch):
         "4. STRUCTURE: none visible\n5. VERDICT: maybe",
     )
 
-    result = vs_mod.screen_segment(43.5, -79.5, 3, "Bronte Creek", False)
+    result = vs_mod.screen_segment(43.5, -79.5, 3, "Bronte Creek", False, user_id=1)
 
     assert result["screened"] is True
     assert result["access_blocked_by_structures"] is True
@@ -92,7 +92,7 @@ def test_screen_segment_golf_course(monkeypatch):
         "4. STRUCTURE: none visible\n5. VERDICT: maybe",
     )
 
-    result = vs_mod.screen_segment(43.5, -79.5, 3, None, False)
+    result = vs_mod.screen_segment(43.5, -79.5, 3, None, False, user_id=1)
 
     assert result["screened"] is True
     assert result["is_golf_course"] is True
@@ -106,7 +106,7 @@ def test_screen_segment_satellite_unavailable(monkeypatch):
 
     monkeypatch.setattr(httpx, "get", _raise)
 
-    result = vs_mod.screen_segment(43.5, -79.5, 3, None, False)
+    result = vs_mod.screen_segment(43.5, -79.5, 3, None, False, user_id=1)
 
     assert result["screened"] is False
     assert result["verdict"] == "unverified"
@@ -122,7 +122,7 @@ def test_screen_segment_promising(monkeypatch):
         "4. STRUCTURE: confluence visible\n5. VERDICT: yes",
     )
 
-    result = vs_mod.screen_segment(43.5, -79.5, 4, "Credit River", True)
+    result = vs_mod.screen_segment(43.5, -79.5, 4, "Credit River", True, user_id=1)
 
     assert result["screened"] is True
     assert result["verdict"] == "promising"
@@ -178,10 +178,10 @@ def test_screen_candidates_filters_unlikely(monkeypatch):
         r.content = [c]
         return r
 
-    monkeypatch.setattr(vs_mod.client.messages, "create", _varying_vision)
+    monkeypatch.setattr(vs_mod.llm, "complete", lambda *a, **kw: _varying_vision(**kw))
 
     candidates = _make_candidates(3)
-    result = vs_mod.screen_candidates(candidates, max_screens=10)
+    result = vs_mod.screen_candidates(candidates, max_screens=10, user_id=1)
 
     assert len(result) == 2
     assert result[0]["ogf_id"] == 0
@@ -200,7 +200,7 @@ def test_vision_budget(monkeypatch):
     )
 
     candidates = _make_candidates(11)
-    result = vs_mod.screen_candidates(candidates, max_screens=10)
+    result = vs_mod.screen_candidates(candidates, max_screens=10, user_id=1)
 
     assert len(result) == 11
 

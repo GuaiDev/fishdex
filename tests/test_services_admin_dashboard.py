@@ -42,11 +42,20 @@ def _seed_tool_usage(db, tool_name, success=1):
     db.conn.commit()
 
 
-def _seed_api_usage(db, model, input_tokens, output_tokens, timestamp=None):
+def _seed_api_usage(db, model, input_tokens, output_tokens, timestamp=None, user_id=1):
+    from src.llm.pricing import estimate_usd
+
     db.execute(
-        "INSERT INTO api_usage (model, input_tokens, output_tokens, total_tokens, timestamp) "
-        "VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')))",
-        [model, input_tokens, output_tokens, input_tokens + output_tokens, timestamp],
+        "INSERT INTO llm_usage (ts, user_id, caller, role, model, input_tokens, output_tokens, "
+        "est_usd) VALUES (COALESCE(?, datetime('now')), ?, 'test', 'chat', ?, ?, ?, ?)",
+        [
+            timestamp,
+            user_id,
+            model,
+            input_tokens,
+            output_tokens,
+            estimate_usd(model, input_tokens, output_tokens),
+        ],
     )
     db.conn.commit()
 

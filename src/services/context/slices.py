@@ -80,7 +80,7 @@ def build_records(
     if not found:
         local_reason = _no_records_reason(db)
         if escalate:
-            slice_ = _escalate(place, species_filter, local_reason)
+            slice_ = _escalate(place, species_filter, local_reason, user_id)
         else:
             slice_ = RecordsSlice(radius_km=place.radius_km, empty_reason=local_reason)
         if with_piscivore:
@@ -137,7 +137,7 @@ def _piscivore_field(db: Database, place: Place) -> ContextField:
 
 
 def _escalate(
-    place: Place, species_filter: str | None, local_reason: EmptyReason
+    place: Place, species_filter: str | None, local_reason: EmptyReason, user_id: int | None
 ) -> RecordsSlice:
     """Second rung: nothing local, so try the web before giving an honest empty.
 
@@ -152,6 +152,7 @@ def _escalate(
         lat=place.lat,
         lng=place.lng,
         species_filter=species_filter,
+        user_id=user_id,
     )
     if records:
         return RecordsSlice(

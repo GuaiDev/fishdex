@@ -158,7 +158,7 @@ def test_enrich_session_returns_dict(db_conn):
         "was_productive": 0,
     })
 
-    result = enrich_session(db_conn, sid, client=None)
+    result = enrich_session(db_conn, sid, use_llm=False)
     assert isinstance(result, dict)
     assert "followup_questions" in result
     assert "proactive_coaching" in result
@@ -172,7 +172,7 @@ def test_enrich_session_empty_stops_returns_dict(db_conn):
     db_conn["sessions"].insert({"date": "2025-06-14", "overall_notes": None})
     sid = db_conn.execute("SELECT MAX(id) FROM sessions").fetchone()[0]
 
-    result = enrich_session(db_conn, sid, client=None)
+    result = enrich_session(db_conn, sid, use_llm=False)
     assert isinstance(result, dict)
     assert result["followup_questions"] == []
     assert result["proactive_coaching"] is None

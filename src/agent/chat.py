@@ -4,10 +4,10 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from anthropic import Anthropic, APIError
+from anthropic import APIError
 from rich.console import Console
 
-from src.agent.client import get_client, get_model
+from src import llm
 from src.agent.system_prompt import assemble, load_template
 from src.agent.tools import execute_tool, tool_schemas
 from src.jurisdictions.registry import get_jurisdiction
@@ -33,15 +33,15 @@ def _iteration_cap_reply(tool_rounds: int) -> str:
     )
 
 
-HAIKU = "claude-haiku-4-5-20251001"
-
 # Jurisdiction for users who have no profile of their own (see _prompt_inputs).
 _DEFAULT_JURISDICTION = "CA-ON"
 
 logger = logging.getLogger(__name__)
 
 
-def _summarize_history(messages: list[dict], client) -> list[dict]:
+def _summarize_history(
+    messages: list[dict], *, user_id: int, session_id: str | None = None
+) -> list[dict]:
     """Summarize the oldest half of conversation history once it exceeds MAX_TURNS_BEFORE_SUMMARY.
 
     Keeps the most recent 6 turns verbatim for immediate context.
@@ -66,8 +66,11 @@ def _summarize_history(messages: list[dict], client) -> list[dict]:
         )
     )
 
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    response = llm.complete(
+        "history_summary",
+        caller="chat._summarize_history",
+        user_id=user_id,
+        session_id=session_id,
         max_tokens=500,
         messages=[{"role": "user", "content": summary_prompt}],
     )
@@ -103,7 +106,7 @@ def _run_full_pipeline(
 ) -> dict:
     """Non-streaming agentic loop. The synthesis path and fallback for all modes."""
     try:
-        client = get_client()
+        llm.get_client()
     except RuntimeError as e:
         return {"reply": str(e), "tool_calls": [], "messages": messages}
 
@@ -118,7 +121,6 @@ def _run_full_pipeline(
         system_prompt += (
             f"\n\nCurrent user: {user_id} (filter all personal data queries by this user_id)"
         )
-    model = get_model()
     tools = _tools(profile)
     tool_calls_made: list[str] = []
 
@@ -137,33 +139,22 @@ def _run_full_pipeline(
         session_row = db["chat_sessions"].get(session_id)
         if session_row and (session_row.get("turn_count") or 0) >= 15:
             if not session_row.get("summary"):
-                close_and_update_context(db, session_id, messages, client, user_id=user_id)
+                close_and_update_context(db, session_id, messages, user_id=user_id)
 
         return {"reply": reply, "tool_calls": tool_calls_made, "messages": messages}
 
     for iteration in range(MAX_AGENT_ITERATIONS):
-        messages = _summarize_history(messages, client)
+        messages = _summarize_history(messages, user_id=user_id, session_id=session_id)
 
-        resp = client.messages.create(
-            model=model,
+        resp = llm.complete(
+            "chat",
+            caller="chat.run_full_pipeline",
+            user_id=user_id,
+            session_id=session_id,
             max_tokens=2048,
             system=system_prompt,
             messages=messages,
             tools=tools,
-        )
-
-        usage = resp.usage
-        db["api_usage"].insert(
-            {
-                "session_id": session_id,
-                "model": resp.model,
-                "input_tokens": usage.input_tokens,
-                "output_tokens": usage.output_tokens,
-                "total_tokens": usage.input_tokens + usage.output_tokens,
-                "tool_calls_made": len([b for b in resp.content if b.type == "tool_use"]),
-                "endpoint": "chat",
-                "user_id": user_id,
-            }
         )
 
         content_blocks = resp.content
@@ -231,7 +222,9 @@ def run_chat_api(
         m["content"][:200] for m in messages[-4:] if isinstance(m.get("content"), str)
     )
 
-    classification = classify_message(latest_user, recent)
+    classification = classify_message(
+        latest_user, recent, user_id=user_id, session_id=session_id
+    )
     mode = classification["mode"]
 
     # The reflex path answers from general knowledge with no retrieval and no
@@ -249,12 +242,14 @@ def run_chat_api(
             classification["mode"] = mode
             classification["reflex_override"] = named_place
 
-    _log_routing(session_id, mode, classification.get("router_tokens", 0), user_id=user_id)
-
     if mode == "reflex":
-        result = handle_reflex(latest_user, classification.get("leading_question"))
+        result = handle_reflex(
+            latest_user,
+            classification.get("leading_question"),
+            user_id=user_id,
+            session_id=session_id,
+        )
         messages.append({"role": "assistant", "content": result["reply"]})
-        _log_mode_usage(session_id, "reflex", result.get("tokens", 0), user_id=user_id)
         return {
             "reply": result["reply"],
             "tool_calls": [],
@@ -273,7 +268,7 @@ def run_chat_api(
 
         db = _get_db()
 
-        loc = extract_location_from_message(latest_user)
+        loc = extract_location_from_message(latest_user, user_id=user_id, session_id=session_id)
         lat = loc.get("lat")
         lng = loc.get("lng")
         location_name = loc.get("location_name")
@@ -315,21 +310,17 @@ def run_chat_api(
                     f"If the synthesis doesn't fully answer the question, "
                     f"say so and offer to run a fresh analysis."
                 )
-                client = get_client()
-                resp = client.messages.create(
-                    model=HAIKU,
+                resp = llm.complete(
+                    "synthesis_answer",
+                    caller="chat.synthesis_cache_answer",
+                    user_id=user_id,
+                    session_id=session_id,
                     max_tokens=600,
                     messages=[{"role": "user", "content": cache_prompt}],
                 )
                 reply = "".join(b.text for b in resp.content if b.type == "text").strip()
                 reply += "\n\n*(Answer from synthesis cache)*"
                 messages.append({"role": "assistant", "content": reply})
-                _log_routing(
-                    session_id,
-                    "synthesis_cache_hit",
-                    resp.usage.input_tokens + resp.usage.output_tokens,
-                    user_id=user_id,
-                )
                 return {
                     "reply": reply,
                     "tool_calls": [],
@@ -362,49 +353,11 @@ def run_chat_api(
     return _run_full_pipeline(messages, session_id, mode=mode, user_id=user_id)
 
 
-def _log_routing(session_id: str, mode: str, tokens: int, user_id: int = 1) -> None:
-    try:
-        db = get_db()
-        db["api_usage"].insert(
-            {
-                "session_id": session_id,
-                "model": HAIKU,
-                "input_tokens": tokens,
-                "output_tokens": 0,
-                "total_tokens": tokens,
-                "tool_calls_made": 0,
-                "endpoint": f"router:{mode}",
-                "user_id": user_id,
-            }
-        )
-    except Exception:
-        pass
-
-
-def _log_mode_usage(session_id: str, mode: str, tokens: int, user_id: int = 1) -> None:
-    try:
-        db = get_db()
-        db["api_usage"].insert(
-            {
-                "session_id": session_id,
-                "model": HAIKU,
-                "input_tokens": 0,
-                "output_tokens": tokens,
-                "total_tokens": tokens,
-                "tool_calls_made": 0,
-                "endpoint": f"mode:{mode}",
-                "user_id": user_id,
-            }
-        )
-    except Exception:
-        pass
-
-
 def run_chat() -> None:
     console = Console()
 
     try:
-        client = get_client()
+        llm.get_client()
     except RuntimeError as e:
         console.print(f"[red]{e}[/red]")
         return
@@ -421,7 +374,7 @@ def run_chat() -> None:
     if angler_context:
         system_prompt = system_prompt + "\n\n" + format_context_for_prompt(angler_context)
 
-    model = get_model()
+    model = llm.model_for("chat")
 
     console.print(f"[dim]fishbot — {model} — type /exit to quit[/dim]")
     console.print()
@@ -435,7 +388,7 @@ def run_chat() -> None:
             user_input = console.input("[bold cyan]> [/bold cyan]").strip()
         except (EOFError, KeyboardInterrupt):
             console.print()
-            close_and_update_context(db, session_id, messages, client)
+            close_and_update_context(db, session_id, messages, user_id=cli_user_id)
             console.print("[dim]Session saved.[/dim]")
             console.print("[dim]bye[/dim]")
             return
@@ -444,7 +397,7 @@ def run_chat() -> None:
             continue
 
         if user_input.lower() in EXIT_COMMANDS:
-            close_and_update_context(db, session_id, messages, client)
+            close_and_update_context(db, session_id, messages, user_id=cli_user_id)
             console.print("[dim]Session saved.[/dim]")
             console.print("[dim]bye[/dim]")
             return
@@ -454,12 +407,18 @@ def run_chat() -> None:
         recent = " ".join(
             m["content"][:200] for m in messages[-4:] if isinstance(m.get("content"), str)
         )
-        classification = classify_message(user_input, recent)
+        classification = classify_message(
+            user_input, recent, user_id=cli_user_id, session_id=session_id
+        )
         mode = classification["mode"]
-        _log_routing(session_id, mode, classification.get("router_tokens", 0))
 
         if mode == "reflex":
-            result = handle_reflex(user_input, classification.get("leading_question"))
+            result = handle_reflex(
+                user_input,
+                classification.get("leading_question"),
+                user_id=cli_user_id,
+                session_id=session_id,
+            )
             reply = result["reply"]
             console.print(reply, markup=False, highlight=False, soft_wrap=True)
             console.print()
@@ -468,7 +427,6 @@ def run_chat() -> None:
             save_turn(db, session_id, "user", user_input, turn_index)
             messages.append({"role": "assistant", "content": reply})
             save_turn(db, session_id, "assistant", reply, turn_index)
-            _log_mode_usage(session_id, "reflex", result.get("tokens", 0))
             turn_index += 1
             continue
 
@@ -481,7 +439,9 @@ def run_chat() -> None:
             from src.agent.router import extract_location_from_message
             from src.services.synthesis_cache import get_cached_synthesis, store_synthesis
 
-            cache_loc = extract_location_from_message(user_input)
+            cache_loc = extract_location_from_message(
+                user_input, user_id=cli_user_id, session_id=session_id
+            )
             c_lat = cache_loc.get("lat")
             c_lng = cache_loc.get("lng")
             c_name = cache_loc.get("location_name")
@@ -501,8 +461,11 @@ def run_chat() -> None:
                         f"If the synthesis doesn't fully answer the question, "
                         f"say so and offer to run a fresh analysis."
                     )
-                    resp = client.messages.create(
-                        model=HAIKU,
+                    resp = llm.complete(
+                        "synthesis_answer",
+                        caller="chat.synthesis_cache_answer",
+                        user_id=cli_user_id,
+                        session_id=session_id,
                         max_tokens=600,
                         messages=[{"role": "user", "content": cache_prompt}],
                     )
@@ -513,17 +476,17 @@ def run_chat() -> None:
                     console.print()
                     messages.append({"role": "assistant", "content": reply})
                     save_turn(db, session_id, "assistant", reply, turn_index)
-                    _log_routing(
-                        session_id,
-                        "synthesis_cache_hit",
-                        resp.usage.input_tokens + resp.usage.output_tokens,
-                    )
                     turn_index += 1
                     continue
 
         try:
             _agentic_loop(
-                client, model, system_prompt, messages, tools, console, session_id=session_id
+                system_prompt,
+                messages,
+                tools,
+                console,
+                session_id=session_id,
+                user_id=cli_user_id,
             )
         except APIError as e:
             console.print(f"[red]API error: {e}[/red]")
@@ -563,8 +526,6 @@ def run_chat() -> None:
 
 
 def _agentic_loop(
-    client: Anthropic,
-    model: str,
     system_prompt: str,
     messages: list[dict],
     tools: list[dict],
@@ -576,12 +537,15 @@ def _agentic_loop(
     db = get_db()
 
     for iteration in range(MAX_AGENT_ITERATIONS):
-        messages[:] = _summarize_history(messages, client)
+        messages[:] = _summarize_history(messages, user_id=user_id, session_id=session_id)
 
         content_blocks: list[Any] = []
 
-        with client.messages.stream(
-            model=model,
+        with llm.stream(
+            "chat",
+            caller="chat.agentic_loop",
+            user_id=user_id,
+            session_id=session_id,
             max_tokens=2048,
             system=system_prompt,
             messages=messages,
@@ -591,20 +555,6 @@ def _agentic_loop(
                 console.print(text, end="", markup=False, highlight=False, soft_wrap=True)
             final_msg = stream.get_final_message()
             content_blocks = final_msg.content
-
-        usage = final_msg.usage
-        db["api_usage"].insert(
-            {
-                "session_id": session_id,
-                "model": final_msg.model,
-                "input_tokens": usage.input_tokens,
-                "output_tokens": usage.output_tokens,
-                "total_tokens": usage.input_tokens + usage.output_tokens,
-                "tool_calls_made": len([b for b in content_blocks if b.type == "tool_use"]),
-                "endpoint": "chat",
-                "user_id": user_id,
-            }
-        )
 
         tool_use_blocks = [b for b in content_blocks if b.type == "tool_use"]
 

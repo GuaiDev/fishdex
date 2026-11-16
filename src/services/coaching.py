@@ -20,7 +20,7 @@ import logging
 
 from sqlite_utils import Database
 
-from src.agent.client import get_client
+from src import llm
 from src.services.context import (
     angler_profile,
     describe,
@@ -38,7 +38,6 @@ from src.services.context.render import (
 
 logger = logging.getLogger(__name__)
 
-HAIKU = "claude-haiku-4-5-20251001"
 
 # The epistemic rule, stated once and shared by both coaching paths. General
 # ecological knowledge applied to observed conditions is legitimate at n=1;
@@ -75,10 +74,11 @@ can be answered without targeting guidance, say plainly why you are declining
 the rest, and suggest the angler verify the current listing themselves."""
 
 
-def _ask(prompt: str, max_tokens: int) -> str:
-    client = get_client()
-    resp = client.messages.create(
-        model=HAIKU,
+def _ask(prompt: str, max_tokens: int, *, user_id: int, caller: str) -> str:
+    resp = llm.complete(
+        "coaching",
+        caller=caller,
+        user_id=user_id,
         max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -122,7 +122,12 @@ def get_species_coaching(
             "experiment for the next trip. 150-250 words."
         )
 
-    return _ask("\n\n".join(blocks), max_tokens=500)
+    return _ask(
+        "\n\n".join(blocks),
+        max_tokens=500,
+        user_id=user_id,
+        caller="coaching.get_species_coaching",
+    )
 
 
 def get_location_coaching(
@@ -162,4 +167,6 @@ def get_location_coaching(
             "instead. 150-200 words.",
         ]
     )
-    return _ask(prompt, max_tokens=450)
+    return _ask(
+        prompt, max_tokens=450, user_id=user_id, caller="coaching.get_location_coaching"
+    )

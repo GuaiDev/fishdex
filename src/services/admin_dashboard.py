@@ -9,19 +9,6 @@ from typing import Any
 
 from sqlite_utils.db import Database
 
-# $/1M tokens (input, output). Matched by substring against api_usage.model,
-# since the exact model string changes across releases (e.g.
-# "claude-haiku-4-5-20251001", "claude-sonnet-4-6") but always contains the
-# tier name. Verified against the Claude API pricing table as of 2026-07:
-# Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5, Opus (any) $5/$25 per 1M tokens.
-# This is an ESTIMATE for budgeting, not a bill — Anthropic's own usage
-# dashboard is the source of truth.
-_PRICING_PER_MILLION: dict[str, tuple[float, float]] = {
-    "haiku": (1.00, 5.00),
-    "sonnet": (3.00, 15.00),
-    "opus": (5.00, 25.00),
-}
-
 _DAY_WINDOWS = (7, 30)
 
 # ~1 decimal degree grid cell for the "location cluster" grouping — coarser
@@ -227,26 +214,24 @@ def _catch_stats(db: Database, species_limit: int = 10, pb_limit: int = 10) -> d
     }
 
 
-def _rate_for_model(model: str) -> tuple[float, float] | None:
-    name = (model or "").lower()
-    for tier, rates in _PRICING_PER_MILLION.items():
-        if tier in name:
-            return rates
-    return None
-
-
 def _api_cost_estimate(db: Database) -> dict[str, Any]:
-    """Approximate cost by model tier (Sonnet vs Haiku vs Opus), all-time and
-    last 30 days. Estimate only — see module docstring on _PRICING_PER_MILLION.
-    """
-    if "api_usage" not in db.table_names():
-        return {"note": "api_usage table not present", "by_model": [], "total_usd": 0.0}
+    """Model spend by model, all-time and last 30 days, read from the `llm_usage` ledger.
 
+    Every model call writes one ledger row with its own estimated cost (see
+    src/llm/pricing.py), so this sums what was recorded rather than re-pricing.
+    A row with no known rate has a NULL cost and is counted as unpriced, never
+    as free. Estimate only — Anthropic's usage dashboard is the source of truth.
+    """
+    if "llm_usage" not in db.table_names():
+        return {"note": "llm_usage table not present", "by_model": [], "total_usd": 0.0}
+
+    select = (
+        "SELECT model, COUNT(*), SUM(input_tokens), SUM(output_tokens), "
+        "SUM(est_usd), SUM(est_usd IS NULL), SUM(web_searches) FROM llm_usage"
+    )
     windows = {
-        "all_time": "SELECT model, COUNT(*), SUM(input_tokens), SUM(output_tokens) "
-        "FROM api_usage GROUP BY model",
-        "last_30_days": "SELECT model, COUNT(*), SUM(input_tokens), SUM(output_tokens) "
-        "FROM api_usage WHERE timestamp >= datetime('now', '-30 days') GROUP BY model",
+        "all_time": f"{select} GROUP BY model",
+        "last_30_days": f"{select} WHERE ts >= datetime('now', '-30 days') GROUP BY model",
     }
 
     result: dict[str, Any] = {}
@@ -254,29 +239,16 @@ def _api_cost_estimate(db: Database) -> dict[str, Any]:
         by_model = []
         total_usd = 0.0
         unpriced_calls = 0
-        for model, calls, input_tokens, output_tokens in db.execute(sql).fetchall():
-            input_tokens = input_tokens or 0
-            output_tokens = output_tokens or 0
-            rates = _rate_for_model(model)
-            if rates is None:
-                unpriced_calls += calls
-                by_model.append({
-                    "model": model,
-                    "calls": calls,
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
-                    "estimated_usd": None,
-                })
-                continue
-            in_rate, out_rate = rates
-            cost = (input_tokens / 1_000_000 * in_rate) + (output_tokens / 1_000_000 * out_rate)
-            total_usd += cost
+        for model, calls, inp, out, usd, unpriced, searches in db.execute(sql).fetchall():
+            unpriced_calls += unpriced or 0
+            total_usd += usd or 0.0
             by_model.append({
                 "model": model,
                 "calls": calls,
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "estimated_usd": round(cost, 4),
+                "input_tokens": inp or 0,
+                "output_tokens": out or 0,
+                "web_searches": searches or 0,
+                "estimated_usd": None if unpriced == calls else round(usd or 0.0, 4),
             })
         result[window_name] = {
             "by_model": sorted(by_model, key=lambda m: m["calls"], reverse=True),
@@ -284,14 +256,21 @@ def _api_cost_estimate(db: Database) -> dict[str, Any]:
             "unpriced_calls": unpriced_calls,
         }
 
+    result["by_caller_30_days"] = [
+        {"caller": c, "calls": n, "estimated_usd": round(u or 0.0, 4)}
+        for c, n, u in db.execute(
+            "SELECT caller, COUNT(*), SUM(est_usd) FROM llm_usage "
+            "WHERE ts >= datetime('now', '-30 days') GROUP BY caller ORDER BY SUM(est_usd) DESC"
+        ).fetchall()
+    ]
+    result["by_user_30_days"] = [
+        {"user_id": uid, "calls": n, "estimated_usd": round(u or 0.0, 4)}
+        for uid, n, u in db.execute(
+            "SELECT user_id, COUNT(*), SUM(est_usd) FROM llm_usage "
+            "WHERE ts >= datetime('now', '-30 days') GROUP BY user_id ORDER BY SUM(est_usd) DESC"
+        ).fetchall()
+    ]
     result["pricing_basis"] = {
-        "note": (
-            "Estimate only, not a bill. $/1M tokens (input, output), matched by "
-            "substring against the model name."
-        ),
-        "rates": {
-            tier: {"input_per_million": r[0], "output_per_million": r[1]}
-            for tier, r in _PRICING_PER_MILLION.items()
-        },
+        "note": "Estimate only, not a bill. Priced per call by src/llm/pricing.py at write time.",
     }
     return result

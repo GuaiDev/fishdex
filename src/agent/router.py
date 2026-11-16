@@ -18,9 +18,7 @@ spending slightly more. A flat generic answer is the main failure mode to avoid.
 
 import json
 
-from src.agent.client import get_client
-
-HAIKU = "claude-haiku-4-5-20251001"
+from src import llm
 
 ROUTER_SYSTEM = """You are a message classifier for a fishing intelligence app.
 Classify the user's message into exactly one mode. Respond with ONLY a JSON object,
@@ -63,19 +61,27 @@ Rules:
 """
 
 
-def classify_message(message: str, conversation_context: str = "") -> dict:
+def classify_message(
+    message: str,
+    conversation_context: str = "",
+    *,
+    user_id: int | None,
+    session_id: str | None = None,
+) -> dict:
     """
     Classify a single user message. Returns dict with mode, leading_question, confidence.
     Falls back to 'synthesis' on any error (err toward quality).
     """
     try:
-        client = get_client()
         prompt = message
         if conversation_context:
             prompt = f"Recent context: {conversation_context[:500]}\n\nMessage: {message}"
 
-        resp = client.messages.create(
-            model=HAIKU,
+        resp = llm.complete(
+            "router",
+            caller="router.classify_message",
+            user_id=user_id,
+            session_id=session_id,
             max_tokens=150,
             system=ROUTER_SYSTEM,
             messages=[{"role": "user", "content": prompt}],
@@ -123,7 +129,9 @@ _LOCATION_SYSTEM = (
 )
 
 
-def extract_location_from_message(message: str) -> dict:
+def extract_location_from_message(
+    message: str, *, user_id: int | None, session_id: str | None = None
+) -> dict:
     """
     Extract location information from a synthesis-mode message.
     Returns dict with lat, lng, location_name (all nullable).
@@ -131,9 +139,11 @@ def extract_location_from_message(message: str) -> dict:
     Falls back to empty dict on any error.
     """
     try:
-        client = get_client()
-        resp = client.messages.create(
-            model=HAIKU,
+        resp = llm.complete(
+            "location_extract",
+            caller="router.extract_location_from_message",
+            user_id=user_id,
+            session_id=session_id,
             max_tokens=100,
             system=_LOCATION_SYSTEM,
             messages=[{"role": "user", "content": message}],
@@ -151,14 +161,22 @@ def extract_location_from_message(message: str) -> dict:
         return {"lat": None, "lng": None, "location_name": None, "extraction_tokens": 0}
 
 
-def handle_reflex(message: str, leading_question: str | None = None) -> dict:
+def handle_reflex(
+    message: str,
+    leading_question: str | None = None,
+    *,
+    user_id: int | None,
+    session_id: str | None = None,
+) -> dict:
     """
     Answer a reflex (generic knowledge) question with a cheap model, no tools.
     Optionally append a leading question to surface synthesis features.
     """
-    client = get_client()
-    resp = client.messages.create(
-        model=HAIKU,
+    resp = llm.complete(
+        "reflex",
+        caller="router.handle_reflex",
+        user_id=user_id,
+        session_id=session_id,
         max_tokens=400,
         system=REFLEX_SYSTEM,
         messages=[{"role": "user", "content": message}],

@@ -660,7 +660,7 @@ def _log_trip(inputs: dict, user_id: int) -> str:
     from src.services.trip_parser import parse_session_from_text
 
     db = get_db()
-    parsed = parse_session_from_text(inputs["description"], db)
+    parsed = parse_session_from_text(inputs["description"], db, user_id=user_id)
     result = log_session(parsed, db, user_id=user_id)
 
     parts = [

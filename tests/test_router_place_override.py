@@ -145,8 +145,6 @@ def _route(monkeypatch, db, message, classified_mode):
         return {"reply": "grounded answer", "tool_calls": [], "messages": messages}
 
     monkeypatch.setattr(chat, "_run_full_pipeline", _fake_pipeline)
-    monkeypatch.setattr(chat, "_log_routing", lambda *a, **k: None)
-    monkeypatch.setattr(chat, "_log_mode_usage", lambda *a, **k: None)
 
     result = chat.run_chat_api([{"role": "user", "content": message}], session_id="t")
     return result, seen

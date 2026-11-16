@@ -66,9 +66,8 @@ def _api_payload(**overrides) -> dict:
         "segment_watercourse_name": "Bronte Creek",
     },
 )
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_parse_complete_trip(mock_get_client, mock_get_model, mock_snap):
+@patch("src.llm.client.get_client")
+def test_parse_complete_trip(mock_get_client, mock_snap):
     mock_get_client.return_value = _mock_client(_api_payload())
 
     result = parse_trip_from_text(
@@ -86,9 +85,8 @@ def test_parse_complete_trip(mock_get_client, mock_get_model, mock_snap):
 
 
 @patch("src.services.trip_parser.snap_to_segment", return_value={})
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_parse_minimal_trip(mock_get_client, mock_get_model, mock_snap):
+@patch("src.llm.client.get_client")
+def test_parse_minimal_trip(mock_get_client, mock_snap):
     mock_get_client.return_value = _mock_client(
         _api_payload(
             date=None,
@@ -117,9 +115,8 @@ def test_parse_minimal_trip(mock_get_client, mock_get_model, mock_snap):
 
 
 @patch("src.services.trip_parser.snap_to_segment", return_value={})
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_parse_negative_trip(mock_get_client, mock_get_model, mock_snap):
+@patch("src.llm.client.get_client")
+def test_parse_negative_trip(mock_get_client, mock_snap):
     mock_get_client.return_value = _mock_client(
         _api_payload(
             species_caught=[],
@@ -143,9 +140,8 @@ def test_parse_negative_trip(mock_get_client, mock_get_model, mock_snap):
     assert result["fish_count"] == 0
 
 
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_snap_to_segment_called_with_parsed_coords(mock_get_client, mock_get_model):
+@patch("src.llm.client.get_client")
+def test_snap_to_segment_called_with_parsed_coords(mock_get_client):
     """When Claude returns lat/lng, snap_to_segment is called with them."""
     mock_get_client.return_value = _mock_client(_api_payload())
 
@@ -266,10 +262,9 @@ def test_resolve_location_unresolved(mock_geo, db_conn):
 
 @patch("src.services.trip_parser.snap_to_segment")
 @patch("src.services.trip_parser.resolve_location")
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
+@patch("src.llm.client.get_client")
 def test_parse_trip_with_fuzzy_location(
-    mock_get_client, mock_get_model, mock_resolve, mock_snap, db_conn
+    mock_get_client, mock_resolve, mock_snap, db_conn
 ):
     """Location without Claude-inferred coords falls through to resolve_location."""
     mock_get_client.return_value = _mock_client(
@@ -315,10 +310,9 @@ def test_parse_trip_with_fuzzy_location(
 
 @patch("src.services.trip_parser.snap_to_segment", return_value={})
 @patch("src.services.trip_parser.resolve_location")
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
+@patch("src.llm.client.get_client")
 def test_parse_trip_unresolved_location_still_returns_result(
-    mock_get_client, mock_get_model, mock_resolve, mock_snap, db_conn
+    mock_get_client, mock_resolve, mock_snap, db_conn
 ):
     """Unresolved location returns parsed data with no coordinates — never blocks."""
     mock_get_client.return_value = _mock_client(
@@ -374,9 +368,8 @@ def _session_payload(**stop_overrides) -> dict:
         "candidates": [],
     },
 )
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_user_vs_party_distinction(mock_get_client, mock_get_model, mock_resolve, db_conn):
+@patch("src.llm.client.get_client")
+def test_user_vs_party_distinction(mock_get_client, mock_resolve, db_conn):
     """Parser keeps friend catches out of species_caught but puts them in party_species_caught."""
     payload = _session_payload(
         species_caught=["channel catfish"],
@@ -387,6 +380,7 @@ def test_user_vs_party_distinction(mock_get_client, mock_get_model, mock_resolve
     result = parse_session_from_text(
         "I caught a channel catfish at Byng Island. My friend caught a freshwater drum on a worm.",
         db_conn,
+        user_id=1,
     )
 
     stop = result["stops"][0]
@@ -406,9 +400,8 @@ def test_user_vs_party_distinction(mock_get_client, mock_get_model, mock_resolve
         "candidates": [],
     },
 )
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_blank_user_productive_party(mock_get_client, mock_get_model, mock_resolve, db_conn):
+@patch("src.llm.client.get_client")
+def test_blank_user_productive_party(mock_get_client, mock_resolve, db_conn):
     """User blank = was_productive false even if friend caught fish."""
     payload = _session_payload(
         species_caught=[],
@@ -420,6 +413,7 @@ def test_blank_user_productive_party(mock_get_client, mock_get_model, mock_resol
     result = parse_session_from_text(
         "My friend caught a nice carp but I blanked all day at Osprey Marsh.",
         db_conn,
+        user_id=1,
     )
 
     stop = result["stops"][0]

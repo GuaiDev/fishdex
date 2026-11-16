@@ -65,15 +65,14 @@ def db_conn(tmp_path):
 
 
 @patch("src.services.trip_parser.resolve_location")
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_session_single_stop(mock_get_client, mock_get_model, mock_resolve, db_conn):
+@patch("src.llm.client.get_client")
+def test_session_single_stop(mock_get_client, mock_resolve, db_conn):
     """Basic single-location session logs correctly."""
     mock_get_client.return_value = _mock_session_client(_session_payload())
     mock_resolve.return_value = _noop_resolve()
 
     text = "June 1 2025, Bronte Creek at Burloak. Caught creek chub and common shiner on worm."
-    parsed = parse_session_from_text(text, db_conn)
+    parsed = parse_session_from_text(text, db_conn, user_id=1)
     assert len(parsed["stops"]) == 1
     assert "creek chub" in parsed["stops"][0]["species_caught"]
 
@@ -89,9 +88,8 @@ def test_session_single_stop(mock_get_client, mock_get_model, mock_resolve, db_c
 
 
 @patch("src.services.trip_parser.resolve_location")
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_session_multi_stop(mock_get_client, mock_get_model, mock_resolve, db_conn):
+@patch("src.llm.client.get_client")
+def test_session_multi_stop(mock_get_client, mock_resolve, db_conn):
     """Multi-location day creates multiple stops with per-stop productivity."""
     payload = _session_payload(
         date=None,
@@ -130,7 +128,7 @@ def test_session_multi_stop(mock_get_client, mock_get_model, mock_resolve, db_co
         "May 10. Started at a Milton stormwater pond, caught one carp. "
         "Then went to Osprey Marsh, caught nothing."
     )
-    parsed = parse_session_from_text(text, db_conn)
+    parsed = parse_session_from_text(text, db_conn, user_id=1)
     assert len(parsed["stops"]) == 2
     assert parsed["stops"][0]["was_productive"] is True
     assert parsed["stops"][1]["was_productive"] is False
@@ -140,9 +138,8 @@ def test_session_multi_stop(mock_get_client, mock_get_model, mock_resolve, db_co
 
 
 @patch("src.services.trip_parser.resolve_location")
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_session_no_ohn_snap_still_logs(mock_get_client, mock_get_model, mock_resolve, db_conn):
+@patch("src.llm.client.get_client")
+def test_session_no_ohn_snap_still_logs(mock_get_client, mock_resolve, db_conn):
     """Lake Ontario location logs fine without OHN segment."""
     payload = _session_payload(
         date="2024-12-15",
@@ -165,7 +162,7 @@ def test_session_no_ohn_snap_still_logs(mock_get_client, mock_get_model, mock_re
     mock_resolve.return_value = _noop_resolve()
 
     text = "Fished Oakville pier on Lake Ontario. Cast spoons for pike. Caught nothing."
-    parsed = parse_session_from_text(text, db_conn)
+    parsed = parse_session_from_text(text, db_conn, user_id=1)
     result = log_session(parsed, db_conn)
     assert result["stops_logged"] == 1
 
@@ -178,9 +175,8 @@ def test_session_no_ohn_snap_still_logs(mock_get_client, mock_get_model, mock_re
 
 
 @patch("src.services.trip_parser.resolve_location")
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_no_species_hallucination(mock_get_client, mock_get_model, mock_resolve, db_conn):
+@patch("src.llm.client.get_client")
+def test_no_species_hallucination(mock_get_client, mock_resolve, db_conn):
     """Validation must not allow specific shiner species when user said only 'shiners'."""
     payload = _session_payload(
         stops=[
@@ -202,7 +198,7 @@ def test_no_species_hallucination(mock_get_client, mock_get_model, mock_resolve,
     mock_resolve.return_value = _noop_resolve()
 
     text = "Caught some shiners in a small creek near London"
-    parsed = parse_session_from_text(text, db_conn)
+    parsed = parse_session_from_text(text, db_conn, user_id=1)
     species = parsed["stops"][0]["species_caught"]
     specific = ["spotfin", "emerald", "brassy", "striped", "common shiner"]
     for s in species:
@@ -210,9 +206,8 @@ def test_no_species_hallucination(mock_get_client, mock_get_model, mock_resolve,
 
 
 @patch("src.services.trip_parser.resolve_location")
-@patch("src.services.trip_parser.get_model", return_value="claude-sonnet-4-6")
-@patch("src.services.trip_parser.get_client")
-def test_productivity_per_stop(mock_get_client, mock_get_model, mock_resolve, db_conn):
+@patch("src.llm.client.get_client")
+def test_productivity_per_stop(mock_get_client, mock_resolve, db_conn):
     """Mixed day has productivity tracked independently per stop."""
     payload = _session_payload(
         stops=[
@@ -249,7 +244,7 @@ def test_productivity_per_stop(mock_get_client, mock_get_model, mock_resolve, db
     Went to two spots today. First spot on the Credit River was blown out, caught nothing.
     Second spot on Bronte Creek was perfect, caught several creek chub.
     """
-    parsed = parse_session_from_text(text, db_conn)
+    parsed = parse_session_from_text(text, db_conn, user_id=1)
     assert len(parsed["stops"]) == 2
     productivities = [s["was_productive"] for s in parsed["stops"]]
     assert False in productivities

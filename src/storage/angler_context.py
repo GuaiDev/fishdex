@@ -7,6 +7,8 @@ from datetime import datetime
 
 from sqlite_utils import Database
 
+from src import llm
+
 CONTEXT_TEMPLATE = """## Active plans
 (none yet)
 
@@ -137,7 +139,7 @@ def _validate_context(context: str, session_summary: str, existing: str = "") ->
     return warnings
 
 
-def update_context(db: Database, session_summary: str, client, user_id: int = 1) -> str:
+def update_context(db: Database, session_summary: str, user_id: int = 1) -> str:
     """Merge a new session summary into the existing angler context document.
 
     Returns the updated document text.
@@ -146,8 +148,10 @@ def update_context(db: Database, session_summary: str, client, user_id: int = 1)
 
     prompt = _MERGE_PROMPT.format(existing=existing, summary=session_summary)
 
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    response = llm.complete(
+        "context_merge",
+        caller="angler_context.update_context",
+        user_id=user_id,
         max_tokens=800,
         messages=[{"role": "user", "content": prompt}],
     )

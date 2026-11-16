@@ -18,7 +18,9 @@ from src.storage.trips import get_parsed_trips, insert_parsed_trip
 logger = logging.getLogger(__name__)
 
 
-def _photo_species_candidates(db_conn: Database, photo_path: str) -> dict | None:
+def _photo_species_candidates(
+    db_conn: Database, photo_path: str, user_id: int | None
+) -> dict | None:
     """Run photo-based species suggestion for a stop's photo. Never raises —
     a vision failure just means the catch falls back to text-only suggestion,
     it never blocks logging."""
@@ -40,7 +42,9 @@ def _photo_species_candidates(db_conn: Database, photo_path: str) -> dict | None
         img = Image.open(photo_path).convert("RGB")
         buf = io.BytesIO()
         img.save(buf, format="JPEG")
-        suggestion = suggest_species_from_photo(buf.getvalue(), candidates, media_type="image/jpeg")
+        suggestion = suggest_species_from_photo(
+            buf.getvalue(), candidates, media_type="image/jpeg", user_id=user_id
+        )
         # After the identification, never before it — a conservation status in
         # the prompt would bias what the model reports seeing.
         return annotate_conservation(db_conn, suggestion)
@@ -373,7 +377,9 @@ def log_session(
         # too) — both fallible AI suggestions, never committed as fact until the
         # user confirms via POST /catches/{id}/confirm-species.
         photo_path = stop.get("photo_path")
-        vision_result = _photo_species_candidates(db_conn, photo_path) if photo_path else None
+        vision_result = (
+            _photo_species_candidates(db_conn, photo_path, user_id) if photo_path else None
+        )
 
         # structured_catches only ever applies to the first stop — the
         # multi-catch UI captures one flat session, not per-stop structure,
@@ -402,7 +408,7 @@ def log_session(
                 # the stop's (possibly unrelated) shared photo.
                 catch_photo_path = sc_photo_path
                 catch_photo_url = sc.get("photo_url")
-                catch_vision = _photo_species_candidates(db_conn, sc_photo_path)
+                catch_vision = _photo_species_candidates(db_conn, sc_photo_path, user_id)
             elif matched_nl_species or (
                 not sc.get("species")
                 and stop.get("photo_path")
@@ -573,11 +579,9 @@ def log_session(
     followup_questions = []
     proactive_coaching = None
     try:
-        from src.agent.client import get_client
         from src.services.trip_enrichment import enrich_session
 
-        client = get_client()
-        enrichment = enrich_session(db_conn, session_id, client, user_id=user_id)
+        enrichment = enrich_session(db_conn, session_id, use_llm=True, user_id=user_id)
         followup_questions = enrichment.get("followup_questions", [])
         proactive_coaching = enrichment.get("proactive_coaching")
     except Exception as e:
@@ -663,7 +667,9 @@ def log_trip(  # DEPRECATED — use log_session / parse_session_from_text instea
     Returns a summary dict with trip_id, parsed data, snap info, and a
     human-readable confirmation string.
     """
-    parsed = parse_trip_from_text(text, user_lat=user_lat, user_lng=user_lng, db=db)
+    parsed = parse_trip_from_text(
+        text, user_lat=user_lat, user_lng=user_lng, db=db, user_id=user_id
+    )
 
     if parsed.get("status") == "needs_location":
         return {

@@ -111,14 +111,11 @@ def test_the_contradiction_prompt_uses_the_renderer(db, monkeypatch):
 
     captured = {}
 
-    class _Client:
-        class messages:
-            @staticmethod
-            def create(**kwargs):
-                captured["prompt"] = kwargs["messages"][0]["content"]
-                return type(
-                    "R", (), {"content": [type("B", (), {"text": "revised"})()]}
-                )()
+    def _complete(role, **kwargs):
+        captured["prompt"] = kwargs["messages"][0]["content"]
+        return type("R", (), {"content": [type("B", (), {"text": "revised"})()]})()
+
+    monkeypatch.setattr("src.services.trip_enrichment.llm.complete", _complete)
 
     insight = BehavioralInsight(
         species="channel catfish",
@@ -131,7 +128,7 @@ def test_the_contradiction_prompt_uses_the_renderer(db, monkeypatch):
         evidence_count=2,
     )
 
-    _synthesize_nuanced_conclusion(insight, _ROW, _Client())
+    _synthesize_nuanced_conclusion(insight, _ROW, True, 1)
     prompt = captured["prompt"]
 
     assert "photo_url" not in prompt and "42.9012" not in prompt
@@ -154,7 +151,7 @@ def test_no_client_still_degrades_gracefully():
         source_detail="log",
         evidence_count=1,
     )
-    out = _synthesize_nuanced_conclusion(insight, _ROW, None)
+    out = _synthesize_nuanced_conclusion(insight, _ROW, False, 1)
     assert out.startswith("original")
 
 

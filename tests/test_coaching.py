@@ -44,16 +44,11 @@ def captured(monkeypatch):
 
     box: dict = {}
 
-    class _Client:
-        class messages:
-            @staticmethod
-            def create(**kwargs):
-                box["prompt"] = kwargs["messages"][0]["content"]
-                return type(
-                    "R", (), {"content": [type("B", (), {"text": "stub response"})()]}
-                )()
+    def _complete(role, **kwargs):
+        box["prompt"] = kwargs["messages"][0]["content"]
+        return type("R", (), {"content": [type("B", (), {"text": "stub response"})()]})()
 
-    monkeypatch.setattr(coaching, "get_client", lambda: _Client())
+    monkeypatch.setattr(coaching.llm, "complete", _complete)
     return box
 
 
