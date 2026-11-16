@@ -13,7 +13,7 @@ from src.models.catch import Catch
 from src.models.profile import Location, UserProfile
 from src.models.trip import Trip
 from src.storage.database import get_db
-from src.storage.profile import load_profile, save_profile
+from src.storage.profile import get_user_home, load_profile, save_profile, set_user_home
 from src.storage.trips import insert_trip, recent_trips
 
 # Verify TLS against the OS trust store rather than certifi's bundle. A machine
@@ -210,6 +210,15 @@ def recent(
 def profile() -> None:
     """View and optionally edit your fishing profile."""
     p = load_profile()
+    db = get_db()
+    stored_home = get_user_home(db, 1)
+    if stored_home is not None:
+        p = p.model_copy(
+            update={
+                "home_location": stored_home[0],
+                "home_jurisdiction": stored_home[1] or p.home_jurisdiction,
+            }
+        )
     _print_profile(p)
 
     if not typer.confirm("Edit profile?", default=False):
@@ -254,6 +263,8 @@ def profile() -> None:
         preferences=preferences,
     )
     save_profile(updated)
+    if home_location is not None:
+        set_user_home(db, 1, home_location, home_jurisdiction)
     console.print("[green]Profile saved.[/green]")
 
 
