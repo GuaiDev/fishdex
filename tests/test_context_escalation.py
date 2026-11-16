@@ -6,6 +6,7 @@ back — not that a string was produced.
 """
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -27,19 +28,18 @@ class _FakeClient:
         self.calls.append(kwargs)
         if self._error:
             raise self._error
-        return SimpleNamespace(
-            content=[SimpleNamespace(type="text", text=self._text or "")]
-        )
+        return SimpleNamespace(content=[SimpleNamespace(type="text", text=self._text or "")])
 
 
 def _call(client, **kwargs):
-    return escalate_records(
-        place_name="Sixteen Mile Creek",
-        lat=43.4675,
-        lng=-79.6877,
-        client=client,
-        **kwargs,
-    )
+    with patch("src.llm.client.get_client", return_value=client):
+        return escalate_records(
+            place_name="Sixteen Mile Creek",
+            lat=43.4675,
+            lng=-79.6877,
+            user_id=1,
+            **kwargs,
+        )
 
 
 # -- the blocklist -------------------------------------------------------------
@@ -166,9 +166,7 @@ def _spy(monkeypatch):
         calls.append(kwargs)
         return [], EmptyReason.WEB_SEARCH_EMPTY
 
-    monkeypatch.setattr(
-        "src.services.context.escalation.escalate_records", fake, raising=True
-    )
+    monkeypatch.setattr("src.services.context.escalation.escalate_records", fake, raising=True)
     return calls
 
 
@@ -201,7 +199,7 @@ def test_explicit_flag_overrides_the_bundle(db, monkeypatch):
 
 
 def test_local_coverage_gap_survives_an_empty_web_search(db, monkeypatch):
-    """"We don't cover this area" is more informative than "the web had nothing"."""
+    """ "We don't cover this area" is more informative than "the web had nothing"."""
     from src.services.context import describe
 
     _spy(monkeypatch)

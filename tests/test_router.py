@@ -16,7 +16,7 @@ def db_conn(tmp_path):
 def test_classify_returns_valid_mode():
     from src.agent.router import classify_message
 
-    result = classify_message("What knot should I use for braid to mono?")
+    result = classify_message("What knot should I use for braid to mono?", user_id=1)
     assert result["mode"] in ("reflex", "synthesis", "memory")
 
 
@@ -26,8 +26,8 @@ def test_classify_falls_back_to_synthesis_on_error(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("no client")
 
-    monkeypatch.setattr(router, "get_client", boom)
-    result = router.classify_message("anything")
+    monkeypatch.setattr(router.llm, "complete", boom)
+    result = router.classify_message("anything", user_id=1)
     assert result["mode"] == "synthesis"
 
 

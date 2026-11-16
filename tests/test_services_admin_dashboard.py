@@ -36,17 +36,24 @@ def _seed_chat_message(db, role, created_at, session_id="s1", user_id=1):
 
 
 def _seed_tool_usage(db, tool_name, success=1):
-    db.execute(
-        "INSERT INTO tool_usage (tool_name, success) VALUES (?, ?)", [tool_name, success]
-    )
+    db.execute("INSERT INTO tool_usage (tool_name, success) VALUES (?, ?)", [tool_name, success])
     db.conn.commit()
 
 
-def _seed_api_usage(db, model, input_tokens, output_tokens, timestamp=None):
+def _seed_api_usage(db, model, input_tokens, output_tokens, timestamp=None, user_id=1):
+    from src.llm.pricing import estimate_usd
+
     db.execute(
-        "INSERT INTO api_usage (model, input_tokens, output_tokens, total_tokens, timestamp) "
-        "VALUES (?, ?, ?, ?, COALESCE(?, datetime('now')))",
-        [model, input_tokens, output_tokens, input_tokens + output_tokens, timestamp],
+        "INSERT INTO llm_usage (ts, user_id, caller, role, model, input_tokens, output_tokens, "
+        "est_usd) VALUES (COALESCE(?, datetime('now')), ?, 'test', 'chat', ?, ?, ?, ?)",
+        [
+            timestamp,
+            user_id,
+            model,
+            input_tokens,
+            output_tokens,
+            estimate_usd(model, input_tokens, output_tokens),
+        ],
     )
     db.conn.commit()
 
@@ -233,9 +240,17 @@ def test_dashboard_does_not_crash_on_empty_database(tmp_path):
 
 def _seed_session_and_stop(db):
     session_id = db["sessions"].insert({"date": "2026-06-01"}).last_pk
-    stop_id = db["stops"].insert({
-        "session_id": session_id, "location_text": "Bronte Creek", "species_caught": "[]",
-    }).last_pk
+    stop_id = (
+        db["stops"]
+        .insert(
+            {
+                "session_id": session_id,
+                "location_text": "Bronte Creek",
+                "species_caught": "[]",
+            }
+        )
+        .last_pk
+    )
     return session_id, stop_id
 
 
@@ -285,8 +300,12 @@ def test_catch_stats_by_species_sums_count_not_rows(tmp_path):
     db = _make_db(tmp_path)
     session_id, stop_id = _seed_session_and_stop(db)
     insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1,
-        species="shorthead redhorse", count=3,
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="shorthead redhorse",
+        count=3,
     )
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="creek chub")
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="creek chub")
@@ -309,12 +328,20 @@ def test_catch_stats_by_species_merges_case_variants(tmp_path):
     db = _make_db(tmp_path)
     session_id, stop_id = _seed_session_and_stop(db)
     insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1,
-        species="Shorthead Redhorse", count=3,
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="Shorthead Redhorse",
+        count=3,
     )
     insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1,
-        species="shorthead redhorse", count=1,
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="shorthead redhorse",
+        count=1,
     )
 
     result = build_dashboard(db)["catch_stats"]
@@ -378,3 +405,52 @@ def test_catch_stats_avg_catches_per_session(tmp_path):
 
     result = build_dashboard(db)["catch_stats"]
     assert result["avg_catches_per_session"] == 1.5  # 3 catches / 2 sessions
+
+
+def test_api_cost_breakdowns_preserve_unknown_and_partial_estimates(tmp_path):
+    db = _make_db(tmp_path)
+    _seed_users(db, n=2)
+    for caller, user_id, price in [
+        ("unknown", 1, None),
+        ("mixed", 2, None),
+        ("mixed", 2, 0.25),
+        ("free", 3, 0.0),
+    ]:
+        db["llm_usage"].insert(
+            {
+                "caller": caller,
+                "user_id": user_id,
+                "role": "router",
+                "model": "test",
+                "est_usd": price,
+            }
+        )
+    db["llm_usage"].insert(
+        {
+            "caller": "unknown",
+            "user_id": 1,
+            "role": "router",
+            "model": "test",
+            "est_usd": 1.0,
+            "ts": "2000-01-01",
+        }
+    )
+
+    costs = build_dashboard(db)["api_cost_estimate"]
+
+    for breakdown, key, ids in [
+        ("by_caller_30_days", "caller", ("unknown", "mixed", "free")),
+        ("by_user_30_days", "user_id", (1, 2, 3)),
+    ]:
+        groups = {row[key]: row for row in costs[breakdown]}
+        for group_id, calls, estimate, unpriced in [
+            (ids[0], 1, None, 1),
+            (ids[1], 2, 0.25, 1),
+            (ids[2], 1, 0.0, 0),
+        ]:
+            assert groups[group_id] == {
+                key: group_id,
+                "calls": calls,
+                "estimated_usd": estimate,
+                "unpriced_calls": unpriced,
+            }

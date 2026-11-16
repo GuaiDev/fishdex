@@ -23,7 +23,8 @@ def test_location_extraction_with_name():
     from src.agent.router import extract_location_from_message
 
     result = extract_location_from_message(
-        "Why does Willoway Park on the Grand River hold channel catfish during midday heat?"
+        "Why does Willoway Park on the Grand River hold channel catfish during midday heat?",
+        user_id=1,
     )
     assert isinstance(result, dict)
     assert "lat" in result
@@ -38,7 +39,7 @@ def test_location_extraction_with_name():
 def test_location_extraction_with_coords():
     from src.agent.router import extract_location_from_message
 
-    result = extract_location_from_message("What's the habitat like at 42.917, -79.774?")
+    result = extract_location_from_message("What's the habitat like at 42.917, -79.774?", user_id=1)
     assert isinstance(result, dict)
     assert "lat" in result
 
@@ -46,7 +47,7 @@ def test_location_extraction_with_coords():
 def test_location_extraction_no_location():
     from src.agent.router import extract_location_from_message
 
-    result = extract_location_from_message("What bait should I use for bass?")
+    result = extract_location_from_message("What bait should I use for bass?", user_id=1)
     assert isinstance(result, dict)
     assert "lat" in result
     assert "location_name" in result

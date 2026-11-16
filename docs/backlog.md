@@ -571,8 +571,9 @@ Build after Lovable UI is stable.
   table keyed on "what location did the user ask about")
 - Tool call frequency + failure counts (from tool_usage)
 - Ingest record counts by source and jurisdiction (observations, gbif_observations)
-- Approximate Sonnet-vs-Haiku API cost estimate (all-time + last 30 days, from
-  api_usage token counts)
+- Model cost estimates (all-time + last 30 days), with 30-day caller/user
+  breakdowns. See the [usage guidance](../README.md#how-to-run) for ledger coverage
+  and estimate limits.
 
 Found during build: 100% of real synthesis-cache entries today are name-only (no
 lat/lng) — a coordinate-only "top locations" query, which is what a first pass

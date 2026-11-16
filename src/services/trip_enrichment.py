@@ -3,11 +3,13 @@ Trip enrichment service.
 After a session is logged, matches stops against behavioral insights,
 identifies condition gaps, and prepares follow-up questions.
 """
+
 import json
 from datetime import datetime
 
 from sqlite_utils import Database
 
+from src import llm
 from src.models.behavioral_insight import BehavioralInsight
 from src.storage.insights import (
     _haversine_km,
@@ -19,7 +21,7 @@ from src.storage.insights import (
 
 # How many confirmations needed to escalate confidence
 CONFIRMATIONS_TO_ESCALATE = {
-    "low": 2,     # 2 confirmations → medium
+    "low": 2,  # 2 confirmations → medium
     "medium": 4,  # 4 confirmations → high
     "high": 999,  # already at max
 }
@@ -69,32 +71,40 @@ def match_insights_to_stop(db: Database, stop: dict, user_id: int = 1) -> list:
         for species in species_list:
             clean_species = species.replace("(uncertain)", "").strip()
             conflicts = check_conflicts(
-                db, clean_species,
-                lat=lat, lng=lng,
+                db,
+                clean_species,
+                lat=lat,
+                lng=lng,
                 condition_season=season,
                 radius_km=1.0,
                 user_id=user_id,
             )
             for insight in conflicts:
-                matched.append({
-                    "insight": insight,
-                    "species": clean_species,
-                    "season": season,
-                })
+                matched.append(
+                    {
+                        "insight": insight,
+                        "species": clean_species,
+                        "season": season,
+                    }
+                )
     elif not was_productive and lat is not None and lng is not None:
         # Blank stop with known coords — check for location-based contradictions
-        all_insights = list(db["behavioral_insights"].rows_where(
-            "user_id = ? AND is_current = 1 AND lat IS NOT NULL AND lng IS NOT NULL",
-            [user_id],
-        ))
+        all_insights = list(
+            db["behavioral_insights"].rows_where(
+                "user_id = ? AND is_current = 1 AND lat IS NOT NULL AND lng IS NOT NULL",
+                [user_id],
+            )
+        )
         for row in all_insights:
             if _haversine_km(lat, lng, row["lat"], row["lng"]) <= 1.0:
                 insight = _row_to_insight(row)
-                matched.append({
-                    "insight": insight,
-                    "species": insight.species,
-                    "season": season,
-                })
+                matched.append(
+                    {
+                        "insight": insight,
+                        "species": insight.species,
+                        "season": season,
+                    }
+                )
 
     return matched
 
@@ -162,8 +172,7 @@ def build_followup_question(
     if "technique" in gaps:
         if was_productive:
             return (
-                f"Nice catch at {location} — what were you using for {species}? "
-                f"Bait, lure, or rig?"
+                f"Nice catch at {location} — what were you using for {species}? Bait, lure, or rig?"
             )
         else:
             return f"No {species} at {location} this time — what technique were you using?"
@@ -185,7 +194,7 @@ def update_insight_confidence(
     insight: BehavioralInsight,
     was_productive: bool,
     stop: dict,
-    client,
+    use_llm: bool,
     user_id: int = 1,
 ) -> BehavioralInsight:
     """Update insight confidence based on whether the trip confirmed or contradicted it.
@@ -214,11 +223,14 @@ def update_insight_confidence(
         else:
             new_confidence = current_confidence
 
-        db["behavioral_insights"].update(insight.id, {
-            "evidence_count": new_evidence,
-            "confidence": new_confidence,
-            "last_validated": datetime.now().isoformat(),
-        })
+        db["behavioral_insights"].update(
+            insight.id,
+            {
+                "evidence_count": new_evidence,
+                "confidence": new_confidence,
+                "last_validated": datetime.now().isoformat(),
+            },
+        )
         return get_insight(db, insight.id)
 
     else:
@@ -226,7 +238,7 @@ def update_insight_confidence(
         contradiction_count = current_detail.count("[contradicted")
 
         if contradiction_count + 1 >= CONTRADICTIONS_TO_REFINE:
-            new_conclusion = _synthesize_nuanced_conclusion(insight, stop, client)
+            new_conclusion = _synthesize_nuanced_conclusion(insight, stop, use_llm, user_id)
             new_insight = BehavioralInsight(
                 species=insight.species,
                 condition_type=insight.condition_type,
@@ -248,16 +260,20 @@ def update_insight_confidence(
             return get_insight(db, new_id)
         else:
             contradiction_note = f" [contradicted {datetime.now().date()}]"
-            db["behavioral_insights"].update(insight.id, {
-                "source_detail": current_detail + contradiction_note,
-            })
+            db["behavioral_insights"].update(
+                insight.id,
+                {
+                    "source_detail": current_detail + contradiction_note,
+                },
+            )
             return get_insight(db, insight.id)
 
 
 def _synthesize_nuanced_conclusion(
     insight: BehavioralInsight,
     contradicting_stop: dict,
-    client,
+    use_llm: bool,
+    user_id: int,
 ) -> str:
     """Use Haiku to synthesize a more nuanced conclusion after contradictions.
 
@@ -272,7 +288,7 @@ def _synthesize_nuanced_conclusion(
     rewritten may itself have been agent_synthesis, or may have come from a
     survey, and those are not the same claim to be revising.
     """
-    if client is None:
+    if not use_llm:
         return insight.conclusion + " (contradicted — conditions may matter)"
 
     from src.services.context.render import render_logged_stop, render_recorded_insight
@@ -289,8 +305,10 @@ def _synthesize_nuanced_conclusion(
         f"evidence that the condition was absent.\n\n"
         f"Write ONLY the revised conclusion, no preamble."
     )
-    response = client.messages.create(
-        model="claude-haiku-4-5-20251001",
+    response = llm.complete(
+        "insight_revision",
+        caller="trip_enrichment._synthesize_nuanced_conclusion",
+        user_id=user_id,
         max_tokens=200,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -300,7 +318,7 @@ def _synthesize_nuanced_conclusion(
 def enrich_session(
     db: Database,
     session_id: int,
-    client,
+    use_llm: bool,
     user_id: int = 1,
 ) -> dict:
     """Main entry point. Called after a session is logged.
@@ -320,22 +338,26 @@ def enrich_session(
 
         for match in matched:
             insight = match["insight"]
-            update_insight_confidence(db, insight, was_productive, stop, client, user_id=user_id)
+            update_insight_confidence(db, insight, was_productive, stop, use_llm, user_id=user_id)
 
             gaps = identify_condition_gaps(stop, insight)
             question = build_followup_question(stop, insight, gaps, was_productive)
             if question:
-                questions.append({
-                    "question": question,
-                    "insight_id": insight.id,
-                    "stop_id": stop.get("id"),
-                    "species": match["species"],
-                })
+                questions.append(
+                    {
+                        "question": question,
+                        "insight_id": insight.id,
+                        "stop_id": stop.get("id"),
+                        "species": match["species"],
+                    }
+                )
 
     # Prioritise follow-up questions about unproductive stops at known spots
-    questions.sort(key=lambda q: (
-        0 if "blanked" in q["question"].lower() or "no " in q["question"].lower() else 1
-    ))
+    questions.sort(
+        key=lambda q: (
+            0 if "blanked" in q["question"].lower() or "no " in q["question"].lower() else 1
+        )
+    )
 
     # Proactive coaching — check for cross-session patterns
     proactive = None
@@ -365,7 +387,9 @@ def _get_all_stops_summary(db: Database, user_id: int = 1) -> list[dict]:
     "All stops" means all of *theirs*. Pattern detection across users would
     invent slumps and species gaps out of other people's trips.
     """
-    rows = list(db.execute("""
+    rows = list(
+        db.execute(
+            """
         SELECT st.location_name, st.location_text, st.species_caught,
                st.was_productive, st.technique, st.lat, st.lng,
                s.date, s.date_approx
@@ -373,19 +397,24 @@ def _get_all_stops_summary(db: Database, user_id: int = 1) -> list[dict]:
         JOIN sessions s ON st.session_id = s.id
         WHERE st.user_id = ?
         ORDER BY s.date DESC, st.id DESC
-    """, [user_id]).fetchall())
+    """,
+            [user_id],
+        ).fetchall()
+    )
 
     stops = []
     for r in rows:
-        stops.append({
-            "location_name": r[0] or r[1] or "unknown",
-            "species_caught": json.loads(r[2] or "[]"),
-            "was_productive": bool(r[3]),
-            "technique": r[4],
-            "lat": r[5],
-            "lng": r[6],
-            "date": r[7] or r[8] or "unknown",
-        })
+        stops.append(
+            {
+                "location_name": r[0] or r[1] or "unknown",
+                "species_caught": json.loads(r[2] or "[]"),
+                "was_productive": bool(r[3]),
+                "technique": r[4],
+                "lat": r[5],
+                "lng": r[6],
+                "date": r[7] or r[8] or "unknown",
+            }
+        )
     return stops
 
 
@@ -402,11 +431,17 @@ def _detect_species_gap(stops: list[dict], user_id: int = 1) -> dict | None:
 
     try:
         from src.storage.database import get_db
+
         db = get_db()
-        targeted_species = list(db.execute("""
+        targeted_species = list(
+            db.execute(
+                """
             SELECT DISTINCT LOWER(species) FROM behavioral_insights
             WHERE is_current = 1 AND user_id = ?
-        """, [user_id]).fetchall())
+        """,
+                [user_id],
+            ).fetchall()
+        )
         targeted = {r[0] for r in targeted_species}
     except Exception:
         targeted = set()
@@ -414,8 +449,9 @@ def _detect_species_gap(stops: list[dict], user_id: int = 1) -> dict | None:
     never_caught = [sp for sp in targeted if sp not in species_caught_count]
 
     if never_caught and total_stops >= _SPECIES_ATTEMPT_THRESHOLD:
-        priority = [s for s in never_caught if s not in
-                    ("unidentified shiner sp.", "unidentified chub sp.")]
+        priority = [
+            s for s in never_caught if s not in ("unidentified shiner sp.", "unidentified chub sp.")
+        ]
         target = priority[0] if priority else never_caught[0]
         return {
             "type": "species_gap",
@@ -436,9 +472,7 @@ def _detect_location_slump(stops: list[dict], current_session_stops: list[dict])
     Only fires if the current session included a stop at that location.
     """
     current_locations = set(
-        s.get("location_name", "").lower()
-        for s in current_session_stops
-        if s.get("location_name")
+        s.get("location_name", "").lower() for s in current_session_stops if s.get("location_name")
     )
 
     if not current_locations:
@@ -448,16 +482,13 @@ def _detect_location_slump(stops: list[dict], current_session_stops: list[dict])
         if location == "unknown" or len(location) < 3:
             continue
 
-        location_stops = [
-            s for s in stops
-            if location in s["location_name"].lower()
-        ]
+        location_stops = [s for s in stops if location in s["location_name"].lower()]
 
         if len(location_stops) < _SLUMP_THRESHOLD + 1:
             continue
 
         productive_stops = [s for s in location_stops if s["was_productive"]]
-        recent_stops = location_stops[:_SLUMP_THRESHOLD + 1]
+        recent_stops = location_stops[: _SLUMP_THRESHOLD + 1]
         recent_unproductive = [s for s in recent_stops if not s["was_productive"]]
 
         if productive_stops and len(recent_unproductive) >= _SLUMP_THRESHOLD:
@@ -501,8 +532,7 @@ def _detect_technique_pattern(stops: list[dict]) -> dict | None:
         unprod_techniques[t] = unprod_techniques.get(t, 0) + 1
 
     productive_only = [
-        t for t, count in prod_techniques.items()
-        if count >= 2 and t not in unprod_techniques
+        t for t, count in prod_techniques.items() if count >= 2 and t not in unprod_techniques
     ]
 
     if productive_only:

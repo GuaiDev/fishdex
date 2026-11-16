@@ -246,7 +246,7 @@ def test_user_2_trip_cannot_change_user_1_insight(db):
     insight = get_insight(db, iid)
     for productive in (True, False):
         with pytest.raises(ValueError):
-            update_insight_confidence(db, insight, productive, {}, client=None, user_id=2)
+            update_insight_confidence(db, insight, productive, {}, use_llm=False, user_id=2)
     after = get_insight(db, iid)
     assert (after.evidence_count, after.confidence, after.source_detail) == (0, "low", "test")
     assert after.is_current is True
@@ -255,7 +255,7 @@ def test_user_2_trip_cannot_change_user_1_insight(db):
 def test_enrich_session_for_user_2_leaves_user_1_insights_alone(db):
     iid = insert_insight(db, _insight(1, confidence="low", evidence_count=0))
     stop = _stop(db, user_id=2, species=["Smallmouth Bass"])
-    result = enrich_session(db, stop["session_id"], client=None, user_id=2)
+    result = enrich_session(db, stop["session_id"], use_llm=False, user_id=2)
     assert result["followup_questions"] == []
     after = get_insight(db, iid)
     assert after.evidence_count == 0 and after.last_validated == get_insight(db, iid).last_validated
@@ -265,7 +265,7 @@ def test_enrich_session_for_user_2_leaves_user_1_insights_alone(db):
 def test_enrich_session_still_updates_the_owners_own_insight(db):
     iid = insert_insight(db, _insight(2, confidence="low", evidence_count=0))
     stop = _stop(db, user_id=2, species=["Smallmouth Bass"])
-    enrich_session(db, stop["session_id"], client=None, user_id=2)
+    enrich_session(db, stop["session_id"], use_llm=False, user_id=2)
     assert get_insight(db, iid).evidence_count == 1
 
 
@@ -275,7 +275,7 @@ def test_contradiction_refinement_stays_with_the_owner(db, monkeypatch):
     monkeypatch.setattr(te, "_synthesize_nuanced_conclusion", lambda *a, **k: "nuanced")
     monkeypatch.setattr(te, "CONTRADICTIONS_TO_REFINE", 1)
     iid = insert_insight(db, _insight(2))
-    new = update_insight_confidence(db, get_insight(db, iid), False, {}, client=None, user_id=2)
+    new = update_insight_confidence(db, get_insight(db, iid), False, {}, use_llm=False, user_id=2)
     assert new.user_id == 2 and new.version == 2
     assert query_insights(db, "bass", user_id=1) == []
 
@@ -356,8 +356,7 @@ def _run_pipeline_for(user_id, tmp_path, monkeypatch):
     secrets = _user_1_secrets(get_db(db_path), profile_path)
 
     client = _FakeClient()
-    monkeypatch.setattr(chat, "get_client", lambda: client)
-    monkeypatch.setattr(chat, "get_model", lambda: "fake")
+    monkeypatch.setattr("src.llm.client.get_client", lambda: client)
     result = chat._run_full_pipeline([{"role": "user", "content": "hi"}], "sess", user_id=user_id)
     assert result["reply"] == "ok"
     (call,) = client.calls

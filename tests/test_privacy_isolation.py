@@ -106,12 +106,11 @@ def test_chat_web_path_never_serves_another_users_cache(tmp_path, monkeypatch):
         return {"reply": f"fresh answer for user {user_id}", "tool_calls": []}
 
     monkeypatch.setattr(chat, "_run_full_pipeline", fake_pipeline)
-    monkeypatch.setattr(chat, "_log_routing", lambda *a, **k: None)
     monkeypatch.setattr(router, "classify_message", lambda *a, **k: {"mode": "synthesis"})
     monkeypatch.setattr(
         router,
         "extract_location_from_message",
-        lambda m: {"lat": LAT, "lng": LNG, "location_name": None},
+        lambda m, **k: {"lat": LAT, "lng": LNG, "location_name": None},
     )
 
     msgs = [{"role": "user", "content": "tell me about this spot"}]
@@ -149,20 +148,19 @@ def test_chat_web_path_cache_hit_serves_only_the_askers_own_reply(tmp_path, monk
     class FakeClient:
         class messages:
             @staticmethod
-            def create(model, max_tokens, messages):
+            def create(model, max_tokens, messages, **_):
                 seen_prompts.append(messages[0]["content"])
                 block = types.SimpleNamespace(type="text", text="rewritten from cache")
                 usage = types.SimpleNamespace(input_tokens=1, output_tokens=1)
                 return types.SimpleNamespace(content=[block], usage=usage)
 
     monkeypatch.setattr(chat, "_run_full_pipeline", fake_pipeline)
-    monkeypatch.setattr(chat, "_log_routing", lambda *a, **k: None)
-    monkeypatch.setattr(chat, "get_client", lambda: FakeClient)
+    monkeypatch.setattr("src.llm.client.get_client", lambda: FakeClient)
     monkeypatch.setattr(router, "classify_message", lambda *a, **k: {"mode": "synthesis"})
     monkeypatch.setattr(
         router,
         "extract_location_from_message",
-        lambda m: {"lat": LAT, "lng": LNG, "location_name": None},
+        lambda m, **k: {"lat": LAT, "lng": LNG, "location_name": None},
     )
 
     msgs = [{"role": "user", "content": "tell me about this spot"}]
@@ -290,7 +288,6 @@ def test_blank_stop_logged_through_log_session_hides_water_only_from_its_owner(d
     # Keep the test offline: no model call, no weather fetch.
     monkeypatch.setattr(enrichment, "enrich_session", lambda *a, **k: {"followup_questions": []})
     monkeypatch.setattr(conditions, "enrich_session_conditions", lambda *a, **k: None)
-    monkeypatch.setattr("src.agent.client.get_client", lambda: object())
 
     parsed = {
         "date": "2026-06-01",

@@ -15,7 +15,7 @@ import logging
 
 from sqlite_utils.db import Database
 
-from src.agent.client import get_client, get_model
+from src import llm
 from src.storage.species_ranges import query_deduped_species_ranges_for_jurisdiction
 
 logger = logging.getLogger(__name__)
@@ -33,6 +33,8 @@ def suggest_species_from_photo(
     photo_bytes: bytes,
     candidate_species: list[str],
     media_type: str = "image/jpeg",
+    *,
+    user_id: int | None,
 ) -> dict:
     """Ask Claude to identify the fish in a catch photo, constrained to
     candidate_species only.
@@ -53,8 +55,6 @@ def suggest_species_from_photo(
             "note": "no candidate species available",
         }
 
-    client = get_client()
-    model = get_model()
     image_data = base64.standard_b64encode(photo_bytes).decode()
     species_list = "\n".join(f"- {s}" for s in candidate_species)
 
@@ -78,8 +78,10 @@ outside the list above. If the photo doesn't clearly show a fish, or you can't n
 to any candidate with at least low confidence, return "candidates": [] and "unresolved": true."""
 
     try:
-        response = client.messages.create(
-            model=model,
+        response = llm.complete(
+            "species_photo",
+            caller="species_vision.suggest_species_from_photo",
+            user_id=user_id,
             max_tokens=400,
             messages=[
                 {

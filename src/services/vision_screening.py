@@ -11,13 +11,13 @@ import base64
 import logging
 import os
 
-import anthropic
 import httpx
 from dotenv import load_dotenv
 
+from src import llm
+
 load_dotenv()
 MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
-client = anthropic.Anthropic()
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,8 @@ def screen_segment(
     stream_order: int,
     watercourse_name: str | None,
     is_confluence: bool,
+    *,
+    user_id: int | None,
 ) -> dict:
     """Analyze a satellite tile with Claude vision. Returns screening result dict."""
     tile = fetch_satellite_tile(lat, lng)
@@ -89,8 +91,10 @@ or pool? (describe briefly or 'none visible')
 Be direct and brief. If water is not visible, say so immediately."""
 
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
+        response = llm.complete(
+            "vision_screen",
+            caller="vision_screening.screen_segment",
+            user_id=user_id,
             max_tokens=300,
             messages=[
                 {
@@ -129,8 +133,7 @@ Be direct and brief. If water is not visible, say so immediately."""
         structure_section = vision_text.split("4.")[-1][:100] if "4." in vision_text else ""
 
         is_engineered = any(
-            word in vision_text.lower()
-            for word in ["engineered", "ditch", "concrete", "channel"]
+            word in vision_text.lower() for word in ["engineered", "ditch", "concrete", "channel"]
         )
         is_culvert = "culvert" in vision_text.lower()
 
@@ -156,6 +159,8 @@ Be direct and brief. If water is not visible, say so immediately."""
 def screen_candidates(
     candidates: list[dict],
     max_screens: int = 10,
+    *,
+    user_id: int | None,
 ) -> list[dict]:
     """Screen top candidates with vision.
 
@@ -181,6 +186,7 @@ def screen_candidates(
             stream_order=candidate.get("stream_order", 0),
             watercourse_name=candidate.get("watercourse_name"),
             is_confluence=candidate.get("is_confluence_segment", False),
+            user_id=user_id,
         )
         api_calls += 1
         candidate["vision_screening"] = result

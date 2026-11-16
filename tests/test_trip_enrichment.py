@@ -34,8 +34,10 @@ def _catfish_insight(**overrides) -> BehavioralInsight:
 
 # ── pure-function tests (no DB needed) ────────────────────────────────────────
 
+
 def test_get_season():
     from src.services.trip_enrichment import get_season
+
     assert get_season(6) == "summer"
     assert get_season(1) == "winter"
     assert get_season(4) == "spring"
@@ -189,6 +191,7 @@ def test_build_followup_question_no_gaps_returns_none():
 
 # ── DB-backed tests ────────────────────────────────────────────────────────────
 
+
 def test_confidence_escalation(tmp_path):
     from src.services.trip_enrichment import update_insight_confidence
 
@@ -196,7 +199,7 @@ def test_confidence_escalation(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(evidence_count=1))  # one away from threshold
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=True, stop={}, client=None)
+    updated = update_insight_confidence(db, insight, was_productive=True, stop={}, use_llm=False)
     assert updated.confidence == "medium"
 
 
@@ -207,7 +210,7 @@ def test_confidence_escalation_not_yet(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(evidence_count=0))
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=True, stop={}, client=None)
+    updated = update_insight_confidence(db, insight, was_productive=True, stop={}, use_llm=False)
     assert updated.confidence == "low"  # not yet at threshold
     assert updated.evidence_count == 1
 
@@ -219,7 +222,7 @@ def test_contradiction_does_not_immediately_change_confidence(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(confidence="high", evidence_count=5))
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, client=None)
+    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, use_llm=False)
     assert updated.confidence == "high"  # one contradiction doesn't drop confidence
 
 
@@ -230,7 +233,7 @@ def test_contradiction_appends_note(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(source_detail="original detail"))
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, client=None)
+    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, use_llm=False)
     assert "[contradicted" in (updated.source_detail or "")
 
 
@@ -239,13 +242,16 @@ def test_second_contradiction_triggers_refinement(tmp_path):
 
     db = _make_db(tmp_path)
     # Pre-load one contradiction into source_detail
-    insight_id = insert_insight(db, _catfish_insight(
-        confidence="medium",
-        source_detail="original [contradicted 2026-01-01]",
-    ))
+    insight_id = insert_insight(
+        db,
+        _catfish_insight(
+            confidence="medium",
+            source_detail="original [contradicted 2026-01-01]",
+        ),
+    )
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, client=None)
+    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, use_llm=False)
     # After second contradiction: refinement fires, is_current flips, new record has confidence=low
     assert updated.confidence == "low"
     # Old insight should now be non-current
@@ -261,6 +267,7 @@ def test_enrich_session_returns_question_for_known_spot(tmp_path):
 
     # Insert an insight about channel catfish at a known location
     from src.storage.insights import insert_insight as ins
+
     insight = BehavioralInsight(
         species="channel catfish",
         condition_type="temporal",
@@ -278,23 +285,25 @@ def test_enrich_session_returns_question_for_known_spot(tmp_path):
 
     # Create a session + stop near that insight (no weather notes)
     session_id = db["sessions"].insert({"date": "2026-06-15", "date_approx": None}).last_pk
-    db["stops"].insert({
-        "session_id": session_id,
-        "location_text": "Willoway Park",
-        "location_name": "Willoway Park",
-        "lat": 42.917,
-        "lng": -79.774,
-        "species_caught": json.dumps(["channel catfish"]),
-        "was_productive": 1,
-        "technique": None,
-        "gear": None,
-        "water_level": None,
-        "water_clarity": None,
-        "weather_notes": None,
-        "notes": None,
-    })
+    db["stops"].insert(
+        {
+            "session_id": session_id,
+            "location_text": "Willoway Park",
+            "location_name": "Willoway Park",
+            "lat": 42.917,
+            "lng": -79.774,
+            "species_caught": json.dumps(["channel catfish"]),
+            "was_productive": 1,
+            "technique": None,
+            "gear": None,
+            "water_level": None,
+            "water_clarity": None,
+            "weather_notes": None,
+            "notes": None,
+        }
+    )
 
-    result = enrich_session(db, session_id, client=None)
+    result = enrich_session(db, session_id, use_llm=False)
     questions = result["followup_questions"]
     assert len(questions) == 1
     q = questions[0]["question"]
@@ -339,26 +348,26 @@ def test_enrich_session_no_match_returns_empty(tmp_path):
     db = _make_db(tmp_path)
 
     session_id = db["sessions"].insert({"date": "2026-06-15", "date_approx": None}).last_pk
-    db["stops"].insert({
-        "session_id": session_id,
-        "location_text": "Some creek",
-        "location_name": "Some creek",
-        "lat": 43.5,
-        "lng": -80.5,
-        "species_caught": json.dumps(["creek chub"]),
-        "was_productive": 1,
-        "technique": None,
-        "gear": None,
-        "water_level": None,
-        "water_clarity": None,
-        "weather_notes": None,
-        "notes": None,
-    })
+    db["stops"].insert(
+        {
+            "session_id": session_id,
+            "location_text": "Some creek",
+            "location_name": "Some creek",
+            "lat": 43.5,
+            "lng": -80.5,
+            "species_caught": json.dumps(["creek chub"]),
+            "was_productive": 1,
+            "technique": None,
+            "gear": None,
+            "water_level": None,
+            "water_clarity": None,
+            "weather_notes": None,
+            "notes": None,
+        }
+    )
 
-    result = enrich_session(db, session_id, client=None)
+    result = enrich_session(db, session_id, use_llm=False)
     assert result["followup_questions"] == []
-
-
 
 
 # ── cross-user isolation ──────────────────────────────────────────────────────
@@ -370,14 +379,20 @@ def test_enrich_session_no_match_returns_empty(tmp_path):
 def _add_stop(db, user_id, lat=43.40, lng=-79.75, species=("channel catfish",), productive=True):
     db["sessions"].insert({"date": "2025-06-14", "user_id": user_id})
     sid = db.execute("SELECT MAX(id) FROM sessions").fetchone()[0]
-    db["stops"].insert({
-        "session_id": sid, "user_id": user_id,
-        "location_text": "Byng Island", "location_name": "Byng Island",
-        "lat": lat, "lng": lng,
-        "species_caught": json.dumps(list(species)),
-        "party_species_caught": json.dumps([]),
-        "was_productive": 1 if productive else 0,
-    }, alter=True)
+    db["stops"].insert(
+        {
+            "session_id": sid,
+            "user_id": user_id,
+            "location_text": "Byng Island",
+            "location_name": "Byng Island",
+            "lat": lat,
+            "lng": lng,
+            "species_caught": json.dumps(list(species)),
+            "party_species_caught": json.dumps([]),
+            "was_productive": 1 if productive else 0,
+        },
+        alter=True,
+    )
 
 
 def test_stop_summary_only_returns_the_requested_users_stops(tmp_path):
@@ -399,9 +414,13 @@ def test_insight_matching_ignores_another_users_insights(tmp_path):
     db["behavioral_insights"].update(other, {"user_id": 2})
 
     blank_stop = {
-        "species_caught": [], "was_productive": 0,
-        "lat": 43.40, "lng": -79.75, "location_name": "Byng Island",
-        "session_id": None, "technique": None,
+        "species_caught": [],
+        "was_productive": 0,
+        "lat": 43.40,
+        "lng": -79.75,
+        "location_name": "Byng Island",
+        "session_id": None,
+        "technique": None,
     }
     assert match_insights_to_stop(db, blank_stop, user_id=1) == []
 

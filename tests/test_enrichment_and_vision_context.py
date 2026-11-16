@@ -63,7 +63,7 @@ def test_the_anglers_observations_do_reach_it():
 
 
 def test_unrecorded_is_stated_not_omitted():
-    """"we didn't write it down" and "it wasn't the case" are different facts."""
+    """ "we didn't write it down" and "it wasn't the case" are different facts."""
     out = render_logged_stop(_ROW)
     assert "water level unrecorded" in out
     assert "weather unrecorded" in out
@@ -97,9 +97,7 @@ def test_agent_synthesis_renders_as_reasoning():
 
 
 def test_a_survey_finding_does_not_render_as_reasoning():
-    out = render_recorded_insight(
-        as_recorded_insight(_Insight("mnrf_survey", "BsM 2019"))
-    )
+    out = render_recorded_insight(as_recorded_insight(_Insight("mnrf_survey", "BsM 2019")))
     assert "reasoning, no source" not in out
     assert "BsM 2019" in out
 
@@ -111,14 +109,11 @@ def test_the_contradiction_prompt_uses_the_renderer(db, monkeypatch):
 
     captured = {}
 
-    class _Client:
-        class messages:
-            @staticmethod
-            def create(**kwargs):
-                captured["prompt"] = kwargs["messages"][0]["content"]
-                return type(
-                    "R", (), {"content": [type("B", (), {"text": "revised"})()]}
-                )()
+    def _complete(role, **kwargs):
+        captured["prompt"] = kwargs["messages"][0]["content"]
+        return type("R", (), {"content": [type("B", (), {"text": "revised"})()]})()
+
+    monkeypatch.setattr("src.services.trip_enrichment.llm.complete", _complete)
 
     insight = BehavioralInsight(
         species="channel catfish",
@@ -131,7 +126,7 @@ def test_the_contradiction_prompt_uses_the_renderer(db, monkeypatch):
         evidence_count=2,
     )
 
-    _synthesize_nuanced_conclusion(insight, _ROW, _Client())
+    _synthesize_nuanced_conclusion(insight, _ROW, True, 1)
     prompt = captured["prompt"]
 
     assert "photo_url" not in prompt and "42.9012" not in prompt
@@ -154,7 +149,7 @@ def test_no_client_still_degrades_gracefully():
         source_detail="log",
         evidence_count=1,
     )
-    out = _synthesize_nuanced_conclusion(insight, _ROW, None)
+    out = _synthesize_nuanced_conclusion(insight, _ROW, False, 1)
     assert out.startswith("original")
 
 

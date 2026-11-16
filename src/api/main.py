@@ -684,7 +684,7 @@ def _log_trip_core(
     started_at, ended_at = _trip_times(started_at, ended_at)
 
     db = get_db()
-    parsed = parse_session_from_text(text, db)
+    parsed = parse_session_from_text(text, db, user_id=user["id"])
     structured_catches = _normalize_structured_catches(catches_json, extra_photos)
 
     # Inject photo metadata into the first stop
