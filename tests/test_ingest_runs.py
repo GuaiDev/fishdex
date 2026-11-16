@@ -44,7 +44,7 @@ def test_wsc_counts_reach_area_and_cli_ledgers(db, monkeypatch):
     from types import SimpleNamespace
 
     from src.cli.main import _run_source
-    from src.models.ingest_area import AreaIngestResult, IngestSource
+    from src.models.ingest_area import AreaIngestResult
     from src.services import area_ingest, ingest_runs, stream_gauge
 
     monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
@@ -75,7 +75,7 @@ def test_wsc_counts_reach_area_and_cli_ledgers(db, monkeypatch):
         )
 
     monkeypatch.setattr(stream_gauge._wsc, "fetch_station_reading", reading)
-    result = AreaIngestResult(label="Calgary", source=IngestSource.GLOBAL, jurisdiction="CA-AB")
+    result = AreaIngestResult(label="Calgary", source="global", jurisdiction="CA-AB")
     area_ingest._attempt(result, "WSC", lambda: stream_gauge.fetch_and_store(51, -114))
     _run_source([], "WSC", "fetching", stream_gauge.fetch_and_store, 51, -114, jurisdiction="CA-AB")
     rows = list(
@@ -98,6 +98,8 @@ def test_configured_jurisdiction_reaches_global_and_tidal_ledgers(db, monkeypatc
         monkeypatch.setattr(module, "fetch_and_store", lambda *a, **k: 0)
     monkeypatch.setattr(osm, "fetch_and_store", lambda *a, **k: (0, 0))
     monkeypatch.setattr(area_ingest, "_check_sdm_retrain", lambda *a: None)
+    national_ingest = importlib.import_module("src.ingest.jurisdictions.ca_national.ingest")
+    monkeypatch.setattr(national_ingest, "get_db", lambda: db)
     tidal = importlib.import_module("src.ingest.jurisdictions.ca_national.tidal")
     monkeypatch.setattr(tidal, "fetch_tidal_readings", lambda *a: [])
     area = IngestArea(
@@ -150,7 +152,7 @@ def test_osm_caught_timeouts_fail_ledger_and_continue(db, monkeypatch, wrapper, 
     import httpx
 
     from src.cli.main import _run_source
-    from src.models.ingest_area import AreaIngestResult, IngestSource
+    from src.models.ingest_area import AreaIngestResult
     from src.services import area_ingest, ingest_runs, osm
 
     monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
@@ -167,7 +169,7 @@ def test_osm_caught_timeouts_fail_ledger_and_continue(db, monkeypatch, wrapper, 
     monkeypatch.setattr(osm._osm, "fetch_access_points", timeout)
     with pytest.warns(UserWarning, match="OSM ingest failed"):
         if wrapper == "area":
-            result = AreaIngestResult(label="Coast", source=IngestSource.GLOBAL)
+            result = AreaIngestResult(label="Coast", source="global")
             area_ingest._attempt(
                 result, "OSM", lambda: {"OSM water features": osm.fetch_and_store(45, -65)[0]}
             )
@@ -210,7 +212,20 @@ def test_tidal_station_diagnostics_reach_ledger(db, monkeypatch, failure):
         return [{"eventDate": "2026-11-16T12:00:00Z", "value": 1.2, "type": "high"}]
 
     monkeypatch.setattr(tidal, "_cached_get", response)
-    result = area_ingest.run_tidal_ingest(45, -65, 100, "Coast", jurisdiction="CA-NS")
+    from src.ingest.jurisdictions.ca_national import ingest as national_ingest
+
+    monkeypatch.setattr(national_ingest, "get_db", lambda: db)
+    result = area_ingest.run_area(
+        area_ingest.IngestArea(
+            label="Coast",
+            jurisdiction="CA-NS",
+            lat=45,
+            lng=-65,
+            radius_km=100,
+            sources=["tidal"],
+        ),
+        "tidal",
+    )
     row = db.execute(
         "SELECT fetched, stored, skipped, empty_count, status, error FROM ingest_runs"
     ).fetchone()
@@ -270,7 +285,7 @@ def test_pwqmn_http_download_failures_reach_ledger(db, monkeypatch, tmp_path, st
 @pytest.mark.parametrize("wrapper", ["area", "cli"])
 def test_gbif_order_and_page_counts_reach_ledger(db, monkeypatch, wrapper):
     from src.cli.main import _run_source
-    from src.models.ingest_area import AreaIngestResult, IngestSource
+    from src.models.ingest_area import AreaIngestResult
     from src.services import area_ingest, gbif, ingest_runs
 
     monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
@@ -297,7 +312,7 @@ def test_gbif_order_and_page_counts_reach_ledger(db, monkeypatch, wrapper):
 
     monkeypatch.setattr(gbif._gbif, "_cached_get", response)
     if wrapper == "area":
-        result = AreaIngestResult(label="Coast", source=IngestSource.GLOBAL)
+        result = AreaIngestResult(label="Coast", source="global")
         area_ingest._attempt(result, "GBIF", lambda: gbif.fetch_and_store(45, -65))
         assert result.stored == {"GBIF": 1}
     else:
@@ -369,7 +384,7 @@ def test_inaturalist_page_diagnostics_reach_ledger(db, monkeypatch, tmp_path, wr
     import httpx
 
     from src.cli.main import _run_source
-    from src.models.ingest_area import AreaIngestResult, IngestSource
+    from src.models.ingest_area import AreaIngestResult
     from src.services import area_ingest, ingest_runs, observations
 
     monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
@@ -409,7 +424,7 @@ def test_inaturalist_page_diagnostics_reach_ledger(db, monkeypatch, tmp_path, wr
         "empty": (1, 0, 0, 1, "success"),
     }[outcome]
     if wrapper == "area":
-        result = AreaIngestResult(label="Coast", source=IngestSource.GLOBAL)
+        result = AreaIngestResult(label="Coast", source="global")
         area_ingest._attempt(result, "iNaturalist", lambda: observations.fetch_and_store(45, -65))
         assert result.stored == {"iNaturalist": expected[1]}
     else:
@@ -437,8 +452,9 @@ def test_bc_wfs_diagnostics_reach_area_ledger(db, monkeypatch, source, outcome):
 
     import httpx
 
-    from src.models.ingest_area import AreaIngestResult, IngestSource
-    from src.services import area_ingest, bc_ingest, ingest_runs
+    from src.ingest.jurisdictions.ca_bc import ingest as bc_ingest
+    from src.models.ingest_area import AreaIngestResult
+    from src.services import area_ingest, ingest_runs
 
     adapter = importlib.import_module(f"src.ingest.jurisdictions.ca_bc.{source}")
     monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
@@ -455,7 +471,7 @@ def test_bc_wfs_diagnostics_reach_area_ledger(db, monkeypatch, source, outcome):
         raise httpx.ReadTimeout("DataBC unavailable")
 
     monkeypatch.setattr(adapter, "_cached_get", response)
-    result = AreaIngestResult(label="BC", source=IngestSource.BC)
+    result = AreaIngestResult(label="BC", source="hydro_network")
 
     def fetch():
         if source == "hydro_network":
@@ -481,9 +497,10 @@ def test_qc_workbook_diagnostics_reach_cli_ledger(db, monkeypatch, outcome):
     import httpx
 
     from src.cli.main import _run_source
+    from src.ingest.jurisdictions.ca_qc import ingest as qc_ingest
     from src.ingest.jurisdictions.ca_qc import water_quality as adapter
     from src.models.water_quality_reading import WaterQualityReading
-    from src.services import ingest_runs, qc_ingest
+    from src.services import ingest_runs
 
     monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
     monkeypatch.setattr(qc_ingest, "get_db", lambda: db)
