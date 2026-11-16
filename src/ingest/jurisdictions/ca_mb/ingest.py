@@ -4,7 +4,7 @@ Orchestrates the CA-MB adapters:
   - MB stocking records (ca_mb/stocking.py — ArcGIS FeatureServer)
   - MB WaLLAS stream network (ca_mb/hydro_network.py — ArcGIS MapServer)
 
-Called from the /ingest/data-mb API endpoint or `weekly-ingest`.
+Run by `fishbot ingest-source` / `weekly-ingest` through this folder's plugin.py.
 Global sources (iNat, GBIF, WSC, OSM, eBird) are handled by the standard
 ingest pipeline and are not called here. MB water quality and fish
 observations are stubs (no usable machine-readable source — see ca_mb/).
@@ -14,6 +14,7 @@ import importlib
 import logging
 from datetime import datetime
 
+from src.jurisdictions.plugin import AreaContext
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -101,3 +102,17 @@ def ingest_mb_data(
         "mb_wallas_barriers": barriers,
         "mb_stocking": stocking,
     }
+
+
+# ── source runners ────────────────────────────────────────────────────────────
+# Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
+# area being run; named in this folder's plugin.py.
+
+
+def run_hydro_network(ctx: AreaContext) -> dict[str, int]:
+    segs, barriers = ingest_mb_hydro_network(ctx.lat, ctx.lng, ctx.radius_km)
+    return {"mb_wallas_segments": segs, "mb_wallas_barriers": barriers}
+
+
+def run_stocking(ctx: AreaContext) -> int:
+    return ingest_mb_stocking(ctx.lat, ctx.lng, ctx.radius_km)

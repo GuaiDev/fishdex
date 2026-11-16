@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src.ingest.jurisdictions.ca_sk import hydro_network
-from src.services.sk_ingest import ingest_sk_hydro_network
+from src.ingest.jurisdictions.ca_sk.ingest import ingest_sk_hydro_network
 from src.storage.database import get_db
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sk_hydro_response.json"
@@ -79,7 +79,7 @@ def test_cache_hit_skips_http(tmp_path):
 def test_service_stores_segments(tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, return_value=_mock_response(_load())), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.services.sk_ingest.get_db", lambda: get_db(db_path))
+        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: get_db(db_path))
         segs, barriers = ingest_sk_hydro_network(52.13, -106.67, radius_km=50)
 
     assert segs == 3
@@ -96,7 +96,7 @@ def test_service_does_not_overwrite_other_province_with_same_raw_id(tmp_path, mo
         {"ogf_id": 201, "name": "MB creek", "jurisdiction": "CA-MB"}, pk="ogf_id"
     )
     with patch(_HTTPX, return_value=_mock_response(_load())), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.services.sk_ingest.get_db", lambda: get_db(db_path))
+        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: get_db(db_path))
         ingest_sk_hydro_network(52.13, -106.67, radius_km=50)
 
     rows = list(get_db(db_path)["stream_segments"].rows)

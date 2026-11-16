@@ -16,7 +16,7 @@ import httpx
 import pytest
 
 from src.ingest.jurisdictions.ca_bc import water_quality as wq
-from src.services.bc_ingest import ingest_bc_water_quality
+from src.ingest.jurisdictions.ca_bc.ingest import ingest_bc_water_quality
 from src.storage.database import get_db
 from src.storage.water_quality import query_water_quality
 
@@ -114,7 +114,7 @@ def test_compliance_location_types_never_reach_stored_readings(tmp_path, monkeyp
 
     db_path = tmp_path / "t.db"
     monkeypatch.setattr(wq, "download_results", lambda: gz_fixture)
-    monkeypatch.setattr("src.services.bc_ingest.get_db", lambda: get_db(db_path))
+    monkeypatch.setattr("src.ingest.jurisdictions.ca_bc.ingest.get_db", lambda: get_db(db_path))
     ingest_bc_water_quality(49.10, -123.02, radius_km=30)
     stored = query_water_quality(get_db(db_path), lat=49.10, lng=-123.02, radius_km=30)
     # 0301336 is the 'Ditch or Culvert' station with DO 1.08 mg/L and pH 3.98.
@@ -293,7 +293,7 @@ def test_failed_download_raises_and_leaves_no_cache_file(tmp_path, monkeypatch):
 def test_ingest_stores_readings_and_returns_count(tmp_path, monkeypatch, gz_fixture):
     db_path = tmp_path / "t.db"
     monkeypatch.setattr(wq, "download_results", lambda: gz_fixture)
-    monkeypatch.setattr("src.services.bc_ingest.get_db", lambda: get_db(db_path))
+    monkeypatch.setattr("src.ingest.jurisdictions.ca_bc.ingest.get_db", lambda: get_db(db_path))
 
     n = ingest_bc_water_quality(*FRASER, radius_km=100)
     db = get_db(db_path)
@@ -311,7 +311,7 @@ def test_bc_readings_reach_the_water_slice_with_their_own_source(tmp_path, monke
 
     db_path = tmp_path / "t.db"
     monkeypatch.setattr(wq, "download_results", lambda: gz_fixture)
-    monkeypatch.setattr("src.services.bc_ingest.get_db", lambda: get_db(db_path))
+    monkeypatch.setattr("src.ingest.jurisdictions.ca_bc.ingest.get_db", lambda: get_db(db_path))
     ingest_bc_water_quality(49.10, -123.02, radius_km=30)
 
     water = describe(get_db(db_path), lat=49.10, lng=-123.02, caller="map_tap").water

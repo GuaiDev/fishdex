@@ -12,11 +12,13 @@ from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
 
+_INGEST_HINT = "fishbot ingest-source CA-NS tidal --area 'Annapolis River NS'"
+
 
 def get_tidal_conditions_for_agent(lat: float, lng: float) -> dict:
     """Return the nearest tidal station's next high and low tide predictions.
 
-    Queries the tidal_readings table (populated by /ingest/data-tidal).
+    Queries the tidal_readings table (populated by `fishbot ingest-source <jurisdiction> tidal`).
     Returns a dict with next_high, next_low, station info, or a message
     if no tidal data is available for this location.
     """
@@ -25,21 +27,23 @@ def get_tidal_conditions_for_agent(lat: float, lng: float) -> dict:
     if "tidal_readings" not in db.table_names():
         return {
             "available": False,
-            "message": "No tidal data ingested yet. Run /ingest/data-tidal for coastal locations.",
+            "message": f"No tidal data ingested yet. Run `{_INGEST_HINT}` for coastal locations.",
         }
 
     # Find the nearest station with predictions within 200km
-    rows = list(db.execute("""
+    rows = list(
+        db.execute("""
         SELECT DISTINCT station_id, station_name, lat, lng
         FROM tidal_readings
         WHERE lat IS NOT NULL AND lng IS NOT NULL
-    """).fetchall())
+    """).fetchall()
+    )
 
     if not rows:
         return {
             "available": False,
             "message": (
-                "No tidal stations in database. Run /ingest/data-tidal for coastal locations."
+                f"No tidal stations in database. Run `{_INGEST_HINT}` for coastal locations."
             ),
         }
 
@@ -60,7 +64,9 @@ def get_tidal_conditions_for_agent(lat: float, lng: float) -> dict:
     now_iso = datetime.now(tz=UTC).isoformat()
 
     # Get next high and next low
-    future_preds = list(db.execute("""
+    future_preds = list(
+        db.execute(
+            """
         SELECT tide_type, prediction_datetime, water_level_m
         FROM tidal_readings
         WHERE station_id = ?
@@ -68,7 +74,10 @@ def get_tidal_conditions_for_agent(lat: float, lng: float) -> dict:
           AND tide_type IN ('high', 'low')
         ORDER BY prediction_datetime ASC
         LIMIT 10
-    """, [station_id, now_iso[:19]]).fetchall())
+    """,
+            [station_id, now_iso[:19]],
+        ).fetchall()
+    )
 
     next_high = next((r for r in future_preds if r[0] == "high"), None)
     next_low = next((r for r in future_preds if r[0] == "low"), None)

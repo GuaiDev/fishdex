@@ -1,7 +1,8 @@
-"""Per-area ingest bundles used by `weekly-ingest`.
+"""Per-area ingest used by `weekly-ingest` and `ingest-source`.
 
-Each `run_*_ingest` function runs every dataset in its bundle for one area,
-isolating failures so one flaky source does not stop the rest, and returns an
+`run_area` runs one source for one area: the global bundle, or a source the
+area's jurisdiction plugin declares (`src/jurisdictions/plugin.py`). Failures
+are isolated so one flaky source does not stop the rest, and each run returns an
 `AreaIngestResult` saying what was stored and what failed. See README.md for
 refresh commands and area configuration.
 """
@@ -12,16 +13,38 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-from src.models.ingest_area import AreaIngestResult, IngestArea, IngestSource
+from src.jurisdictions.plugin import GLOBAL_SOURCE, AreaContext, JurisdictionPlugin, SourceSpec
+from src.jurisdictions.registry import all_plugins, get_plugin, plugins
+from src.models.ingest_area import AreaIngestResult, IngestArea
 from src.storage.database import ensure_schema, get_db
 
 _log = logging.getLogger(__name__)
 
-DEFAULT_AREAS_PATH = Path("data/ingest_areas.json")
+
+def plugin_areas() -> list[IngestArea]:
+    """Every area the jurisdiction plugins schedule, in registry order."""
+    return [
+        IngestArea(
+            label=a.label,
+            jurisdiction=plugin.code,
+            lat=a.lat,
+            lng=a.lng,
+            radius_km=a.radius_km,
+            sources=list(a.sources),
+            source_radius_km=dict(a.source_radius_km),
+        )
+        for plugin in all_plugins()
+        for a in plugin.cron_areas
+    ]
 
 
-def load_areas(path: Path = DEFAULT_AREAS_PATH) -> list[IngestArea]:
-    """Read and validate the area list. Raises on a malformed file — never skips."""
+def load_areas(path: Path | None = None) -> list[IngestArea]:
+    """The areas to ingest: those the plugins declare, or a JSON file when given.
+
+    Raises on a malformed file — never skips.
+    """
+    if path is None:
+        return plugin_areas()
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     return [IngestArea.model_validate(a) for a in data["areas"]]
 
@@ -55,7 +78,7 @@ def run_global_ingest(
     )
     db = get_db()
     ensure_schema(db)
-    result = AreaIngestResult(label=label, source=IngestSource.GLOBAL)
+    result = AreaIngestResult(label=label, source=GLOBAL_SOURCE)
 
     _attempt(
         result,
@@ -112,126 +135,112 @@ def _check_sdm_retrain(db, label: str) -> None:
         _log.exception("[%s] SDM retrain check failed", label)
 
 
-def run_bc_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
-    """Run FWA, FISS, and BC EnMoDS ingest for a BC location."""
-    from src.services.bc_ingest import (
-        ingest_bc_hydro_network,
-        ingest_bc_water_quality,
-        ingest_fiss_observations,
-    )
-
-    _log.info(
-        "[%s] BC ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-    ensure_schema(get_db())
-    result = AreaIngestResult(label=label, source=IngestSource.BC)
-    _attempt(
-        result,
-        "FWA stream segments",
-        lambda: ingest_bc_hydro_network(lat, lng, radius_km=radius_km)[0],
-    )
-    _attempt(
-        result,
-        "FISS observations",
-        lambda: ingest_fiss_observations(lat, lng, radius_km=radius_km),
-    )
-    _attempt(
-        result,
-        "BC EnMoDS water quality",
-        lambda: ingest_bc_water_quality(lat, lng, radius_km=radius_km),
-    )
-    _log.info("[%s] BC ingest complete", label)
-    return result
+class IngestJobError(ValueError):
+    """A (jurisdiction, source, area) that cannot be run, with the reason and the options."""
 
 
-def run_ab_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
-    """Run Alberta-specific ingest adapters."""
-    from src.services.ab_ingest import ingest_ab_data
-
-    _log.info(
-        "[%s] AB ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-    ensure_schema(get_db())
-    result = AreaIngestResult(label=label, source=IngestSource.AB)
-    _attempt(result, "AB adapters", lambda: ingest_ab_data(lat, lng, radius_km))
-    return result
+def _sources_hint(plugin: JurisdictionPlugin) -> str:
+    runnable = [n for n, spec in plugin.sources.items() if spec.runner]
+    other = [n for n, spec in plugin.sources.items() if not spec.runner]
+    text = f"{plugin.code} can run: {', '.join([GLOBAL_SOURCE, *runnable])}"
+    if other:
+        text += f" (declared but not runnable here: {', '.join(other)})"
+    return text
 
 
-def run_qc_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
-    """Run Quebec-specific ingest adapters."""
-    from src.services.qc_ingest import ingest_qc_data
+def check_job(jurisdiction: str, source: str) -> SourceSpec | None:
+    """Raise `IngestJobError` unless `source` can run for `jurisdiction`.
 
-    _log.info(
-        "[%s] QC ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-    ensure_schema(get_db())
-    result = AreaIngestResult(label=label, source=IngestSource.QC)
-    _attempt(result, "QC adapters", lambda: ingest_qc_data(lat, lng, radius_km))
-    return result
-
-
-def run_mb_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
-    """Run Manitoba-specific ingest adapters."""
-    from src.services.mb_ingest import ingest_mb_data
-
-    _log.info(
-        "[%s] MB ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-    ensure_schema(get_db())
-    result = AreaIngestResult(label=label, source=IngestSource.MB)
-    _attempt(result, "MB adapters", lambda: ingest_mb_data(lat, lng, radius_km))
-    return result
+    Returns the plugin's `SourceSpec`, or None for the global bundle, which
+    works anywhere.
+    """
+    if source == GLOBAL_SOURCE:
+        return None
+    plugin = get_plugin(jurisdiction)
+    if plugin is None:
+        known = ", ".join(sorted(plugins()))
+        raise IngestJobError(f"unknown jurisdiction {jurisdiction!r} (known: {known})")
+    spec = plugin.sources.get(source)
+    if spec is None:
+        raise IngestJobError(f"{plugin.code} has no source {source!r}. {_sources_hint(plugin)}")
+    if not spec.runner:
+        hint = f" {spec.note}" if spec.note else ""
+        raise IngestJobError(f"{plugin.code} source {source!r} has no runner.{hint}")
+    return spec
 
 
-def run_sk_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
-    """Run Saskatchewan-specific ingest adapters."""
-    from src.services.sk_ingest import ingest_sk_data
-
-    _log.info(
-        "[%s] SK ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-    ensure_schema(get_db())
-    result = AreaIngestResult(label=label, source=IngestSource.SK)
-    _attempt(result, "SK adapters", lambda: ingest_sk_data(lat, lng, radius_km))
-    return result
-
-
-def run_tidal_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
-    """Run CHS tidal predictions ingest."""
-    from src.ingest.jurisdictions.ca_national.tidal import fetch_tidal_readings
-
-    _log.info(
-        "[%s] Tidal ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
-    )
-    db = get_db()
-    ensure_schema(db)
-    result = AreaIngestResult(label=label, source=IngestSource.TIDAL)
-
-    def _tidal() -> int:
-        rows = fetch_tidal_readings(lat, lng, radius_km)
-        if rows:
-            db["tidal_readings"].upsert_all(rows, pk="record_id")
-        return len(rows)
-
-    _attempt(result, "CHS tide predictions", _tidal)
-    return result
-
-
-_RUNNERS = {
-    IngestSource.BC: run_bc_ingest,
-    IngestSource.AB: run_ab_ingest,
-    IngestSource.QC: run_qc_ingest,
-    IngestSource.MB: run_mb_ingest,
-    IngestSource.SK: run_sk_ingest,
-    IngestSource.TIDAL: run_tidal_ingest,
-}
-
-
-def run_area(
-    area: IngestArea, source: IngestSource, days_back: int | None = 90
-) -> AreaIngestResult:
-    """Run one source bundle for one configured area."""
+def run_area(area: IngestArea, source: str, days_back: int | None = 90) -> AreaIngestResult:
+    """Run one source for one area: the global bundle, or a source its plugin declares."""
+    spec = check_job(area.jurisdiction, source)
     radius = area.radius_for(source)
-    if source is IngestSource.GLOBAL:
+    if spec is None:
         return run_global_ingest(area.lat, area.lng, radius, area.label, days_back)
-    return _RUNNERS[source](area.lat, area.lng, radius, area.label)
+
+    _log.info(
+        "[%s] %s %s started — lat=%.4f lng=%.4f radius=%.0fkm",
+        area.label,
+        area.jurisdiction,
+        source,
+        area.lat,
+        area.lng,
+        radius,
+    )
+    ensure_schema(get_db())
+    result = AreaIngestResult(label=area.label, source=source)
+    ctx = AreaContext(area.label, area.lat, area.lng, radius)
+    _attempt(result, spec.label or source, lambda: spec.load_runner()(ctx))
+    return result
+
+
+def resolve_area(
+    jurisdiction: str,
+    source: str,
+    area: str | None = None,
+    lat: float | None = None,
+    lng: float | None = None,
+    radius_km: float | None = None,
+) -> IngestArea:
+    """The area a one-off `ingest-source` run covers.
+
+    A configured area is picked by its label (case-insensitive, within the
+    jurisdiction); otherwise `lat`/`lng` describe an ad-hoc one. A region-wide
+    source (regulations, species ranges) needs neither and gets a placeholder
+    its runner ignores.
+    """
+    spec = check_job(jurisdiction, source)
+    if area:
+        configured = [a for a in load_areas() if a.jurisdiction == jurisdiction]
+        match = [a for a in configured if a.label.lower() == area.lower()]
+        if not match:
+            labels = ", ".join(a.label for a in configured) or "none configured"
+            raise IngestJobError(f"{jurisdiction} has no area {area!r} (configured: {labels})")
+        base = match[0]
+        return base.model_copy(
+            update={
+                "radius_km": radius_km if radius_km is not None else base.radius_for(source),
+                "sources": [source],
+                "source_radius_km": {
+                    **base.source_radius_km,
+                    **({source: radius_km} if radius_km is not None else {}),
+                },
+            }
+        )
+    if lat is not None and lng is not None:
+        return IngestArea(
+            label=f"{jurisdiction} ({lat}, {lng})",
+            jurisdiction=jurisdiction,
+            lat=lat,
+            lng=lng,
+            radius_km=radius_km or 50.0,
+            sources=[source],
+        )
+    if spec is not None and not spec.area_scoped:
+        return IngestArea(
+            label=f"{jurisdiction} {source}",
+            jurisdiction=jurisdiction,
+            lat=0.0,
+            lng=0.0,
+            radius_km=1.0,
+            sources=[source],
+        )
+    raise IngestJobError("give --area LABEL, or --lat and --lng")

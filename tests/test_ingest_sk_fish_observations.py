@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src.ingest.jurisdictions.ca_sk import fish_observations
-from src.services.sk_ingest import ingest_sk_fish_observations
+from src.ingest.jurisdictions.ca_sk.ingest import ingest_sk_fish_observations
 from src.storage.database import get_db
 from src.storage.observations import query_observations
 
@@ -83,7 +83,7 @@ def test_cache_hit_skips_http(tmp_path):
 def test_service_stores_observations(tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, side_effect=_server), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.services.sk_ingest.get_db", lambda: get_db(db_path))
+        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: get_db(db_path))
         n = ingest_sk_fish_observations(52.13, -106.67, radius_km=50)
 
     assert n == 3

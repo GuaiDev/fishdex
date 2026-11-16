@@ -14,6 +14,7 @@ import importlib
 import logging
 from datetime import datetime
 
+from src.jurisdictions.plugin import AreaContext
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,9 @@ def ingest_ab_water_quality(
     _mod = importlib.import_module("src.ingest.jurisdictions.ca_ab.water_quality")
     logger.info(
         "AB water quality: fetching — lat=%.4f lng=%.4f radius=%.0fkm",
-        lat, lng, radius_km,
+        lat,
+        lng,
+        radius_km,
     )
     readings = _mod.fetch_water_quality_readings(lat, lng, radius_km)
     if readings:
@@ -151,3 +154,25 @@ def _upsert_regulation_chunks(db, chunks: list[dict]) -> None:
         if chunk.get("zone_name"):
             row["zone_name"] = chunk["zone_name"]
         db["regulation_chunks"].upsert(row, pk=["zone", "jurisdiction", "regulation_year"])
+
+
+# ── source runners ────────────────────────────────────────────────────────────
+# Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
+# area being run; named in this folder's plugin.py.
+
+
+def run_hydro_network(ctx: AreaContext) -> dict[str, int]:
+    segs, barriers = ingest_ab_hydro_network(ctx.lat, ctx.lng, ctx.radius_km)
+    return {"ab_hydro_segments": segs, "ab_hydro_barriers": barriers}
+
+
+def run_stocking(ctx: AreaContext) -> int:
+    return ingest_ab_stocking()
+
+
+def run_regulations(ctx: AreaContext) -> int:
+    return ingest_ab_regulations()
+
+
+def run_water_quality(ctx: AreaContext) -> int:
+    return ingest_ab_water_quality(ctx.lat, ctx.lng, ctx.radius_km)

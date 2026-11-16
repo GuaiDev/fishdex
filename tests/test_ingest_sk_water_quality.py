@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src.ingest.jurisdictions.ca_sk import water_quality as wq
-from src.services.sk_ingest import ingest_sk_water_quality
+from src.ingest.jurisdictions.ca_sk.ingest import ingest_sk_water_quality
 from src.storage.database import get_db
 from src.storage.water_quality import query_water_quality
 
@@ -82,7 +82,7 @@ def test_no_date_warns(tmp_path, caplog):
 def test_service_stores_readings(tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, return_value=_mock_response(_load())), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.services.sk_ingest.get_db", lambda: get_db(db_path))
+        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: get_db(db_path))
         n = ingest_sk_water_quality(52.13, -106.67, radius_km=50)
 
     assert n == 2

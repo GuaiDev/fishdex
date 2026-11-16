@@ -379,11 +379,7 @@ Plan mode. Paste:
 > Components:
 > 
 > 1. **Jurisdiction registry** (src/jurisdictions/):
->    - Base class `Jurisdiction` with abstract methods: `get_regulations_context()`, `get_stocking_source()`, `get_hydrography_source()`, `get_imagery_source()`, `get_disclaimer()`
->    - `OntarioJurisdiction` — concrete, returns Ontario-specific info
->    - `UnknownJurisdictionFallback` — returns global sources + a disclaimer string
->    - Stubs for other Canadian provinces and major US states returning the fallback for now
->    - Registry dict mapping ISO codes to instances
+>    - Follow the [jurisdiction checklist](../../src/ingest/jurisdictions/JURISDICTION_TEMPLATE.md) for the current registration contract.
 > 
 > 2. **Pydantic models** (src/models/):
 >    - UserProfile: home_jurisdiction (ISO code), home_location (lat/lng/name), frequented_jurisdictions, target_species, gear (list of dicts), annual_budget, skill_level, fishing_style, preferences (free text)
@@ -613,7 +609,7 @@ Start with Ontario as the reference implementation.
 > 
 > All persist to jurisdiction-tagged tables.
 > 
-> Update OntarioJurisdiction class to return real regulation context for `get_regulations_context(species, lat, lng)`.
+> Set Ontario’s plugin `regulatory_context` for its prompt guidance; see the [jurisdiction checklist](../../src/ingest/jurisdictions/JURISDICTION_TEMPLATE.md).
 > 
 > Add agent tools:
 > - `get_regulations(species, lat, lng)` — returns rules for species at location
@@ -627,11 +623,11 @@ Run and verify. Some regulations PDFs are messy; expect to iterate on the parser
 
 > Now that Ontario is real, refactor for adding other jurisdictions.
 > 
-> Create src/ingest/jurisdictions/template/ as a reference template — a README explaining how to add a new jurisdiction adapter, with placeholder files matching the Ontario structure.
+> Follow the [jurisdiction checklist](../../src/ingest/jurisdictions/JURISDICTION_TEMPLATE.md) when adding adapters.
 > 
 > Implement a Michigan adapter as the second example (Michigan DNR has good open data — fishing regs PDFs, stocking CSVs, public access sites). Same structure as Ontario.
 > 
-> Update the jurisdiction registry to register Michigan.
+> Add Michigan’s plugin following that checklist.
 > 
 > Don't implement other states/provinces yet — but ensure the registry knows about them with the fallback so the bot doesn't crash.
 

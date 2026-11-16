@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src.ingest.jurisdictions.ca_sk import stocking
-from src.services.sk_ingest import ingest_sk_stocking
+from src.ingest.jurisdictions.ca_sk.ingest import ingest_sk_stocking
 from src.storage.database import get_db
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -87,7 +87,7 @@ def test_unresolved_waterbody_kept_with_null_coords_and_warns(tmp_path, caplog):
 def test_service_stores_rows(tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, side_effect=_server), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.services.sk_ingest.get_db", lambda: get_db(db_path))
+        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: get_db(db_path))
         n = ingest_sk_stocking(52.13, -106.67, radius_km=50)
 
     assert n == 3

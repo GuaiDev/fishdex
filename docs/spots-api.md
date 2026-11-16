@@ -2239,7 +2239,7 @@ It is the one kind that is a ranking rather than a located structure, and it is 
 that depends on a cache, so read this section before building the chip.
 
 **Where the spots come from.** `make build-spots` wraps the `explore()` ranking (the untapped-water
-scorer) for each labelled ingest area of the jurisdiction (`data/ingest_areas.json`; outside
+scorer) for each labelled ingest area of the jurisdiction (each jurisdiction plugin's `cron_areas`; outside
 them every reach has few records, because nothing was collected there, so "quiet" would only mean
 "not ingested"). Per area the best 5 reaches are tier 2 and the next 10 tier 3, spaced at least 2 km
 apart so one creek is not fifteen spots. Spots are the same for every user: `explore()` runs with

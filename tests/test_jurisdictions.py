@@ -1,13 +1,13 @@
 """Tests for the jurisdiction registry."""
 
-from src.jurisdictions.ontario import OntarioJurisdiction
+from src.jurisdictions.base import Jurisdiction
 from src.jurisdictions.registry import get_jurisdiction
 from src.jurisdictions.unknown import UnknownJurisdiction
 
 
-def test_get_ontario_returns_concrete_class():
+def test_get_ontario_is_fully_modeled():
     j = get_jurisdiction("CA-ON")
-    assert isinstance(j, OntarioJurisdiction)
+    assert isinstance(j, Jurisdiction) and not isinstance(j, UnknownJurisdiction)
     assert j.code == "CA-ON"
     assert j.name == "Ontario"
     assert j.country == "CA"
@@ -15,7 +15,7 @@ def test_get_ontario_returns_concrete_class():
 
 
 def test_ontario_regulatory_context_mentions_mnrf():
-    assert "MNRF" in OntarioJurisdiction().regulatory_context()
+    assert "MNRF" in get_jurisdiction("CA-ON").regulatory_context()
 
 
 def test_michigan_stub_has_name_but_no_detailed_data():

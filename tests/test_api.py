@@ -135,18 +135,19 @@ def test_server_ingest_routes_refuse_with_cli_directions(monkeypatch, body):
     for path in (
         "/ingest",
         "/ingest/data",
-        "/ingest/data-bc",
-        "/ingest/data-ab",
-        "/ingest/data-qc",
-        "/ingest/data-mb",
-        "/ingest/data-sk",
-        "/ingest/data-national",
-        "/ingest/data-tidal",
     ):
         response = client.post(path, json=body, headers=headers)
         assert response.status_code == 410, (path, response.status_code, response.text)
         assert "fishbot weekly-ingest" in response.json()["detail"]
-        assert "fishbot ingest" in response.json()["detail"]
+        assert "fishbot ingest-source" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("province", ["bc", "ab", "qc", "mb", "sk", "national", "tidal"])
+def test_per_province_ingest_routes_are_retired(monkeypatch, province):
+    """One generic `fishbot ingest-source` replaced /ingest/data-<prov>; the routes are gone."""
+    monkeypatch.setenv("FISHBOT_API_KEY", "test-key")
+    response = client.post(f"/ingest/data-{province}", json={}, headers={"X-Api-Key": "test-key"})
+    assert response.status_code in (404, 405), response.status_code
 
 
 def test_admin_token_refuses_without_key(monkeypatch):

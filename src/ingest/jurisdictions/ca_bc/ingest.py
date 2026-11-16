@@ -8,7 +8,7 @@ Orchestrates the CA-BC adapters:
   - BC fishing regulations (ca_bc/regulations.py — province-wide, not bbox)
   - BC EnMoDS water quality (ca_bc/water_quality.py — current-tier results file)
 
-Called from the CLI `ingest-bc` command or the /ingest/data-bc API endpoint.
+Run by `fishbot ingest-source` / `weekly-ingest` through this folder's plugin.py.
 Global sources (iNat, GBIF, WSC, OSM, eBird) are handled by the standard
 ingest pipeline and do not need to be called here.
 """
@@ -17,6 +17,7 @@ import importlib
 import logging
 from datetime import datetime
 
+from src.jurisdictions.plugin import AreaContext
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -207,3 +208,32 @@ def ingest_bc_data(
         "fiss_stocking": fiss_stocking,
         "water_quality_readings": wq_count,
     }
+
+
+# ── source runners ────────────────────────────────────────────────────────────
+# Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
+# area being run; named in this folder's plugin.py.
+
+
+def run_hydro_network(ctx: AreaContext) -> int:
+    return ingest_bc_hydro_network(ctx.lat, ctx.lng, radius_km=ctx.radius_km)[0]
+
+
+def run_fish_observations(ctx: AreaContext) -> int:
+    return ingest_fiss_observations(ctx.lat, ctx.lng, radius_km=ctx.radius_km)
+
+
+def run_water_quality(ctx: AreaContext) -> int:
+    return ingest_bc_water_quality(ctx.lat, ctx.lng, radius_km=ctx.radius_km)
+
+
+def run_stocking(ctx: AreaContext) -> int:
+    return ingest_fiss_stocking(ctx.lat, ctx.lng, radius_km=ctx.radius_km)
+
+
+def run_salmon_escapement(ctx: AreaContext) -> int:
+    return ingest_bc_nuseds()
+
+
+def run_regulations(ctx: AreaContext) -> int:
+    return ingest_bc_regulations()
