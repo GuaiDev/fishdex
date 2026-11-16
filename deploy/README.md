@@ -69,13 +69,42 @@ model calls. A request that fits its account budget but exceeds the remaining se
 returns 503 without charging the account. Unset, invalid, zero, or negative values disable
 the server-wide cap; the account budget still applies.
 
+## Health checks and request logs
+
+`GET /health/live` reports process liveness without checking data. Fly uses
+`GET /health/ready`, which returns 200 with `status: ready` only when the database
+opens, its schema version matches the application, and the map checks below pass.
+Otherwise it returns 503 with `status: not_ready` and individual `checks` results.
+The legacy `/health` endpoint remains available but does not verify readiness.
+
+API request logs are JSON on stdout, including when started with `fishbot serve`.
+Each `http_request` record includes `request_id`, `route`, `status`, `latency_ms`,
+and `user_hash` (a truncated SHA-256 of the authenticated user ID, or null).
+Requests reaching the observability middleware receive an `X-Request-ID` response
+header: a supplied nonempty ASCII value using only characters `!` through `~`
+and at most 128 characters is
+reused after trimming whitespace; otherwise the API generates a UUID.
+
 ## Refreshing the map data on the volume
 
 Readiness reports the baked artifact's SHA-256 as `map_artifact_digest`.
 The `map_artifact_consistent` check requires a nonempty `map_segments` table with
 exactly the artifact's declared segment count. It does not detect changed contents
 in a same-count artifact. Handle those changes by reseeding the database using
-the procedure below, with map segments rebuilt from the new artifact.
+the procedure below, with map segments rebuilt from the new artifact. The digest
+identifies the baked file, not the loaded database contents.
+
+Before uploading a replacement database for a changed `data/processed/map_data.json`,
+stop any local API using it, back up `data/fishing.db`, and clear only its map segments:
+
+```sh
+uv run python -c 'from src.storage.database import get_db; db = get_db(); db.execute("DELETE FROM map_segments"); db.conn.commit(); db.conn.close()'
+```
+
+Repeat step 7 with that database and deploy the matching artifact. API startup
+imports the artifact when `map_segments` is empty; it leaves nonempty tables alone.
+Confirm `/health/ready` succeeds after restart. This preserves other tables,
+including users and records; do not substitute a fresh empty database.
 
 After `make build-anchors` (live OpenStreetMap, slow: minutes per stretch, cached afterwards)
 rebuilds the anchors and spots in `data/fishing.db`, repeat step 7 with the new file: stop the

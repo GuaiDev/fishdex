@@ -71,7 +71,7 @@ def test_readiness_requires_matching_nonempty_map(map_count, expected_count, mon
 
     monkeypatch.setattr(main, "_map_artifact_info", lambda: ("artifact-digest", expected_count))
     db = get_db()
-    db.executemany(
+    db.conn.executemany(
         "INSERT INTO map_segments (ogf_id, lat, lng) VALUES (?, 45, -79)",
         [(index,) for index in range(map_count)],
     )

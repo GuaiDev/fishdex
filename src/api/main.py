@@ -269,8 +269,10 @@ app = FastAPI(
 @app.middleware("http")
 async def request_observability(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", "").strip()
-    if not request_id or len(request_id) > 128 or any(
-        ord(char) < 33 or ord(char) > 126 for char in request_id
+    if (
+        not request_id
+        or len(request_id) > 128
+        or any(ord(char) < 33 or ord(char) > 126 for char in request_id)
     ):
         request_id = str(uuid.uuid4())
     request.state.request_id = request_id
@@ -287,9 +289,7 @@ async def request_observability(request: Request, call_next):
         route_name = getattr(route, "path", request.url.path)
         user_id = getattr(request.state, "user_id", None)
         user_hash = (
-            hashlib.sha256(str(user_id).encode()).hexdigest()[:16]
-            if user_id is not None
-            else None
+            hashlib.sha256(str(user_id).encode()).hexdigest()[:16] if user_id is not None else None
         )
         _log.info(
             "http_request",
@@ -303,6 +303,7 @@ async def request_observability(request: Request, call_next):
                 }
             },
         )
+
 
 # CORS: FISHBOT_CORS_ORIGINS is a comma-separated list of origins allowed to call the API from
 # a browser (the hosted app's address). Unset keeps the local default of "any origin", which is
@@ -374,7 +375,7 @@ class ChatResponse(BaseModel):
 
 @lru_cache(maxsize=1)
 def _map_artifact_info() -> tuple[str | None, int | None]:
-    """Return the baked map artifact digest and its declared segment row floor."""
+    """Return the baked map artifact digest and its declared segment count."""
     map_file = Path("data/processed/map_data.json")
     try:
         content = map_file.read_bytes()
