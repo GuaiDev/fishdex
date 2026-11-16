@@ -117,10 +117,21 @@ def serve(
     uvicorn.run("src.api.main:app", host=host, port=port, reload=reload)
 
 
+def _home_profile(db) -> UserProfile:
+    if "users" not in db.table_names() or db.execute(
+        "SELECT 1 FROM users WHERE id = ?", [1]
+    ).fetchone() is None:
+        return load_profile()
+    stored = get_user_home(db, 1)
+    home, jurisdiction = stored if stored is not None else (None, None)
+    return UserProfile(home_location=home, home_jurisdiction=jurisdiction or "CA-ON")
+
+
 @app.command()
 def log() -> None:
     """Interactively log a fishing trip."""
-    profile = load_profile()
+    db = get_db()
+    profile = _home_profile(db)
     today = date_type.today().isoformat()
 
     trip_date_str = typer.prompt("Date (YYYY-MM-DD)", default=today)
@@ -170,7 +181,6 @@ def log() -> None:
         what_didnt=what_didnt,
     )
 
-    db = get_db()
     trip_id = insert_trip(db, trip)
     console.print(f"[green]Saved trip #{trip_id}[/green] — {location_name} on {trip_date_str}")
 
@@ -370,7 +380,7 @@ def ingest(
     from src.services.osm import fetch_and_store as osm_fetch_and_store
     from src.services.stream_gauge import fetch_and_store as wsc_fetch_and_store
 
-    profile = load_profile()
+    profile = _home_profile(get_db())
 
     if lat is not None and lng is not None:
         center_lat, center_lng = lat, lng
