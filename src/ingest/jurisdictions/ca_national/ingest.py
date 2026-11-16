@@ -124,6 +124,9 @@ def run_tidal(ctx: AreaContext) -> int:
     rows = fetch_tidal_readings(ctx.lat, ctx.lng, ctx.radius_km)
     if rows:
         db["tidal_readings"].upsert_all(rows, pk="record_id")
+    from src.services.ingest_runs import record_counts
+
+    record_counts(stored=len(rows))
     return len(rows)
 
 
