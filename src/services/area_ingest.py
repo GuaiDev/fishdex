@@ -262,7 +262,7 @@ def run_tidal_ingest(
             db["tidal_readings"].upsert_all(rows, pk="record_id")
         from src.services.ingest_runs import record_counts
 
-        record_counts(fetched=1, empty=int(not rows), stored=len(rows))
+        record_counts(stored=len(rows))
         return len(rows)
 
     _attempt(result, "CHS tide predictions", _tidal)

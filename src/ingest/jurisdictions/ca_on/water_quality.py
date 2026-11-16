@@ -21,6 +21,7 @@ import httpx
 
 from src.ingest.discovery import check_resource_discovery
 from src.models.water_quality_reading import WaterQualityReading
+from src.services.ingest_runs import record_error
 
 _STATIONS_URL = "https://files.ontario.ca/moe_mapping/downloads/2Water/PWQMN/PWQMN_Stations.csv"
 _CKAN_PACKAGE_URL = (
@@ -179,14 +180,12 @@ def download_field_data(resource_name: str, url: str) -> Path | None:
             headers={"User-Agent": _USER_AGENT},
             timeout=120,
         ) as r:
-            if r.status_code == 404:
-                logger.warning("PWQMN field data '%s' returned 404, skipping", label)
-                return None
             r.raise_for_status()
             with dest.open("wb") as f:
                 for chunk in r.iter_bytes(chunk_size=65536):
                     f.write(chunk)
     except httpx.HTTPStatusError as exc:
+        record_error(exc)
         logger.warning("PWQMN field data '%s' download failed: %s", label, exc)
         return None
     logger.info("Downloaded PWQMN field data '%s' to %s", label, dest)

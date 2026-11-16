@@ -168,9 +168,9 @@ def test_osm_caught_timeouts_fail_ledger_and_continue(db, monkeypatch, wrapper, 
     with pytest.warns(UserWarning, match="OSM ingest failed"):
         if wrapper == "area":
             result = AreaIngestResult(label="Coast", source=IngestSource.GLOBAL)
-            area_ingest._attempt(result, "OSM", lambda: {
-                "OSM water features": osm.fetch_and_store(45, -65)[0]
-            })
+            area_ingest._attempt(
+                result, "OSM", lambda: {"OSM water features": osm.fetch_and_store(45, -65)[0]}
+            )
             assert result.stored == {"OSM water features": 0}
         else:
             assert _run_source([], "OSM", "fetching", osm.fetch_and_store, 45, -65) == (0, 0)
@@ -183,3 +183,85 @@ def test_osm_caught_timeouts_fail_ledger_and_continue(db, monkeypatch, wrapper, 
     assert db.execute("SELECT status FROM ingest_runs ORDER BY id DESC LIMIT 1").fetchone() == (
         "success",
     )
+
+
+@pytest.mark.parametrize("failure", [None, "station", "discovery"])
+def test_tidal_station_diagnostics_reach_ledger(db, monkeypatch, failure):
+    import httpx
+
+    from src.ingest.jurisdictions.ca_national import tidal
+    from src.services import area_ingest, ingest_runs
+
+    monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
+    monkeypatch.setattr(area_ingest, "get_db", lambda: db)
+    examined = []
+
+    def response(url, params, ttl):
+        if url == tidal._STATIONS_URL:
+            if failure == "discovery":
+                raise httpx.ReadTimeout("station discovery failed")
+            return [{"id": str(i), "latitude": 45, "longitude": -65} for i in range(20)]
+        station_id = url.split("/")[-2]
+        examined.append(station_id)
+        if failure == "station" and station_id == "0":
+            raise httpx.ReadTimeout("station predictions failed")
+        if int(station_id) < 18:
+            return []
+        return [{"eventDate": "2026-11-16T12:00:00Z", "value": 1.2, "type": "high"}]
+
+    monkeypatch.setattr(tidal, "_cached_get", response)
+    result = area_ingest.run_tidal_ingest(45, -65, 100, "Coast", jurisdiction="CA-NS")
+    row = db.execute(
+        "SELECT fetched, stored, skipped, empty_count, status, error FROM ingest_runs"
+    ).fetchone()
+    if failure == "discovery":
+        assert row == (1, 0, 1, 0, "failed", "ReadTimeout: station discovery failed")
+        assert examined == []
+        assert result.stored == {"CHS tide predictions": 0}
+    else:
+        assert examined == [str(i) for i in range(20)]
+        assert result.stored == {"CHS tide predictions": 2}
+        assert db.execute("SELECT COUNT(*) FROM tidal_readings").fetchone() == (2,)
+        if failure == "station":
+            assert row == (20, 2, 1, 17, "failed", "ReadTimeout: station predictions failed")
+        else:
+            assert row == (20, 2, 0, 18, "warning", None)
+
+
+@pytest.mark.parametrize("status", [404, 500])
+def test_pwqmn_http_download_failures_reach_ledger(db, monkeypatch, tmp_path, status):
+    from contextlib import contextmanager
+
+    import httpx
+
+    from src.cli.main import _run_source
+    from src.ingest.jurisdictions.ca_on import water_quality as adapter
+    from src.services import ingest_runs, water_quality
+
+    monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
+    monkeypatch.setattr(water_quality, "get_db", lambda: db)
+    monkeypatch.setattr(adapter, "_RAW_DIR", tmp_path)
+    monkeypatch.setattr(adapter, "load_stations", lambda: {})
+    urls = ["https://example.com/first.csv", "https://example.com/second.csv"]
+    monkeypatch.setattr(
+        adapter,
+        "_get_field_data_resources",
+        lambda: [{"name": str(i), "url": url} for i, url in enumerate(urls)],
+    )
+    attempted = []
+
+    @contextmanager
+    def stream(method, url, **kwargs):
+        attempted.append(url)
+        yield httpx.Response(status, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(adapter.httpx, "stream", stream)
+    assert _run_source([], "PWQMN", "fetching", water_quality.ingest_water_quality_data) == 0
+    assert attempted == urls
+    row = db.execute(
+        "SELECT fetched, stored, skipped, empty_count, status, error FROM ingest_runs"
+    ).fetchone()
+    assert row[:5] == (2, 0, 2, 0, "failed")
+    assert row[5].startswith("HTTPStatusError:")
+    assert str(status) in row[5]
+    assert urls[-1] in row[5]
