@@ -159,3 +159,33 @@ def test_migration_never_overwrites_a_stored_home(tmp_path):
     migrate(db)
 
     assert get_user_home(db, 1)[0] == KAMLOOPS
+
+
+@pytest.mark.raw_db
+def test_migration_preserves_jurisdiction_without_a_home(tmp_path):
+    profile_mod.PROFILE_PATH.write_text(
+        json.dumps({"home_jurisdiction": "CA-BC", "home_location": None})
+    )
+    db = _migrated_up_to_previous(tmp_path / "t.db")
+    migrate(db)
+    profile_mod.PROFILE_PATH.unlink()
+
+    assert get_user_home(db, 1) == (None, "CA-BC")
+    profile, _, jurisdiction = chat._prompt_inputs(db, 1)
+    assert profile.home_location is None
+    assert profile.home_jurisdiction == "CA-BC"
+    assert jurisdiction.code == "CA-BC"
+    assert place_mod._home_point(db, 1) is None
+
+
+def test_jurisdiction_without_a_home_is_per_user(db):
+    _user(db, 2, "bc_angler")
+    db.execute("UPDATE users SET home_jurisdiction = ? WHERE id = ?", ["CA-BC", 2])
+
+    profile, trips, jurisdiction = chat._prompt_inputs(db, 2)
+
+    assert profile.home_location is None
+    assert profile.home_jurisdiction == "CA-BC"
+    assert jurisdiction.code == "CA-BC"
+    assert trips == []
+    assert place_mod._home_point(db, 2) is None

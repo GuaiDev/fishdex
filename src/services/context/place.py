@@ -332,7 +332,7 @@ def _home_point(db: Database, user_id: int) -> tuple[float, float] | None:
     stored = get_user_home(db, user_id)
     if stored is not None:
         home = stored[0]
-        return home.lat, home.lng
+        return (home.lat, home.lng) if home is not None else None
     if user_id != 1:
         return None
     try:
