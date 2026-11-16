@@ -40,8 +40,8 @@ def test_ingest_run_records_failure_and_error(tmp_path):
 
 
 def test_wsc_counts_reach_area_and_cli_ledgers(db, monkeypatch):
-    from types import SimpleNamespace
     from datetime import datetime
+    from types import SimpleNamespace
 
     from src.cli.main import _run_source
     from src.models.ingest_area import AreaIngestResult, IngestSource
@@ -456,6 +456,7 @@ def test_bc_wfs_diagnostics_reach_area_ledger(db, monkeypatch, source, outcome):
 
     monkeypatch.setattr(adapter, "_cached_get", response)
     result = AreaIngestResult(label="BC", source=IngestSource.BC)
+
     def fetch():
         if source == "hydro_network":
             return bc_ingest.ingest_bc_hydro_network(49, -123)[0]
