@@ -216,7 +216,14 @@ def resolve_area(
             raise IngestJobError(f"{jurisdiction} has no area {area!r} (configured: {labels})")
         base = match[0]
         return base.model_copy(
-            update={"radius_km": radius_km or base.radius_for(source), "sources": [source]}
+            update={
+                "radius_km": radius_km if radius_km is not None else base.radius_for(source),
+                "sources": [source],
+                "source_radius_km": {
+                    **base.source_radius_km,
+                    **({source: radius_km} if radius_km is not None else {}),
+                },
+            }
         )
     if lat is not None and lng is not None:
         return IngestArea(

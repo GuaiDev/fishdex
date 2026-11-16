@@ -105,6 +105,30 @@ def test_run_area_dispatches_with_the_per_source_radius(monkeypatch):
     assert results[1].stored == {"CHS tide predictions": 7}
 
 
+@pytest.mark.parametrize("radius, expected", [(None, 100), (20, 20)])
+def test_ingest_source_configured_area_radius_reaches_runner(monkeypatch, radius, expected):
+    calls = []
+    configured = area_ingest.load_areas()
+    monkeypatch.setattr(area_ingest, "load_areas", lambda: configured)
+    monkeypatch.setattr(area_ingest, "ensure_schema", lambda db: None)
+    monkeypatch.setattr(area_ingest, "get_db", lambda: None)
+    monkeypatch.setattr(
+        area_ingest.SourceSpec,
+        "load_runner",
+        lambda self: lambda ctx: calls.append(ctx.radius_km) or 7,
+    )
+    args = ["ingest-source", "CA-NS", "tidal", "--area", "Annapolis River NS"]
+    if radius is not None:
+        args.extend(["--radius", str(radius)])
+
+    out = CliRunner().invoke(app, args)
+
+    assert out.exit_code == 0, out.output
+    assert calls == [expected]
+    original = next(a for a in configured if a.label == "Annapolis River NS")
+    assert original.radius_for("tidal") == 100
+
+
 def _areas_file(tmp_path):
     p = tmp_path / "areas.json"
     p.write_text(
