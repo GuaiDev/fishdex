@@ -133,8 +133,7 @@ Be direct and brief. If water is not visible, say so immediately."""
         structure_section = vision_text.split("4.")[-1][:100] if "4." in vision_text else ""
 
         is_engineered = any(
-            word in vision_text.lower()
-            for word in ["engineered", "ditch", "concrete", "channel"]
+            word in vision_text.lower() for word in ["engineered", "ditch", "concrete", "channel"]
         )
         is_culvert = "culvert" in vision_text.lower()
 

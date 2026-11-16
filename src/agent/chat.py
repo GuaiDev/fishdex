@@ -222,9 +222,7 @@ def run_chat_api(
         m["content"][:200] for m in messages[-4:] if isinstance(m.get("content"), str)
     )
 
-    classification = classify_message(
-        latest_user, recent, user_id=user_id, session_id=session_id
-    )
+    classification = classify_message(latest_user, recent, user_id=user_id, session_id=session_id)
     mode = classification["mode"]
 
     # The reflex path answers from general knowledge with no retrieval and no

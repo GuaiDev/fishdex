@@ -136,8 +136,8 @@ def stream(
 ) -> Iterator[Any]:
     """Streaming twin of `complete`: yields the SDK stream, writes the row on exit.
 
-    The row is written from the final message, so a stream the caller abandons
-    before it finishes is recorded as an error with no tokens.
+    On normal exit, get_final_message() finishes consuming the stream and supplies
+    usage. An exception before that completes records an error with no tokens.
     """
     model = model_for(role)
     client = client_mod.get_client()

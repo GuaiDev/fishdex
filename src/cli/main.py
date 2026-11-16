@@ -1109,7 +1109,8 @@ def usage(days: int = typer.Option(7, "--days", "-d", help="Number of days to sh
     db = get_db()
     window = f"ts >= DATE('now', '-{days} days')"
     rows = db.execute(f"""
-        SELECT DATE(ts), SUM(input_tokens), SUM(output_tokens), COUNT(*), SUM(est_usd), COUNT(*) - COUNT(est_usd)
+        SELECT DATE(ts), SUM(input_tokens), SUM(output_tokens), COUNT(*),
+               SUM(est_usd), COUNT(*) - COUNT(est_usd)
         FROM llm_usage WHERE {window} GROUP BY DATE(ts) ORDER BY 1 DESC
     """).fetchall()
 
@@ -1118,13 +1119,13 @@ def usage(days: int = typer.Option(7, "--days", "-d", help="Number of days to sh
         return
 
     console.print(f"\nModel usage — last {days} days\n")
-    console.print(f"{'Day':<12} {'Input':>10} {'Output':>10} {'Calls':>6} {'Est. USD':>10} {'Unpriced':>8}")
+    console.print(
+        f"{'Day':<12} {'Input':>10} {'Output':>10} {'Calls':>6} {'Est. USD':>10} {'Unpriced':>8}"
+    )
     console.print("-" * 52)
     for day, inp, out, calls, usd, unpriced in rows:
         estimate = "unknown" if usd is None else f"{usd:.4f}"
-        console.print(
-            f"{day:<12} {inp:>10,} {out:>10,} {calls:>6} {estimate:>10} {unpriced:>8}"
-        )
+        console.print(f"{day:<12} {inp:>10,} {out:>10,} {calls:>6} {estimate:>10} {unpriced:>8}")
 
     console.print("\nBy caller (Est. USD, Unpriced):")
     for caller, calls, usd, unpriced in db.execute(f"""

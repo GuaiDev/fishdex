@@ -71,9 +71,7 @@ def _top_locations(db: Database, limit: int = 10) -> list[dict[str, Any]]:
     if "segment_synthesis" not in db.table_names():
         return []
 
-    rows = db.execute(
-        "SELECT lat, lng, location_name, hit_count FROM segment_synthesis"
-    ).fetchall()
+    rows = db.execute("SELECT lat, lng, location_name, hit_count FROM segment_synthesis").fetchall()
 
     clusters: dict[tuple, dict[str, Any]] = {}
     for lat, lng, location_name, hit_count in rows:
@@ -85,13 +83,16 @@ def _top_locations(db: Database, limit: int = 10) -> list[dict[str, Any]]:
         else:
             continue
 
-        entry = clusters.setdefault(key, {
-            "lat": round(lat, _CLUSTER_DECIMALS) if lat is not None else None,
-            "lng": round(lng, _CLUSTER_DECIMALS) if lng is not None else None,
-            "query_count": 0,
-            "distinct_cache_entries": 0,
-            "sample_location_name": location_name,
-        })
+        entry = clusters.setdefault(
+            key,
+            {
+                "lat": round(lat, _CLUSTER_DECIMALS) if lat is not None else None,
+                "lng": round(lng, _CLUSTER_DECIMALS) if lng is not None else None,
+                "query_count": 0,
+                "distinct_cache_entries": 0,
+                "sample_location_name": location_name,
+            },
+        )
         entry["query_count"] += queries
         entry["distinct_cache_entries"] += 1
         if location_name and not entry["sample_location_name"]:
@@ -192,9 +193,7 @@ def _catch_stats(db: Database, species_limit: int = 10, pb_limit: int = 10) -> d
             "ORDER BY pb.best_size_cm DESC LIMIT ?",
             [pb_limit],
         ).fetchall()
-        top_largest = [
-            {"species": r[0], "biggest_size_cm": r[1], "username": r[2]} for r in rows
-        ]
+        top_largest = [{"species": r[0], "biggest_size_cm": r[1], "username": r[2]} for r in rows]
 
     total_sessions = (
         db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
@@ -242,14 +241,16 @@ def _api_cost_estimate(db: Database) -> dict[str, Any]:
         for model, calls, inp, out, usd, unpriced, searches in db.execute(sql).fetchall():
             unpriced_calls += unpriced or 0
             total_usd += usd or 0.0
-            by_model.append({
-                "model": model,
-                "calls": calls,
-                "input_tokens": inp or 0,
-                "output_tokens": out or 0,
-                "web_searches": searches or 0,
-                "estimated_usd": None if unpriced == calls else round(usd or 0.0, 4),
-            })
+            by_model.append(
+                {
+                    "model": model,
+                    "calls": calls,
+                    "input_tokens": inp or 0,
+                    "output_tokens": out or 0,
+                    "web_searches": searches or 0,
+                    "estimated_usd": None if unpriced == calls else round(usd or 0.0, 4),
+                }
+            )
         result[window_name] = {
             "by_model": sorted(by_model, key=lambda m: m["calls"], reverse=True),
             "total_usd": round(total_usd, 4),
@@ -257,16 +258,24 @@ def _api_cost_estimate(db: Database) -> dict[str, Any]:
         }
 
     result["by_caller_30_days"] = [
-        {"caller": c, "calls": n, "estimated_usd": None if u is None else round(u, 4),
-         "unpriced_calls": unpriced}
+        {
+            "caller": c,
+            "calls": n,
+            "estimated_usd": None if u is None else round(u, 4),
+            "unpriced_calls": unpriced,
+        }
         for c, n, u, unpriced in db.execute(
             "SELECT caller, COUNT(*), SUM(est_usd), COUNT(*) - COUNT(est_usd) FROM llm_usage "
             "WHERE ts >= datetime('now', '-30 days') GROUP BY caller ORDER BY SUM(est_usd) DESC"
         ).fetchall()
     ]
     result["by_user_30_days"] = [
-        {"user_id": uid, "calls": n, "estimated_usd": None if u is None else round(u, 4),
-         "unpriced_calls": unpriced}
+        {
+            "user_id": uid,
+            "calls": n,
+            "estimated_usd": None if u is None else round(u, 4),
+            "unpriced_calls": unpriced,
+        }
         for uid, n, u, unpriced in db.execute(
             "SELECT user_id, COUNT(*), SUM(est_usd), COUNT(*) - COUNT(est_usd) FROM llm_usage "
             "WHERE ts >= datetime('now', '-30 days') GROUP BY user_id ORDER BY SUM(est_usd) DESC"

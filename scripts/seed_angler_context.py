@@ -2,7 +2,9 @@
 One-time script to seed the angler context from existing session summaries.
 Run with: uv run python scripts/seed_angler_context.py
 """
+
 import sys
+
 sys.path.insert(0, "src")
 
 from storage.angler_context import update_context
@@ -11,12 +13,14 @@ from storage.database import ensure_schema, get_db
 db = get_db()
 ensure_schema(db)
 
-summaries = list(db.execute("""
+summaries = list(
+    db.execute("""
     SELECT summary, started_at FROM chat_sessions
     WHERE summary IS NOT NULL
       AND LENGTH(summary) > 100
     ORDER BY started_at ASC
-""").fetchall())
+""").fetchall()
+)
 
 if not summaries:
     print("No existing summaries to seed from.")

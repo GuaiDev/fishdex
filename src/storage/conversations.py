@@ -23,22 +23,27 @@ def save_turn(db: Database, session_id: str, role: str, content: str, turn_index
     """Save a single user or assistant message."""
     if not isinstance(content, str) or not content.strip():
         return  # skip tool call blocks and empty messages
-    db["chat_messages"].insert({
-        "session_id": session_id,
-        "role": role,
-        "content": content,
-        "turn_index": turn_index,
-        "created_at": datetime.now().isoformat(),
-    })
+    db["chat_messages"].insert(
+        {
+            "session_id": session_id,
+            "role": role,
+            "content": content,
+            "turn_index": turn_index,
+            "created_at": datetime.now().isoformat(),
+        }
+    )
     db["chat_sessions"].update(session_id, {"turn_count": turn_index + 1})
 
 
 def end_session(db: Database, session_id: str, summary: str | None = None) -> None:
     """Mark session as ended, optionally store a summary."""
-    db["chat_sessions"].update(session_id, {
-        "ended_at": datetime.now().isoformat(),
-        "summary": summary,
-    })
+    db["chat_sessions"].update(
+        session_id,
+        {
+            "ended_at": datetime.now().isoformat(),
+            "summary": summary,
+        },
+    )
 
 
 def generate_session_summary(
@@ -46,8 +51,7 @@ def generate_session_summary(
 ) -> str:
     """Generate a compact summary of the session using Haiku."""
     text_messages = [
-        m for m in messages
-        if isinstance(m.get("content"), str) and m.get("content", "").strip()
+        m for m in messages if isinstance(m.get("content"), str) and m.get("content", "").strip()
     ]
 
     if not text_messages:
@@ -58,10 +62,7 @@ def generate_session_summary(
         "Include: locations discussed, species targeted, tactics/baits mentioned, "
         "any plans made (trips, spots to try), and any conclusions reached. "
         "Be concise — this will be loaded as context in a future session.\n\n"
-        + "\n".join(
-            f"{m['role'].upper()}: {m['content'][:400]}"
-            for m in text_messages[-20:]
-        )
+        + "\n".join(f"{m['role'].upper()}: {m['content'][:400]}" for m in text_messages[-20:])
     )
 
     response = llm.complete(

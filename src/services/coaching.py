@@ -167,6 +167,4 @@ def get_location_coaching(
             "instead. 150-200 words.",
         ]
     )
-    return _ask(
-        prompt, max_tokens=450, user_id=user_id, caller="coaching.get_location_coaching"
-    )
+    return _ask(prompt, max_tokens=450, user_id=user_id, caller="coaching.get_location_coaching")

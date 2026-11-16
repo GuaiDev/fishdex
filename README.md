@@ -162,7 +162,17 @@ Optional keys unlock individual adapters and features:
 | `DATASTREAM_API_KEY` | DataStream water quality |
 | `FISHBOT_API_KEY` | Web API authentication — **required** for admin endpoints (see below) |
 
-Note that `.env.example` currently documents only `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`, `LOG_LEVEL` and `DATASTREAM_API_KEY` — the rest are read by code but undocumented there.
+See [.env.example](.env.example) for model override configuration and basic setup;
+the optional keys above are read by code but are not all listed there.
+
+`uv run python -m src.cli.main usage --days 7` shows daily model calls, tokens,
+and estimated USD, plus a caller breakdown. It reads the `llm_usage` ledger,
+which records gateway calls from migration 28 onward; historical `api_usage`
+rows are not included. Estimates are stored at call time using
+[`src/llm/pricing.py`](src/llm/pricing.py), including prompt caching and web searches.
+An unknown estimate appears as `unknown`; `Unpriced` counts calls without an
+estimate, and a mixed group's amount covers only its priced calls. These are
+budget estimates; Anthropic's console remains the billing authority.
 
 ### Setting `FISHBOT_API_KEY` locally
 

@@ -25,7 +25,6 @@ SKIPPED_TRIPS = [
     nothing — carp may have been spawning. Then tried Lake Aquitaine in Mississauga
     with a trout magnet for panfish, caught nothing.
     """,
-
     # Multi-stop day — went to one spot, moved to another
     """
     April 17 2025. Originally went to Greenway Dog Park on the Thames River in London
@@ -33,20 +32,17 @@ SKIPPED_TRIPS = [
     instead. At The Forks caught one shorthead redhorse and one 8 lb silver redhorse
     despite the high water.
     """,
-
     # Vague multi-session
     """
     March 2025, multiple sessions in London Ontario. Tried several times for suckers
     using worms. Also tried for walleye using white grubs with chartreuse tails.
     Did not catch anything in any of these sessions.
     """,
-
     # Lake Ontario — no OHN segment
     """
     December 2024 or February 2025. Downtown Oakville pier on Lake Ontario.
     Cast spoons targeting trout and pike. Caught nothing.
     """,
-
     # Lake Ontario ice fishing
     """
     December 2024 or February 2025. Burloak Boat Club harbour on Lake Ontario,
@@ -62,14 +58,14 @@ def main(auto: bool = False) -> None:
     total_stops = 0
 
     for i, trip_text in enumerate(SKIPPED_TRIPS, 1):
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Trip {i}/{len(SKIPPED_TRIPS)}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print(f"Text: {trip_text.strip()[:120]}...")
 
         parsed = parse_session_from_text(trip_text.strip(), db, user_id=1)
 
-        print(f"\nParsed JSON:")
+        print("\nParsed JSON:")
         print(json.dumps(parsed, indent=2, default=str))
 
         if auto:
@@ -87,7 +83,7 @@ def main(auto: bool = False) -> None:
         total_stops += result["stops_logged"]
         print(f"Logged: session #{result['session_id']}, {result['stops_logged']} stops.")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Done. {total_sessions} sessions logged, {total_stops} stops total.")
 
 

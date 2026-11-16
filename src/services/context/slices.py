@@ -168,9 +168,7 @@ def _escalate(
         and local_reason is EmptyReason.SOURCE_DOES_NOT_COVER_AREA
     ):
         reason = local_reason
-    return RecordsSlice(
-        radius_km=place.radius_km, empty_reason=reason, escalated_to_web=True
-    )
+    return RecordsSlice(radius_km=place.radius_km, empty_reason=reason, escalated_to_web=True)
 
 
 def _no_records_reason(db: Database) -> EmptyReason:
@@ -197,9 +195,7 @@ def _merge(found: dict[str, SpeciesRecord], rec: SpeciesRecord) -> None:
     # because a separate rule swapped in the precise record's provenance while
     # leaving the recent record's date in place. Two dates for one record, and
     # nothing to tell the reader which is real.
-    if rec.most_recent and (
-        existing.most_recent is None or rec.most_recent > existing.most_recent
-    ):
+    if rec.most_recent and (existing.most_recent is None or rec.most_recent > existing.most_recent):
         existing.most_recent = rec.most_recent
         existing.provenance = rec.provenance
         existing.is_obscured = rec.is_obscured
@@ -252,9 +248,7 @@ def _inat_records(
     return out
 
 
-def _gbif_records(
-    db: Database, place: Place, species_filter: str | None
-) -> list[SpeciesRecord]:
+def _gbif_records(db: Database, place: Place, species_filter: str | None) -> list[SpeciesRecord]:
     if "gbif_observations" not in db.table_names():
         return []
     try:
@@ -444,10 +438,7 @@ def _fill_substrate(db: Database, place: Place, out: WaterSlice) -> None:
         out.substrate = ContextField.empty(EmptyReason.NO_RECORDS_IN_RADIUS)
         return
 
-    category = (
-        getattr(unit, "substrate_class", None)
-        or getattr(unit, "primary_material", None)
-    )
+    category = getattr(unit, "substrate_class", None) or getattr(unit, "primary_material", None)
     meaning = translate.substrate(category)
     out.substrate = (
         ContextField.recorded(category, source="Ontario surficial geology", meaning=meaning)
@@ -563,16 +554,12 @@ def _fill_benthic(db: Database, place: Place, out: WaterSlice) -> None:
     try:
         from src.storage.benthic import query_benthic
 
-        rows = query_benthic(
-            db, lat=place.lat, lng=place.lng, radius_km=max(place.radius_km, 25.0)
-        )
+        rows = query_benthic(db, lat=place.lat, lng=place.lng, radius_km=max(place.radius_km, 25.0))
     except Exception:  # noqa: BLE001
         logger.warning("benthic slice failed", exc_info=True)
         rows = []
 
-    vals = [
-        r.ept_proportion for r in rows if getattr(r, "ept_proportion", None) is not None
-    ]
+    vals = [r.ept_proportion for r in rows if getattr(r, "ept_proportion", None) is not None]
     if not vals:
         out.benthic_health = ContextField.empty(EmptyReason.NO_RECORDS_IN_RADIUS)
         return
@@ -662,9 +649,7 @@ def _has_barrier_coverage(db: Database, place: Place) -> bool:
     return False
 
 
-def _confluence_and_waterbody(
-    db: Database, place: Place
-) -> tuple[ContextField, ContextField]:
+def _confluence_and_waterbody(db: Database, place: Place) -> tuple[ContextField, ContextField]:
     """Structural flags from the Phase 3a feature matrix, when it is present."""
     if not place.segment_ids or not _FEATURE_MATRIX_PATH.exists():
         empty = ContextField.empty(
@@ -728,11 +713,7 @@ def _barrier_counts(db: Database, place: Place) -> tuple[int, int]:
     say "fish stack below the dam"; not good enough to count fish passage.
     """
     deg = max(place.radius_km, 10.0) / _KM_PER_DEGREE
-    rows = list(
-        db["barriers"].rows_where(
-            "nearest_segment_ogf_id IS NOT NULL", [], limit=5000
-        )
-    )
+    rows = list(db["barriers"].rows_where("nearest_segment_ogf_id IS NOT NULL", [], limit=5000))
     up = down = 0
     for r in rows:
         blat, blng = _barrier_point(r)
@@ -900,9 +881,7 @@ def _fill_weather(place: Place, out: ConditionsSlice, now: datetime) -> None:
     seen = raw.get("time")
 
     def field(key: str, meaning: str | None = None) -> ContextField:
-        return _live_field(
-            raw, key, "Open-Meteo", seen, WEATHER_STALE_S, now, unavailable, meaning
-        )
+        return _live_field(raw, key, "Open-Meteo", seen, WEATHER_STALE_S, now, unavailable, meaning)
 
     out.air_temp_c = field("temperature_c")
     out.wind_speed_kmh = field("wind_speed_kmh")
@@ -915,6 +894,7 @@ def _fill_gauge(db: Database, place: Place, out: ConditionsSlice, now: datetime)
     from src.services.stream_gauge import nearest_gauge
 
     fields = ("flow_cms", "flow_trend", "level_m", "level_trend")
+
     def own_water(candidates: list[str]) -> list[str] | None:
         try:
             return water_names_at(db, place, candidates)

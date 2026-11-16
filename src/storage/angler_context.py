@@ -3,6 +3,7 @@ Persistent rolling context document for the angler.
 A single document that accumulates knowledge across all chat sessions.
 Updated after each meaningful session ends.
 """
+
 from datetime import datetime
 
 from sqlite_utils import Database
@@ -81,17 +82,22 @@ def save_context(db: Database, content: str, user_id: int = 1) -> None:
         None,
     )
     if existing:
-        db["angler_context"].update(existing["id"], {
-            "content": content.strip(),
-            "last_updated": datetime.now().isoformat(),
-            "session_count": (existing.get("session_count") or 0) + 1,
-        })
+        db["angler_context"].update(
+            existing["id"],
+            {
+                "content": content.strip(),
+                "last_updated": datetime.now().isoformat(),
+                "session_count": (existing.get("session_count") or 0) + 1,
+            },
+        )
     else:
-        db["angler_context"].insert({
-            "user_id": user_id,
-            "content": content.strip(),
-            "last_updated": datetime.now().isoformat(),
-        })
+        db["angler_context"].insert(
+            {
+                "user_id": user_id,
+                "content": content.strip(),
+                "last_updated": datetime.now().isoformat(),
+            }
+        )
     db.conn.commit()
 
 
@@ -125,8 +131,9 @@ def correct_context(db: Database, user_id: int = 1) -> None:
 def _validate_context(context: str, session_summary: str, existing: str = "") -> list[str]:
     """Check for river names in context that weren't in the session summary or existing context."""
     import re
+
     warnings = []
-    river_pattern = re.compile(r',\s*([\w\s]+River)', re.IGNORECASE)
+    river_pattern = re.compile(r",\s*([\w\s]+River)", re.IGNORECASE)
     context_rivers = set(m.lower() for m in river_pattern.findall(context))
     summary_rivers = set(m.lower() for m in river_pattern.findall(session_summary))
     existing_rivers = set(m.lower() for m in river_pattern.findall(existing))
@@ -166,8 +173,4 @@ def update_context(db: Database, session_summary: str, user_id: int = 1) -> str:
 
 def format_context_for_prompt(context: str) -> str:
     """Format the angler context document for injection into the system prompt."""
-    return (
-        "## What I know about your fishing\n\n"
-        + context
-        + "\n\n---"
-    )
+    return "## What I know about your fishing\n\n" + context + "\n\n---"
