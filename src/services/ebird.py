@@ -50,7 +50,6 @@ def fetch_and_store(
 ) -> int:
     """Fetch piscivore observations and upsert to DB. Returns count stored."""
     obs = fetch_piscivore_observations(lat, lng, radius_km, days_back)
-    record_counts(fetched=1, empty=int(not obs))
     if obs:
         upsert_bird_observations(get_db(), obs)
     record_counts(stored=len(obs))

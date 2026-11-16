@@ -25,6 +25,7 @@ import httpx
 
 from src.jurisdictions.geo import jurisdiction_for_coords
 from src.models.gbif_observation import GBIFObservation
+from src.services.ingest_runs import record_counts
 
 _API_URL = "https://api.gbif.org/v1/occurrence/search"
 _CACHE_DIR = Path("data/cache/gbif")
@@ -88,6 +89,7 @@ def fetch_gbif_observations(
             params = {**base_params, "offset": offset}
             raw = _cached_get(params)
             results = raw.get("results", [])
+            record_counts(fetched=1, empty=int(not results))
             all_results.extend(results)
 
             if raw.get("endOfRecords", True) or not results:
@@ -96,6 +98,7 @@ def fetch_gbif_observations(
             offset += len(results)
             time.sleep(1)
 
+    record_counts(skipped=sum(not _has_coords(r) for r in all_results))
     return [_parse_observation(r) for r in all_results if _has_coords(r)]
 
 

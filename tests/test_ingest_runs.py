@@ -265,3 +265,99 @@ def test_pwqmn_http_download_failures_reach_ledger(db, monkeypatch, tmp_path, st
     assert row[5].startswith("HTTPStatusError:")
     assert str(status) in row[5]
     assert urls[-1] in row[5]
+
+
+@pytest.mark.parametrize("wrapper", ["area", "cli"])
+def test_gbif_order_and_page_counts_reach_ledger(db, monkeypatch, wrapper):
+    from src.cli.main import _run_source
+    from src.models.ingest_area import AreaIngestResult, IngestSource
+    from src.services import area_ingest, gbif, ingest_runs
+
+    monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
+    monkeypatch.setattr(gbif, "get_db", lambda: db)
+    monkeypatch.setattr(gbif._gbif.time, "sleep", lambda seconds: None)
+    requests = []
+
+    def response(params):
+        requests.append((params["orderKey"], params["offset"]))
+        if params["orderKey"] == gbif._gbif._FISH_ORDER_KEYS[0]:
+            if params["offset"] == 0:
+                return {
+                    "results": [
+                        {
+                            "key": 1,
+                            "species": "Esox lucius",
+                            "decimalLatitude": 45,
+                            "decimalLongitude": -65,
+                        }
+                    ],
+                    "endOfRecords": False,
+                }
+        return {"results": [], "endOfRecords": True}
+
+    monkeypatch.setattr(gbif._gbif, "_cached_get", response)
+    if wrapper == "area":
+        result = AreaIngestResult(label="Coast", source=IngestSource.GLOBAL)
+        area_ingest._attempt(result, "GBIF", lambda: gbif.fetch_and_store(45, -65))
+        assert result.stored == {"GBIF": 1}
+    else:
+        assert _run_source([], "GBIF", "fetching", gbif.fetch_and_store, 45, -65) == 1
+    assert len(requests) == 14
+    assert requests[:2] == [
+        (gbif._gbif._FISH_ORDER_KEYS[0], 0),
+        (gbif._gbif._FISH_ORDER_KEYS[0], 1),
+    ]
+    assert db.execute("SELECT COUNT(*) FROM gbif_observations").fetchone() == (1,)
+    assert db.execute(
+        "SELECT fetched, stored, skipped, empty_count, status FROM ingest_runs"
+    ).fetchone() == (14, 1, 0, 13, "warning")
+
+
+@pytest.mark.parametrize("failure", ["timeout", "http", "partial", "empty", "missing_key"])
+def test_ebird_request_diagnostics_reach_ledger(db, monkeypatch, failure):
+    import httpx
+
+    from src.cli.main import _run_source
+    from src.services import ebird, ingest_runs
+
+    monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
+    monkeypatch.setattr(ebird, "get_db", lambda: db)
+    monkeypatch.setenv("EBIRD_API_KEY", "" if failure == "missing_key" else "test-key")
+    monkeypatch.setattr(ebird._ebird_ingest.time, "sleep", lambda seconds: None)
+    requests = []
+
+    def response(api_key, species_code, *args):
+        requests.append(species_code)
+        if failure == "empty":
+            return []
+        if failure == "partial" and len(requests) > 1:
+            return [
+                {"subId": "survey", "lat": 45, "lng": -65, "obsDt": "2026-11-16", "comName": "Bird"}
+            ]
+        if failure == "http":
+            httpx.Response(
+                500, request=httpx.Request("GET", "https://example.com")
+            ).raise_for_status()
+        raise httpx.ReadTimeout("eBird unavailable")
+
+    monkeypatch.setattr(ebird._ebird_ingest, "_cached_get", response)
+    count = _run_source([], "eBird", "fetching", ebird.fetch_and_store, 45, -65)
+    row = db.execute(
+        "SELECT fetched, stored, skipped, empty_count, status, error FROM ingest_runs"
+    ).fetchone()
+    if failure == "missing_key":
+        assert requests == []
+        assert count == 0
+        assert row == (0, 0, 1, 0, "success", None)
+    else:
+        assert requests == ebird._ebird_ingest.PISCIVORE_CODES
+        if failure == "empty":
+            assert count == 0
+            assert row == (5, 0, 0, 5, "success", None)
+        else:
+            stored = 4 if failure == "partial" else 0
+            assert count == stored
+            assert row[:5] == (5, stored, 1 if stored else 5, 0, "failed")
+            assert row[5].startswith("HTTPStatusError:" if failure == "http" else "ReadTimeout:")
+            if stored:
+                assert db.execute("SELECT COUNT(*) FROM bird_observations").fetchone() == (4,)
