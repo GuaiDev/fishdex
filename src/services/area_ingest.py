@@ -53,12 +53,7 @@ def _attempt(result: AreaIngestResult, name: str, fn: Callable[[], object]) -> N
     """Run one dataset; record its count, or its error, on `result`."""
     from src.services.ingest_runs import ingest_run
 
-    jurisdiction = {
-        IngestSource.GLOBAL: "CA-ON", IngestSource.BC: "CA-BC",
-        IngestSource.AB: "CA-AB", IngestSource.QC: "CA-QC",
-        IngestSource.MB: "CA-MB", IngestSource.SK: "CA-SK",
-    }.get(result.source)
-    with ingest_run(name, jurisdiction=jurisdiction, area=result.label) as run:
+    with ingest_run(name, jurisdiction=result.jurisdiction, area=result.label) as run:
         try:
             value = fn()
         except Exception as exc:  # noqa: BLE001 - isolation is the point
@@ -72,12 +67,18 @@ def _attempt(result: AreaIngestResult, name: str, fn: Callable[[], object]) -> N
         else:
             count = int(value or 0)
             result.stored[name] = count
-        run.record(fetched=max(count, 1), stored=count, empty=1 if not count else 0)
+        if not run.fetched and not run.skipped:
+            run.record(stored=count)
         _log.info("[%s] %s: %s", result.label, name, value)
 
 
 def run_global_ingest(
-    lat: float, lng: float, radius_km: float, label: str, days_back: int | None = 90
+    lat: float,
+    lng: float,
+    radius_km: float,
+    label: str,
+    days_back: int | None = 90,
+    jurisdiction: str | None = None,
 ) -> AreaIngestResult:
     """Run iNat, GBIF, WSC, OSM, and the SDM retrain check for a location."""
     from src.services.gbif import fetch_and_store as gbif_fetch
@@ -90,7 +91,7 @@ def run_global_ingest(
     )
     db = get_db()
     ensure_schema(db)
-    result = AreaIngestResult(label=label, source=GLOBAL_SOURCE)
+    result = AreaIngestResult(label=label, source=GLOBAL_SOURCE, jurisdiction=jurisdiction)
 
     _attempt(
         result,
@@ -186,7 +187,9 @@ def run_area(area: IngestArea, source: str, days_back: int | None = 90) -> AreaI
     spec = check_job(area.jurisdiction, source)
     radius = area.radius_for(source)
     if spec is None:
-        return run_global_ingest(area.lat, area.lng, radius, area.label, days_back)
+        return run_global_ingest(
+            area.lat, area.lng, radius, area.label, days_back, jurisdiction=area.jurisdiction
+        )
 
     _log.info(
         "[%s] %s %s started — lat=%.4f lng=%.4f radius=%.0fkm",
@@ -198,7 +201,7 @@ def run_area(area: IngestArea, source: str, days_back: int | None = 90) -> AreaI
         radius,
     )
     ensure_schema(get_db())
-    result = AreaIngestResult(label=area.label, source=source)
+    result = AreaIngestResult(label=area.label, source=source, jurisdiction=area.jurisdiction)
     ctx = AreaContext(area.label, area.lat, area.lng, radius)
     _attempt(result, spec.label or source, lambda: spec.load_runner()(ctx))
     return result

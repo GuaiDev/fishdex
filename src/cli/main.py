@@ -272,7 +272,9 @@ class _SourceResult:
         self.error = error
 
 
-def _run_source(results: list, name: str, announce: str, fn, *args, **kwargs) -> object:
+def _run_source(
+    results: list, name: str, announce: str, fn, *args, jurisdiction: str | None = "CA-ON", **kwargs
+) -> object:
     """Run one ingest source in isolation.
 
     A single flaky source used to abort the whole run: a GBIF timeout took out
@@ -287,7 +289,7 @@ def _run_source(results: list, name: str, announce: str, fn, *args, **kwargs) ->
     console.print(f"[dim]{announce}[/dim]")
     from src.services.ingest_runs import ingest_run
 
-    with ingest_run(name, jurisdiction="CA-ON") as run:
+    with ingest_run(name, jurisdiction=jurisdiction) as run:
         try:
             value = fn(*args, **kwargs)
         except KeyboardInterrupt:
@@ -309,9 +311,8 @@ def _run_source(results: list, name: str, announce: str, fn, *args, **kwargs) ->
         else:
             count = value
         if isinstance(count, (int, float)):
-            run.record(
-                fetched=max(int(count), 1), stored=int(count or 0), empty=1 if not count else 0
-            )
+            if not run.fetched and not run.skipped:
+                run.record(stored=int(count or 0))
         results.append(_SourceResult(name, True, detail=_describe_result(value)))
         return value
 
@@ -400,6 +401,8 @@ def ingest(
     _cas = _importlib.import_module("src.ingest.global.ca_boundaries")
     _crown = _importlib.import_module("src.ingest.global.crown_land")
 
+    from src.jurisdictions.geo import jurisdiction_for_coords
+
     results: list = []
     r = results  # every source below is isolated; one failure does not stop the rest
 
@@ -413,6 +416,7 @@ def ingest(
         center_lng,
         radius_km=radius_km,
         days_back=days_back,
+        jurisdiction=jurisdiction_for_coords(center_lat, center_lng),
     )
     _run_source(
         r,
@@ -422,6 +426,7 @@ def ingest(
         center_lat,
         center_lng,
         radius_km=radius_km,
+        jurisdiction=jurisdiction_for_coords(center_lat, center_lng),
     )
     _run_source(
         r,
@@ -431,6 +436,7 @@ def ingest(
         center_lat,
         center_lng,
         radius_km=radius_km,
+        jurisdiction=jurisdiction_for_coords(center_lat, center_lng),
     )
     _run_source(
         r,
@@ -439,6 +445,7 @@ def ingest(
         osm_fetch_and_store,
         center_lat,
         center_lng,
+        jurisdiction=jurisdiction_for_coords(center_lat, center_lng),
     )
     _run_source(
         r,
@@ -508,6 +515,7 @@ def ingest(
         center_lat,
         center_lng,
         radius_km,
+        jurisdiction=jurisdiction_for_coords(center_lat, center_lng),
     )
     _run_source(
         r,
@@ -687,7 +695,7 @@ def ingest_hydat() -> None:
 
     with ingest_run("HydAT temperature", jurisdiction="CA") as run:
         count = _hydat.derive_from_pwqmn(get_db())
-        run.record(fetched=max(count, 1), stored=count, empty=1 if not count else 0)
+        run.record(stored=count)
     console.print(f"Derived thermal regime for {count} stations from PWQMN water quality data")
 
 
@@ -935,7 +943,7 @@ def ingest_fmz() -> None:
 
     with ingest_run("FMZ boundaries", jurisdiction="CA-ON") as run:
         n = ingest_fmz_boundaries()
-        run.record(fetched=max(n, 1), stored=n, empty=1 if not n else 0)
+        run.record(stored=n)
     if n:
         console.print(f"[green]FMZ boundaries stored: {n} zones[/green]")
     else:
@@ -1507,8 +1515,10 @@ def ingest_trca() -> None:
         records = trca.parse_survey_records(path, source_url=url)
         written = upsert_fish_surveys(db, records)
         run.record(
-            fetched=max(len(records), 1), stored=written,
-            skipped=max(len(records) - written, 0), empty=1 if not records else 0
+            fetched=max(len(records), 1),
+            stored=written,
+            skipped=max(len(records) - written, 0),
+            empty=1 if not records else 0,
         )
 
     n_events = db.execute(

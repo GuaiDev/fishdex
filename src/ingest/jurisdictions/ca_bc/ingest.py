@@ -18,6 +18,7 @@ import logging
 from datetime import datetime
 
 from src.jurisdictions.plugin import AreaContext
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,7 @@ def ingest_bc_hydro_network(
         "FWA: fetching stream segments — lat=%.4f lon=%.4f radius=%.0fkm", lat, lon, radius_km
     )
     segments = _fwa.fetch_watercourses(lat, lon, radius_km)
+    record_counts(fetched=1, empty=int(not segments))
     logger.info("FWA: %d segments fetched from WFS", len(segments))
 
     now = datetime.utcnow().isoformat()
@@ -71,6 +73,7 @@ def ingest_bc_hydro_network(
         db["stream_segments"].insert_all(seg_rows, pk="ogf_id", replace=True)
 
     logger.info("FWA: %d segments stored to DB", len(segments))
+    record_counts(stored=len(segments))
     return len(segments), 0
 
 
@@ -89,10 +92,12 @@ def ingest_fiss_observations(
         "FISS: fetching fish observations — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km
     )
     observations = _fiss.fetch_observations(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not observations))
     logger.info("FISS: %d observations fetched from WFS", len(observations))
     if observations:
         upsert_observations(db, observations)
     logger.info("FISS: %d observations stored to DB", len(observations))
+    record_counts(stored=len(observations))
     return len(observations)
 
 
@@ -115,9 +120,11 @@ def ingest_bc_water_quality(
         "BC EnMoDS: fetching water quality — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km
     )
     readings = _wq.fetch_water_quality_readings(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not readings))
     if readings:
         upsert_water_quality_readings(db, readings)
     logger.info("BC EnMoDS: %d readings stored", len(readings))
+    record_counts(stored=len(readings))
     return len(readings)
 
 
@@ -136,11 +143,13 @@ def ingest_fiss_stocking(
     db = get_db()
     logger.info("FISS stocking: extracting stocking records — lat=%.4f lng=%.4f", lat, lng)
     rows = _fiss.fetch_stocking_from_fiss(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not rows))
     if rows:
         # stocking_records has no ingested_at column (unlike regulation_chunks) —
         # upsert_all would raise sqlite3.OperationalError if we set one.
         db["stocking_records"].upsert_all(rows, pk="record_id")
     logger.info("FISS stocking: %d stocking records stored", len(rows))
+    record_counts(stored=len(rows))
     return len(rows)
 
 
@@ -154,12 +163,14 @@ def ingest_bc_nuseds() -> int:
     db = get_db()
     logger.info("NuSEDS: downloading and parsing salmon escapement …")
     rows = _nuseds.fetch_salmon_escapement()
+    record_counts(fetched=1, empty=int(not rows))
     if rows:
         now = datetime.utcnow().isoformat()
         for r in rows:
             r["ingested_at"] = now
         db["salmon_escapement"].upsert_all(rows, pk="record_id")
     logger.info("NuSEDS: %d escapement records stored", len(rows))
+    record_counts(stored=len(rows))
     return len(rows)
 
 
@@ -169,9 +180,11 @@ def ingest_bc_regulations() -> int:
     db = get_db()
     logger.info("BC regulations: fetching and parsing PDF …")
     chunks = _regs.fetch_regulations()
+    record_counts(fetched=1, empty=int(not chunks))
     if chunks:
         _upsert_regulation_chunks(db, chunks)
     logger.info("BC regulations: %d chunks stored", len(chunks))
+    record_counts(stored=len(chunks))
     return len(chunks)
 
 

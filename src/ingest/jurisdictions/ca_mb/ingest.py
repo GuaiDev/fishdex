@@ -15,6 +15,7 @@ import logging
 from datetime import datetime
 
 from src.jurisdictions.plugin import AreaContext
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ def ingest_mb_hydro_network(
         radius_km,
     )
     segments = _wallas.fetch_watercourses(lat, lon, radius_km)
+    record_counts(fetched=1, empty=int(not segments))
     logger.info("WaLLAS: %d segments fetched", len(segments))
 
     now = datetime.utcnow().isoformat()
@@ -68,6 +70,7 @@ def ingest_mb_hydro_network(
         db["stream_segments"].insert_all(seg_rows, pk="ogf_id", replace=True)
 
     logger.info("WaLLAS: %d segments stored to DB", len(segments))
+    record_counts(stored=len(segments))
     return len(segments), 0
 
 
@@ -82,10 +85,12 @@ def ingest_mb_stocking(
 
     logger.info("MB stocking: fetching — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km)
     rows = _mb.fetch_stocking_records(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not rows))
     if rows:
         # stocking_records has no ingested_at column — see ca_ab/stocking.py note.
         db["stocking_records"].upsert_all(rows, pk="record_id")
     logger.info("MB stocking: %d records stored", len(rows))
+    record_counts(stored=len(rows))
     return len(rows)
 
 

@@ -17,11 +17,15 @@ def fetch_and_store(
     radius_km: float = 50,
     days_back: int | None = 90,
 ) -> int:
+    from src.services.ingest_runs import record_counts
+
     observations = fetch_observations(lat, lng, radius_km, days_back)
+    record_counts(fetched=1, empty=int(not observations))
     if not observations:
         return 0
     db = get_db()
     upsert_observations(db, observations)
+    record_counts(stored=len(observations))
     return len(observations)
 
 
