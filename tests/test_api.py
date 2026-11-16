@@ -146,9 +146,7 @@ def test_server_ingest_routes_refuse_with_cli_directions(monkeypatch, body):
 def test_per_province_ingest_routes_are_retired(monkeypatch, province):
     """One generic `fishbot ingest-source` replaced /ingest/data-<prov>; the routes are gone."""
     monkeypatch.setenv("FISHBOT_API_KEY", "test-key")
-    response = client.post(
-        f"/ingest/data-{province}", json={}, headers={"X-Api-Key": "test-key"}
-    )
+    response = client.post(f"/ingest/data-{province}", json={}, headers={"X-Api-Key": "test-key"})
     assert response.status_code in (404, 405), response.status_code
 
 
