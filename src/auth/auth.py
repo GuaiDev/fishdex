@@ -93,6 +93,10 @@ def get_user_from_token(db: Database, token: str) -> dict | None:
     """
     Validate a session token and return the user dict.
     Returns None if token is invalid or expired.
+
+    Activity timestamps are best-effort and throttled to once per five minutes
+    per session. The conditional session update arbitrates concurrent stale
+    readers; only its winner updates users.last_seen_at in the same transaction.
     """
     if not token:
         return None
