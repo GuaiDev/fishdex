@@ -67,7 +67,6 @@ def ingest_qc_water_quality(
         radius_km,
     )
     readings = _mod.fetch_water_quality_readings(lat, lng, radius_km)
-    record_counts(fetched=1, empty=int(not readings))
     if readings:
         from src.storage.water_quality import upsert_water_quality_readings
 

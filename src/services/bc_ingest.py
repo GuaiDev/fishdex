@@ -40,7 +40,6 @@ def ingest_bc_hydro_network(
         "FWA: fetching stream segments — lat=%.4f lon=%.4f radius=%.0fkm", lat, lon, radius_km
     )
     segments = _fwa.fetch_watercourses(lat, lon, radius_km)
-    record_counts(fetched=1, empty=int(not segments))
     logger.info("FWA: %d segments fetched from WFS", len(segments))
 
     now = datetime.utcnow().isoformat()
@@ -91,7 +90,6 @@ def ingest_fiss_observations(
         "FISS: fetching fish observations — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km
     )
     observations = _fiss.fetch_observations(lat, lng, radius_km)
-    record_counts(fetched=1, empty=int(not observations))
     logger.info("FISS: %d observations fetched from WFS", len(observations))
     if observations:
         upsert_observations(db, observations)
@@ -142,7 +140,6 @@ def ingest_fiss_stocking(
     db = get_db()
     logger.info("FISS stocking: extracting stocking records — lat=%.4f lng=%.4f", lat, lng)
     rows = _fiss.fetch_stocking_from_fiss(lat, lng, radius_km)
-    record_counts(fetched=1, empty=int(not rows))
     if rows:
         # stocking_records has no ingested_at column (unlike regulation_chunks) —
         # upsert_all would raise sqlite3.OperationalError if we set one.

@@ -428,3 +428,106 @@ def test_inaturalist_page_diagnostics_reach_ledger(db, monkeypatch, tmp_path, wr
     else:
         assert row[5] is None
     assert db.execute("SELECT COUNT(*) FROM observations").fetchone() == (expected[1],)
+
+
+@pytest.mark.parametrize("source", ["hydro_network", "fish_observations"])
+@pytest.mark.parametrize("outcome", ["first_failed", "later_failed", "empty"])
+def test_bc_wfs_diagnostics_reach_area_ledger(db, monkeypatch, source, outcome):
+    import importlib
+
+    import httpx
+
+    from src.models.ingest_area import AreaIngestResult, IngestSource
+    from src.services import area_ingest, bc_ingest, ingest_runs
+
+    adapter = importlib.import_module(f"src.ingest.jurisdictions.ca_bc.{source}")
+    monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
+    monkeypatch.setattr(bc_ingest, "get_db", lambda: db)
+    monkeypatch.setattr(adapter, "_PAGE_SIZE", 1)
+    requests = []
+
+    def response(url, params):
+        requests.append(params["startIndex"])
+        if outcome == "empty":
+            return {"features": []}
+        if outcome == "later_failed" and params["startIndex"] == 0:
+            return {"features": [{}]}
+        raise httpx.ReadTimeout("DataBC unavailable")
+
+    monkeypatch.setattr(adapter, "_cached_get", response)
+    result = AreaIngestResult(label="BC", source=IngestSource.BC)
+    def fetch():
+        if source == "hydro_network":
+            return bc_ingest.ingest_bc_hydro_network(49, -123)[0]
+        return bc_ingest.ingest_fiss_observations(49, -123)
+
+    area_ingest._attempt(result, source, fetch)
+    expected_fetched = 2 if outcome == "later_failed" else 1
+    assert requests == ([0, 1] if expected_fetched == 2 else [0])
+    row = db.execute(
+        "SELECT fetched, stored, skipped, empty_count, status, error FROM ingest_runs"
+    ).fetchone()
+    if outcome == "empty":
+        assert row == (1, 0, 0, 1, "success", None)
+    else:
+        assert row == (expected_fetched, 0, 1, 0, "failed", "ReadTimeout: DataBC unavailable")
+
+
+@pytest.mark.parametrize("outcome", ["all_failed", "partial", "empty"])
+def test_qc_workbook_diagnostics_reach_cli_ledger(db, monkeypatch, outcome):
+    from datetime import date
+
+    import httpx
+
+    from src.cli.main import _run_source
+    from src.ingest.jurisdictions.ca_qc import water_quality as adapter
+    from src.models.water_quality_reading import WaterQualityReading
+    from src.services import ingest_runs, qc_ingest
+
+    monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
+    monkeypatch.setattr(qc_ingest, "get_db", lambda: db)
+    monkeypatch.setattr(
+        adapter,
+        "_load_stations",
+        lambda: [{"id": str(i), "lat": 46, "lng": -72, "chiffrier_url": str(i)} for i in range(20)],
+    )
+    requests = []
+
+    def download(url):
+        requests.append(url)
+        if outcome == "all_failed" or (outcome == "partial" and url == "0"):
+            raise httpx.ReadTimeout("workbook unavailable")
+        return url
+
+    def parse(path, wanted):
+        if outcome == "empty":
+            return []
+        return [
+            WaterQualityReading(
+                record_id=path, station_id=path, sampled_at=date(2026, 11, 16), jurisdiction="CA-QC"
+            )
+        ]
+
+    monkeypatch.setattr(adapter, "_download_chiffrier", download)
+    monkeypatch.setattr(adapter, "parse_chiffrier", parse)
+    stored = 19 if outcome == "partial" else 0
+    assert (
+        _run_source([], "QC water quality", "fetching", qc_ingest.ingest_qc_water_quality, 46, -72)
+        == stored
+    )
+    assert requests == [str(i) for i in range(20)]
+    row = db.execute(
+        "SELECT fetched, stored, skipped, empty_count, status, error FROM ingest_runs"
+    ).fetchone()
+    if outcome == "empty":
+        assert row == (20, 0, 0, 20, "warning", None)
+    else:
+        assert row == (
+            20,
+            stored,
+            1 if stored else 20,
+            0,
+            "failed",
+            "ReadTimeout: workbook unavailable",
+        )
+    assert db.execute("SELECT COUNT(*) FROM water_quality_readings").fetchone() == (stored,)

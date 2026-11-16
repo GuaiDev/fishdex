@@ -35,6 +35,7 @@ import httpx
 from shapely.geometry import MultiLineString, Point, shape
 
 from src.models.hydrology import StreamSegment
+from src.services.ingest_runs import record_counts, record_error
 
 _WFS_URL = (
     "https://openmaps.gov.bc.ca/geo/pub/"
@@ -124,12 +125,16 @@ def _wfs_paginate(url: str, base_params: dict) -> list[dict]:
         import urllib.parse
         full_url = url + "?" + urllib.parse.urlencode(params)
         logger.info("FWA WFS request: %s", full_url)
+        record_counts(fetched=1)
         try:
             data = _cached_get(url, params)
         except Exception as exc:
+            record_counts(skipped=1)
+            record_error(exc)
             logger.error("FWA WFS request failed at startIndex=%d: %s", start, exc)
             break
         page = data.get("features", [])
+        record_counts(empty=int(not page))
         logger.info(
             "FWA WFS startIndex=%d: %d features on page (totalFeatures=%s)",
             start, len(page), data.get("totalFeatures"),
