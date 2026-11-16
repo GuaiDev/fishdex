@@ -209,3 +209,55 @@ def test_profile_edit_persists_jurisdiction_without_coordinates(db, monkeypatch,
     assert profile.home_location is None
     assert profile.home_jurisdiction == "CA-BC"
     assert jurisdiction.code == "CA-BC"
+
+
+def test_log_uses_stored_jurisdiction_over_legacy_profile(two_mill_creeks, monkeypatch):
+    import src.cli.main as cli
+
+    profile_mod.save_profile(profile_mod.UserProfile.default())
+    set_user_home(two_mill_creeks, 1, KAMLOOPS, "CA-BC")
+    monkeypatch.setattr(cli, "get_db", lambda: two_mill_creeks)
+    answers = iter(["2026-01-01", "Mill Creek"])
+
+    def prompt(label, **kwargs):
+        if label in ("Date (YYYY-MM-DD)", "Location name (lake/river)"):
+            return next(answers)
+        return kwargs["default"]
+
+    monkeypatch.setattr(cli.typer, "prompt", prompt)
+    monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: False)
+    cli.log()
+
+    assert two_mill_creeks.execute("SELECT jurisdiction FROM trips").fetchone()[0] == "CA-BC"
+
+
+def test_ingest_uses_stored_home_over_legacy_profile(two_mill_creeks, monkeypatch):
+    import src.cli.main as cli
+    import src.storage.stream_temperature as temperature
+
+    profile_mod.save_profile(profile_mod.UserProfile.default())
+    set_user_home(two_mill_creeks, 1, KAMLOOPS, "CA-BC")
+    monkeypatch.setattr(cli, "get_db", lambda: two_mill_creeks)
+    calls = {}
+
+    def source(results, name, message, fetch, *args, **kwargs):
+        calls[name] = args
+
+    monkeypatch.setattr(cli, "_run_source", source)
+    monkeypatch.setattr(cli, "_print_ingest_summary", lambda results: None)
+    monkeypatch.setattr(cli, "_check_sdm_retrain_needed", lambda db: None)
+    monkeypatch.setattr(temperature, "is_data_loaded", lambda db: True)
+    cli.ingest(radius_km=300.0, days_back=90, lat=None, lng=None)
+
+    assert calls["iNaturalist"] == (KAMLOOPS.lat, KAMLOOPS.lng)
+    assert calls["GBIF"] == (KAMLOOPS.lat, KAMLOOPS.lng)
+
+
+def test_cli_home_profile_uses_legacy_only_without_a_user_row(db):
+    import src.cli.main as cli
+
+    profile_mod.save_profile(profile_mod.UserProfile.default())
+    db.execute("DELETE FROM users WHERE id = 1")
+    assert cli._home_profile(db).home_location == OAKVILLE
+    _user(db, 1, "jason")
+    assert cli._home_profile(db).home_location is None
