@@ -154,6 +154,7 @@ def ingest_sk_data(
 # Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
 # area being run; named in this folder's plugin.py.
 
+
 def run_hydro_network(ctx: AreaContext) -> dict[str, int]:
     segs, barriers = ingest_sk_hydro_network(ctx.lat, ctx.lng, ctx.radius_km)
     return {"sk_hydro_segments": segs, "sk_hydro_barriers": barriers}

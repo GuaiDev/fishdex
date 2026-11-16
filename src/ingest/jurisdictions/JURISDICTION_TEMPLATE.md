@@ -22,7 +22,7 @@ These global sources work for any lat/lng without any jurisdiction-specific code
 | CABIN benthic | Federal macroinvertebrate data (all Canada) | `src/ingest/jurisdictions/ca_on/benthic.py` |
 
 For CLI ingestion and regional refresh commands, see
-[README.md](../../../README.md#running-locally-and-hosting). No API ingest
+[README.md](../../../../README.md#running-locally-and-hosting). No API ingest
 endpoint runs adapters.
 
 ---
@@ -37,6 +37,8 @@ ISO 3166-2 code in lowercase (e.g. `ca_bc`, `us_mi`, `ca_ab`).
 | File | What it does |
 |------|-------------|
 | `__init__.py` | Empty (just makes it a Python package) |
+| `plugin.py` | Exports `PLUGIN`; see the checklist below |
+| `ingest.py` | Runners referenced by the plugin, when sources are runnable |
 | `hydro_network.py` | Stream segments from the jurisdiction's official stream network |
 | `water_quality.py` | Water quality readings (DO, pH, temp, conductivity) |
 

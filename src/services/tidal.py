@@ -31,11 +31,13 @@ def get_tidal_conditions_for_agent(lat: float, lng: float) -> dict:
         }
 
     # Find the nearest station with predictions within 200km
-    rows = list(db.execute("""
+    rows = list(
+        db.execute("""
         SELECT DISTINCT station_id, station_name, lat, lng
         FROM tidal_readings
         WHERE lat IS NOT NULL AND lng IS NOT NULL
-    """).fetchall())
+    """).fetchall()
+    )
 
     if not rows:
         return {
@@ -62,7 +64,9 @@ def get_tidal_conditions_for_agent(lat: float, lng: float) -> dict:
     now_iso = datetime.now(tz=UTC).isoformat()
 
     # Get next high and next low
-    future_preds = list(db.execute("""
+    future_preds = list(
+        db.execute(
+            """
         SELECT tide_type, prediction_datetime, water_level_m
         FROM tidal_readings
         WHERE station_id = ?
@@ -70,7 +74,10 @@ def get_tidal_conditions_for_agent(lat: float, lng: float) -> dict:
           AND tide_type IN ('high', 'low')
         ORDER BY prediction_datetime ASC
         LIMIT 10
-    """, [station_id, now_iso[:19]]).fetchall())
+    """,
+            [station_id, now_iso[:19]],
+        ).fetchall()
+    )
 
     next_high = next((r for r in future_preds if r[0] == "high"), None)
     next_low = next((r for r in future_preds if r[0] == "low"), None)

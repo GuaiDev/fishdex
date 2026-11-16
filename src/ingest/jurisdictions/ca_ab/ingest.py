@@ -108,7 +108,9 @@ def ingest_ab_water_quality(
     _mod = importlib.import_module("src.ingest.jurisdictions.ca_ab.water_quality")
     logger.info(
         "AB water quality: fetching — lat=%.4f lng=%.4f radius=%.0fkm",
-        lat, lng, radius_km,
+        lat,
+        lng,
+        radius_km,
     )
     readings = _mod.fetch_water_quality_readings(lat, lng, radius_km)
     if readings:
@@ -157,6 +159,7 @@ def _upsert_regulation_chunks(db, chunks: list[dict]) -> None:
 # ── source runners ────────────────────────────────────────────────────────────
 # Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
 # area being run; named in this folder's plugin.py.
+
 
 def run_hydro_network(ctx: AreaContext) -> dict[str, int]:
     segs, barriers = ingest_ab_hydro_network(ctx.lat, ctx.lng, ctx.radius_km)

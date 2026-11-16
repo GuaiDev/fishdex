@@ -43,7 +43,7 @@ class SourceSpec:
     """Name used for this dataset in ingest results. Defaults to the source name."""
     schedule: str | None = None
     """How often it should be refreshed, e.g. "weekly". Documentation for the
-    cron job; `JurisdictionPlugin.areas` decides what `weekly-ingest` runs."""
+    cron job; `JurisdictionPlugin.cron_areas` decides what `weekly-ingest` runs."""
     ttl_days: float | None = None
     """How long the adapter's cache serves a response before refetching."""
     ttl_constant: str | None = None

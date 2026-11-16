@@ -108,6 +108,7 @@ def ingest_mb_data(
 # Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
 # area being run; named in this folder's plugin.py.
 
+
 def run_hydro_network(ctx: AreaContext) -> dict[str, int]:
     segs, barriers = ingest_mb_hydro_network(ctx.lat, ctx.lng, ctx.radius_km)
     return {"mb_wallas_segments": segs, "mb_wallas_barriers": barriers}

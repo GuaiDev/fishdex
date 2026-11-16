@@ -107,6 +107,7 @@ def _upsert_regulation_chunks(db, chunks: list[dict]) -> None:
 # Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
 # area being run; named in this folder's plugin.py.
 
+
 def run_species_ranges(ctx: AreaContext) -> int:
     return ingest_qc_species_ranges()
 

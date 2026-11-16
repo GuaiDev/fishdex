@@ -18,24 +18,9 @@ Every other change in this document follows from this single design decision: **
 - The user's profile has a `home_jurisdiction` and a `frequented_jurisdictions` list.
 - The bot's system prompt dynamically loads regulatory context for the relevant jurisdiction based on where the user is asking about, not where they live.
 
-### A simple registry pattern
+### Jurisdiction registration
 
-```python
-# src/jurisdictions/registry.py
-JURISDICTIONS = {
-    "CA-ON": OntarioJurisdiction(),
-    "CA-BC": BritishColumbiaJurisdiction(),
-    "US-MI": MichiganJurisdiction(),
-    # ...
-}
-
-def get_jurisdiction(code: str) -> Jurisdiction:
-    if code not in JURISDICTIONS:
-        return UnknownJurisdiction(code)  # graceful fallback
-    return JURISDICTIONS[code]
-```
-
-Each `Jurisdiction` class provides: regulatory data location, stocking data source, hydrography source, imagery source, building footprint source. The bot doesn't care which jurisdiction it's working with — it asks the registry.
+For the current registration contract, see the [jurisdiction checklist](../../src/ingest/jurisdictions/JURISDICTION_TEMPLATE.md).
 
 ### Graceful fallback for unknown jurisdictions
 
@@ -247,7 +232,7 @@ These replace the corresponding prompts in the original Getting Started doc.
 > 
 > - SQLite trips schema in data/fishing.db: id, date, jurisdiction (ISO 3166-2), location_name, lat, lng, species_caught (json), conditions (json), gear_used (json), notes, what_worked, what_didnt.
 > 
-> - Create the jurisdiction registry: src/jurisdictions/__init__.py with a base Jurisdiction class and an OntarioJurisdiction subclass as the first implementation. Other Canadian provinces and US states are stubs returning UnknownJurisdictionFallback for now.
+> - For jurisdiction registration, follow the [jurisdiction checklist](../../src/ingest/jurisdictions/JURISDICTION_TEMPLATE.md).
 > 
 > - Chat loop: load user profile + 5 most recent trips + active jurisdiction context into the system prompt every turn. System prompt at prompts/system.md.
 > 

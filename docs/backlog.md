@@ -217,13 +217,13 @@ Reusable adapter pattern. Ontario complete (Phase 1). BC, AB, QC, federal, and
 Maritime province stubs added in two sessions June 28 2026.
 
 ### Phase 1 (BC first jurisdiction)
-- `src/ingest/jurisdictions/config.py` — central registry (JurisdictionConfig, CronArea dataclasses)
+- Jurisdiction registration: see the [jurisdiction checklist](../src/ingest/jurisdictions/JURISDICTION_TEMPLATE.md).
 - `src/ingest/jurisdictions/JURISDICTION_TEMPLATE.md` — checklist + schema reference
 - `src/ingest/jurisdictions/ca_bc/` — BC adapters:
   - `hydro_network.py` (FWA stream network via DataBC WFS) — ~1,400 segments per 10km radius
   - `fish_observations.py` (FISS fish observations via DataBC WFS) — ~4,200 obs per 10km radius
   - `water_quality.py` (BC EnMoDS results) — current-tier file streamed and filtered by radius (see below)
-- `src/services/bc_ingest.py` — BC service layer
+- `src/ingest/jurisdictions/ca_bc/ingest.py` — BC source runners
 - Refresh commands: see [README.md](../README.md#running-locally-and-hosting).
 - Model additions: `stream_order` + `segment_source` on StreamSegment; `source` on Observation
 - DB migrations: idempotent column additions, jurisdiction-scoped deletes on ingest
@@ -341,16 +341,14 @@ Test suite updated to match new signatures (35 tests pass).
 **New migration**: `regulation_chunks.zone_name TEXT` added via idempotent `ALTER TABLE`
 
 **New service entry points**:
-- `src/services/ab_ingest.py` — AB stocking, regulations, water quality
-- `src/services/qc_ingest.py` — QC species ranges, regulations, water quality
-- `src/services/national_ingest.py` — DFO critical habitat, DataStream water quality
+- `src/ingest/jurisdictions/ca_ab/ingest.py` — AB stocking, regulations, water quality
+- `src/ingest/jurisdictions/ca_qc/ingest.py` — QC species ranges, regulations, water quality
+- `src/ingest/jurisdictions/ca_national/ingest.py` — DFO critical habitat, DataStream water quality
 - `src/services/tidal.py` — agent tool: `get_tidal_conditions_for_agent(lat, lng)`
 
 **Refresh commands**: see [README.md](../README.md#running-locally-and-hosting).
 
-**Jurisdiction config** (`config.py`): CA-AB, CA-QC, CA-MB, CA-SK, CA-NS, CA-NB, CA-PE
-registered with cron areas and data_sources dicts. CA-BC updated with
-stocking=True, regulations=True, salmon_escapement=True.
+**Jurisdiction configuration**: see the [jurisdiction checklist](../src/ingest/jurisdictions/JURISDICTION_TEMPLATE.md).
 
 ### Bug fixes — session 3 (June 28 2026)
 Bugs found and fixed during first Railway test run of multi-province adapters:
@@ -418,7 +416,7 @@ them had ever actually run against real data before.
   jurisdiction-specific ones. Every global-source observation for those seven
   provinces was silently tagged `jurisdiction='UNKNOWN'`, breaking jurisdiction-based
   filtering everywhere it's used, project-wide. Fixed by adding verified bounding
-  boxes for all seven — checked against every `cron_area` in `config.py` plus known
+  boxes for all seven — checked against the scheduled areas at the time plus known
   cities per province, since a first pass had real bugs (Calgary resolving to CA-BC,
   Miramichi resolving to CA-NS) caught before landing. File: `src/jurisdictions/geo.py`.
 - **DataStream water quality**: query construction reviewed against DataStream's

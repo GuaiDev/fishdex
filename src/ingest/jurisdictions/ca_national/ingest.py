@@ -25,13 +25,13 @@ def ingest_dfo_critical_habitat(
     radius_km: float = 100.0,
 ) -> int:
     """Fetch and upsert DFO critical habitat records near lat/lng. Returns count."""
-    _mod = importlib.import_module(
-        "src.ingest.jurisdictions.ca_national.dfo_critical_habitat"
-    )
+    _mod = importlib.import_module("src.ingest.jurisdictions.ca_national.dfo_critical_habitat")
     db = get_db()
     logger.info(
         "DFO critical habitat: fetching — lat=%.4f lng=%.4f radius=%.0fkm",
-        lat, lng, radius_km,
+        lat,
+        lng,
+        radius_km,
     )
     rows = _mod.fetch_critical_habitat(lat, lng, radius_km)
     if rows:
@@ -52,9 +52,7 @@ def ingest_dfo_sar_range() -> int:
     """
     from src.storage.species_ranges import upsert_species_ranges_merged
 
-    _mod = importlib.import_module(
-        "src.ingest.jurisdictions.ca_national.dfo_sar_range"
-    )
+    _mod = importlib.import_module("src.ingest.jurisdictions.ca_national.dfo_sar_range")
     db = get_db()
     logger.info("DFO SAR range: fetching critical habitat …")
     rows = _mod.fetch_sar_ranges()
@@ -70,6 +68,7 @@ def ingest_cabin_all_provinces() -> int:
     The expanded benthic adapter filters to ALL provinces. Returns count.
     """
     from src.services.benthic import ingest_benthic_samples
+
     db = get_db()
     logger.info("CABIN (all provinces): starting ingestion …")
     n = ingest_benthic_samples(db)
@@ -83,13 +82,13 @@ def ingest_datastream_water_quality(
     radius_km: float = 100.0,
 ) -> int:
     """Fetch DataStream water quality for lat/lng. Returns count."""
-    _mod = importlib.import_module(
-        "src.ingest.jurisdictions.ca_national.datastream_water_quality"
-    )
+    _mod = importlib.import_module("src.ingest.jurisdictions.ca_national.datastream_water_quality")
     db = get_db()
     logger.info(
         "DataStream: fetching water quality — lat=%.4f lng=%.4f radius=%.0fkm",
-        lat, lng, radius_km,
+        lat,
+        lng,
+        radius_km,
     )
     readings = _mod.fetch_water_quality_readings(lat, lng, radius_km)
     if readings:
@@ -115,6 +114,7 @@ def ingest_national_data(
 # ── source runners ────────────────────────────────────────────────────────────
 # Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
 # area being run; named in this folder's plugin.py.
+
 
 def run_tidal(ctx: AreaContext) -> int:
     """CHS tide predictions near the area. Used by the coastal Maritime plugins."""

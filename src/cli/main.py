@@ -588,9 +588,7 @@ def weekly_ingest(
         for col in ("Area", "Jurisdiction", "Source", "lat", "lng", "radius km"):
             table.add_column(col)
         for a, s in jobs:
-            table.add_row(
-                a.label, a.jurisdiction, s, str(a.lat), str(a.lng), str(a.radius_for(s))
-            )
+            table.add_row(a.label, a.jurisdiction, s, str(a.lat), str(a.lng), str(a.radius_for(s)))
         console.print(table)
         return
 
