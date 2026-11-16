@@ -385,7 +385,10 @@ def health_live():
 
 @app.get("/health/ready")
 def health_ready():
-    """Report whether the API can serve against its current schema and map artifact."""
+    """Check schema and map artifact row counts, not loaded content identity.
+
+    Same-count artifact content changes are not detected; use the reseed procedure.
+    """
     from src.storage.database import MIGRATIONS, get_db
 
     checks: dict[str, bool] = {}
@@ -404,19 +407,21 @@ def health_ready():
         checks["schema_version"] = schema_version == len(MIGRATIONS)
 
         map_digest, segment_floor = _map_artifact_info()
-        details["map_version"] = map_digest
+        details["map_artifact_digest"] = map_digest
         details["row_floors"] = {"map_segments": segment_floor}
         if "map_segments" in tables:
             map_rows = db.execute("SELECT COUNT(*) FROM map_segments").fetchone()[0]
         else:
             map_rows = 0
         details["map_rows"] = {"map_segments": map_rows}
-        checks["map_version"] = map_digest is not None
+        checks["map_artifact_consistent"] = (
+            map_digest is not None and map_rows > 0 and map_rows == segment_floor
+        )
         checks["map_row_floors"] = segment_floor is not None and map_rows >= segment_floor
     except Exception:
         checks.setdefault("db_opens", False)
         checks["schema_version"] = False
-        checks["map_version"] = False
+        checks["map_artifact_consistent"] = False
         checks["map_row_floors"] = False
     finally:
         if "db" in locals():

@@ -71,6 +71,12 @@ the server-wide cap; the account budget still applies.
 
 ## Refreshing the map data on the volume
 
+Readiness reports the baked artifact's SHA-256 as `map_artifact_digest`.
+The `map_artifact_consistent` check requires a nonempty `map_segments` table with
+exactly the artifact's declared segment count. It does not detect changed contents
+in a same-count artifact. Handle those changes by reseeding the database using
+the procedure below, with map segments rebuilt from the new artifact.
+
 After `make build-anchors` (live OpenStreetMap, slow: minutes per stretch, cached afterwards)
 rebuilds the anchors and spots in `data/fishing.db`, repeat step 7 with the new file: stop the
 machine, `put data/fishing.db /data/fishing.db`, then `fly machine restart`. Check with
