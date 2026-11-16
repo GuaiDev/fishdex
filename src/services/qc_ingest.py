@@ -12,6 +12,7 @@ import importlib
 import logging
 from datetime import datetime
 
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -30,9 +31,11 @@ def ingest_qc_species_ranges() -> int:
     db = get_db()
     logger.info("QC species ranges: fetching …")
     rows = _mod.fetch_species_ranges()
+    record_counts(fetched=1, empty=int(not rows))
     if rows:
         upsert_species_ranges_merged(db, rows)
     logger.info("QC species ranges: %d records stored", len(rows))
+    record_counts(stored=len(rows))
     return len(rows)
 
 
@@ -42,9 +45,11 @@ def ingest_qc_regulations() -> int:
     db = get_db()
     logger.info("QC regulations: fetching regulation chunks …")
     chunks = _mod.fetch_regulations()
+    record_counts(fetched=1, empty=int(not chunks))
     if chunks:
         _upsert_regulation_chunks(db, chunks)
     logger.info("QC regulations: %d chunks stored", len(chunks))
+    record_counts(stored=len(chunks))
     return len(chunks)
 
 
@@ -62,11 +67,13 @@ def ingest_qc_water_quality(
         radius_km,
     )
     readings = _mod.fetch_water_quality_readings(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not readings))
     if readings:
         from src.storage.water_quality import upsert_water_quality_readings
 
         upsert_water_quality_readings(get_db(), readings)
     logger.info("QC water quality: %d readings stored", len(readings))
+    record_counts(stored=len(readings))
     return len(readings)
 
 

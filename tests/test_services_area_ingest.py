@@ -40,7 +40,6 @@ def test_committed_area_list_loads_and_matches_the_old_workflow():
     assert IngestSource.SK in by_label["South Saskatchewan River Saskatoon"].sources
 
 
-
 def test_load_areas_rejects_a_malformed_area(tmp_path):
     p = tmp_path / "areas.json"
     p.write_text(json.dumps({"areas": [{"label": "x", "lat": 1, "lng": 2}]}))
@@ -62,8 +61,8 @@ def test_run_area_dispatches_with_the_per_source_radius(monkeypatch):
     calls = []
 
     def fake(source):
-        def _run(lat, lng, radius_km, label, *rest):
-            calls.append((source, lat, lng, radius_km, label, rest))
+        def _run(lat, lng, radius_km, label, *rest, jurisdiction=None):
+            calls.append((source, lat, lng, radius_km, label, rest, jurisdiction))
             return area_ingest.AreaIngestResult(label=label, source=source)
 
         return _run
@@ -82,8 +81,8 @@ def test_run_area_dispatches_with_the_per_source_radius(monkeypatch):
     for s in area.sources:
         area_ingest.run_area(area, s, days_back=90)
     assert calls == [
-        (IngestSource.GLOBAL, 44.98, -65.5, 40, "Annapolis River NS", (90,)),
-        (IngestSource.TIDAL, 44.98, -65.5, 100, "Annapolis River NS", ()),
+        (IngestSource.GLOBAL, 44.98, -65.5, 40, "Annapolis River NS", (90,), "CA-NS"),
+        (IngestSource.TIDAL, 44.98, -65.5, 100, "Annapolis River NS", (), "CA-NS"),
     ]
 
 

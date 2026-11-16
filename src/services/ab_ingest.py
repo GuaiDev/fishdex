@@ -14,6 +14,7 @@ import importlib
 import logging
 from datetime import datetime
 
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -31,11 +32,13 @@ def ingest_ab_stocking() -> int:
     db = get_db()
     logger.info("AB stocking: fetching records …")
     rows = _mod.fetch_stocking_records()
+    record_counts(fetched=1, empty=int(not rows))
     if rows:
         # stocking_records has no ingested_at column (unlike regulation_chunks) —
         # upsert_all would raise sqlite3.OperationalError if we set one.
         db["stocking_records"].upsert_all(rows, pk="record_id")
     logger.info("AB stocking: %d records stored", len(rows))
+    record_counts(stored=len(rows))
     return len(rows)
 
 
@@ -56,6 +59,7 @@ def ingest_ab_hydro_network(
         "FWMIS: fetching stream segments — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km
     )
     segments = _mod.fetch_watercourses(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not segments))
     logger.info("FWMIS: %d segments fetched from FeatureServer", len(segments))
 
     now = datetime.utcnow().isoformat()
@@ -83,6 +87,7 @@ def ingest_ab_hydro_network(
         db["stream_segments"].insert_all(seg_rows, pk="ogf_id", replace=True)
 
     logger.info("FWMIS: %d segments stored to DB", len(segments))
+    record_counts(stored=len(segments))
     return len(segments), 0
 
 
@@ -92,9 +97,11 @@ def ingest_ab_regulations() -> int:
     db = get_db()
     logger.info("AB regulations: fetching regulation chunks …")
     chunks = _mod.fetch_regulations()
+    record_counts(fetched=1, empty=int(not chunks))
     if chunks:
         _upsert_regulation_chunks(db, chunks)
     logger.info("AB regulations: %d chunks stored", len(chunks))
+    record_counts(stored=len(chunks))
     return len(chunks)
 
 
@@ -107,13 +114,17 @@ def ingest_ab_water_quality(
     _mod = importlib.import_module("src.ingest.jurisdictions.ca_ab.water_quality")
     logger.info(
         "AB water quality: fetching — lat=%.4f lng=%.4f radius=%.0fkm",
-        lat, lng, radius_km,
+        lat,
+        lng,
+        radius_km,
     )
     readings = _mod.fetch_water_quality_readings(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not readings))
     if readings:
         db = get_db()
         db["water_quality_readings"].upsert_all(readings, pk="record_id")
     logger.info("AB water quality: %d readings stored", len(readings))
+    record_counts(stored=len(readings))
     return len(readings)
 
 

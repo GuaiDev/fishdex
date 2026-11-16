@@ -30,12 +30,7 @@ def _attempt(result: AreaIngestResult, name: str, fn: Callable[[], object]) -> N
     """Run one dataset; record its count, or its error, on `result`."""
     from src.services.ingest_runs import ingest_run
 
-    jurisdiction = {
-        IngestSource.GLOBAL: "CA-ON", IngestSource.BC: "CA-BC",
-        IngestSource.AB: "CA-AB", IngestSource.QC: "CA-QC",
-        IngestSource.MB: "CA-MB", IngestSource.SK: "CA-SK",
-    }.get(result.source)
-    with ingest_run(name, jurisdiction=jurisdiction, area=result.label) as run:
+    with ingest_run(name, jurisdiction=result.jurisdiction, area=result.label) as run:
         try:
             value = fn()
         except Exception as exc:  # noqa: BLE001 - isolation is the point
@@ -49,12 +44,18 @@ def _attempt(result: AreaIngestResult, name: str, fn: Callable[[], object]) -> N
         else:
             count = int(value or 0)
             result.stored[name] = count
-        run.record(fetched=max(count, 1), stored=count, empty=1 if not count else 0)
+        if not run.fetched and not run.skipped:
+            run.record(stored=count)
         _log.info("[%s] %s: %s", result.label, name, value)
 
 
 def run_global_ingest(
-    lat: float, lng: float, radius_km: float, label: str, days_back: int | None = 90
+    lat: float,
+    lng: float,
+    radius_km: float,
+    label: str,
+    days_back: int | None = 90,
+    jurisdiction: str | None = None,
 ) -> AreaIngestResult:
     """Run iNat, GBIF, WSC, OSM, and the SDM retrain check for a location."""
     from src.services.gbif import fetch_and_store as gbif_fetch
@@ -67,7 +68,7 @@ def run_global_ingest(
     )
     db = get_db()
     ensure_schema(db)
-    result = AreaIngestResult(label=label, source=IngestSource.GLOBAL)
+    result = AreaIngestResult(label=label, jurisdiction=jurisdiction, source=IngestSource.GLOBAL)
 
     _attempt(
         result,
@@ -124,7 +125,13 @@ def _check_sdm_retrain(db, label: str) -> None:
         _log.exception("[%s] SDM retrain check failed", label)
 
 
-def run_bc_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
+def run_bc_ingest(
+    lat: float,
+    lng: float,
+    radius_km: float,
+    label: str,
+    jurisdiction: str | None = None,
+) -> AreaIngestResult:
     """Run FWA, FISS, and BC EnMoDS ingest for a BC location."""
     from src.services.bc_ingest import (
         ingest_bc_hydro_network,
@@ -136,7 +143,7 @@ def run_bc_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaI
         "[%s] BC ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
     )
     ensure_schema(get_db())
-    result = AreaIngestResult(label=label, source=IngestSource.BC)
+    result = AreaIngestResult(label=label, jurisdiction=jurisdiction, source=IngestSource.BC)
     _attempt(
         result,
         "FWA stream segments",
@@ -156,7 +163,13 @@ def run_bc_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaI
     return result
 
 
-def run_ab_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
+def run_ab_ingest(
+    lat: float,
+    lng: float,
+    radius_km: float,
+    label: str,
+    jurisdiction: str | None = None,
+) -> AreaIngestResult:
     """Run Alberta-specific ingest adapters."""
     from src.services.ab_ingest import ingest_ab_data
 
@@ -164,12 +177,18 @@ def run_ab_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaI
         "[%s] AB ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
     )
     ensure_schema(get_db())
-    result = AreaIngestResult(label=label, source=IngestSource.AB)
+    result = AreaIngestResult(label=label, jurisdiction=jurisdiction, source=IngestSource.AB)
     _attempt(result, "AB adapters", lambda: ingest_ab_data(lat, lng, radius_km))
     return result
 
 
-def run_qc_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
+def run_qc_ingest(
+    lat: float,
+    lng: float,
+    radius_km: float,
+    label: str,
+    jurisdiction: str | None = None,
+) -> AreaIngestResult:
     """Run Quebec-specific ingest adapters."""
     from src.services.qc_ingest import ingest_qc_data
 
@@ -177,12 +196,18 @@ def run_qc_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaI
         "[%s] QC ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
     )
     ensure_schema(get_db())
-    result = AreaIngestResult(label=label, source=IngestSource.QC)
+    result = AreaIngestResult(label=label, jurisdiction=jurisdiction, source=IngestSource.QC)
     _attempt(result, "QC adapters", lambda: ingest_qc_data(lat, lng, radius_km))
     return result
 
 
-def run_mb_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
+def run_mb_ingest(
+    lat: float,
+    lng: float,
+    radius_km: float,
+    label: str,
+    jurisdiction: str | None = None,
+) -> AreaIngestResult:
     """Run Manitoba-specific ingest adapters."""
     from src.services.mb_ingest import ingest_mb_data
 
@@ -190,12 +215,18 @@ def run_mb_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaI
         "[%s] MB ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
     )
     ensure_schema(get_db())
-    result = AreaIngestResult(label=label, source=IngestSource.MB)
+    result = AreaIngestResult(label=label, jurisdiction=jurisdiction, source=IngestSource.MB)
     _attempt(result, "MB adapters", lambda: ingest_mb_data(lat, lng, radius_km))
     return result
 
 
-def run_sk_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
+def run_sk_ingest(
+    lat: float,
+    lng: float,
+    radius_km: float,
+    label: str,
+    jurisdiction: str | None = None,
+) -> AreaIngestResult:
     """Run Saskatchewan-specific ingest adapters."""
     from src.services.sk_ingest import ingest_sk_data
 
@@ -203,12 +234,18 @@ def run_sk_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaI
         "[%s] SK ingest started — lat=%.4f lng=%.4f radius=%.0fkm", label, lat, lng, radius_km
     )
     ensure_schema(get_db())
-    result = AreaIngestResult(label=label, source=IngestSource.SK)
+    result = AreaIngestResult(label=label, jurisdiction=jurisdiction, source=IngestSource.SK)
     _attempt(result, "SK adapters", lambda: ingest_sk_data(lat, lng, radius_km))
     return result
 
 
-def run_tidal_ingest(lat: float, lng: float, radius_km: float, label: str) -> AreaIngestResult:
+def run_tidal_ingest(
+    lat: float,
+    lng: float,
+    radius_km: float,
+    label: str,
+    jurisdiction: str | None = None,
+) -> AreaIngestResult:
     """Run CHS tidal predictions ingest."""
     from src.ingest.jurisdictions.ca_national.tidal import fetch_tidal_readings
 
@@ -217,12 +254,15 @@ def run_tidal_ingest(lat: float, lng: float, radius_km: float, label: str) -> Ar
     )
     db = get_db()
     ensure_schema(db)
-    result = AreaIngestResult(label=label, source=IngestSource.TIDAL)
+    result = AreaIngestResult(label=label, jurisdiction=jurisdiction, source=IngestSource.TIDAL)
 
     def _tidal() -> int:
         rows = fetch_tidal_readings(lat, lng, radius_km)
         if rows:
             db["tidal_readings"].upsert_all(rows, pk="record_id")
+        from src.services.ingest_runs import record_counts
+
+        record_counts(fetched=1, empty=int(not rows), stored=len(rows))
         return len(rows)
 
     _attempt(result, "CHS tide predictions", _tidal)
@@ -245,5 +285,7 @@ def run_area(
     """Run one source bundle for one configured area."""
     radius = area.radius_for(source)
     if source is IngestSource.GLOBAL:
-        return run_global_ingest(area.lat, area.lng, radius, area.label, days_back)
-    return _RUNNERS[source](area.lat, area.lng, radius, area.label)
+        return run_global_ingest(
+            area.lat, area.lng, radius, area.label, days_back, jurisdiction=area.jurisdiction
+        )
+    return _RUNNERS[source](area.lat, area.lng, radius, area.label, jurisdiction=area.jurisdiction)

@@ -1,6 +1,7 @@
 """Durable ingest run ledger and consistent empty-response diagnostics."""
 
 import logging
+from contextvars import ContextVar
 from datetime import datetime
 
 from sqlite_utils import Database
@@ -12,6 +13,15 @@ logger = logging.getLogger(__name__)
 # Avoid alarming on small sources, while treating an empty majority as suspect.
 EMPTY_SHARE_WARNING_FLOOR = 0.5
 MIN_FETCHED_FOR_EMPTY_WARNING = 10
+
+
+_active_run: ContextVar["IngestRun | None"] = ContextVar("active_ingest_run", default=None)
+
+
+def record_counts(**counts: int) -> None:
+    run = _active_run.get()
+    if run is not None:
+        run.record(**counts)
 
 
 class IngestRun:
@@ -59,9 +69,11 @@ class IngestRun:
         )
         self.run_id = db.conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         db.conn.commit()
+        self._token = _active_run.set(self)
         return self
 
     def __exit__(self, exc_type, exc, tb) -> bool:
+        _active_run.reset(self._token)
         if exc is not None:
             self.error = f"{type(exc).__name__}: {exc}"
             self.status = "failed"
