@@ -39,7 +39,7 @@ def read_profile_file(path: Path) -> UserProfile | None:
         return None
 
 
-def get_user_home(db: Database, user_id: int) -> tuple[Location, JurisdictionCode | None] | None:
+def get_user_home(db: Database, user_id: int) -> tuple[Location | None, JurisdictionCode | None] | None:
     """The home a user stored in the database, with its jurisdiction, or None if unset."""
     if "users" not in db.table_names():
         return None
@@ -47,9 +47,14 @@ def get_user_home(db: Database, user_id: int) -> tuple[Location, JurisdictionCod
         "SELECT home_name, home_lat, home_lng, home_jurisdiction FROM users WHERE id = ?",
         [user_id],
     ).fetchone()
-    if row is None or row[1] is None or row[2] is None:
+    if row is None:
         return None
-    return Location(name=row[0] or "", lat=float(row[1]), lng=float(row[2])), row[3]
+    home = None
+    if row[1] is not None and row[2] is not None:
+        home = Location(name=row[0] or "", lat=float(row[1]), lng=float(row[2]))
+    if home is None and row[3] is None:
+        return None
+    return home, row[3]
 
 
 def set_user_home(
