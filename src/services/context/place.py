@@ -58,9 +58,7 @@ def resolve(
     return None
 
 
-_COORD_RE = re.compile(
-    r"(-?\d{1,3}\.\d{3,})\s*[,/ ]\s*(-?\d{1,3}\.\d{3,})"
-)
+_COORD_RE = re.compile(r"(-?\d{1,3}\.\d{3,})\s*[,/ ]\s*(-?\d{1,3}\.\d{3,})")
 
 
 @lru_cache(maxsize=4)
@@ -240,9 +238,7 @@ def _from_name(db: Database, query: str, radius_km: float, user_id: int) -> Plac
 # ── lookups ───────────────────────────────────────────────────────────────────
 
 
-def _user_logged_place(
-    db: Database, pattern: str, user_id: int
-) -> tuple[float, float, str] | None:
+def _user_logged_place(db: Database, pattern: str, user_id: int) -> tuple[float, float, str] | None:
     if "stops" not in db.table_names():
         return None
     rows = list(
@@ -311,9 +307,7 @@ def _named_segment(
     # same watercourse at the scale this app works at.
     chosen = candidates[0]
     others = sum(
-        1
-        for c in candidates
-        if abs(c[0] - chosen[0]) > 0.25 or abs(c[1] - chosen[1]) > 0.25
+        1 for c in candidates if abs(c[0] - chosen[0]) > 0.25 or abs(c[1] - chosen[1]) > 0.25
     )
     if others == 0 and len(distinct_names) > 1:
         others = len(distinct_names) - 1

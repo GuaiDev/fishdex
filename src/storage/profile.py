@@ -1,4 +1,4 @@
-"""User profile load/save (JSON-backed at data/user_profile.json)."""
+"""Per-user database home storage and legacy JSON profile load/save."""
 
 from datetime import datetime
 from pathlib import Path
@@ -39,7 +39,9 @@ def read_profile_file(path: Path) -> UserProfile | None:
         return None
 
 
-def get_user_home(db: Database, user_id: int) -> tuple[Location | None, JurisdictionCode | None] | None:
+def get_user_home(
+    db: Database, user_id: int
+) -> tuple[Location | None, JurisdictionCode | None] | None:
     """The home a user stored in the database, with its jurisdiction, or None if unset."""
     if "users" not in db.table_names():
         return None

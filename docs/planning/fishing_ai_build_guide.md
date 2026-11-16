@@ -391,7 +391,7 @@ Plan mode. Paste:
 >    - LureRecommendation, Observation, etc. — stubs for later
 > 
 > 3. **Storage** (src/storage/):
->    - profile.py: load/save user profile to data/user_profile.json
+>    - profile.py: profile storage; see [README usage](../../README.md#how-to-run) for current home ownership and legacy-file handling
 >    - trips.py: SQLite via sqlite-utils, CRUD for trips
 >    - Auto-create DB and tables on first use
 > 

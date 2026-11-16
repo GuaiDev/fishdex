@@ -61,7 +61,7 @@ Add a `CLAUDE.md` at the root describing the project, your fishing context (spec
 **Goal:** A terminal chatbot you can talk to about fishing, that remembers your preferences.
 
 1. Write a basic CLI loop that calls Claude API with a system prompt like *"You are a fishing assistant for an Ontario angler who fishes for [species] within [range] of Toronto."*
-2. Store user profile (location, target species, gear, budget, skill level) as JSON in `data/user_profile.json`. Load it into the system prompt every turn.
+2. Load the user profile into the system prompt every turn. See [README usage](../../README.md#how-to-run) for current profile storage and home ownership.
 3. Add a `trips` table: date, location (lat/lng), species, conditions, what worked, what didn't. Build commands like `/log` and `/recent`.
 4. **No data sources yet.** This phase is purely about the conversation feel and the personalization plumbing.
 
