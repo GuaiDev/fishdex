@@ -49,7 +49,8 @@ project is a static build (`buildCommand` + `outputDirectory`).
    (`fly machine stop`), then `fly machine start` and
    `fly ssh sftp shell` → `put data/fishing.db /data/fishing.db` (and `put` photos into
    `/data/photos/` if any). Restart with `fly machine restart`.
-8. Check `https://<app>.fly.dev/health` returns `{"status":"ok"}`.
+8. Check `https://<app>.fly.dev/health/live` returns `{"status":"ok"}` and
+   `https://<app>.fly.dev/health/ready` returns `{"status":"ready", ...}`.
 9. Make your token on the host: `fly ssh console -C "python -m src.cli.main token"`.
    For friends, create invite codes with `POST /admin/invite` using that token.
 10. `vercel login`, then from the repo root `vercel link` and `vercel --prod`. In the Vercel

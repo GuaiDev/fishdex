@@ -47,6 +47,23 @@ def test_health_no_auth_required():
     assert response.status_code == 200
 
 
+def test_health_live_and_request_id():
+    response = client.get("/health/live", headers={"X-Request-ID": "health-check-17"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.headers["X-Request-ID"] == "health-check-17"
+
+
+def test_readiness_fails_when_map_database_is_empty():
+    response = client.get("/health/ready")
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "not_ready"
+    assert body["checks"]["db_opens"] is True
+    assert body["checks"]["map_row_floors"] is False
+    assert body["row_floors"]["map_segments"] > 0
+
+
 @REQUIRES_API
 def test_chat_basic():
     response = client.post(
