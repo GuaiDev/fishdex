@@ -55,6 +55,8 @@ from pathlib import Path
 
 import httpx
 
+from src.services.ingest_runs import record_error
+
 _PDF_URL = (
     "https://www2.gov.bc.ca/assets/gov/sports-recreation-arts-and-culture/"
     "outdoor-recreation/fishing-and-hunting/freshwater-fishing/fishing_synopsis.pdf"
@@ -134,6 +136,7 @@ def fetch_regulations() -> list[dict]:
         with pdfplumber.open(_PDF_PATH) as pdf:
             full_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
     except Exception as exc:
+        record_error(exc)
         logger.error("BC regulations: PDF parse failed: %s", exc)
         return []
 
@@ -259,4 +262,5 @@ def _download_pdf_if_stale() -> None:
         _PDF_PATH.write_bytes(response.content)
         logger.info("BC regulations: downloaded %.1f MB", len(response.content) / 1_048_576)
     except Exception as exc:
+        record_error(exc)
         logger.error("BC regulations: download failed: %s", exc)

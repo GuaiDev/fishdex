@@ -549,3 +549,72 @@ def test_qc_workbook_diagnostics_reach_cli_ledger(db, monkeypatch, outcome):
             "ReadTimeout: workbook unavailable",
         )
     assert db.execute("SELECT COUNT(*) FROM water_quality_readings").fetchone() == (stored,)
+
+
+@pytest.mark.parametrize(
+    "jurisdiction,dataset,stage",
+    [
+        ("ca_ab", "regulations", "discovery"),
+        ("ca_ab", "regulations", "download"),
+        ("ca_ab", "regulations", "parse"),
+        ("ca_bc", "regulations", "download"),
+        ("ca_bc", "regulations", "parse"),
+        ("ca_bc", "nuseds", "discovery"),
+        ("ca_bc", "nuseds", "download"),
+    ],
+)
+def test_regulations_and_nuseds_caught_failures_fail_ledger(
+    db, monkeypatch, tmp_path, jurisdiction, dataset, stage
+):
+    import importlib
+    from contextlib import contextmanager
+
+    import httpx
+    import pdfplumber
+
+    from src.cli.main import _run_source
+    from src.services import ingest_runs
+
+    adapter = importlib.import_module(f"src.ingest.jurisdictions.{jurisdiction}.{dataset}")
+    service = importlib.import_module(f"src.ingest.jurisdictions.{jurisdiction}.ingest")
+    monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
+    monkeypatch.setattr(service, "get_db", lambda: db)
+    is_nuseds = dataset == "nuseds"
+    data_path = tmp_path / ("source.xlsx" if is_nuseds else "source.pdf")
+    monkeypatch.setattr(adapter, "_XLSX_PATH" if is_nuseds else "_PDF_PATH", data_path)
+    if hasattr(adapter, "_PACKAGE_CACHE_PATH"):
+        monkeypatch.setattr(adapter, "_PACKAGE_CACHE_PATH", tmp_path / "package.json")
+
+    def fail(*args, **kwargs):
+        if stage == "parse":
+            raise ValueError("invalid PDF")
+        raise httpx.ReadTimeout("publisher unavailable")
+
+    @contextmanager
+    def failed_stream(*args, **kwargs):
+        fail()
+        yield
+
+    monkeypatch.setattr(adapter.httpx, "get", fail)
+    monkeypatch.setattr(adapter.httpx, "stream", failed_stream)
+    if stage != "discovery":
+        if is_nuseds:
+            monkeypatch.setattr(
+                adapter, "_find_xlsx_url", lambda: "https://example.com/source.xlsx"
+            )
+        elif jurisdiction == "ca_ab":
+            monkeypatch.setattr(
+                adapter, "_find_current_pdf", lambda: ("https://example.com/source.pdf", 2026)
+            )
+    if stage == "parse":
+        data_path.write_bytes(b"invalid PDF")
+        monkeypatch.setattr(pdfplumber, "open", fail)
+
+    source_name = f"{jurisdiction} {dataset}"
+    fetch = getattr(service, f"ingest_{jurisdiction[3:]}_{dataset}")
+    assert _run_source([], source_name, "fetching", fetch) == 0
+    row = db.execute("SELECT status, error, stored FROM ingest_runs").fetchone()
+    expected_error = (
+        "ValueError: invalid PDF" if stage == "parse" else "ReadTimeout: publisher unavailable"
+    )
+    assert row == ("failed", expected_error, 0)

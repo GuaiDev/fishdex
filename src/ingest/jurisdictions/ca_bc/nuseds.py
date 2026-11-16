@@ -62,6 +62,8 @@ from pathlib import Path
 
 import httpx
 
+from src.services.ingest_runs import record_error
+
 _PACKAGE_URL = "https://open.canada.ca/data/api/action/package_show"
 _PACKAGE_ID = "c48669a3-045b-400d-b730-48aafe8c5ee6"
 _XLSX_PATH = Path("data/raw/nuseds_all_areas.xlsx")
@@ -227,6 +229,7 @@ def _find_xlsx_url() -> str | None:
             pkg = resp.json().get("result", {})
             _PACKAGE_CACHE_PATH.write_text(json.dumps(pkg))
         except Exception as exc:
+            record_error(exc)
             logger.error("NuSEDS: CKAN package fetch failed: %s", exc)
             return None
 
@@ -269,4 +272,5 @@ def _download_xlsx_if_stale(url: str) -> None:
                     fh.write(chunk)
         logger.info("NuSEDS: downloaded %.1f MB", _XLSX_PATH.stat().st_size / 1_048_576)
     except Exception as exc:
+        record_error(exc)
         logger.error("NuSEDS: download failed: %s", exc)

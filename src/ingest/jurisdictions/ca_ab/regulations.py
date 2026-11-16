@@ -43,6 +43,8 @@ from pathlib import Path
 
 import httpx
 
+from src.services.ingest_runs import record_error
+
 _PACKAGE_URL = "https://open.alberta.ca/api/3/action/package_show"
 _PACKAGE_ID = "dbf392f4-266f-4947-adc0-fa4bdf4e2c9c"
 _PDF_PATH = Path("data/raw/ab_regulations.pdf")
@@ -95,6 +97,7 @@ def fetch_regulations() -> list[dict]:
         with pdfplumber.open(_PDF_PATH) as pdf:
             full_text = "\n".join(p.extract_text() or "" for p in pdf.pages)
     except Exception as exc:
+        record_error(exc)
         logger.error("AB regulations: PDF parse failed: %s", exc)
         return []
 
@@ -184,6 +187,7 @@ def _find_current_pdf() -> tuple[str, int] | None:
             pkg = resp.json().get("result", {})
             _PACKAGE_CACHE_PATH.write_text(json.dumps(pkg))
         except Exception as exc:
+            record_error(exc)
             logger.error("AB regulations: CKAN package fetch failed: %s", exc)
             return None
 
@@ -233,4 +237,5 @@ def _download_pdf_if_stale(url: str) -> None:
                     fh.write(chunk)
         logger.info("AB regulations: downloaded %.1f MB", _PDF_PATH.stat().st_size / 1_048_576)
     except Exception as exc:
+        record_error(exc)
         logger.error("AB regulations: download failed: %s", exc)
