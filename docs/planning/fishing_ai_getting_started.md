@@ -168,7 +168,8 @@ Enter plan mode. Paste:
 > Requirements:
 > - Use typer for the CLI with commands: `chat`, `log` (log a trip), `recent` (show recent trips), `profile` (view/edit user profile)
 > - Use the Anthropic SDK to talk to Claude. Default to claude-sonnet-4-6, allow override via env var.
-> - Store user profile as JSON at data/user_profile.json. Schema: location (lat/lng + name), target_species (list), gear (list of dicts), budget (annual), skill_level, fishing_style, preferences (free text).
+> - For current profile storage and home ownership, see [README usage](../../README.md#how-to-run).
+> - Other profile fields: target_species (list), gear (list of dicts), budget (annual), skill_level, fishing_style, preferences (free text).
 > - Store trips in SQLite at data/fishing.db. Schema: id, date, location_name, lat, lng, species_caught (json list), conditions (json), gear_used (json list), notes, what_worked, what_didnt.
 > - The chat loop: load user profile into the system prompt every turn. Include the 5 most recent trips as context. Use a system prompt stored at prompts/system.md so I can edit it without changing code.
 > - Use rich for nice terminal output. Show typing indicators while Claude responds.
@@ -220,7 +221,7 @@ New session is fine here. Open Claude Code in the project, `/clear` if you conti
 > - Function: `fetch_observations(lat, lng, radius_km, days_back=30, taxa=['Actinopterygii'])` — returns list of pydantic Observation models
 > - Cache responses in data/cache/inaturalist/ as JSON, keyed by query hash, with 24hr TTL
 > - Persist deduplicated observations to a new `observations` table in fishing.db
-> - CLI command `make ingest` that pulls observations for a configurable bounding box (read from data/user_profile.json — use the user's home location + 50km radius default)
+> - CLI command `make ingest` that pulls observations for a configurable area; see [README usage](../../README.md#how-to-run) for home selection.
 > - Use httpx async for the API calls, respect their rate limits (1 req/sec is polite)
 > - No API key required for iNaturalist reads
 > - Tests with a recorded fixture (use vcrpy or just mock httpx) — don't hit the real API in tests
