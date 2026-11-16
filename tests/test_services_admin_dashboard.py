@@ -387,3 +387,39 @@ def test_catch_stats_avg_catches_per_session(tmp_path):
 
     result = build_dashboard(db)["catch_stats"]
     assert result["avg_catches_per_session"] == 1.5  # 3 catches / 2 sessions
+
+
+def test_api_cost_breakdowns_preserve_unknown_and_partial_estimates(tmp_path):
+    db = _make_db(tmp_path)
+    _seed_users(db, n=2)
+    for caller, user_id, price in [
+        ("unknown", 1, None),
+        ("mixed", 2, None),
+        ("mixed", 2, 0.25),
+        ("free", 3, 0.0),
+    ]:
+        db["llm_usage"].insert({
+            "caller": caller, "user_id": user_id, "role": "router",
+            "model": "test", "est_usd": price,
+        })
+    db["llm_usage"].insert({
+        "caller": "unknown", "user_id": 1, "role": "router",
+        "model": "test", "est_usd": 1.0, "ts": "2000-01-01",
+    })
+
+    costs = build_dashboard(db)["api_cost_estimate"]
+
+    for breakdown, key, ids in [
+        ("by_caller_30_days", "caller", ("unknown", "mixed", "free")),
+        ("by_user_30_days", "user_id", (1, 2, 3)),
+    ]:
+        groups = {row[key]: row for row in costs[breakdown]}
+        for group_id, calls, estimate, unpriced in [
+            (ids[0], 1, None, 1),
+            (ids[1], 2, 0.25, 1),
+            (ids[2], 1, 0.0, 0),
+        ]:
+            assert groups[group_id] == {
+                key: group_id, "calls": calls,
+                "estimated_usd": estimate, "unpriced_calls": unpriced,
+            }

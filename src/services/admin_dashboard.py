@@ -257,16 +257,18 @@ def _api_cost_estimate(db: Database) -> dict[str, Any]:
         }
 
     result["by_caller_30_days"] = [
-        {"caller": c, "calls": n, "estimated_usd": round(u or 0.0, 4)}
-        for c, n, u in db.execute(
-            "SELECT caller, COUNT(*), SUM(est_usd) FROM llm_usage "
+        {"caller": c, "calls": n, "estimated_usd": None if u is None else round(u, 4),
+         "unpriced_calls": unpriced}
+        for c, n, u, unpriced in db.execute(
+            "SELECT caller, COUNT(*), SUM(est_usd), COUNT(*) - COUNT(est_usd) FROM llm_usage "
             "WHERE ts >= datetime('now', '-30 days') GROUP BY caller ORDER BY SUM(est_usd) DESC"
         ).fetchall()
     ]
     result["by_user_30_days"] = [
-        {"user_id": uid, "calls": n, "estimated_usd": round(u or 0.0, 4)}
-        for uid, n, u in db.execute(
-            "SELECT user_id, COUNT(*), SUM(est_usd) FROM llm_usage "
+        {"user_id": uid, "calls": n, "estimated_usd": None if u is None else round(u, 4),
+         "unpriced_calls": unpriced}
+        for uid, n, u, unpriced in db.execute(
+            "SELECT user_id, COUNT(*), SUM(est_usd), COUNT(*) - COUNT(est_usd) FROM llm_usage "
             "WHERE ts >= datetime('now', '-30 days') GROUP BY user_id ORDER BY SUM(est_usd) DESC"
         ).fetchall()
     ]
