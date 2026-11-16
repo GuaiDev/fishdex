@@ -97,19 +97,6 @@ def test_log_trip_endpoint():
     assert "session_id" in data
 
 
-def test_ingest_data_requires_lat_lng(monkeypatch):
-    """Missing lat/lng returns 400."""
-    monkeypatch.setenv("FISHBOT_API_KEY", "test-key")
-    monkeypatch.setenv("FISHBOT_ALLOW_SERVER_INGEST", "1")
-    response = client.post(
-        "/ingest/data",
-        json={"label": "test"},
-        headers={"X-Api-Key": "test-key"},
-    )
-    # Either 400 (missing lat/lng), 401 (wrong key), or 422 (validation) — all acceptable
-    assert response.status_code in (400, 401, 422)
-
-
 def test_api_key_unset_refuses(monkeypatch):
     """With FISHBOT_API_KEY unset, protected endpoints refuse (503), even with a header."""
     monkeypatch.delenv("FISHBOT_API_KEY", raising=False)
@@ -139,24 +126,10 @@ def test_api_key_wrong_refuses(monkeypatch):
     assert response.status_code == 401
 
 
-def test_api_key_right_passes(monkeypatch):
-    monkeypatch.setenv("FISHBOT_API_KEY", "right-key")
-    monkeypatch.setenv("FISHBOT_ALLOW_SERVER_INGEST", "1")
-    response = client.post(
-        "/ingest/data",
-        json={"label": "test"},
-        headers={"X-Api-Key": "right-key"},
-    )
-    # Past the key check: the body is rejected by validation, not by auth.
-    assert response.status_code in (400, 422)
-
-
-def test_server_ingest_routes_are_disabled_by_default(monkeypatch):
-    """The API process does not run ingest work unless explicitly opted in."""
+@pytest.mark.parametrize("body", [{}, {"query": "trout", "lat": 43.45, "lng": -79.72}])
+def test_server_ingest_routes_refuse_with_cli_directions(monkeypatch, body):
     monkeypatch.setenv("FISHBOT_API_KEY", "test-key")
-    monkeypatch.delenv("FISHBOT_ALLOW_SERVER_INGEST", raising=False)
     headers = {"X-Api-Key": "test-key"}
-    body = {"query": "trout", "lat": 43.45, "lng": -79.72}
 
     for path in (
         "/ingest",
@@ -170,7 +143,9 @@ def test_server_ingest_routes_are_disabled_by_default(monkeypatch):
         "/ingest/data-tidal",
     ):
         response = client.post(path, json=body, headers=headers)
-        assert response.status_code == 404, (path, response.status_code, response.text)
+        assert response.status_code == 410, (path, response.status_code, response.text)
+        assert "fishbot weekly-ingest" in response.json()["detail"]
+        assert "fishbot ingest" in response.json()["detail"]
 
 
 def test_admin_token_refuses_without_key(monkeypatch):

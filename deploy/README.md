@@ -81,5 +81,9 @@ only serves tier 1 spots, so a spot ranked tier 2 or 3 appears for signed-in use
 - `auto_stop_machines` is on, so an idle API sleeps and the first request takes a few seconds.
   Set `min_machines_running = 1` in `fly.toml` to keep it warm.
 - SQLite means one machine only. Do not scale to more than one.
-- `POST /ingest` now needs the `X-Api-Key` header (`FISHBOT_API_KEY`); it was open before.
+- The `/ingest` and `/ingest/data*` API routes permanently refuse ingest requests. Run regional
+  refreshes in a separate CLI process on the host with
+  `fly ssh console -C "python -m src.cli.main weekly-ingest"`; use
+  `fly ssh console -C "python -m src.cli.main ingest"` for source ingestion.
+  The Makefile targets `weekly-ingest` and `ingest` run these CLI commands locally.
 - Back up the volume with `fly volumes snapshots list fishdex_data` (daily by default).

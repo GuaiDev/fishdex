@@ -168,7 +168,7 @@ Note that `.env.example` currently documents only `ANTHROPIC_API_KEY`, `CLAUDE_M
 
 The API's admin endpoints (`POST /admin/token`, `/admin/dashboard`, `/ingest`, `/ingest/data*`, and so on) are protected by `FISHBOT_API_KEY`. If it is unset or empty they refuse every request with HTTP 503 rather than letting anyone in; a wrong or missing `X-Api-Key` header gets 401. So set it before `make serve`: add a line such as `FISHBOT_API_KEY=pick-any-long-random-string` to `.env` (generate one with `python -c "import secrets; print(secrets.token_urlsafe(32))"`), or export it in your shell.
 
-Server-side ingest routes are disabled by default, even with a valid API key. Run refreshes with `make weekly-ingest`, which runs in the CLI process. Set `FISHBOT_ALLOW_SERVER_INGEST=1` only when you explicitly need the legacy API triggers; they then run inside the web server process.
+Server-side ingest routes permanently refuse requests with HTTP 410 and CLI directions after API key authentication. Run regional refreshes with `make weekly-ingest` and source ingestion with `make ingest`; both run in a separate CLI process.
 
 ### Running locally and hosting
 
@@ -195,7 +195,7 @@ to narrow the question or ask again if the cap is reached.
 
 A public deployment is prepared but not live until the steps are run: the static app (`app/`) on Vercel and the API on Fly.io with the database on a volume. Anyone with the link gets a read-only demo with no sign-in (tier 1 spots in a capped map area, a saved example in place of the live coach, nothing saved); everything else needs a token or invite code. Set `FISHBOT_PUBLIC_DEMO=0` to turn the demo off. `FISHBOT_CORS_ORIGINS` limits which sites a browser lets call the API. The setup, what to seed versus re-ingest, and the login and secret steps are in [`deploy/README.md`](deploy/README.md).
 
-The weekly data refresh is `make weekly-ingest`. It reads the list of areas (label, jurisdiction, lat, lng, radius and which source bundles to run) from `data/ingest_areas.json` and runs each one through the same service code as the legacy `/ingest/data*` triggers, in the CLI process, one after another, then prints what each dataset stored and what failed. Edit that file to add or drop an area. To preview without fetching anything:
+The weekly data refresh is `make weekly-ingest`. It reads the list of areas (label, jurisdiction, lat, lng, radius and which source bundles to run) from `data/ingest_areas.json` and runs each one through the ingest services in the CLI process, one after another, then prints what each dataset stored and what failed. Edit that file to add or drop an area. To preview without fetching anything:
 
 ```bash
 uv run python -m src.cli.main weekly-ingest --dry-run
