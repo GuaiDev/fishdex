@@ -29,7 +29,7 @@ format:
 ingest:
 	uv run python -m src.cli.main ingest
 
-# Every area in data/ingest_areas.json, run in sequence against the local
+# Every area the jurisdiction plugins schedule (src/ingest/jurisdictions/*/plugin.py), run in sequence against the local
 # database. Replaces the old weekly GitHub Action. Preview without fetching:
 #   uv run python -m src.cli.main weekly-ingest --dry-run
 # Schedule it weekly with cron (Sundays 2am local time; cron's PATH is short,

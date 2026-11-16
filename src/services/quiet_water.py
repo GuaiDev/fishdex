@@ -9,7 +9,7 @@ and it never implies presence or absence (presence vs. pressure, CLAUDE.md).
 How the spots are chosen (report 6.3: "top N by explore() within the user's area"):
 
 - **The areas** are the labelled areas the weekly ingest covers
-  (`data/ingest_areas.json`) for the build's jurisdiction. That is where the
+  (each jurisdiction plugin's `cron_areas`) for the build's jurisdiction. That is where the
   observation records that "few" is measured against were collected: outside
   them every reach has few records, so "quiet" would mean "not ingested". The
   user's home is inside one of them.
@@ -48,6 +48,7 @@ from pathlib import Path
 
 from sqlite_utils.db import Database
 
+from src.jurisdictions.registry import get_plugin
 from src.models.context import EmptyReason, ExploreResult
 from src.models.exclusion_zone import ExclusionZone, ExclusionZoneFile
 from src.models.ingest_area import IngestArea
@@ -240,7 +241,9 @@ def _title(r: ExploreResult, named: "_NamedReaches") -> str | None:
 
 def load_exclusions(jurisdiction: JurisdictionCode) -> list[ExclusionZone]:
     """The waters this jurisdiction's file says not to suggest; none when it has no file."""
-    path = Path(EXCLUSIONS_PATH.format(code=jurisdiction.lower().replace("-", "_")))
+    plugin = get_plugin(jurisdiction)
+    declared = plugin.curation.get("exclusions") if plugin else None
+    path = Path(declared or EXCLUSIONS_PATH.format(code=jurisdiction.lower().replace("-", "_")))
     if not path.exists():
         logger.info("no exclusion file for %s (%s): nothing excluded", jurisdiction, path)
         return []

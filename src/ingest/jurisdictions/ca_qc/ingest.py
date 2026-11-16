@@ -12,6 +12,7 @@ import importlib
 import logging
 from datetime import datetime
 
+from src.jurisdictions.plugin import AreaContext
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -100,3 +101,19 @@ def _upsert_regulation_chunks(db, chunks: list[dict]) -> None:
         if chunk.get("zone_name"):
             row["zone_name"] = chunk["zone_name"]
         db["regulation_chunks"].upsert(row, pk=["zone", "jurisdiction", "regulation_year"])
+
+
+# ── source runners ────────────────────────────────────────────────────────────
+# Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
+# area being run; named in this folder's plugin.py.
+
+def run_species_ranges(ctx: AreaContext) -> int:
+    return ingest_qc_species_ranges()
+
+
+def run_regulations(ctx: AreaContext) -> int:
+    return ingest_qc_regulations()
+
+
+def run_water_quality(ctx: AreaContext) -> int:
+    return ingest_qc_water_quality(ctx.lat, ctx.lng, ctx.radius_km)

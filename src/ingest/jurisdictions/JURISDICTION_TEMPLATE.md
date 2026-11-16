@@ -126,9 +126,13 @@ Shared with iNaturalist (source='iNaturalist') and FISS (source='FISS').
 [ ] Implement hydro_network.py — fetch_watercourses(lat, lon, radius_km) → list[StreamSegment]
 [ ] Implement water_quality.py — fetch_water_quality_readings(lat, lng, radius_km) → list[WaterQualityReading]
 [ ] Implement fish_observations.py if an official fish obs layer exists
-[ ] Add jurisdiction to src/ingest/jurisdictions/config.py (register() call)
-[ ] Create src/services/<code>_ingest.py with ingest_<code>_data(lat, lng, radius_km)
-[ ] Add cron areas to .github/workflows/weekly_ingest.yml
+[ ] Create src/ingest/jurisdictions/<code>/plugin.py exporting PLUGIN = JurisdictionPlugin(...)
+    (code, name, bbox, sources, cron_areas, status_authorities, ...) — see
+    src/jurisdictions/plugin.py and any existing folder (ca_mb/plugin.py is a small one).
+    This is the only registration: the registry, coordinate tagging, the prompt,
+    `weekly-ingest` and `ingest-source` all find the folder by scanning.
+[ ] Create src/ingest/jurisdictions/<code>/ingest.py with one run_<source>(ctx: AreaContext)
+    per runnable source, and name each in the plugin's `sources`
 [ ] Confirm all adapters write jurisdiction="<CODE>" and correct segment_source / source
 [ ] Run make lint; fix any issues
 [ ] Test with a small radius (radius_km=10) against a known location in the jurisdiction

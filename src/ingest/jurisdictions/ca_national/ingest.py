@@ -6,13 +6,14 @@ Orchestrates national-scope adapters:
   - CABIN benthic (all provinces — expanded from Ontario-only)
   - DataStream water quality (Manitoba + Atlantic Canada)
 
-Called from the /ingest/data-national API endpoint.
+Run through the generic ingest (`fishbot ingest-source`) via the jurisdiction plugins.
 Global sources (iNat, GBIF, WSC, OSM) are handled by the standard pipeline.
 """
 
 import importlib
 import logging
 
+from src.jurisdictions.plugin import AreaContext
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -109,3 +110,22 @@ def ingest_national_data(
         "dfo_critical_habitat": critical_habitat,
         "datastream_water_quality": datastream,
     }
+
+
+# ── source runners ────────────────────────────────────────────────────────────
+# Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
+# area being run; named in this folder's plugin.py.
+
+def run_tidal(ctx: AreaContext) -> int:
+    """CHS tide predictions near the area. Used by the coastal Maritime plugins."""
+    from src.ingest.jurisdictions.ca_national.tidal import fetch_tidal_readings
+
+    db = get_db()
+    rows = fetch_tidal_readings(ctx.lat, ctx.lng, ctx.radius_km)
+    if rows:
+        db["tidal_readings"].upsert_all(rows, pk="record_id")
+    return len(rows)
+
+
+def run_benthic(ctx: AreaContext) -> int:
+    return ingest_cabin_all_provinces()

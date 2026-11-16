@@ -6,7 +6,7 @@ Orchestrates the CA-SK adapters:
   - SK stocking (ca_sk/stocking.py — SK Fish Stocking History)
   - SK water quality (ca_sk/water_quality.py — Long Term Water Chemistry)
 
-Called from the /ingest/data-sk API endpoint or `weekly-ingest`.
+Run by `fishbot ingest-source` / `weekly-ingest` through this folder's plugin.py.
 Global sources (iNat, GBIF, WSC, OSM, eBird) are handled by the standard
 ingest pipeline and are not called here.
 """
@@ -15,6 +15,7 @@ import importlib
 import logging
 from datetime import datetime
 
+from src.jurisdictions.plugin import AreaContext
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -147,3 +148,24 @@ def ingest_sk_data(
         "sk_stocking": stocking,
         "sk_water_quality": wq,
     }
+
+
+# ── source runners ────────────────────────────────────────────────────────────
+# Called by the generic ingest (`fishbot ingest-source`, `weekly-ingest`) with the
+# area being run; named in this folder's plugin.py.
+
+def run_hydro_network(ctx: AreaContext) -> dict[str, int]:
+    segs, barriers = ingest_sk_hydro_network(ctx.lat, ctx.lng, ctx.radius_km)
+    return {"sk_hydro_segments": segs, "sk_hydro_barriers": barriers}
+
+
+def run_fish_observations(ctx: AreaContext) -> int:
+    return ingest_sk_fish_observations(ctx.lat, ctx.lng, ctx.radius_km)
+
+
+def run_stocking(ctx: AreaContext) -> int:
+    return ingest_sk_stocking(ctx.lat, ctx.lng, ctx.radius_km)
+
+
+def run_water_quality(ctx: AreaContext) -> int:
+    return ingest_sk_water_quality(ctx.lat, ctx.lng, ctx.radius_km)

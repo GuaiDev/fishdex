@@ -121,7 +121,7 @@ make app
 # Run all ingestion adapters around home
 make ingest
 
-# Refresh every area in data/ingest_areas.json (the weekly ingest)
+# Refresh every area the jurisdiction plugins schedule (the weekly ingest)
 make weekly-ingest
 
 # Rebuild the explore map's named fishing stretches from data/curation/,
@@ -195,7 +195,7 @@ to narrow the question or ask again if the cap is reached.
 
 A public deployment is prepared but not live until the steps are run: the static app (`app/`) on Vercel and the API on Fly.io with the database on a volume. Anyone with the link gets a read-only demo with no sign-in (tier 1 spots in a capped map area, a saved example in place of the live coach, nothing saved); everything else needs a token or invite code. Set `FISHBOT_PUBLIC_DEMO=0` to turn the demo off. `FISHBOT_CORS_ORIGINS` limits which sites a browser lets call the API. The setup, what to seed versus re-ingest, and the login and secret steps are in [`deploy/README.md`](deploy/README.md).
 
-The weekly data refresh is `make weekly-ingest`. It reads the list of areas (label, jurisdiction, lat, lng, radius and which source bundles to run) from `data/ingest_areas.json` and runs each one through the ingest services in the CLI process, one after another, then prints what each dataset stored and what failed. Edit that file to add or drop an area. To preview without fetching anything:
+The weekly data refresh is `make weekly-ingest`. It reads the list of areas (label, lat, lng, radius and which sources to run) from each jurisdiction's `plugin.py` under `src/ingest/jurisdictions/<code>/` and runs each one through the ingest services in the CLI process, one after another, then prints what each dataset stored and what failed. Edit that jurisdiction's `cron_areas` to add or drop an area. To run one source for one area, use `uv run python -m src.cli.main ingest-source CA-BC hydro_network --area "Fraser River Lower Mainland"` (any jurisdiction, any source its plugin declares). To preview without fetching anything:
 
 ```bash
 uv run python -m src.cli.main weekly-ingest --dry-run

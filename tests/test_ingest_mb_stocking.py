@@ -11,7 +11,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from src.ingest.jurisdictions.ca_mb import stocking
-from src.services.mb_ingest import ingest_mb_stocking
+from src.ingest.jurisdictions.ca_mb.ingest import ingest_mb_stocking
 from src.storage.database import get_db
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mb_stocking_response.json"
@@ -85,7 +85,7 @@ def test_cache_hit_skips_http(tmp_path):
 def test_ingest_stores_records_and_is_idempotent(tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, return_value=_mock_response(_load())), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.services.mb_ingest.get_db", lambda: get_db(db_path))
+        monkeypatch.setattr("src.ingest.jurisdictions.ca_mb.ingest.get_db", lambda: get_db(db_path))
         n = ingest_mb_stocking(*_lat_lng(), radius_km=50)
         assert n == 2
         db = get_db(db_path)

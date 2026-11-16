@@ -18,7 +18,7 @@ def _make_db(tmp_path) -> Database:
 
 
 def test_ingest_ab_stocking_does_not_crash_on_real_schema(tmp_path, monkeypatch):
-    from src.services import ab_ingest
+    from src.ingest.jurisdictions.ca_ab import ingest as ab_ingest
 
     db = _make_db(tmp_path)
     monkeypatch.setattr(ab_ingest, "get_db", lambda: db)
@@ -77,7 +77,7 @@ def _fake_segment(ogf_id: int):
 
 
 def test_ab_hydro_ingest_never_overwrites_other_jurisdiction_row(tmp_path, monkeypatch):
-    from src.services import ab_ingest
+    from src.ingest.jurisdictions.ca_ab import ingest as ab_ingest
 
     db = _make_db(tmp_path)
     monkeypatch.setattr(ab_ingest, "get_db", lambda: db)
@@ -105,7 +105,7 @@ def test_ab_hydro_ingest_never_overwrites_other_jurisdiction_row(tmp_path, monke
 
 
 def test_ab_hydro_ingest_keeps_earlier_areas_and_empty_fetch_wipes_nothing(tmp_path, monkeypatch):
-    from src.services import ab_ingest
+    from src.ingest.jurisdictions.ca_ab import ingest as ab_ingest
 
     db = _make_db(tmp_path)
     monkeypatch.setattr(ab_ingest, "get_db", lambda: db)

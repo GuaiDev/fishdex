@@ -3,7 +3,7 @@
 from datetime import date
 
 from src.agent.system_prompt import assemble
-from src.jurisdictions.ontario import OntarioJurisdiction
+from src.jurisdictions.registry import get_jurisdiction
 from src.jurisdictions.unknown import UnknownJurisdiction
 from src.models.catch import Catch
 from src.models.profile import UserProfile
@@ -13,7 +13,7 @@ TEMPLATE = "# Test template\n\nThis is the persona prompt."
 
 
 def test_assemble_with_no_trips():
-    out = assemble(TEMPLATE, UserProfile.default(), [], OntarioJurisdiction())
+    out = assemble(TEMPLATE, UserProfile.default(), [], get_jurisdiction("CA-ON"))
     assert "No trips logged yet" in out
     assert "## Your angler" in out
     assert "## Active jurisdiction" in out
@@ -36,7 +36,7 @@ def test_assemble_includes_profile_and_trip_data():
             location_name="Credit River",
         ),
     ]
-    out = assemble(TEMPLATE, p, trips, OntarioJurisdiction())
+    out = assemble(TEMPLATE, p, trips, get_jurisdiction("CA-ON"))
     assert "smallmouth bass" in out
     assert "Lake Simcoe" in out
     assert "Credit River" in out

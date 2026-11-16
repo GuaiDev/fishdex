@@ -1188,18 +1188,12 @@ def list_users(user: dict = Depends(get_current_user)):
 
 @app.post("/ingest")
 @app.post("/ingest/data")
-@app.post("/ingest/data-bc")
-@app.post("/ingest/data-ab")
-@app.post("/ingest/data-qc")
-@app.post("/ingest/data-mb")
-@app.post("/ingest/data-sk")
-@app.post("/ingest/data-national")
-@app.post("/ingest/data-tidal")
 def refuse_server_ingest(_: None = Depends(verify_api_key)):
     raise HTTPException(
         status_code=410,
         detail="Server-side ingest has been removed; run `fishbot weekly-ingest` for regional "
-        "refreshes or `fishbot ingest` for source ingestion in a separate CLI process.",
+        "refreshes, `fishbot ingest-source <jurisdiction> <source>` for one source, or "
+        "`fishbot ingest` for home-area ingestion in a separate CLI process.",
     )
 
 

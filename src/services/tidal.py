@@ -12,11 +12,13 @@ from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
 
+_INGEST_HINT = "fishbot ingest-source CA-NS tidal --area 'Annapolis River NS'"
+
 
 def get_tidal_conditions_for_agent(lat: float, lng: float) -> dict:
     """Return the nearest tidal station's next high and low tide predictions.
 
-    Queries the tidal_readings table (populated by /ingest/data-tidal).
+    Queries the tidal_readings table (populated by `fishbot ingest-source <jurisdiction> tidal`).
     Returns a dict with next_high, next_low, station info, or a message
     if no tidal data is available for this location.
     """
@@ -25,7 +27,7 @@ def get_tidal_conditions_for_agent(lat: float, lng: float) -> dict:
     if "tidal_readings" not in db.table_names():
         return {
             "available": False,
-            "message": "No tidal data ingested yet. Run /ingest/data-tidal for coastal locations.",
+            "message": f"No tidal data ingested yet. Run `{_INGEST_HINT}` for coastal locations.",
         }
 
     # Find the nearest station with predictions within 200km
@@ -39,7 +41,7 @@ def get_tidal_conditions_for_agent(lat: float, lng: float) -> dict:
         return {
             "available": False,
             "message": (
-                "No tidal stations in database. Run /ingest/data-tidal for coastal locations."
+                f"No tidal stations in database. Run `{_INGEST_HINT}` for coastal locations."
             ),
         }
 

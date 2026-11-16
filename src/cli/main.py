@@ -546,7 +546,9 @@ def ingest(
 @app.command(name="weekly-ingest")
 def weekly_ingest(
     areas_file: str = typer.Option(
-        "data/ingest_areas.json", "--areas", help="JSON file listing the areas to ingest"
+        None,
+        "--areas",
+        help="JSON file listing the areas to ingest (default: every jurisdiction plugin's areas)",
     ),
     only: str = typer.Option(
         None, "--only", help="Run only areas whose label contains this text (case-insensitive)"
@@ -556,7 +558,7 @@ def weekly_ingest(
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="List what would run, fetch nothing"),
 ) -> None:
-    """Ingest every area in data/ingest_areas.json, one after another.
+    """Ingest every area the jurisdiction plugins declare, one after another.
 
     Replaces the old weekly GitHub Action that POSTed each area to a hosted
     server. Runs ingest services against the local database in this CLI process.
@@ -565,9 +567,9 @@ def weekly_ingest(
     """
     from pathlib import Path
 
-    from src.services.area_ingest import load_areas, run_area
+    from src.services.area_ingest import IngestJobError, check_job, load_areas, run_area
 
-    areas = load_areas(Path(areas_file))
+    areas = load_areas(Path(areas_file) if areas_file else None)
     if only:
         areas = [a for a in areas if only.lower() in a.label.lower()]
         if not areas:
@@ -575,20 +577,26 @@ def weekly_ingest(
             raise typer.Exit(1)
 
     jobs = [(a, s) for a in areas for s in a.sources]
+    try:
+        for a, s in jobs:
+            check_job(a.jurisdiction, s)
+    except IngestJobError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
     if dry_run:
         table = Table(title=f"weekly-ingest plan ({len(jobs)} runs)")
         for col in ("Area", "Jurisdiction", "Source", "lat", "lng", "radius km"):
             table.add_column(col)
         for a, s in jobs:
             table.add_row(
-                a.label, a.jurisdiction, s.value, str(a.lat), str(a.lng), str(a.radius_for(s))
+                a.label, a.jurisdiction, s, str(a.lat), str(a.lng), str(a.radius_for(s))
             )
         console.print(table)
         return
 
     results = []
     for i, (a, s) in enumerate(jobs, 1):
-        console.print(f"[dim]({i}/{len(jobs)}) {a.label} — {s.value}…[/dim]")
+        console.print(f"[dim]({i}/{len(jobs)}) {a.label} — {s}…[/dim]")
         results.append(run_area(a, s, days_back=days_back or None))
 
     table = Table(title="Weekly ingest summary")
@@ -601,7 +609,7 @@ def weekly_ingest(
         failed = ", ".join(f"{k}: {v}" for k, v in r.failed.items())
         table.add_row(
             r.label,
-            r.source.value,
+            r.source,
             "[green]ok[/green]" if r.ok else "[red]FAILED[/red]",
             "; ".join(x for x in (stored, failed) if x),
         )
@@ -612,6 +620,46 @@ def weekly_ingest(
         console.print(f"[red]{len(failed_runs)} of {len(results)} runs had a failed dataset.[/red]")
         raise typer.Exit(1)
     console.print(f"[green]All {len(results)} runs succeeded.[/green]")
+
+
+@app.command(name="ingest-source")
+def ingest_source(
+    jurisdiction: str = typer.Argument(..., help="ISO 3166-2 code, e.g. CA-BC"),
+    source: str = typer.Argument(
+        ..., help="Source name from the jurisdiction's plugin (e.g. hydro_network), or global"
+    ),
+    area: str = typer.Option(
+        None, "--area", help="Label of a configured area for the jurisdiction"
+    ),
+    lat: float = typer.Option(None, "--lat", help="Ad-hoc area latitude (instead of --area)"),
+    lng: float = typer.Option(None, "--lng", help="Ad-hoc area longitude (instead of --area)"),
+    radius_km: float = typer.Option(None, "--radius", help="Search radius in km"),
+    days_back: int = typer.Option(
+        90, "--days", help="iNaturalist history for the global source (0 = all history)"
+    ),
+) -> None:
+    """Run one source for one jurisdiction and area — the generic ingest.
+
+    The sources a jurisdiction offers are declared in its plugin, so a new
+    region is runnable here without touching this command. Region-wide sources
+    (regulations, species ranges) need no area.
+    """
+    from src.services.area_ingest import IngestJobError, resolve_area, run_area
+
+    try:
+        target = resolve_area(jurisdiction, source, area, lat, lng, radius_km)
+    except IngestJobError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+
+    result = run_area(target, source, days_back=days_back or None)
+    for name, count in result.stored.items():
+        console.print(f"{name}: {count}")
+    for name, error in result.failed.items():
+        console.print(f"[red]{name} FAILED: {error}[/red]")
+    if not result.ok:
+        raise typer.Exit(1)
+    console.print(f"[green]{target.label} — {source}: done.[/green]")
 
 
 @app.command(name="ingest-hydat")
