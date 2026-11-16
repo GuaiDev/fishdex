@@ -119,12 +119,24 @@ def get_user_from_token(db: Database, token: str) -> dict | None:
     if not user:
         return None
 
-    try:
-        db["user_sessions"].update(session["id"], {"last_used_at": datetime.now().isoformat()})
-        db["users"].update(user["id"], {"last_seen_at": datetime.now().isoformat()})
-        db.conn.commit()
-    except Exception:
-        pass
+    now = datetime.now()
+    should_touch = True
+    last_used = session.get("last_used_at")
+    if last_used:
+        try:
+            last_used_dt = datetime.fromisoformat(last_used)
+            if now - last_used_dt < timedelta(minutes=5):
+                should_touch = False
+        except Exception:
+            should_touch = True
+
+    if should_touch:
+        try:
+            db["user_sessions"].update(session["id"], {"last_used_at": now.isoformat()})
+            db["users"].update(user["id"], {"last_seen_at": now.isoformat()})
+            db.conn.commit()
+        except Exception:
+            pass
 
     return user
 
