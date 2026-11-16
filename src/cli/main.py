@@ -263,8 +263,7 @@ def profile() -> None:
         preferences=preferences,
     )
     save_profile(updated)
-    if home_location is not None:
-        set_user_home(db, 1, home_location, home_jurisdiction)
+    set_user_home(db, 1, home_location, home_jurisdiction)
     console.print("[green]Profile saved.[/green]")
 
 

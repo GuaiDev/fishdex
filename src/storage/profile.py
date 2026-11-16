@@ -58,12 +58,18 @@ def get_user_home(db: Database, user_id: int) -> tuple[Location | None, Jurisdic
 
 
 def set_user_home(
-    db: Database, user_id: int, home: Location, jurisdiction: JurisdictionCode
+    db: Database, user_id: int, home: Location | None, jurisdiction: JurisdictionCode
 ) -> None:
     """Store a user's home point and jurisdiction."""
     db.execute(
         "UPDATE users SET home_name = ?, home_lat = ?, home_lng = ?, home_jurisdiction = ? "
         "WHERE id = ?",
-        [home.name, home.lat, home.lng, jurisdiction, user_id],
+        [
+            home.name if home else None,
+            home.lat if home else None,
+            home.lng if home else None,
+            jurisdiction,
+            user_id,
+        ],
     )
     db.conn.commit()
