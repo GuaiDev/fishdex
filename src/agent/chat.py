@@ -11,10 +11,11 @@ from src.agent.client import get_client, get_model
 from src.agent.system_prompt import assemble, load_template
 from src.agent.tools import execute_tool, tool_schemas
 from src.jurisdictions.registry import get_jurisdiction
+from src.models.profile import UserProfile
 from src.storage.angler_context import format_context_for_prompt, load_context
 from src.storage.conversations import close_and_update_context, save_turn, start_session
 from src.storage.database import get_db
-from src.storage.profile import load_profile
+from src.storage.profile import get_user_home, load_profile
 from src.storage.trips import recent_trips
 
 EXIT_COMMANDS = {"/exit", "/quit", "exit", "quit"}
@@ -87,14 +88,32 @@ def _prompt_inputs(db: Any, user_id: int) -> tuple[Any, list, Any]:
     """The profile, recent trips and jurisdiction a user's system prompt is built from.
 
     The profile file (data/user_profile.json) and the legacy `trips` table have
-    no user_id: they are user 1's. Any other user gets neither, and the
-    jurisdiction falls back to the app default rather than user 1's home, so
-    nothing in their prompt (or in the tool descriptions built from the profile)
-    is derived from someone else's data.
+    no user_id: they are user 1's. Any other user gets neither. Home and
+    jurisdiction are per user and live in the database: a stored home overrides
+    the file's for user 1, and anyone else with stored home or jurisdiction gets
+    a profile carrying only those. A jurisdiction does not require coordinates.
+    Users without a stored jurisdiction use the app default (user 1 retains the
+    legacy file fallback), never another user's home, so nothing in their prompt
+    (or in the tool descriptions built from the profile) is derived from someone
+    else's data.
     """
+    stored = get_user_home(db, user_id)
     if user_id == 1:
         profile = load_profile()
+        if stored is not None:
+            home, jurisdiction = stored
+            profile = profile.model_copy(
+                update={
+                    "home_location": home,
+                    "home_jurisdiction": jurisdiction or profile.home_jurisdiction,
+                }
+            )
         return profile, recent_trips(db, limit=5), get_jurisdiction(profile.home_jurisdiction)
+    if stored is not None:
+        home, jurisdiction = stored
+        jurisdiction = jurisdiction or _DEFAULT_JURISDICTION
+        profile = UserProfile(home_jurisdiction=jurisdiction, home_location=home)
+        return profile, [], get_jurisdiction(jurisdiction)
     return None, [], get_jurisdiction(_DEFAULT_JURISDICTION)
 
 

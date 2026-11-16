@@ -1875,6 +1875,47 @@ class Migration:
     apply: Callable[[Database], None]
 
 
+def migrate_user_home(db: Database) -> None:
+    """Give each user a home point and jurisdiction, and seed user 1's from the profile file.
+
+    Home used to live only in data/user_profile.json, so every user's place names
+    were ranked by distance from the captain's home. Idempotent. The profile file is
+    read only when it exists: a missing file seeds nothing, so user 1 keeps the
+    legacy fallback instead of being given a home nobody chose. A home already
+    stored is never overwritten.
+    """
+    if "users" not in db.table_names():
+        return
+    cols = {c.name for c in db["users"].columns}
+    for col, decl in (
+        ("home_name", "TEXT"),
+        ("home_lat", "REAL"),
+        ("home_lng", "REAL"),
+        ("home_jurisdiction", "TEXT"),
+    ):
+        if col not in cols:
+            db.execute(f"ALTER TABLE users ADD COLUMN {col} {decl}")
+    db.conn.commit()
+
+    from src.storage.profile import PROFILE_PATH, read_profile_file
+
+    profile = read_profile_file(PROFILE_PATH)
+    if profile is None:
+        return
+    home = profile.home_location
+    db.execute(
+        "UPDATE users SET home_name = ?, home_lat = ?, home_lng = ?, home_jurisdiction = ? "
+        "WHERE id = 1 AND home_lat IS NULL AND home_lng IS NULL",
+        [
+            home.name if home else None,
+            home.lat if home else None,
+            home.lng if home else None,
+            profile.home_jurisdiction,
+        ],
+    )
+    db.conn.commit()
+
+
 # The schema's history, in the order it must run. Numbers are permanent: a step
 # that has run on any database is never edited or renumbered, and a change goes in
 # as a new step at the end. Version 1 is everything the app created before
@@ -1912,6 +1953,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(25, "session_conditions_gauge", migrate_session_conditions_gauge),
     Migration(26, "species_images", migrate_species_images),
     Migration(27, "hydro_segments", _ensure_hydro_segments),
+    Migration(28, "user_home", migrate_user_home),
 )
 
 assert [m.version for m in MIGRATIONS] == list(range(1, len(MIGRATIONS) + 1))
