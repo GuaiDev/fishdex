@@ -114,11 +114,10 @@ def _tool_usage(db: Database) -> list[dict[str, Any]]:
 
 
 def _ingest_status(db: Database) -> dict[str, Any]:
-    """Record counts by source and jurisdiction, from observations and
-    gbif_observations — the two tables the task calls out explicitly.
-    Other ingest tables (stocking_records, salmon_escapement, regulation_chunks,
-    species_ranges, water_quality_readings, ...) aren't included; add here if
-    a fuller ingest-coverage view is needed later.
+    """Combine recent run diagnostics with observation coverage.
+
+    Coverage counts include only observations and gbif_observations; the run
+    ledger covers additional sources without scanning their stored datasets.
     """
     status: dict[str, Any] = {"observations": [], "gbif_observations": [], "runs": []}
 
@@ -130,10 +129,19 @@ def _ingest_status(db: Database) -> dict[str, Any]:
         ).fetchall()
         status["runs"] = [
             {
-                "id": r[0], "source": r[1], "jurisdiction": r[2], "area": r[3],
-                "started_at": r[4], "finished_at": r[5], "fetched": r[6],
-                "stored": r[7], "skipped": r[8], "empty_count": r[9],
-                "empty_share": r[10], "status": r[11], "error": r[12],
+                "id": r[0],
+                "source": r[1],
+                "jurisdiction": r[2],
+                "area": r[3],
+                "started_at": r[4],
+                "finished_at": r[5],
+                "fetched": r[6],
+                "stored": r[7],
+                "skipped": r[8],
+                "empty_count": r[9],
+                "empty_share": r[10],
+                "status": r[11],
+                "error": r[12],
             }
             for r in rows
         ]

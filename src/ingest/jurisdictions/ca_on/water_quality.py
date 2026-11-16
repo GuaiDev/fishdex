@@ -282,9 +282,7 @@ def parse_field_data(
         header = csv.DictReader(f).fieldnames or []
     normalized = {h.strip().lower() for h in header}
 
-    is_long = "result" in normalized and (
-        "analyte" in normalized or "parm" in normalized
-    )
+    is_long = "result" in normalized and ("analyte" in normalized or "parm" in normalized)
     if is_long:
         return _parse_long_format(csv_path, stations)
     return _parse_wide_format(csv_path, stations)
@@ -362,7 +360,9 @@ def _parse_long_format(
         logger.warning(
             "PWQMN %s: %d sample(s) rejected by validation (out-of-range values in "
             "the published data), %d kept",
-            csv_path.name, rejected, len(records),
+            csv_path.name,
+            rejected,
+            len(records),
         )
     return records
 

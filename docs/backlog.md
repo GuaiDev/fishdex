@@ -570,7 +570,7 @@ Build after Lovable UI is stable.
 - Top 10 queried locations (from segment_synthesis, the synthesis cache — the only
   table keyed on "what location did the user ask about")
 - Tool call frequency + failure counts (from tool_usage)
-- Ingest record counts by source and jurisdiction (observations, gbif_observations)
+- Ingest coverage and recent run diagnostics — see [README](../README.md#running-locally-and-hosting)
 - Model cost estimates (all-time + last 30 days), with 30-day caller/user
   breakdowns. See the [usage guidance](../README.md#how-to-run) for ledger coverage
   and estimate limits.

@@ -29,10 +29,7 @@ import httpx
 from src.models.observation import Observation
 from src.services.ingest_runs import record_counts, record_error
 
-_WFS_URL = (
-    "https://openmaps.gov.bc.ca/geo/pub/"
-    "WHSE_FISH.FISS_FISH_OBSRVTN_PNT_SP/ows"
-)
+_WFS_URL = "https://openmaps.gov.bc.ca/geo/pub/WHSE_FISH.FISS_FISH_OBSRVTN_PNT_SP/ows"
 _TYPE_NAME = "pub:WHSE_FISH.FISS_FISH_OBSRVTN_PNT_SP"
 _PAGE_SIZE = 1000
 _CACHE_DIR = Path("data/cache/fiss")
@@ -43,9 +40,16 @@ _USER_AGENT = "fishbot/1.0 (personal fishing exploration bot)"
 _UNKNOWN_DATE = date(1900, 1, 1)
 
 # FISS ACTIVITY_CODE values that indicate stocking events (not wild observations)
-_STOCKING_ACTIVITY_CODES: frozenset[str] = frozenset({
-    "STO", "STK", "STOCK", "PLANT", "STOCKING", "HATCHERY",
-})
+_STOCKING_ACTIVITY_CODES: frozenset[str] = frozenset(
+    {
+        "STO",
+        "STK",
+        "STOCK",
+        "PLANT",
+        "STOCKING",
+        "HATCHERY",
+    }
+)
 
 logger = logging.getLogger(__name__)
 
@@ -220,24 +224,26 @@ def fetch_stocking_from_fiss(
         year = obs_date.year if obs_date.year > 1900 else None
         place = (props.get("GAZETTED_NAME") or props.get("WATERBODY_IDENTIFIER") or "").strip()
 
-        stocking_rows.append({
-            "record_id": f"FISS_STO_{fid}",
-            "waterbody_name": place or None,
-            "waterbody_code": (props.get("WATERBODY_IDENTIFIER") or "").strip() or None,
-            "municipality": None,
-            "county": None,
-            "lat": feat_lat,
-            "lng": lon,
-            "jurisdiction": "CA-BC",
-            "species": species,
-            "species_code": activity_code,
-            "year": year,
-            "month": None,
-            "quantity": None,
-            "life_stage": None,
-            "stocking_purpose": "hatchery",
-            "stocked_at": obs_date.isoformat() if obs_date.year > 1900 else None,
-        })
+        stocking_rows.append(
+            {
+                "record_id": f"FISS_STO_{fid}",
+                "waterbody_name": place or None,
+                "waterbody_code": (props.get("WATERBODY_IDENTIFIER") or "").strip() or None,
+                "municipality": None,
+                "county": None,
+                "lat": feat_lat,
+                "lng": lon,
+                "jurisdiction": "CA-BC",
+                "species": species,
+                "species_code": activity_code,
+                "year": year,
+                "month": None,
+                "quantity": None,
+                "life_stage": None,
+                "stocking_purpose": "hatchery",
+                "stocked_at": obs_date.isoformat() if obs_date.year > 1900 else None,
+            }
+        )
 
     logger.info("FISS stocking: %d stocking records extracted from FISS", len(stocking_rows))
     return stocking_rows
