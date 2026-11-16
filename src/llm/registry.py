@@ -52,12 +52,12 @@ def model_for(role: str) -> str:
     except KeyError:
         raise KeyError(f"unknown LLM role {role!r}; add it to src/llm/registry.py") from None
 
+    from src.llm.client import load_env
+
+    load_env()
     override = os.environ.get(f"FISHDEX_MODEL_{role.upper()}")
     if override:
         return override
     if entry.follows_main_model:
-        from src.llm.client import load_env
-
-        load_env()
         return os.environ.get("CLAUDE_MODEL") or entry.model
     return entry.model

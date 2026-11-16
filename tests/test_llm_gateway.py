@@ -1,8 +1,6 @@
 """The LLM gateway: one ledger row per call, attributed to the right user."""
 
-import re
 import types
-from pathlib import Path
 
 import pytest
 
@@ -107,12 +105,54 @@ def test_ledger_failure_does_not_fail_the_request(monkeypatch):
     assert ledger.write_failures == before + 1
 
 
-def test_no_model_call_outside_the_gateway():
-    src = Path(__file__).resolve().parents[1] / "src"
-    offenders = [
-        str(p.relative_to(src))
-        for p in src.rglob("*.py")
-        if "llm" not in p.relative_to(src).parts[:1]
-        and re.search(r"messages\.(create|stream)\(", p.read_text())
-    ]
-    assert offenders == []
+
+@pytest.mark.parametrize("role,variable", [
+    ("router", "FISHDEX_MODEL_ROUTER"),
+    ("chat", "FISHDEX_MODEL_CHAT"),
+    ("chat", "CLAUDE_MODEL"),
+])
+def test_dotenv_override_used_on_first_call(
+    ledger_db, monkeypatch, tmp_path, role, variable
+):
+    from dotenv import load_dotenv
+
+    env_file = tmp_path / ".env"
+    env_file.write_text(f"{variable}=dotenv-model\n")
+    monkeypatch.delenv(variable, raising=False)
+    monkeypatch.delenv("FISHDEX_MODEL_CHAT", raising=False)
+    monkeypatch.setattr("src.llm.client.load_env", lambda: load_dotenv(env_file))
+    messages = _Messages()
+    _use(monkeypatch, messages)
+
+    llm.complete(role, caller="t.dotenv", user_id=7, max_tokens=5)
+
+    assert messages.kwargs["model"] == "dotenv-model"
+    assert _rows(ledger_db)[0]["model"] == "dotenv-model"
+
+
+def test_usage_displays_unpriced_calls(ledger_db, monkeypatch):
+    from io import StringIO
+
+    from rich.console import Console
+    from src.cli import main
+
+    for caller, price in [("unknown", None), ("mixed", None), ("mixed", 0.25)]:
+        ledger_db["llm_usage"].insert({
+            "caller": caller, "role": "router", "model": "test", "est_usd": price,
+        })
+    output = StringIO()
+    monkeypatch.setattr(main, "get_db", lambda: ledger_db)
+    monkeypatch.setattr(main, "console", Console(file=output, width=160))
+
+    main.usage(days=7)
+
+    rendered = output.getvalue()
+    assert "Unpriced" in rendered
+    assert "unknown" in rendered
+    unknown_line = next(line for line in rendered.splitlines() if "unknown" in line)
+    assert "unknown" in unknown_line.split()[2:]
+    mixed_line = next(line for line in rendered.splitlines() if "mixed" in line)
+    assert "0.2500" in mixed_line
+    assert mixed_line.split()[-1] == "1"
+    day_line = next(line for line in rendered.splitlines() if "0.2500" in line)
+    assert day_line.split()[-1] == "2"

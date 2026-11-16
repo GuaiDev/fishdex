@@ -67,7 +67,7 @@ def main(auto: bool = False) -> None:
         print(f"{'='*60}")
         print(f"Text: {trip_text.strip()[:120]}...")
 
-        parsed = parse_session_from_text(trip_text.strip(), db)
+        parsed = parse_session_from_text(trip_text.strip(), db, user_id=1)
 
         print(f"\nParsed JSON:")
         print(json.dumps(parsed, indent=2, default=str))
@@ -82,7 +82,7 @@ def main(auto: bool = False) -> None:
             print("Skipped.")
             continue
 
-        result = log_session(parsed, db)
+        result = log_session(parsed, db, user_id=1)
         total_sessions += 1
         total_stops += result["stops_logged"]
         print(f"Logged: session #{result['session_id']}, {result['stops_logged']} stops.")
