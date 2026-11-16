@@ -285,21 +285,35 @@ def _run_source(results: list, name: str, announce: str, fn, *args, **kwargs) ->
     import logging
 
     console.print(f"[dim]{announce}[/dim]")
-    try:
-        value = fn(*args, **kwargs)
-    except KeyboardInterrupt:
-        raise  # never swallow the user's Ctrl-C
-    except Exception as exc:  # noqa: BLE001 - isolation is the whole point
-        logging.getLogger(__name__).error(
-            "%s failed: %s: %s", name, type(exc).__name__, exc, exc_info=True
-        )
-        console.print(f"[red]  {name} FAILED — {type(exc).__name__}: {exc}[/red]")
-        console.print("[dim]  continuing with the remaining sources…[/dim]")
-        results.append(_SourceResult(name, False, error=f"{type(exc).__name__}: {exc}"))
-        return None
+    from src.services.ingest_runs import ingest_run
 
-    results.append(_SourceResult(name, True, detail=_describe_result(value)))
-    return value
+    with ingest_run(name, jurisdiction="CA-ON") as run:
+        try:
+            value = fn(*args, **kwargs)
+        except KeyboardInterrupt:
+            raise  # never swallow the user's Ctrl-C
+        except Exception as exc:  # noqa: BLE001 - isolation is the whole point
+            logging.getLogger(__name__).error(
+                "%s failed: %s: %s", name, type(exc).__name__, exc, exc_info=True
+            )
+            console.print(f"[red]  {name} FAILED — {type(exc).__name__}: {exc}[/red]")
+            console.print("[dim]  continuing with the remaining sources…[/dim]")
+            results.append(_SourceResult(name, False, error=f"{type(exc).__name__}: {exc}"))
+            run.error = results[-1].error
+            return None
+
+        if isinstance(value, dict):
+            count = sum(value.values())
+        elif isinstance(value, tuple):
+            count = sum(value)
+        else:
+            count = value
+        if isinstance(count, (int, float)):
+            run.record(
+                fetched=max(int(count), 1), stored=int(count or 0), empty=1 if not count else 0
+            )
+        results.append(_SourceResult(name, True, detail=_describe_result(value)))
+        return value
 
 
 def _describe_result(value: object) -> str:
@@ -623,7 +637,11 @@ def ingest_hydat() -> None:
     import importlib
 
     _hydat = importlib.import_module("src.ingest.global.hydat_temperature")
-    count = _hydat.derive_from_pwqmn(get_db())
+    from src.services.ingest_runs import ingest_run
+
+    with ingest_run("HydAT temperature", jurisdiction="CA") as run:
+        count = _hydat.derive_from_pwqmn(get_db())
+        run.record(fetched=max(count, 1), stored=count, empty=1 if not count else 0)
     console.print(f"Derived thermal regime for {count} stations from PWQMN water quality data")
 
 
@@ -867,7 +885,11 @@ def ingest_fmz() -> None:
     from src.services.regulations import ingest_fmz_boundaries
 
     console.print("[dim]Downloading Ontario FMZ boundary polygons…[/dim]")
-    n = ingest_fmz_boundaries()
+    from src.services.ingest_runs import ingest_run
+
+    with ingest_run("FMZ boundaries", jurisdiction="CA-ON") as run:
+        n = ingest_fmz_boundaries()
+        run.record(fetched=max(n, 1), stored=n, empty=1 if not n else 0)
     if n:
         console.print(f"[green]FMZ boundaries stored: {n} zones[/green]")
     else:
@@ -1434,23 +1456,29 @@ def ingest_trca() -> None:
     """Ingest TRCA fish community survey data (abundance + sampling events)."""
     import importlib
 
+    from src.services.ingest_runs import ingest_run
     from src.storage.fish_surveys import upsert_fish_surveys
 
-    trca = importlib.import_module("src.ingest.jurisdictions.ca_on.trca_surveys")
-    url = trca.resolve_csv_url()
-    if not url:
-        console.print("[red]Could not resolve the TRCA fish community CSV.[/red]")
-        console.print("[dim]Run with -v: discovery logs the available resource names.[/dim]")
-        raise typer.Exit(1)
-
-    path = trca.download_survey_csv(url)
-    if path is None:
-        console.print("[red]Download failed.[/red]")
-        raise typer.Exit(1)
-
-    records = trca.parse_survey_records(path, source_url=url)
     db = get_db()
-    written = upsert_fish_surveys(db, records)
+    with ingest_run("TRCA fish community surveys", jurisdiction="CA-ON", db=db) as run:
+        trca = importlib.import_module("src.ingest.jurisdictions.ca_on.trca_surveys")
+        url = trca.resolve_csv_url()
+        if not url:
+            console.print("[red]Could not resolve the TRCA fish community CSV.[/red]")
+            console.print("[dim]Run with -v: discovery logs the available resource names.[/dim]")
+            raise typer.Exit(1)
+
+        path = trca.download_survey_csv(url)
+        if path is None:
+            console.print("[red]Download failed.[/red]")
+            raise typer.Exit(1)
+
+        records = trca.parse_survey_records(path, source_url=url)
+        written = upsert_fish_surveys(db, records)
+        run.record(
+            fetched=max(len(records), 1), stored=written,
+            skipped=max(len(records) - written, 0), empty=1 if not records else 0
+        )
 
     n_events = db.execute(
         "SELECT COUNT(*) FROM (SELECT 1 FROM fish_surveys GROUP BY station_name, visit_date)"
