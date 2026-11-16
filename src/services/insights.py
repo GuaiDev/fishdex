@@ -57,11 +57,15 @@ def seed_dispersal_insights() -> int:
 
     Returns the number of newly inserted records (0 if already seeded).
     """
+    from src.services.ingest_runs import record_counts
+
     if not _DISPERSAL_SEED_PATH.exists():
+        record_counts(fetched=1, empty=1)
         return 0
     raw = json.loads(_DISPERSAL_SEED_PATH.read_text(encoding="utf-8"))
     db = get_db()
     count = 0
+    record_counts(fetched=len(raw) or 1, empty=int(not raw))
     for entry in raw:
         existing = list(
             db["behavioral_insights"].rows_where(
@@ -73,6 +77,9 @@ def seed_dispersal_insights() -> int:
             insight = BehavioralInsight(**entry)
             insert_insight(db, insight)
             count += 1
+            record_counts(stored=1)
+        else:
+            record_counts(skipped=1)
     return count
 
 

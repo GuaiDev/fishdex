@@ -2,6 +2,7 @@
 
 import json
 
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 from src.storage.species_ranges import query_sar_species, query_species_range, upsert_species_ranges
 
@@ -22,9 +23,7 @@ _STATUS_SEVERITY = {
 # Any SARA/COSEWIC schedule status warrants a conservation note. Threatened and
 # Endangered additionally carry legal prohibitions; Special Concern and
 # Extirpated do not, but still should never be handed targeting advice.
-_LISTED_STATUSES = frozenset(
-    {"Special Concern", "Threatened", "Endangered", "Extirpated"}
-)
+_LISTED_STATUSES = frozenset({"Special Concern", "Threatened", "Endangered", "Extirpated"})
 
 
 def _sar_assessment(sr) -> tuple[bool, str]:
@@ -148,6 +147,8 @@ def load_and_store() -> int:
 
     db = get_db()
     ranges = load_species_database()
+    record_counts(fetched=1, empty=int(not ranges))
     if ranges:
         upsert_species_ranges(db, ranges)
+    record_counts(stored=len(ranges))
     return len(ranges)

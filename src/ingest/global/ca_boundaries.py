@@ -102,11 +102,15 @@ def fetch_ca_boundaries_near(lat: float, lng: float, radius_km: float = 200.0) -
 
 def fetch_and_store(db, lat: float, lng: float, radius_km: float = 200.0) -> int:
     """Fetch CA boundaries and upsert into the ca_boundaries table. Returns count stored."""
+    from src.services.ingest_runs import record_counts
+
     boundaries = fetch_ca_boundaries_near(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not boundaries))
     if not boundaries:
         return 0
     _ensure_table(db)
     db["ca_boundaries"].upsert_all(boundaries, pk="ca_id")
+    record_counts(stored=len(boundaries))
     return len(boundaries)
 
 

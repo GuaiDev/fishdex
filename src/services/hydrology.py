@@ -18,6 +18,7 @@ import math
 import networkx as nx
 
 from src.models.hydrology import ConnectivityResult, HydroBarrier, StreamSegment
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -468,9 +469,11 @@ def ingest_hydro_network(
 
     logger.info("Fetching OHN watercourse segments (%.0fkm bbox)…", radius_km)
     segments = fetch_watercourses(lat, lon, radius_km)
+    record_counts(fetched=1, empty=int(not segments))
 
     logger.info("Fetching OHN barrier points (%.0fkm bbox)…", radius_km)
     barriers = fetch_barriers(lat, lon, radius_km, segments=segments)
+    record_counts(fetched=1, empty=int(not barriers))
 
     now = datetime.utcnow().isoformat()
 
@@ -522,6 +525,7 @@ def ingest_hydro_network(
     _service_cache = None
 
     logger.info("OHN ingest done: %d segments, %d barriers", len(segments), len(barriers))
+    record_counts(stored=len(segments) + len(barriers))
     return len(segments), len(barriers)
 
 

@@ -70,6 +70,7 @@ def fetch_and_store(
 ) -> int:
     """Fetch posts from target subreddits and store them. Returns count processed."""
     from src.ingest.community.reddit import fetch_subreddit_posts
+    from src.services.ingest_runs import record_counts, record_error
 
     if subreddits_hot is None:
         subreddits_hot = ["OntarioFishing", "CanadianFishing"]
@@ -86,16 +87,26 @@ def fetch_and_store(
     try:
         for subreddit in subreddits_hot:
             posts = fetch_subreddit_posts(subreddit, listing="hot", limit=limit_per_subreddit)
-            total += upsert_posts(db, posts)
+            record_counts(fetched=1, empty=int(not posts))
+            written = upsert_posts(db, posts)
+            record_counts(stored=written, skipped=len(posts) - written)
+            total += written
             new_posts = fetch_subreddit_posts(subreddit, listing="new", limit=50)
-            total += upsert_posts(db, new_posts)
+            record_counts(fetched=1, empty=int(not new_posts))
+            written = upsert_posts(db, new_posts)
+            record_counts(stored=written, skipped=len(new_posts) - written)
+            total += written
 
         for subreddit, queries in subreddits_search.items():
             for q in queries:
                 posts = fetch_subreddit_posts(subreddit, query=q, limit=50, time_filter="year")
-                total += upsert_posts(db, posts)
+                record_counts(fetched=1, empty=int(not posts))
+                written = upsert_posts(db, posts)
+                record_counts(stored=written, skipped=len(posts) - written)
+                total += written
 
     except httpx.HTTPStatusError as exc:
+        record_error(exc)
         status = exc.response.status_code
         if status == 403:
             log.warning("Reddit fetch blocked (403) — API credentials may be required. Skipping.")

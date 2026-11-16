@@ -2,6 +2,8 @@
 
 import logging
 
+import pytest
+
 from src.services.admin_dashboard import build_dashboard
 from src.services.ingest_runs import ingest_run
 from src.storage.database import get_db
@@ -110,3 +112,74 @@ def test_configured_jurisdiction_reaches_global_and_tidal_ledgers(db, monkeypatc
         area_ingest.run_area(area, source)
     rows = list(db.execute("SELECT jurisdiction, area FROM ingest_runs"))
     assert rows == [("CA-NS", "Coast")] * 5
+
+
+def test_pwqmn_resource_counts_reach_cli_ledger(db, monkeypatch):
+    from src.cli.main import _run_source
+    from src.ingest.jurisdictions.ca_on import water_quality as adapter
+    from src.services import ingest_runs, water_quality
+
+    monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
+    monkeypatch.setattr(water_quality, "get_db", lambda: db)
+    monkeypatch.setattr(adapter, "load_stations", lambda: {})
+    monkeypatch.setattr(
+        adapter,
+        "_get_field_data_resources",
+        lambda: [{"name": str(i), "url": str(i)} for i in range(21)],
+    )
+    monkeypatch.setattr(
+        adapter, "download_field_data", lambda name, url: None if name == "20" else int(name)
+    )
+    monkeypatch.setattr(
+        adapter, "parse_field_data", lambda path, stations: [path] if path < 2 else []
+    )
+    written = []
+    monkeypatch.setattr(
+        water_quality, "upsert_water_quality_readings", lambda db, records: written.extend(records)
+    )
+    assert _run_source([], "PWQMN", "fetching", water_quality.ingest_water_quality_data) == 2
+    assert written == [0, 1]
+    assert db.execute(
+        "SELECT fetched, stored, skipped, empty_count, status FROM ingest_runs"
+    ).fetchone() == (21, 2, 1, 18, "warning")
+
+
+@pytest.mark.parametrize("wrapper", ["area", "cli"])
+@pytest.mark.parametrize("failed_dataset", ["water", "access"])
+def test_osm_caught_timeouts_fail_ledger_and_continue(db, monkeypatch, wrapper, failed_dataset):
+    import httpx
+
+    from src.cli.main import _run_source
+    from src.models.ingest_area import AreaIngestResult, IngestSource
+    from src.services import area_ingest, ingest_runs, osm
+
+    monkeypatch.setattr(ingest_runs, "get_db", lambda: db)
+    monkeypatch.setattr(osm, "get_db", lambda: db)
+
+    def timeout(*args, **kwargs):
+        raise httpx.ReadTimeout("Overpass unavailable")
+
+    monkeypatch.setattr(
+        osm._osm,
+        "fetch_water_features",
+        timeout if failed_dataset == "water" else lambda *a, **k: [],
+    )
+    monkeypatch.setattr(osm._osm, "fetch_access_points", timeout)
+    with pytest.warns(UserWarning, match="OSM ingest failed"):
+        if wrapper == "area":
+            result = AreaIngestResult(label="Coast", source=IngestSource.GLOBAL)
+            area_ingest._attempt(result, "OSM", lambda: {
+                "OSM water features": osm.fetch_and_store(45, -65)[0]
+            })
+            assert result.stored == {"OSM water features": 0}
+        else:
+            assert _run_source([], "OSM", "fetching", osm.fetch_and_store, 45, -65) == (0, 0)
+    assert db.execute("SELECT status, error FROM ingest_runs").fetchone() == (
+        "failed",
+        "ReadTimeout: Overpass unavailable",
+    )
+    with ingest_run("next source", db=db):
+        pass
+    assert db.execute("SELECT status FROM ingest_runs ORDER BY id DESC LIMIT 1").fetchone() == (
+        "success",
+    )
