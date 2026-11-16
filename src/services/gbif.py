@@ -21,7 +21,6 @@ def fetch_and_store(
     from src.services.ingest_runs import record_counts
 
     observations = fetch_gbif_observations(lat, lng, radius_km)
-    record_counts(fetched=1, empty=int(not observations))
     if not observations:
         return 0
     db = get_db()
