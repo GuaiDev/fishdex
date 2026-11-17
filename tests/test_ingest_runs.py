@@ -622,7 +622,9 @@ def test_regulations_and_nuseds_caught_failures_fail_ledger(
 
 @pytest.mark.parametrize("stage", ["start", "finish"])
 @pytest.mark.parametrize("source_fails", [False, True])
-def test_ledger_write_failure_preserves_source_outcome(db, monkeypatch, caplog, stage, source_fails):
+def test_ledger_write_failure_preserves_source_outcome(
+    db, monkeypatch, caplog, stage, source_fails
+):
     import sqlite3
 
     from src.services.ingest_runs import record_counts
@@ -652,9 +654,10 @@ def test_ledger_write_failure_preserves_source_outcome(db, monkeypatch, caplog, 
         record_counts(stored=1)
     assert next_run.stored == 1
     assert run.stored == 0
-    assert db.execute(
-        "SELECT status, stored FROM ingest_runs WHERE source='next'"
-    ).fetchone() == ("success", 1)
+    assert db.execute("SELECT status, stored FROM ingest_runs WHERE source='next'").fetchone() == (
+        "success",
+        1,
+    )
 
 
 def test_gauge_insert_failure_marks_ledger_failed(db, monkeypatch):
@@ -667,13 +670,24 @@ def test_gauge_insert_failure_marks_ledger_failed(db, monkeypatch):
     from src.services import stream_gauge
 
     monkeypatch.setattr(stream_gauge, "get_db", lambda: db)
-    monkeypatch.setattr(stream_gauge._wsc, "fetch_nearby_stations", lambda *a: [
-        {"STATION_NUMBER": "1", "LATITUDE": 51, "LONGITUDE": -114}
-    ])
+    monkeypatch.setattr(
+        stream_gauge._wsc,
+        "fetch_nearby_stations",
+        lambda *a: [{"STATION_NUMBER": "1", "LATITUDE": 51, "LONGITUDE": -114}],
+    )
     reading = SimpleNamespace(
-        station_id="1", station_name="Gauge", river_name="Bow", lat=51, lng=-114,
-        jurisdiction="CA-AB", water_level_m=1, discharge_cms=1, level_trend=None,
-        discharge_trend=None, level_grade=None, reading_datetime=datetime.now(),
+        station_id="1",
+        station_name="Gauge",
+        river_name="Bow",
+        lat=51,
+        lng=-114,
+        jurisdiction="CA-AB",
+        water_level_m=1,
+        discharge_cms=1,
+        level_trend=None,
+        discharge_trend=None,
+        level_grade=None,
+        reading_datetime=datetime.now(),
         fetched_at=datetime.now(),
     )
     monkeypatch.setattr(stream_gauge._wsc, "fetch_station_reading", lambda *a: reading)
