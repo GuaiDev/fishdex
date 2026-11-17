@@ -12,7 +12,6 @@ import pytest
 
 from src.services.context import recompute_user_layer, user_layer
 from src.storage import user_patterns
-from src.storage.database import get_db
 
 
 @pytest.fixture

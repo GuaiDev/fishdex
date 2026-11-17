@@ -872,7 +872,9 @@ def test_card_says_not_looked_up_apart_from_nothing_found(db):
 # ── an empty species file fails closed (the S5 gap) ───────────────────────────
 
 
-def test_an_empty_species_file_withholds_every_species_and_says_status_is_missing(tmp_path, migrated_template_db):
+def test_an_empty_species_file_withholds_every_species_and_says_status_is_missing(
+    tmp_path, migrated_template_db
+):
     from src.storage.database import get_db
 
     path = tmp_path / "empty.db"
@@ -893,7 +895,9 @@ def test_an_empty_species_file_withholds_every_species_and_says_status_is_missin
     assert "redside" not in blob and "clinostomus" not in blob and "creek chub" not in blob
 
 
-def test_a_species_file_for_another_jurisdiction_does_not_count_as_status_data(tmp_path, migrated_template_db):
+def test_a_species_file_for_another_jurisdiction_does_not_count_as_status_data(
+    tmp_path, migrated_template_db
+):
     from src.storage.database import get_db
 
     path = tmp_path / "other.db"
@@ -926,7 +930,9 @@ def test_a_populated_file_keeps_the_per_species_unknown_behaviour(db):
     assert card.meta.species_status_unchecked == 1
 
 
-def test_the_species_filter_and_new_to_me_name_nothing_without_status_data(tmp_path, migrated_template_db):
+def test_the_species_filter_and_new_to_me_name_nothing_without_status_data(
+    tmp_path, migrated_template_db
+):
     from src.services.spot_card import new_species_at_spot
     from src.services.spots import _spots_with_species
     from src.storage.database import get_db

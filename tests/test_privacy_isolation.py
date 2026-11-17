@@ -14,7 +14,6 @@ from src.services.context import _seen_segment_ids
 from src.services.synthesis_cache import get_cached_synthesis, store_synthesis
 from src.services.trip_logger import _penalise_segment
 from src.storage.database import (
-    get_db,
     migrate_dismissed_segments_user,
     migrate_segment_synthesis_user,
 )
@@ -68,7 +67,7 @@ def test_legacy_rows_without_a_user_are_never_served(db):
         assert get_cached_synthesis(db, user_id=uid, location_name="Old Creek") is None
 
 
-def test_synthesis_migration_adds_user_id_to_old_table(tmp_path):
+def test_synthesis_migration_adds_user_id_to_old_table(fast_db):
     db = fast_db
     db.execute("DROP TABLE segment_synthesis")
     db.execute(
@@ -87,7 +86,7 @@ def test_synthesis_migration_adds_user_id_to_old_table(tmp_path):
     assert get_cached_synthesis(db, user_id=1, lat=1, lng=1) is None
 
 
-def test_chat_web_path_never_serves_another_users_cache(tmp_path, monkeypatch):
+def test_chat_web_path_never_serves_another_users_cache(tmp_path, fast_db, monkeypatch):
     """Through run_chat_api: user 2 asking about user 1's cached place gets a fresh answer."""
     import src.agent.chat as chat
     import src.agent.router as router
@@ -123,7 +122,7 @@ def test_chat_web_path_never_serves_another_users_cache(tmp_path, monkeypatch):
     assert get_cached_synthesis(db, user_id=1, lat=LAT, lng=LNG)["synthesis"] == "A's catches"
 
 
-def test_chat_web_path_cache_hit_serves_only_the_askers_own_reply(tmp_path, monkeypatch):
+def test_chat_web_path_cache_hit_serves_only_the_askers_own_reply(tmp_path, fast_db, monkeypatch):
     """A repeat question by user 2 is a cache hit on user 2's reply; user 1's row is untouched."""
     import types
 
@@ -183,7 +182,7 @@ def test_blank_stop_by_one_user_does_not_hide_water_from_another(db):
     assert 101 not in _seen_segment_ids(db, user_id=2)
 
 
-def test_dismiss_tool_is_per_user(tmp_path, monkeypatch):
+def test_dismiss_tool_is_per_user(tmp_path, fast_db, monkeypatch):
     import src.storage.database as db_mod
 
     monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")

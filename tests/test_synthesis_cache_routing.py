@@ -3,7 +3,6 @@
 import pytest
 
 from src.services.synthesis_cache import get_cached_synthesis, store_synthesis
-from src.storage.database import get_db
 
 # ── db fixture ────────────────────────────────────────────────────────────────
 

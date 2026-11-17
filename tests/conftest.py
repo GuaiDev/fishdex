@@ -4,7 +4,7 @@ import shutil
 
 import pytest
 
-from src.storage.database import _configure_connection, get_db, migrate
+from src.storage.database import get_db, migrate
 
 
 def pytest_collection_modifyitems(config, items):

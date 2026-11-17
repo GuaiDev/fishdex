@@ -94,7 +94,7 @@ def test_service_stores_observations(tmp_path, monkeypatch):
     assert {o.jurisdiction for o in stored} == {"CA-SK"}
 
 
-def test_sk_and_bc_rows_with_same_raw_id_both_survive(tmp_path):
+def test_sk_and_bc_rows_with_same_raw_id_both_survive(tmp_path, fast_db):
     from src.storage.observations import upsert_observations
 
     with patch(_HTTPX, side_effect=_server), patch(_CACHE, tmp_path):

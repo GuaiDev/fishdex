@@ -10,7 +10,6 @@ import json
 
 import pytest
 
-from src.storage.database import get_db
 from src.storage.fmz_boundaries import boundary_count, resolve_zone
 
 OAKVILLE = (43.4675, -79.6877)

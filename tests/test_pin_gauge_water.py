@@ -6,9 +6,8 @@ network is a handful of rows in a temporary database.
 
 import importlib
 import json
-from datetime import UTC, datetime, timedelta
-
 import shutil
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -172,7 +171,7 @@ def _segment(db, ogf_id, name, lat, lng, dlat=0.0005):
 
 
 @pytest.fixture
-def db(tmp_path):
+def db(fast_db):
     db = fast_db
     _segment(db, 1, "Credit River", MOUTH[0], MOUTH[1])
     _segment(db, 2, "Far Creek", MOUTH[0] + 0.02, MOUTH[1])  # about 2.2 km away
@@ -261,11 +260,9 @@ def test_a_pin_with_no_gauge_on_its_river_says_whose_water_the_row_is(db, panel)
 
 
 def test_a_pin_whose_water_is_unknown_gets_the_nearest_gauge_named_for_its_own_water(
-    tmp_path, network, monkeypatch
+    fast_db, network, monkeypatch
 ):
-    path = tmp_path / "bare.db"
-    shutil.copy(migrated_template_db, path)
-    bare = get_db(path)
+    bare = fast_db
     monkeypatch.setattr("src.services.weather.get_conditions_for_agent", lambda **kw: _weather())
     ctx = describe(bare, lat=MOUTH[0], lng=MOUTH[1], caller="pin_panel")
     prov = ctx.conditions.flow_cms.provenance

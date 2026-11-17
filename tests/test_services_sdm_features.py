@@ -1,6 +1,5 @@
 """Tests for SDM feature matrix helpers. All use synthetic data — no live DB."""
 
-from pathlib import Path
 
 import networkx as nx
 import numpy as np
@@ -340,10 +339,9 @@ def _y_network():
     ]
 
 
-def test_build_feature_matrix_integration(tmp_path: Path):
+def test_build_feature_matrix_integration(tmp_path, fast_db):
     from unittest.mock import patch
 
-    from src.storage.database import get_db
 
     db = fast_db
     edges = _y_network()
@@ -640,9 +638,8 @@ def test_confluence_distance():
     assert dists[4] > 10.0  # should be many km away
 
 
-def test_waterbody_proximity(tmp_path):
+def test_waterbody_proximity(fast_db):
     """Segment within 200m of a pond gets connected_to_waterbody=True."""
-    from src.storage.database import get_db
 
     db = fast_db
     if "water_features" not in db.table_names():

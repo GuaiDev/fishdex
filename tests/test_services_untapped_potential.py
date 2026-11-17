@@ -14,7 +14,6 @@ from src.services.untapped_potential import (
     gate_exclusion_reason,
     plausibility_gate,
 )
-from src.storage.database import get_db
 
 # ── synthetic helpers ─────────────────────────────────────────────────────────
 
@@ -177,7 +176,7 @@ def test_gate_zeroes_score_for_excluded_segment():
 # ── unit: formula correctness ─────────────────────────────────────────────────
 
 
-def test_untapped_formula_low_pressure_remote_scores_highest(tmp_path: Path, monkeypatch):
+def test_untapped_formula_low_pressure_remote_scores_highest(tmp_path, fast_db, monkeypatch):
     import src.services.accessibility as acc_mod
     import src.services.untapped_potential as up_mod
 
@@ -205,7 +204,7 @@ def test_untapped_formula_low_pressure_remote_scores_highest(tmp_path: Path, mon
     assert seg2["untapped_score"] < seg1["untapped_score"]
 
 
-def test_untapped_sorted_descending(tmp_path: Path, monkeypatch):
+def test_untapped_sorted_descending(tmp_path, fast_db, monkeypatch):
     import src.services.accessibility as acc_mod
     import src.services.untapped_potential as up_mod
 
@@ -224,7 +223,7 @@ def test_untapped_sorted_descending(tmp_path: Path, monkeypatch):
     assert np.all(scores[:-1] >= scores[1:])
 
 
-def test_untapped_ignores_sdm_predictions_entirely(tmp_path: Path, monkeypatch):
+def test_untapped_ignores_sdm_predictions_entirely(tmp_path, fast_db, monkeypatch):
     """SDM predictions in the DB must not influence the ranking any more.
 
     Previously `species=` reweighted scores by per-species habitat probability.
@@ -365,7 +364,7 @@ def _make_fm_with_centroids(tmp_path, n=4):
     )
 
 
-def _setup_full_env(tmp_path, monkeypatch):
+def _setup_full_env(tmp_path, monkeypatch, fast_db):
     import src.services.accessibility as acc_mod
     import src.services.untapped_potential as up_mod
 
@@ -386,7 +385,7 @@ def _setup_full_env(tmp_path, monkeypatch):
     return db, fm
 
 
-def test_dismiss_tool_inserts_record(tmp_path, monkeypatch):
+def test_dismiss_tool_inserts_record(tmp_path, fast_db, monkeypatch):
     """dismiss_segment tool call inserts a row into dismissed_segments."""
     import src.storage.database as db_mod
     monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")

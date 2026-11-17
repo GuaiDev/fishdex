@@ -10,7 +10,6 @@ import importlib
 import logging
 from pathlib import Path
 
-from src.storage.database import get_db
 from src.storage.fish_surveys import (
     survey_events_near,
     upsert_fish_surveys,
@@ -120,7 +119,7 @@ def test_unmapped_common_name_keeps_the_record():
 # ── storage ───────────────────────────────────────────────────────────────────
 
 
-def test_records_actually_land_in_the_table(tmp_path: Path):
+def test_records_actually_land_in_the_table(fast_db):
     """The regression this guards.
 
     upsert_all looked like it worked and wrote nothing. sqlite_utils implements
@@ -138,7 +137,7 @@ def test_records_actually_land_in_the_table(tmp_path: Path):
     assert db["fish_surveys"].count == len(recs), "rows did not persist"
 
 
-def test_reingest_is_idempotent(tmp_path: Path):
+def test_reingest_is_idempotent(fast_db):
     db = fast_db
     recs = _records()
     upsert_fish_surveys(db, recs)
@@ -148,12 +147,12 @@ def test_reingest_is_idempotent(tmp_path: Path):
     assert second == 0, f"second pass should add no new rows, reported {second}"
 
 
-def test_empty_input_writes_nothing(tmp_path: Path):
+def test_empty_input_writes_nothing(fast_db):
     db = fast_db
     assert upsert_fish_surveys(db, []) == 0
 
 
-def test_events_group_by_station_visit(tmp_path: Path):
+def test_events_group_by_station_visit(fast_db):
     """A station visit with its full species list is what makes an absence
     readable: the species not in the list were not caught at known effort."""
     db = fast_db

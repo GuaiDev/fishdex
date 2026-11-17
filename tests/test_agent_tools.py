@@ -17,8 +17,7 @@ class _Profile:
 
 
 @pytest.fixture
-def db(tmp_path, monkeypatch):
-    from src.storage.database import get_db
+def db(fast_db, monkeypatch):
 
     database = fast_db
     monkeypatch.setattr(tools, "get_db", lambda: database)

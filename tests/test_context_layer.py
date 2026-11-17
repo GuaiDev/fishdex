@@ -18,7 +18,6 @@ from src.services.context import _BUNDLES, describe, translate
 from src.services.context import place as place_mod
 from src.services.context.escalation import BLOCKED_DOMAINS, filter_web_results, is_blocked
 from src.services.context.user import build_user_layer
-from src.storage.database import get_db
 
 
 @pytest.fixture

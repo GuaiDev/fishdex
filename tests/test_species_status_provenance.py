@@ -13,7 +13,6 @@ import pytest
 from src.models.context import ProvenanceKind
 from src.models.species_range import SpeciesRange
 from src.services.context.species import describe_species
-from src.storage.database import get_db
 from src.storage.species_ranges import upsert_species_ranges
 
 

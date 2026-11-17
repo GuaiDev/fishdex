@@ -1,6 +1,5 @@
 """Tests for YouTube transcript ingest module. No real API calls."""
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -12,7 +11,6 @@ from src.ingest.community.youtube_ingest import (
     ingest_query,
     search_knowledge,
 )
-from src.storage.database import get_db
 
 # --- Pure unit tests (no DB, no network) ---
 

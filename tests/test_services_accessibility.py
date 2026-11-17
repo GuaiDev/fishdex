@@ -1,7 +1,6 @@
 """Tests for access score computation. All use synthetic data — no live calls."""
 
 import json
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -18,7 +17,6 @@ from src.services.accessibility import (
     compute_access_scores,
 )
 from src.services.untapped_potential import _access_note
-from src.storage.database import get_db
 
 # ── synthetic helpers ─────────────────────────────────────────────────────────
 
@@ -119,14 +117,14 @@ def test_park_modifier_values():
     assert _PARK_MODIFIERS["Wilderness"] == pytest.approx(-0.4)
 
 
-def test_park_index_empty_db(tmp_path: Path):
+def test_park_index_empty_db(fast_db):
     db = fast_db
     tree, data = _build_park_index(db)
     assert tree is None
     assert data == []
 
 
-def test_park_containment_recreational(tmp_path: Path):
+def test_park_containment_recreational(fast_db):
     db = fast_db
     # Segment inside a Recreational park
     seg_lat, seg_lng = 43.65, -79.38
@@ -138,7 +136,7 @@ def test_park_containment_recreational(tmp_path: Path):
     assert mods[0] == pytest.approx(0.3)
 
 
-def test_park_containment_wilderness(tmp_path: Path):
+def test_park_containment_wilderness(fast_db):
     db = fast_db
     seg_lat, seg_lng = 43.70, -79.40
     _insert_park(db, "park_wild", "Wilderness", seg_lat, seg_lng)
@@ -149,7 +147,7 @@ def test_park_containment_wilderness(tmp_path: Path):
     assert mods[0] == pytest.approx(-0.4)
 
 
-def test_park_outside_polygon_gets_zero(tmp_path: Path):
+def test_park_outside_polygon_gets_zero(fast_db):
     db = fast_db
     # Park far from segment
     _insert_park(db, "park_far", "Recreational", 45.0, -75.0)
@@ -224,7 +222,7 @@ def test_road_proximity_uses_parking_as_proxy():
 # ── full compute_access_scores test ──────────────────────────────────────────
 
 
-def test_compute_access_scores_output_range(tmp_path: Path, monkeypatch):
+def test_compute_access_scores_output_range(tmp_path, fast_db, monkeypatch):
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
@@ -236,7 +234,7 @@ def test_compute_access_scores_output_range(tmp_path: Path, monkeypatch):
     assert scores.max() <= 1.0
 
 
-def test_compute_access_scores_fishing_spot_beats_no_access(tmp_path: Path, monkeypatch):
+def test_compute_access_scores_fishing_spot_beats_no_access(tmp_path, fast_db, monkeypatch):
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
@@ -252,7 +250,7 @@ def test_compute_access_scores_fishing_spot_beats_no_access(tmp_path: Path, monk
     assert scores.iloc[0] > scores.iloc[9]
 
 
-def test_compute_access_scores_nature_reserve_penalizes(tmp_path: Path, monkeypatch):
+def test_compute_access_scores_nature_reserve_penalizes(tmp_path, fast_db, monkeypatch):
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
@@ -271,7 +269,7 @@ def test_compute_access_scores_nature_reserve_penalizes(tmp_path: Path, monkeypa
     assert scores.iloc[1] > scores.iloc[0]
 
 
-def test_compute_access_scores_writes_parquet(tmp_path: Path, monkeypatch):
+def test_compute_access_scores_writes_parquet(tmp_path, fast_db, monkeypatch):
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
@@ -323,7 +321,7 @@ def _insert_crown_land(db, crown_id: str, lat: float, lng: float) -> None:
     )
 
 
-def test_crown_land_pip(tmp_path: Path):
+def test_crown_land_pip(fast_db):
     """Segment centroid inside a crown land polygon gets is_crown_land=True."""
     db = fast_db
     inside_lat, inside_lng = 43.75, -79.75

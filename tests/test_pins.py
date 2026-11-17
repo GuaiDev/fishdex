@@ -13,7 +13,6 @@ from src.services.pins.labels import LINK_RADIUS_M
 from src.services.trip_logger import log_session
 from src.storage import pins as store
 from src.storage.catches import get_personal_best
-from src.storage.database import get_db
 
 HOME = (43.5000, -79.7000)
 # ~100 m north of HOME: inside the link radius.
@@ -410,7 +409,7 @@ def test_map_payload_lists_unpinned_stops_with_their_candidates(db):
     assert [c["pin_id"] for c in stop["candidates"]] == [pin_id]
 
 
-def test_migration_is_idempotent(tmp_path):
+def test_migration_is_idempotent(fast_db):
     db = fast_db
     store.ensure_tables(db)
     store.ensure_tables(db)

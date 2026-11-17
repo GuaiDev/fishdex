@@ -11,8 +11,6 @@ import json
 
 import pytest
 
-from src.storage.database import get_db
-
 
 @pytest.fixture
 def db_conn(fast_db):

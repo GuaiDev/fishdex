@@ -69,7 +69,7 @@ def test_unknown_status_is_rejected():
 # ── table ──────────────────────────────────────────────────────────────────
 
 
-def test_table_exists_after_schema_setup_and_round_trips(tmp_path):
+def test_table_exists_after_schema_setup_and_round_trips(fast_db):
     db = fast_db
     assert store.get_species_images(db) == {}
 
@@ -78,7 +78,7 @@ def test_table_exists_after_schema_setup_and_round_trips(tmp_path):
     assert store.get_species_images(db)["Micropterus dolomieu"] == _approved()
 
 
-def test_replace_drops_species_no_longer_listed(tmp_path):
+def test_replace_drops_species_no_longer_listed(fast_db):
     db = fast_db
     store.replace_species_images(db, [_approved(), _approved(species_id="Esox lucius")])
     store.replace_species_images(db, [_approved()])
@@ -86,7 +86,7 @@ def test_replace_drops_species_no_longer_listed(tmp_path):
     assert list(store.get_species_images(db)) == ["Micropterus dolomieu"]
 
 
-def test_images_by_id_resyncs_a_stale_table(tmp_path):
+def test_images_by_id_resyncs_a_stale_table(fast_db):
     db = fast_db
     store.replace_species_images(db, [_approved(species_id="Esox lucius")])
 

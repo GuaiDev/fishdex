@@ -3,7 +3,6 @@
 from datetime import datetime, timedelta
 
 from src.services.admin_dashboard import build_dashboard
-from src.storage.database import get_db
 
 
 def _make_db(fast_db):
@@ -68,15 +67,15 @@ def _seed_synthesis(db, cache_key, location_name, lat=None, lng=None, hit_count=
 # --- users ---
 
 
-def test_total_users_count(tmp_path):
-    db = _make_db(tmp_path)
+def test_total_users_count(fast_db):
+    db = _make_db(fast_db)
     _seed_users(db, n=3)
     result = build_dashboard(db)
     assert result["users"]["total_users"] == 4  # 3 seeded + the default admin user
 
 
-def test_messages_sent_windowed_correctly(tmp_path):
-    db = _make_db(tmp_path)
+def test_messages_sent_windowed_correctly(fast_db):
+    db = _make_db(fast_db)
     _seed_users(db, n=1)
     now = datetime.now()
     _seed_chat_message(db, "user", (now - timedelta(days=1)).isoformat())
@@ -94,8 +93,8 @@ def test_messages_sent_windowed_correctly(tmp_path):
 # --- tool usage ---
 
 
-def test_tool_usage_frequency_and_failures(tmp_path):
-    db = _make_db(tmp_path)
+def test_tool_usage_frequency_and_failures(fast_db):
+    db = _make_db(fast_db)
     _seed_tool_usage(db, "get_conditions")
     _seed_tool_usage(db, "get_conditions")
     _seed_tool_usage(db, "get_conditions", success=0)
@@ -113,8 +112,8 @@ def test_tool_usage_frequency_and_failures(tmp_path):
 # --- ingest status ---
 
 
-def test_ingest_status_observations_by_source_and_jurisdiction(tmp_path):
-    db = _make_db(tmp_path)
+def test_ingest_status_observations_by_source_and_jurisdiction(fast_db):
+    db = _make_db(fast_db)
     db.execute(
         "INSERT INTO observations (observation_id, species, lat, lng, observed_on, "
         "jurisdiction, source) "
@@ -136,8 +135,8 @@ def test_ingest_status_observations_by_source_and_jurisdiction(tmp_path):
     assert obs[("FISS", "CA-BC")] == 1
 
 
-def test_ingest_status_gbif_labeled_correctly(tmp_path):
-    db = _make_db(tmp_path)
+def test_ingest_status_gbif_labeled_correctly(fast_db):
+    db = _make_db(fast_db)
     db.execute(
         "INSERT INTO gbif_observations (gbif_key, species, lat, lng, jurisdiction) "
         "VALUES (1, 'Test', 43.0, -79.0, 'CA-ON')"
@@ -152,10 +151,10 @@ def test_ingest_status_gbif_labeled_correctly(tmp_path):
 # --- top locations ---
 
 
-def test_top_locations_groups_name_only_entries(tmp_path):
+def test_top_locations_groups_name_only_entries(fast_db):
     """Real usage in this project is 100% name-only synthesis cache entries
     (no lat/lng) — a lat/lng-only grouping would always return empty."""
-    db = _make_db(tmp_path)
+    db = _make_db(fast_db)
     _seed_synthesis(db, "name:willoway park", "Willoway Park", hit_count=5)
     _seed_synthesis(db, "name:bronte creek", "Bronte Creek", hit_count=0)
 
@@ -168,8 +167,8 @@ def test_top_locations_groups_name_only_entries(tmp_path):
     assert result["top_locations"][0]["query_count"] == 6
 
 
-def test_top_locations_clusters_nearby_coordinates(tmp_path):
-    db = _make_db(tmp_path)
+def test_top_locations_clusters_nearby_coordinates(fast_db):
+    db = _make_db(fast_db)
     _seed_synthesis(db, "geo:43.467,-79.687", "Oakville A", lat=43.4671, lng=-79.6871, hit_count=2)
     _seed_synthesis(db, "geo:43.468,-79.688", "Oakville B", lat=43.4682, lng=-79.6882, hit_count=1)
 
@@ -179,8 +178,8 @@ def test_top_locations_clusters_nearby_coordinates(tmp_path):
     assert result["top_locations"][0]["query_count"] == 5  # (2+1) + (1+1)
 
 
-def test_top_locations_respects_limit(tmp_path):
-    db = _make_db(tmp_path)
+def test_top_locations_respects_limit(fast_db):
+    db = _make_db(fast_db)
     for i in range(15):
         _seed_synthesis(db, f"name:place{i}", f"Place {i}", hit_count=i)
     result = build_dashboard(db)
@@ -190,8 +189,8 @@ def test_top_locations_respects_limit(tmp_path):
 # --- api cost estimate ---
 
 
-def test_api_cost_estimate_sonnet_vs_haiku(tmp_path):
-    db = _make_db(tmp_path)
+def test_api_cost_estimate_sonnet_vs_haiku(fast_db):
+    db = _make_db(fast_db)
     _seed_api_usage(db, "claude-sonnet-4-6", 1_000_000, 1_000_000)
     _seed_api_usage(db, "claude-haiku-4-5-20251001", 1_000_000, 1_000_000)
 
@@ -203,8 +202,8 @@ def test_api_cost_estimate_sonnet_vs_haiku(tmp_path):
     assert result["api_cost_estimate"]["all_time"]["total_usd"] == 24.0
 
 
-def test_api_cost_estimate_unknown_model_not_silently_priced(tmp_path):
-    db = _make_db(tmp_path)
+def test_api_cost_estimate_unknown_model_not_silently_priced(fast_db):
+    db = _make_db(fast_db)
     _seed_api_usage(db, "some-future-model-nobody-has-priced-yet", 1_000_000, 1_000_000)
 
     result = build_dashboard(db)
@@ -214,8 +213,8 @@ def test_api_cost_estimate_unknown_model_not_silently_priced(tmp_path):
     assert all_time["total_usd"] == 0.0
 
 
-def test_api_cost_estimate_last_30_days_excludes_older_calls(tmp_path):
-    db = _make_db(tmp_path)
+def test_api_cost_estimate_last_30_days_excludes_older_calls(fast_db):
+    db = _make_db(fast_db)
     old = (datetime.now() - timedelta(days=60)).isoformat()
     _seed_api_usage(db, "claude-sonnet-4-6", 1_000_000, 0, timestamp=old)
     _seed_api_usage(db, "claude-sonnet-4-6", 1_000_000, 0)
@@ -225,8 +224,8 @@ def test_api_cost_estimate_last_30_days_excludes_older_calls(tmp_path):
     assert result["api_cost_estimate"]["all_time"]["total_usd"] == 6.0  # both calls
 
 
-def test_dashboard_does_not_crash_on_empty_database(tmp_path):
-    db = _make_db(tmp_path)
+def test_dashboard_does_not_crash_on_empty_database(fast_db):
+    db = _make_db(fast_db)
     result = build_dashboard(db)
     assert result["users"]["total_users"] == 1  # the default admin user get_db() seeds
     assert result["top_locations"] == []
@@ -252,8 +251,8 @@ def _seed_session_and_stop(db):
     return session_id, stop_id
 
 
-def test_catch_stats_empty_database_has_no_crash(tmp_path):
-    db = _make_db(tmp_path)
+def test_catch_stats_empty_database_has_no_crash(fast_db):
+    db = _make_db(fast_db)
     result = build_dashboard(db)["catch_stats"]
     assert result["total_catches"] == 0
     assert result["by_species"] == []
@@ -261,10 +260,10 @@ def test_catch_stats_empty_database_has_no_crash(tmp_path):
     assert result["avg_catches_per_session"] == 0.0
 
 
-def test_catch_stats_total_and_by_species(tmp_path):
+def test_catch_stats_total_and_by_species(fast_db):
     from src.storage.catches import insert_catch
 
-    db = _make_db(tmp_path)
+    db = _make_db(fast_db)
     session_id, stop_id = _seed_session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="creek chub")
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="creek chub")
@@ -277,10 +276,10 @@ def test_catch_stats_total_and_by_species(tmp_path):
     assert result["by_species"][0]["species"] == "creek chub"  # sorted by count desc
 
 
-def test_catch_stats_by_species_respects_top_10_limit(tmp_path):
+def test_catch_stats_by_species_respects_top_10_limit(fast_db):
     from src.storage.catches import insert_catch
 
-    db = _make_db(tmp_path)
+    db = _make_db(fast_db)
     session_id, stop_id = _seed_session_and_stop(db)
     for i in range(15):
         insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species=f"species{i}")
@@ -289,13 +288,13 @@ def test_catch_stats_by_species_respects_top_10_limit(tmp_path):
     assert len(result["by_species"]) == 10
 
 
-def test_catch_stats_by_species_sums_count_not_rows(tmp_path):
+def test_catch_stats_by_species_sums_count_not_rows(fast_db):
     """A single catch card logged as 'x3' (one row, count=3) must contribute
     3 to its species' total, not 1 — this was the original bug: a real
     3-fish catch card ranked *below* two separate 1-fish log entries."""
     from src.storage.catches import insert_catch
 
-    db = _make_db(tmp_path)
+    db = _make_db(fast_db)
     session_id, stop_id = _seed_session_and_stop(db)
     insert_catch(
         db,
@@ -317,13 +316,13 @@ def test_catch_stats_by_species_sums_count_not_rows(tmp_path):
     assert result["by_species"][0]["species"] == "shorthead redhorse"
 
 
-def test_catch_stats_by_species_merges_case_variants(tmp_path):
+def test_catch_stats_by_species_merges_case_variants(fast_db):
     """Species logged with different casing (e.g. a directly-typed structured
     catch vs. one that came through NL parsing) must merge into one group,
     not silently split a species' true total across two dashboard rows."""
     from src.storage.catches import insert_catch
 
-    db = _make_db(tmp_path)
+    db = _make_db(fast_db)
     session_id, stop_id = _seed_session_and_stop(db)
     insert_catch(
         db,
@@ -347,10 +346,10 @@ def test_catch_stats_by_species_merges_case_variants(tmp_path):
     assert result["by_species"][0]["count"] == 4
 
 
-def test_catch_stats_personal_bests_count_and_top_10(tmp_path):
+def test_catch_stats_personal_bests_count_and_top_10(fast_db):
     from src.storage.catches import insert_catch, update_personal_best_if_higher
 
-    db = _make_db(tmp_path)
+    db = _make_db(fast_db)
     _seed_users(db, n=1)  # user id 2, on top of default user id 1
     session_id, stop_id = _seed_session_and_stop(db)
 
@@ -374,10 +373,10 @@ def test_catch_stats_personal_bests_count_and_top_10(tmp_path):
     assert result["top_10_largest"][0]["species"] == "common carp"
 
 
-def test_catch_stats_personal_bests_top_10_limit(tmp_path):
+def test_catch_stats_personal_bests_top_10_limit(fast_db):
     from src.storage.catches import insert_catch, update_personal_best_if_higher
 
-    db = _make_db(tmp_path)
+    db = _make_db(fast_db)
     session_id, stop_id = _seed_session_and_stop(db)
     for i in range(15):
         c = insert_catch(
@@ -391,10 +390,10 @@ def test_catch_stats_personal_bests_top_10_limit(tmp_path):
     assert len(result["top_10_largest"]) == 10
 
 
-def test_catch_stats_avg_catches_per_session(tmp_path):
+def test_catch_stats_avg_catches_per_session(fast_db):
     from src.storage.catches import insert_catch
 
-    db = _make_db(tmp_path)
+    db = _make_db(fast_db)
     s1, stop1 = _seed_session_and_stop(db)
     s2, stop2 = _seed_session_and_stop(db)
     insert_catch(db, stop_id=stop1, session_id=s1, user_id=1, species="creek chub")
