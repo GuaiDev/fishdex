@@ -219,6 +219,24 @@ To run it every week, add a line to your crontab (`crontab -e`), adjusting the p
 
 The command exits non-zero when any dataset failed, so the log shows the run that needs attention.
 
+Ingest diagnostics persist in SQLite's `ingest_runs` ledger for source invocations
+wrapped by the CLI and area runners. Each row records the source, jurisdiction
+and area when available, start and finish times, fetched/stored/skipped counts,
+empty-response count and share, status, and error. Counts use each adapter's unit
+of work (for example, pages, stations, or resources), so fetched is not a row total.
+An empty-majority warning uses the thresholds defined in
+[`src/services/ingest_runs.py`](src/services/ingest_runs.py). Recorded errors mark
+the run failed even when an adapter continues with partial results; these caught
+errors do not necessarily make the CLI exit non-zero. Ledger write failures are
+logged while ingestion continues: a failed start can leave no row, and a failed
+finalization can leave a row `running`. Interrupted runs can also remain `running`
+if finalization never executes.
+
+Inspect `GET /admin/dashboard` with the `X-Api-Key` header: `ingest_status.runs`
+contains the latest 100 ledger rows, newest first, alongside the existing
+observation coverage counts. Use this history to distinguish an empty response
+from a recorded failure across refreshes.
+
 ## Project scope
 
 All data sources are publicly available under open licenses. No scraping of Instagram, Facebook, TikTok, FishBrain, FishAngler or similar platforms — this is enforced in code, not just documented. Synthesising public information is fine; reconstructing deliberately hidden locations is not. Spot discovery output stays personal — there are no export features that would broadcast location lists.

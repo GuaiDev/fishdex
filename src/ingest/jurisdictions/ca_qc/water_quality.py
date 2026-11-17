@@ -56,6 +56,7 @@ import openpyxl
 
 from src.ingest.discovery import check_resource_discovery
 from src.models.water_quality_reading import WaterQualityReading
+from src.services.ingest_runs import record_counts, record_error
 
 _PACKAGE_URL = "https://www.donneesquebec.ca/recherche/api/3/action/package_show"
 _PACKAGE_ID = "suivi-physicochimique-des-rivieres-et-du-fleuve"
@@ -88,6 +89,7 @@ def fetch_water_quality_readings(
     """Fetch Réseau-rivières samples for stations within radius_km of lat/lng."""
     stations = _stations_near(_load_stations(), lat, lng, radius_km)
     if not stations:
+        record_counts(fetched=1, empty=1)
         logger.info(
             "QC water quality: no Réseau-rivières stations within %.0fkm of (%.4f, %.4f)",
             radius_km,
@@ -103,10 +105,15 @@ def fetch_water_quality_readings(
     readings: list[WaterQualityReading] = []
     failed: list[str] = []
     for url, wanted in by_url.items():
+        record_counts(fetched=1)
         try:
             path = _download_chiffrier(url)
-            readings.extend(parse_chiffrier(path, wanted))
+            parsed = parse_chiffrier(path, wanted)
+            record_counts(empty=int(not parsed))
+            readings.extend(parsed)
         except Exception as exc:  # noqa: BLE001 - one bad workbook must not drop the rest
+            record_counts(skipped=1)
+            record_error(exc)
             failed.append(url)
             logger.warning("QC water quality: %s failed — %s", url, exc)
 

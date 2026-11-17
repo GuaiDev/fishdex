@@ -16,6 +16,7 @@ import logging
 from datetime import datetime
 
 from src.jurisdictions.plugin import AreaContext
+from src.services.ingest_runs import record_counts
 from src.storage.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,7 @@ def ingest_sk_hydro_network(
         radius_km,
     )
     segments = _sk.fetch_watercourses(lat, lon, radius_km)
+    record_counts(fetched=1, empty=int(not segments))
     logger.info("SK hydro: %d segments fetched", len(segments))
 
     now = datetime.utcnow().isoformat()
@@ -68,6 +70,7 @@ def ingest_sk_hydro_network(
         db["stream_segments"].insert_all(seg_rows, pk="ogf_id", replace=True)
 
     logger.info("SK hydro: %d segments stored to DB", len(segments))
+    record_counts(stored=len(segments))
     return len(segments), 0
 
 
@@ -89,9 +92,11 @@ def ingest_sk_fish_observations(
         radius_km,
     )
     observations = _sk.fetch_observations(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not observations))
     if observations:
         upsert_observations(db, observations)
     logger.info("SK Fish Atlas: %d observations stored", len(observations))
+    record_counts(stored=len(observations))
     return len(observations)
 
 
@@ -106,9 +111,11 @@ def ingest_sk_stocking(
 
     logger.info("SK stocking: fetching — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km)
     rows = _sk.fetch_stocking_records(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not rows))
     if rows:
         db["stocking_records"].upsert_all(rows, pk="record_id")
     logger.info("SK stocking: %d records stored", len(rows))
+    record_counts(stored=len(rows))
     return len(rows)
 
 
@@ -125,9 +132,11 @@ def ingest_sk_water_quality(
 
     logger.info("SK water quality: fetching — lat=%.4f lng=%.4f radius=%.0fkm", lat, lng, radius_km)
     readings = _sk.fetch_water_quality_readings(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not readings))
     if readings:
         upsert_water_quality_readings(db, readings)
     logger.info("SK water quality: %d readings stored", len(readings))
+    record_counts(stored=len(readings))
     return len(readings)
 
 

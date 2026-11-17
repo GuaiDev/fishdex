@@ -40,6 +40,7 @@ class AreaIngestResult(BaseModel):
 
     label: str
     source: str
+    jurisdiction: str | None = None
     stored: dict[str, int] = Field(default_factory=dict)
     """Dataset name → rows stored (or row counts the adapter reported)."""
 

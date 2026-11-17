@@ -18,11 +18,14 @@ def fetch_and_store(
     lng: float,
     radius_km: float = 50,
 ) -> int:
+    from src.services.ingest_runs import record_counts
+
     observations = fetch_gbif_observations(lat, lng, radius_km)
     if not observations:
         return 0
     db = get_db()
     upsert_gbif_observations(db, observations)
+    record_counts(stored=len(observations))
     return len(observations)
 
 

@@ -27,6 +27,7 @@ from dotenv import load_dotenv
 
 from src.jurisdictions.geo import jurisdiction_for_coords
 from src.models.bird_observation import BirdObservation
+from src.services.ingest_runs import record_counts, record_error
 
 load_dotenv()
 
@@ -63,6 +64,7 @@ def fetch_piscivore_observations(
     """
     api_key = os.environ.get("EBIRD_API_KEY", "").strip()
     if not api_key:
+        record_counts(skipped=1)
         logger.warning(
             "EBIRD_API_KEY not set — skipping eBird piscivore fetch. "
             "Set EBIRD_API_KEY in .env to enable."
@@ -77,12 +79,16 @@ def fetch_piscivore_observations(
     for i, species_code in enumerate(PISCIVORE_CODES):
         if i > 0:
             time.sleep(_INTER_SPECIES_DELAY)
+        record_counts(fetched=1)
         try:
             raw = _cached_get(api_key, species_code, lat, lng, dist, back, today)
             obs = _parse_response(raw, species_code)
+            record_counts(empty=int(not obs), skipped=len(raw) - len(obs))
             all_obs.extend(obs)
             logger.info("  eBird %s: %d observations", species_code, len(obs))
         except httpx.HTTPError as exc:
+            record_counts(skipped=1)
+            record_error(exc)
             logger.warning("eBird fetch failed for %s: %s", species_code, exc)
 
     return all_obs

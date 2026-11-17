@@ -4,6 +4,7 @@ import json
 import logging
 from statistics import mean
 
+from src.services.ingest_runs import record_counts
 from src.storage.benthic import query_benthic, upsert_benthic_samples
 from src.storage.database import get_db
 
@@ -40,18 +41,22 @@ def ingest_benthic_samples(db=None, province_filter: str | None = None) -> int:
     if province_filter:
         jur_filter = _PROVINCE_TO_JURISDICTION.get(province_filter.upper())
         visit_jurisdictions = {
-            vid: jur for vid, jur in visit_jurisdictions.items()
-            if jur == jur_filter
+            vid: jur for vid, jur in visit_jurisdictions.items() if jur == jur_filter
         }
 
     if not visit_jurisdictions:
+        record_counts(fetched=1, empty=1)
         logger.warning("No Canadian visits found in CABIN study file")
         return 0
 
     benthic_agg = parse_benthic(benthic_path, visit_jurisdictions)
     records = build_samples(study_meta, benthic_agg, visit_jurisdictions)
+    record_counts(
+        fetched=len(visit_jurisdictions), empty=len(visit_jurisdictions.keys() - benthic_agg.keys())
+    )
     if records:
         upsert_benthic_samples(db, records)
+    record_counts(stored=len(records))
     return len(records)
 
 

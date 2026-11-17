@@ -75,8 +75,8 @@ def test_attempt_records_counts_and_failures_without_stopping():
 def test_run_area_dispatches_with_the_per_source_radius(monkeypatch):
     calls = []
 
-    def fake_global(lat, lng, radius_km, label, days_back):
-        calls.append(("global", lat, lng, radius_km, label, days_back))
+    def fake_global(lat, lng, radius_km, label, days_back, jurisdiction=None):
+        calls.append(("global", lat, lng, radius_km, label, days_back, jurisdiction))
         return area_ingest.AreaIngestResult(label=label, source="global")
 
     class _Runner:
@@ -99,7 +99,7 @@ def test_run_area_dispatches_with_the_per_source_radius(monkeypatch):
     )
     results = [area_ingest.run_area(area, s, days_back=90) for s in area.sources]
     assert calls == [
-        ("global", 44.98, -65.5, 40, "Annapolis River NS", 90),
+        ("global", 44.98, -65.5, 40, "Annapolis River NS", 90, "CA-NS"),
         ("tidal", 44.98, -65.5, 100, "Annapolis River NS"),
     ]
     assert results[1].stored == {"CHS tide predictions": 7}

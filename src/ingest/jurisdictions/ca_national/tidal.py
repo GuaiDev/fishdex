@@ -29,6 +29,7 @@ from pathlib import Path
 import httpx
 
 from src.jurisdictions.geo import jurisdiction_for_coords
+from src.services.ingest_runs import record_counts, record_error
 
 _BASE_URL = "https://api-iwls.dfo-mpo.gc.ca"
 _STATIONS_URL = f"{_BASE_URL}/api/v1/stations"
@@ -53,17 +54,24 @@ def fetch_tidal_readings(
     if not stations:
         logger.info(
             "CHS tidal: no stations found within %.0fkm of (%.4f, %.4f)",
-            radius_km, lat, lng,
+            radius_km,
+            lat,
+            lng,
         )
         return []
 
     logger.info("CHS tidal: %d stations found near (%.4f, %.4f)", len(stations), lat, lng)
     rows: list[dict] = []
     for station in stations:
+        record_counts(fetched=1)
         try:
             preds = _fetch_predictions(station["id"])
-            rows.extend(_parse_predictions(station, preds))
+            parsed = _parse_predictions(station, preds)
+            record_counts(empty=int(not parsed))
+            rows.extend(parsed)
         except Exception as exc:
+            record_counts(skipped=1)
+            record_error(exc)
             logger.warning(
                 "CHS tidal: failed to fetch predictions for station %s: %s", station["id"], exc
             )
@@ -77,6 +85,8 @@ def _fetch_nearby_stations(lat: float, lng: float, radius_km: float) -> list[dic
     try:
         data = _cached_get(_STATIONS_URL, {}, _STATIONS_TTL)
     except Exception as exc:
+        record_counts(fetched=1, skipped=1)
+        record_error(exc)
         logger.error("CHS tidal: stations fetch failed: %s", exc)
         return []
 
@@ -94,13 +104,17 @@ def _fetch_nearby_stations(lat: float, lng: float, radius_km: float) -> list[dic
             continue
         dist = _haversine_km(lat, lng, slat, slng)
         if dist <= radius_km:
-            nearby.append({
-                "id": str(s.get("id") or s.get("station_id") or ""),
-                "name": str(s.get("officialName") or s.get("name") or "Unknown"),
-                "lat": slat,
-                "lng": slng,
-            })
+            nearby.append(
+                {
+                    "id": str(s.get("id") or s.get("station_id") or ""),
+                    "name": str(s.get("officialName") or s.get("name") or "Unknown"),
+                    "lat": slat,
+                    "lng": slng,
+                }
+            )
 
+    if not nearby:
+        record_counts(fetched=1, empty=1)
     return nearby
 
 
@@ -140,19 +154,21 @@ def _parse_predictions(station: dict, predictions: list[dict]) -> list[dict]:
         else:
             tide_type = None
         record_id = f"{station['id']}_{iso_dt}"
-        rows.append({
-            "record_id": record_id,
-            "station_id": station["id"],
-            "station_name": station["name"],
-            "lat": station["lat"],
-            "lng": station["lng"],
-            "jurisdiction": jur,
-            "prediction_datetime": iso_dt,
-            "water_level_m": level,
-            "data_type": "prediction",
-            "tide_type": tide_type,
-            "fetched_at": now,
-        })
+        rows.append(
+            {
+                "record_id": record_id,
+                "station_id": station["id"],
+                "station_name": station["name"],
+                "lat": station["lat"],
+                "lng": station["lng"],
+                "jurisdiction": jur,
+                "prediction_datetime": iso_dt,
+                "water_level_m": level,
+                "data_type": "prediction",
+                "tide_type": tide_type,
+                "fetched_at": now,
+            }
+        )
     return rows
 
 

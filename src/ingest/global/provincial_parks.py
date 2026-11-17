@@ -75,11 +75,15 @@ def fetch_parks_near(lat: float, lng: float, radius_km: float = 200.0) -> list[d
 
 def fetch_and_store(db, lat: float, lng: float, radius_km: float = 200.0) -> int:
     """Fetch parks and upsert into the provincial_parks table. Returns count stored."""
+    from src.services.ingest_runs import record_counts
+
     parks = fetch_parks_near(lat, lng, radius_km)
+    record_counts(fetched=1, empty=int(not parks))
     if not parks:
         return 0
     _ensure_table(db)
     db["provincial_parks"].upsert_all(parks, pk="park_id")
+    record_counts(stored=len(parks))
     return len(parks)
 
 

@@ -16,6 +16,7 @@ import httpx
 
 from src.jurisdictions.geo import jurisdiction_for_coords
 from src.models.observation import Observation
+from src.services.ingest_runs import record_counts, record_error
 
 _log = logging.getLogger(__name__)
 
@@ -56,9 +57,12 @@ def fetch_observations(
 
     while True:
         params = {**base_params, "page": page}
+        record_counts(fetched=1)
         try:
             raw = _cached_get(params)
         except httpx.HTTPStatusError as exc:
+            record_counts(skipped=1)
+            record_error(exc)
             # Keep what we already have. Discarding thousands of successfully
             # fetched records because page N+1 was refused helps nobody.
             _log.warning(
@@ -69,6 +73,7 @@ def fetch_observations(
             )
             break
         results = raw.get("results", [])
+        record_counts(empty=int(not results))
         all_results.extend(results)
 
         if total is None:
@@ -104,6 +109,7 @@ def fetch_observations(
         parsed.append(_parse_observation(r))
 
     dropped = n_no_location + n_no_date
+    record_counts(skipped=dropped)
     if dropped:
         share = dropped / len(all_results)
         # Material share goes to WARNING; a stray record or two is INFO. Either

@@ -21,6 +21,7 @@ import httpx
 
 from src.ingest.discovery import check_resource_discovery
 from src.models.water_quality_reading import WaterQualityReading
+from src.services.ingest_runs import record_error
 
 _STATIONS_URL = "https://files.ontario.ca/moe_mapping/downloads/2Water/PWQMN/PWQMN_Stations.csv"
 _CKAN_PACKAGE_URL = (
@@ -179,14 +180,12 @@ def download_field_data(resource_name: str, url: str) -> Path | None:
             headers={"User-Agent": _USER_AGENT},
             timeout=120,
         ) as r:
-            if r.status_code == 404:
-                logger.warning("PWQMN field data '%s' returned 404, skipping", label)
-                return None
             r.raise_for_status()
             with dest.open("wb") as f:
                 for chunk in r.iter_bytes(chunk_size=65536):
                     f.write(chunk)
     except httpx.HTTPStatusError as exc:
+        record_error(exc)
         logger.warning("PWQMN field data '%s' download failed: %s", label, exc)
         return None
     logger.info("Downloaded PWQMN field data '%s' to %s", label, dest)
@@ -283,9 +282,7 @@ def parse_field_data(
         header = csv.DictReader(f).fieldnames or []
     normalized = {h.strip().lower() for h in header}
 
-    is_long = "result" in normalized and (
-        "analyte" in normalized or "parm" in normalized
-    )
+    is_long = "result" in normalized and ("analyte" in normalized or "parm" in normalized)
     if is_long:
         return _parse_long_format(csv_path, stations)
     return _parse_wide_format(csv_path, stations)
@@ -363,7 +360,9 @@ def _parse_long_format(
         logger.warning(
             "PWQMN %s: %d sample(s) rejected by validation (out-of-range values in "
             "the published data), %d kept",
-            csv_path.name, rejected, len(records),
+            csv_path.name,
+            rejected,
+            len(records),
         )
     return records
 

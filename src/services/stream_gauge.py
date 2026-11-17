@@ -194,8 +194,11 @@ def _first_reporting(candidates: list, timeout: float) -> NearestGauge | None:
 
 def fetch_and_store(lat: float, lng: float, radius_km: float = 50) -> int:
     """Fetch nearby gauge readings and store them. Called by the ingest CLI."""
+    from src.services.ingest_runs import record_counts, record_error
+
     stations = _wsc.fetch_nearby_stations(lat, lng, radius_km)
     if not stations:
+        record_counts(fetched=1, empty=1)
         return 0
 
     db = get_db()
@@ -203,17 +206,21 @@ def fetch_and_store(lat: float, lng: float, radius_km: float = 50) -> int:
 
     count = 0
     for station in stations:
+        record_counts(fetched=1)
         station_id = station.get("STATION_NUMBER") or station.get("station_number")
         s_lat = station.get("LATITUDE") or station.get("latitude")
         s_lng = station.get("LONGITUDE") or station.get("longitude")
         if not station_id or s_lat is None or s_lng is None:
+            record_counts(skipped=1)
             continue
 
         reading = _wsc.fetch_station_reading(station_id, float(s_lat), float(s_lng))
         if reading is None:
+            record_counts(empty=1)
             continue
 
         try:
+            before = db.conn.total_changes
             db["stream_gauge_readings"].insert(
                 {
                     "station_id": reading.station_id,
@@ -232,9 +239,12 @@ def fetch_and_store(lat: float, lng: float, radius_km: float = 50) -> int:
                 },
                 ignore=True,  # unique index on (station_id, reading_datetime) prevents dupes
             )
+            written = db.conn.total_changes - before
+            record_counts(stored=written, skipped=int(not written))
             count += 1
-        except Exception:
-            pass
+        except Exception as exc:
+            record_counts(skipped=1)
+            record_error(exc)
 
     return count
 

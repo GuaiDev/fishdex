@@ -6,6 +6,7 @@ import logging
 from collections import defaultdict
 from datetime import date
 
+from src.services.ingest_runs import record_counts
 from src.storage.bird_observations import query_bird_observations, upsert_bird_observations
 from src.storage.database import get_db
 
@@ -51,6 +52,7 @@ def fetch_and_store(
     obs = fetch_piscivore_observations(lat, lng, radius_km, days_back)
     if obs:
         upsert_bird_observations(get_db(), obs)
+    record_counts(stored=len(obs))
     return len(obs)
 
 

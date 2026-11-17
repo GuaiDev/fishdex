@@ -57,11 +57,15 @@ def seed_dispersal_insights() -> int:
 
     Returns the number of newly inserted records (0 if already seeded).
     """
+    from src.services.ingest_runs import record_counts
+
     if not _DISPERSAL_SEED_PATH.exists():
+        record_counts(fetched=1, empty=1)
         return 0
     raw = json.loads(_DISPERSAL_SEED_PATH.read_text(encoding="utf-8"))
     db = get_db()
     count = 0
+    record_counts(fetched=len(raw) or 1, empty=int(not raw))
     for entry in raw:
         existing = list(
             db["behavioral_insights"].rows_where(
@@ -73,6 +77,9 @@ def seed_dispersal_insights() -> int:
             insight = BehavioralInsight(**entry)
             insert_insight(db, insight)
             count += 1
+            record_counts(stored=1)
+        else:
+            record_counts(skipped=1)
     return count
 
 
@@ -125,9 +132,12 @@ def record_behavioral_insight_for_agent(
 
     # Check for conflicting current insights at same location/season
     from src.storage.insights import check_conflicts, refine_insight
+
     conflicts = check_conflicts(
-        db, species,
-        lat=lat, lng=lng,
+        db,
+        species,
+        lat=lat,
+        lng=lng,
         condition_season=condition_season,
         radius_km=1.0,
         user_id=user_id,
@@ -145,9 +155,19 @@ def record_behavioral_insight_for_agent(
         # 2. New insight is explicitly contradicting (check for keywords in conclusion)
         # 3. New confidence >= existing confidence (don't downgrade with weak data)
         contradiction_keywords = [
-            "contradict", "contrary", "reversal", "opposite", "unlike prior",
-            "completely", "overturns", "not the case", "wrong", "incorrect",
-            "not just", "also viable", "not only"
+            "contradict",
+            "contrary",
+            "reversal",
+            "opposite",
+            "unlike prior",
+            "completely",
+            "overturns",
+            "not the case",
+            "wrong",
+            "incorrect",
+            "not just",
+            "also viable",
+            "not only",
         ]
         is_contradiction = any(kw in conclusion.lower() for kw in contradiction_keywords)
         same_type = conflict.condition_type == condition_type
@@ -161,25 +181,29 @@ def record_behavioral_insight_for_agent(
             if lat is not None or location_name is not None:
                 try:
                     from src.services.synthesis_cache import invalidate_cache
+
                     invalidate_cache(db, lat=lat, lng=lng, location_name=location_name)
                 except Exception:
                     pass
-            return json.dumps({
-                "success": True,
-                "insight_id": insight_id,
-                "species": species,
-                "condition_type": condition_type,
-                "conclusion": conclusion,
-                "confidence": confidence,
-                "refined_prior_insights": refined_ids,
-                "note": f"Versioned out {len(refined_ids)} conflicting insight(s)"
-            })
+            return json.dumps(
+                {
+                    "success": True,
+                    "insight_id": insight_id,
+                    "species": species,
+                    "condition_type": condition_type,
+                    "conclusion": conclusion,
+                    "confidence": confidence,
+                    "refined_prior_insights": refined_ids,
+                    "note": f"Versioned out {len(refined_ids)} conflicting insight(s)",
+                }
+            )
 
     # No contradiction found — standard insert
     insight_id = insert_insight(db, insight)
     if lat is not None or location_name is not None:
         try:
             from src.services.synthesis_cache import invalidate_cache
+
             invalidate_cache(db, lat=lat, lng=lng, location_name=location_name)
         except Exception:
             pass
@@ -205,6 +229,4 @@ def check_conflicts_for_agent_service(
     from src.storage.insights import check_conflicts_for_agent
 
     db = get_db()
-    return check_conflicts_for_agent(
-        db, species, lat, lng, condition_season, user_id=user_id
-    )
+    return check_conflicts_for_agent(db, species, lat, lng, condition_season, user_id=user_id)
