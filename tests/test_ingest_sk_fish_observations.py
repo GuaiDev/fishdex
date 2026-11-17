@@ -13,7 +13,6 @@ from unittest.mock import MagicMock, patch
 
 from src.ingest.jurisdictions.ca_sk import fish_observations
 from src.ingest.jurisdictions.ca_sk.ingest import ingest_sk_fish_observations
-from src.storage.database import get_db
 from src.storage.observations import query_observations
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -80,15 +79,15 @@ def test_cache_hit_skips_http(tmp_path):
     assert mock_get.call_count == 2
 
 
-def test_service_stores_observations(tmp_path, monkeypatch):
+def test_service_stores_observations(db_factory, tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, side_effect=_server), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: get_db(db_path))
+        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: db_factory(db_path))
         n = ingest_sk_fish_observations(52.13, -106.67, radius_km=50)
 
     assert n == 3
     stored, _ = query_observations(
-        get_db(db_path), lat=52.13, lng=-106.67, radius_km=50, days_back=90
+        db_factory(db_path), lat=52.13, lng=-106.67, radius_km=50, days_back=90
     )
     assert {o.source for o in stored} == {"SKFishAtlas"}
     assert {o.jurisdiction for o in stored} == {"CA-SK"}

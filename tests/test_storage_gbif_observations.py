@@ -3,7 +3,6 @@
 from datetime import date
 
 from src.models.gbif_observation import GBIFObservation
-from src.storage.database import get_db
 from src.storage.gbif_observations import oldest_gbif_record, upsert_gbif_observations
 
 
@@ -26,19 +25,19 @@ def _obs(**overrides) -> GBIFObservation:
     return GBIFObservation(**base)
 
 
-def test_oldest_returns_none_on_empty_db(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_oldest_returns_none_on_empty_db(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     assert oldest_gbif_record(db) is None
 
 
-def test_oldest_returns_none_when_all_dates_null(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_oldest_returns_none_when_all_dates_null(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     upsert_gbif_observations(db, [_obs(gbif_key=1, observed_on=None)])
     assert oldest_gbif_record(db) is None
 
 
-def test_oldest_returns_earliest_dated_record(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_oldest_returns_earliest_dated_record(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     upsert_gbif_observations(
         db,
         [
@@ -53,8 +52,8 @@ def test_oldest_returns_earliest_dated_record(tmp_path):
     assert result.observed_on == date(1972, 7, 4)
 
 
-def test_oldest_skips_null_dates(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_oldest_skips_null_dates(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     upsert_gbif_observations(
         db,
         [

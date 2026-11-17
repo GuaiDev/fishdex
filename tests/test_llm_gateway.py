@@ -7,7 +7,6 @@ import pytest
 from src import llm
 from src.llm import ledger
 from src.llm.pricing import estimate_usd
-from src.storage.database import get_db
 
 
 class _Messages:
@@ -30,10 +29,10 @@ class _Messages:
 
 
 @pytest.fixture
-def ledger_db(tmp_path, monkeypatch):
+def ledger_db(db_factory, tmp_path, monkeypatch):
     path = tmp_path / "ledger.db"
-    monkeypatch.setattr(ledger, "_open_db", lambda: get_db(path))
-    return get_db(path)
+    monkeypatch.setattr(ledger, "_open_db", lambda: db_factory(path))
+    return db_factory(path)
 
 
 def _use(monkeypatch, messages):

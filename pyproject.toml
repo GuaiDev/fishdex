@@ -64,5 +64,5 @@ select = ["E", "F", "I", "UP"]
 testpaths = ["tests"]
 markers = [
     "raw_db: get_db() opens the database and nothing else (no test auto-migrate)",
-    "network: hits the network or external services (excluded by default)",
+    "network: hits the network or external services",
 ]

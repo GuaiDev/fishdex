@@ -4,12 +4,11 @@ import json
 
 import pytest
 
-from src.storage.database import get_db
 
 
 @pytest.fixture
-def db_conn(tmp_path):
-    return get_db(path=tmp_path / "test.db")
+def db_conn(db_factory, tmp_path):
+    return db_factory(path=tmp_path / "test.db")
 
 
 def _insert_stop(db, location_name, location_text, species, date="2025-05-15", lat=None, lng=None):

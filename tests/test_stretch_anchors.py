@@ -55,24 +55,18 @@ def network():
 
 
 @pytest.fixture(scope="module")
-def _template_db(tmp_path_factory):
-    """Schema setup costs over a second; build it once and copy the file per test."""
-    from src.storage.database import get_db
-
-    path = tmp_path_factory.mktemp("template") / "template.db"
-    get_db(path).conn.close()
-    return path
+def _template_db(migrated_template_db):
+    return migrated_template_db
 
 
 @pytest.fixture
-def db(tmp_path, _template_db):
+def db(db_factory, tmp_path, _template_db):
     import shutil
 
-    from src.storage.database import get_db
-
+    
     path = tmp_path / "anchors.db"
     shutil.copy(_template_db, path)
-    return get_db(path)
+    return db_factory(path)
 
 
 def _stretch(sid, name, ids):

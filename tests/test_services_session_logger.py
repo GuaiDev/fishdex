@@ -7,7 +7,6 @@ import pytest
 
 from src.services.trip_logger import log_session
 from src.services.trip_parser import parse_session_from_text
-from src.storage.database import get_db
 
 
 def _mock_session_client(payload: dict) -> MagicMock:
@@ -57,8 +56,8 @@ def _noop_resolve() -> dict:
 
 
 @pytest.fixture
-def db_conn(tmp_path):
-    return get_db(path=tmp_path / "test.db")
+def db_conn(db_factory, tmp_path):
+    return db_factory(path=tmp_path / "test.db")
 
 
 # ── parse + log tests ─────────────────────────────────────────────────────────

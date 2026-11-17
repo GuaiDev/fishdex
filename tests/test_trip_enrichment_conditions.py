@@ -2,12 +2,11 @@
 
 import pytest
 
-from src.storage.database import get_db
 
 
 @pytest.fixture
-def db_conn(tmp_path):
-    return get_db(path=tmp_path / "test.db")
+def db_conn(db_factory, tmp_path):
+    return db_factory(path=tmp_path / "test.db")
 
 
 def test_moon_phase_known_date():

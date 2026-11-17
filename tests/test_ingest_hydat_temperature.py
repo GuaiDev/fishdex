@@ -7,7 +7,6 @@ import pytest
 from sqlite_utils import Database
 
 from src.models.stream_temperature import StreamTemperatureSummary
-from src.storage.database import get_db
 from src.storage.stream_temperature import (
     is_data_loaded,
     query_temperature_summaries,
@@ -99,13 +98,13 @@ def _insert_pwqmn_rows(db: Database) -> None:
 
 
 @pytest.fixture()
-def app_db(tmp_path: Path):
-    return get_db(path=tmp_path / "fishing_test.db")
+def app_db(db_factory, tmp_path: Path):
+    return db_factory(path=tmp_path / "fishing_test.db")
 
 
 @pytest.fixture()
-def populated_db(tmp_path: Path):
-    db = get_db(path=tmp_path / "fishing_test.db")
+def populated_db(db_factory, tmp_path: Path):
+    db = db_factory(path=tmp_path / "fishing_test.db")
     _insert_pwqmn_rows(db)
     _derive_from_pwqmn(db)
     return db
@@ -175,14 +174,14 @@ def test_species_notes_unknown_returns_string():
 # ---------------------------------------------------------------------------
 
 
-def test_derive_returns_three_qualifying_stations(tmp_path):
-    db = get_db(path=tmp_path / "t.db")
+def test_derive_returns_three_qualifying_stations(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "t.db")
     _insert_pwqmn_rows(db)
     assert _derive_from_pwqmn(db) == 3
 
 
-def test_derive_excludes_insufficient_data(tmp_path):
-    db = get_db(path=tmp_path / "t.db")
+def test_derive_excludes_insufficient_data(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "t.db")
     _insert_pwqmn_rows(db)
     _derive_from_pwqmn(db)
     ids = {row["station_id"] for row in db["stream_temperature_summaries"].rows}
@@ -199,8 +198,8 @@ def test_derive_returns_zero_when_no_temp_data(app_db):
     assert _derive_from_pwqmn(app_db) == 0
 
 
-def test_derive_is_idempotent(tmp_path):
-    db = get_db(path=tmp_path / "t.db")
+def test_derive_is_idempotent(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "t.db")
     _insert_pwqmn_rows(db)
     _derive_from_pwqmn(db)
     _derive_from_pwqmn(db)
@@ -255,8 +254,8 @@ def test_derive_years_of_data(populated_db):
     assert row[0] == 3
 
 
-def test_derive_summaries_are_summary_models(tmp_path):
-    db = get_db(path=tmp_path / "t.db")
+def test_derive_summaries_are_summary_models(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "t.db")
     _insert_pwqmn_rows(db)
     _derive_from_pwqmn(db)
     rows = list(db["stream_temperature_summaries"].rows)

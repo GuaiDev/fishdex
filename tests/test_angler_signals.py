@@ -36,21 +36,16 @@ STEP = 0.05  # ~5.5 km: every place is its own water, far outside every visit ra
 
 
 @pytest.fixture(scope="module")
-def _template_db(tmp_path_factory):
-    from src.storage.database import get_db
-
-    path = tmp_path_factory.mktemp("signals_template") / "template.db"
-    get_db(path).conn.close()
-    return path
+def _template_db(migrated_template_db):
+    return migrated_template_db
 
 
 @pytest.fixture
-def db(tmp_path, _template_db):
-    from src.storage.database import get_db
-
+def db(db_factory, tmp_path, _template_db):
+    
     path = tmp_path / "signals.db"
     shutil.copy(_template_db, path)
-    db = get_db(path)
+    db = db_factory(path)
     upsert_species_ranges(db, [species_row(CHUB[1], CHUB[0])])
     return db
 

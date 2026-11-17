@@ -144,8 +144,12 @@ def test_selection_naming_an_unknown_species_is_an_error():
 
 
 @pytest.fixture(scope="module")
-def committed(tmp_path_factory) -> dict[str, SpeciesImage]:
-    db = get_db(tmp_path_factory.mktemp("db") / "committed.db")
+def committed(tmp_path_factory, migrated_template_db) -> dict[str, SpeciesImage]:
+    import shutil
+
+    path = tmp_path_factory.mktemp("db") / "committed.db"
+    shutil.copy(migrated_template_db, path)
+    db = get_db(path)
     service.sync_species_images(db)
     return store.get_species_images(db)
 

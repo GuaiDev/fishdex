@@ -13,7 +13,6 @@ from unittest.mock import MagicMock, patch
 
 from src.ingest.jurisdictions.ca_sk import water_quality as wq
 from src.ingest.jurisdictions.ca_sk.ingest import ingest_sk_water_quality
-from src.storage.database import get_db
 from src.storage.water_quality import query_water_quality
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sk_wq_response.json"
@@ -79,13 +78,13 @@ def test_no_date_warns(tmp_path, caplog):
     assert "no usable collection year" in " ".join(r.getMessage() for r in caplog.records)
 
 
-def test_service_stores_readings(tmp_path, monkeypatch):
+def test_service_stores_readings(db_factory, tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, return_value=_mock_response(_load())), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: get_db(db_path))
+        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: db_factory(db_path))
         n = ingest_sk_water_quality(52.13, -106.67, radius_km=50)
 
     assert n == 2
-    stored = query_water_quality(get_db(db_path), lat=52.13, lng=-106.67, radius_km=50)
+    stored = query_water_quality(db_factory(db_path), lat=52.13, lng=-106.67, radius_km=50)
     assert {r.jurisdiction for r in stored} == {"CA-SK"}
     assert {r.record_id for r in stored} == {"SK_WQ_8001", "SK_WQ_8002"}

@@ -17,7 +17,6 @@ import pytest
 
 from src.ingest.jurisdictions.ca_bc import water_quality as wq
 from src.ingest.jurisdictions.ca_bc.ingest import ingest_bc_water_quality
-from src.storage.database import get_db
 from src.storage.water_quality import query_water_quality
 
 FIXTURE = Path(__file__).parent / "fixtures" / "enmods_results_sample.csv"
@@ -108,15 +107,15 @@ def test_validator_rejection_is_counted_not_silent():
     assert "2025-11-05" not in {r.sampled_at.isoformat() for r in readings}
 
 
-def test_compliance_location_types_never_reach_stored_readings(tmp_path, monkeypatch, gz_fixture):
+def test_compliance_location_types_never_reach_stored_readings(db_factory, tmp_path, monkeypatch, gz_fixture):
     _, stats = wq.parse_results(FIXTURE, *FRASER, radius_km=100)
     assert stats.rows_not_ambient == 4
 
     db_path = tmp_path / "t.db"
     monkeypatch.setattr(wq, "download_results", lambda: gz_fixture)
-    monkeypatch.setattr("src.ingest.jurisdictions.ca_bc.ingest.get_db", lambda: get_db(db_path))
+    monkeypatch.setattr("src.ingest.jurisdictions.ca_bc.ingest.get_db", lambda: db_factory(db_path))
     ingest_bc_water_quality(49.10, -123.02, radius_km=30)
-    stored = query_water_quality(get_db(db_path), lat=49.10, lng=-123.02, radius_km=30)
+    stored = query_water_quality(db_factory(db_path), lat=49.10, lng=-123.02, radius_km=30)
     # 0301336 is the 'Ditch or Culvert' station with DO 1.08 mg/L and pH 3.98.
     assert stored
     assert "0301336" not in {r.station_id for r in stored}
@@ -290,13 +289,13 @@ def test_failed_download_raises_and_leaves_no_cache_file(tmp_path, monkeypatch):
     assert not (tmp_path / "cache" / wq._CACHE_FILE).exists()
 
 
-def test_ingest_stores_readings_and_returns_count(tmp_path, monkeypatch, gz_fixture):
+def test_ingest_stores_readings_and_returns_count(db_factory, tmp_path, monkeypatch, gz_fixture):
     db_path = tmp_path / "t.db"
     monkeypatch.setattr(wq, "download_results", lambda: gz_fixture)
-    monkeypatch.setattr("src.ingest.jurisdictions.ca_bc.ingest.get_db", lambda: get_db(db_path))
+    monkeypatch.setattr("src.ingest.jurisdictions.ca_bc.ingest.get_db", lambda: db_factory(db_path))
 
     n = ingest_bc_water_quality(*FRASER, radius_km=100)
-    db = get_db(db_path)
+    db = db_factory(db_path)
     stored = query_water_quality(db, lat=FRASER[0], lng=FRASER[1], radius_km=100)
     assert n == len(stored) > 0
     assert {r.jurisdiction for r in stored} == {"CA-BC"}
@@ -306,15 +305,15 @@ def test_ingest_stores_readings_and_returns_count(tmp_path, monkeypatch, gz_fixt
     assert db["water_quality_readings"].count == n
 
 
-def test_bc_readings_reach_the_water_slice_with_their_own_source(tmp_path, monkeypatch, gz_fixture):
+def test_bc_readings_reach_the_water_slice_with_their_own_source(db_factory, tmp_path, monkeypatch, gz_fixture):
     from src.services.context import describe
 
     db_path = tmp_path / "t.db"
     monkeypatch.setattr(wq, "download_results", lambda: gz_fixture)
-    monkeypatch.setattr("src.ingest.jurisdictions.ca_bc.ingest.get_db", lambda: get_db(db_path))
+    monkeypatch.setattr("src.ingest.jurisdictions.ca_bc.ingest.get_db", lambda: db_factory(db_path))
     ingest_bc_water_quality(49.10, -123.02, radius_km=30)
 
-    water = describe(get_db(db_path), lat=49.10, lng=-123.02, caller="map_tap").water
+    water = describe(db_factory(db_path), lat=49.10, lng=-123.02, caller="map_tap").water
     assert not water.dissolved_oxygen.is_empty
     assert "BC EnMoDS" in water.dissolved_oxygen.provenance.source
     assert "PWQMN" not in water.dissolved_oxygen.provenance.source

@@ -447,13 +447,15 @@ WHOLE = ((43.095, LON), (43.005, LON))
 
 
 @pytest.fixture(scope="module")
-def db(tmp_path_factory):
+def db(tmp_path_factory, migrated_template_db):
     """One database for the module: schema setup costs seconds, and every
     build replaces the CA-ON set wholesale, so tests cannot see each other."""
     from src.storage.database import get_db
 
     path = tmp_path_factory.mktemp("stretches") / "test.db"
-    get_db(path)
+    import shutil
+
+    shutil.copy(migrated_template_db, path)
     return get_db(path)
 
 

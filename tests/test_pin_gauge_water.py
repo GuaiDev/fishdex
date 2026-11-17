@@ -18,7 +18,6 @@ from src.services.context import place as place_mod
 from src.services.pins.conditions import _label
 from src.services.pins.labels import CONDITION_FIELDS, labels_payload
 from src.services.water_names import normalize_water_name, same_water
-from src.storage.database import get_db
 
 wsc = importlib.import_module("src.ingest.global.wsc")
 
@@ -193,10 +192,10 @@ def test_the_pins_river_is_found_however_many_other_segments_surround_it(db):
     assert place_mod.water_names_at(db, place, ["Credit River"]) == ["Credit River"]
 
 
-def test_no_hydro_table_means_no_names_not_an_error(tmp_path, migrated_template_db):
+def test_no_hydro_table_means_no_names_not_an_error(db_factory, tmp_path, migrated_template_db):
     path = tmp_path / "empty.db"
     shutil.copy(migrated_template_db, path)
-    empty = get_db(path)
+    empty = db_factory(path)
     place = place_mod.resolve(empty, lat=MOUTH[0], lng=MOUTH[1])
     assert place_mod.water_names_at(empty, place, ['Credit River']) is None
 

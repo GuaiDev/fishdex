@@ -5,7 +5,6 @@ import pytest
 from src.models.species_range import SpeciesRange
 from src.services.fishdex import get_fishdex_data
 from src.storage.catches import insert_catch, update_personal_best_if_higher
-from src.storage.database import get_db
 from src.storage.species_ranges import upsert_species_ranges
 
 
@@ -19,14 +18,14 @@ def _session_and_stop(db, user_id=1):
     return session_id, stop_id
 
 
-def test_no_catches_returns_empty_caught_species(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_no_catches_returns_empty_caught_species(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     data = get_fishdex_data(db, user_id=1, jurisdiction="CA-ON")
     assert data["caughtSpecies"] == []
 
 
-def test_caught_species_aggregates_count_and_family(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_caught_species_aggregates_count_and_family(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     session_id, stop_id = _session_and_stop(db)
 
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="creek chub")
@@ -47,8 +46,8 @@ def test_caught_species_aggregates_count_and_family(tmp_path):
     assert by_name["Rock Bass"]["representativePhotoUrl"] == "/photos/rockbass.jpg"
 
 
-def test_catch_with_no_photo_has_none_representative_photo(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_catch_with_no_photo_has_none_representative_photo(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
 
@@ -56,8 +55,8 @@ def test_catch_with_no_photo_has_none_representative_photo(tmp_path):
     assert data["caughtSpecies"][0]["representativePhotoUrl"] is None
 
 
-def test_no_size_data_never_fabricates_personal_best(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_no_size_data_never_fabricates_personal_best(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
 
@@ -67,8 +66,8 @@ def test_no_size_data_never_fabricates_personal_best(tmp_path):
     assert catch["maxLengthInches"] is None
 
 
-def test_personal_best_from_stored_table_reported_in_inches(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_personal_best_from_stored_table_reported_in_inches(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     session_id, stop_id = _session_and_stop(db)
     catch_id = insert_catch(
         db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass",
@@ -84,8 +83,8 @@ def test_personal_best_from_stored_table_reported_in_inches(tmp_path):
     assert catch["maxLengthInches"] == pytest.approx(14.0, abs=0.01)
 
 
-def test_region_pool_filters_by_jurisdiction_and_carries_family(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_region_pool_filters_by_jurisdiction_and_carries_family(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     upsert_species_ranges(db, [
         SpeciesRange(
             species="Smallmouth Bass", scientific_name="Micropterus dolomieu",
@@ -109,8 +108,8 @@ def test_region_pool_filters_by_jurisdiction_and_carries_family(tmp_path):
     assert bass["familyCommonName"] == "Bass & Sunfish"
 
 
-def test_caught_species_uses_canonical_capitalization_from_pool(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_caught_species_uses_canonical_capitalization_from_pool(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     upsert_species_ranges(db, [
         SpeciesRange(
             species="Smallmouth Bass", scientific_name="Micropterus dolomieu",
@@ -132,8 +131,8 @@ def _range(common, sci):
     )
 
 
-def test_every_species_carries_one_image_shape(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_every_species_carries_one_image_shape(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     upsert_species_ranges(db, [
         _range("Smallmouth Bass", "Micropterus dolomieu"),
         _range("Northern Pike", "Esox lucius"),
@@ -148,8 +147,8 @@ def test_every_species_carries_one_image_shape(tmp_path):
         assert set(entry["image"]) == {"url", "thumbUrl", "status", "creator", "licence"}
 
 
-def test_species_with_an_approved_image_gets_it_and_the_rest_get_the_placeholder(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_species_with_an_approved_image_gets_it_and_the_rest_get_the_placeholder(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     upsert_species_ranges(db, [
         _range("Smallmouth Bass", "Micropterus dolomieu"),
         _range("Northern Pike", "Esox lucius"),
@@ -176,8 +175,8 @@ def test_species_with_an_approved_image_gets_it_and_the_rest_get_the_placeholder
     assert pike["creator"] is None and pike["licence"] is None
 
 
-def test_a_catch_the_species_list_does_not_know_gets_the_placeholder(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_a_catch_the_species_list_does_not_know_gets_the_placeholder(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="mystery fish")
 
@@ -186,10 +185,10 @@ def test_a_catch_the_species_list_does_not_know_gets_the_placeholder(tmp_path):
     assert image["status"] == "placeholder"
 
 
-def test_every_image_url_points_at_a_file_the_static_mount_serves(tmp_path):
+def test_every_image_url_points_at_a_file_the_static_mount_serves(db_factory, tmp_path):
     from pathlib import Path
 
-    db = get_db(path=tmp_path / "test.db")
+    db = db_factory(path=tmp_path / "test.db")
     upsert_species_ranges(db, [_range("Smallmouth Bass", "Micropterus dolomieu")])
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
