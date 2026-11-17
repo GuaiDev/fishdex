@@ -67,14 +67,18 @@ class IngestRun:
         self.empty += empty
 
     def __enter__(self) -> "IngestRun":
-        db = self._db or get_db()
-        db.execute(
-            "INSERT INTO ingest_runs (source, jurisdiction, area, started_at, status) "
-            "VALUES (?, ?, ?, ?, 'running')",
-            [self.source, self.jurisdiction, self.area, self._started_at],
-        )
-        self.run_id = db.conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        db.conn.commit()
+        try:
+            db = self._db or get_db()
+            db.execute(
+                "INSERT INTO ingest_runs (source, jurisdiction, area, started_at, status) "
+                "VALUES (?, ?, ?, ?, 'running')",
+                [self.source, self.jurisdiction, self.area, self._started_at],
+            )
+            self.run_id = db.conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            db.conn.commit()
+        except Exception:
+            self.run_id = None
+            logger.exception("Could not start ingest ledger for %s", self.source)
         self._token = _active_run.set(self)
         return self
 
@@ -101,23 +105,27 @@ class IngestRun:
                 self.fetched,
                 self.empty_share * 100,
             )
-        db = self._db or get_db()
-        db.execute(
-            "UPDATE ingest_runs SET finished_at=?, fetched=?, stored=?, skipped=?, "
-            "empty_count=?, empty_share=?, status=?, error=? WHERE id=?",
-            [
-                datetime.now().isoformat(timespec="seconds"),
-                self.fetched,
-                self.stored,
-                self.skipped,
-                self.empty,
-                self.empty_share,
-                self.status,
-                self.error,
-                self.run_id,
-            ],
-        )
-        db.conn.commit()
+        if self.run_id is not None:
+            try:
+                db = self._db or get_db()
+                db.execute(
+                    "UPDATE ingest_runs SET finished_at=?, fetched=?, stored=?, skipped=?, "
+                    "empty_count=?, empty_share=?, status=?, error=? WHERE id=?",
+                    [
+                        datetime.now().isoformat(timespec="seconds"),
+                        self.fetched,
+                        self.stored,
+                        self.skipped,
+                        self.empty,
+                        self.empty_share,
+                        self.status,
+                        self.error,
+                        self.run_id,
+                    ],
+                )
+                db.conn.commit()
+            except Exception:
+                logger.exception("Could not finalize ingest ledger for %s", self.source)
         return False
 
 

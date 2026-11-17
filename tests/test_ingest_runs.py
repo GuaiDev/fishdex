@@ -618,3 +618,72 @@ def test_regulations_and_nuseds_caught_failures_fail_ledger(
         "ValueError: invalid PDF" if stage == "parse" else "ReadTimeout: publisher unavailable"
     )
     assert row == ("failed", expected_error, 0)
+
+
+@pytest.mark.parametrize("stage", ["start", "finish"])
+@pytest.mark.parametrize("source_fails", [False, True])
+def test_ledger_write_failure_preserves_source_outcome(db, monkeypatch, caplog, stage, source_fails):
+    import sqlite3
+
+    from src.services.ingest_runs import record_counts
+
+    execute = db.execute
+
+    def locked(sql, *args, **kwargs):
+        if sql.startswith("INSERT" if stage == "start" else "UPDATE"):
+            raise sqlite3.OperationalError("database is locked")
+        return execute(sql, *args, **kwargs)
+
+    source_error = RuntimeError("source failed")
+    with monkeypatch.context() as patch:
+        patch.setattr(db, "execute", locked)
+        try:
+            with ingest_run("locked", db=db) as run:
+                record_counts(fetched=3)
+                if source_fails:
+                    raise source_error
+        except RuntimeError as exc:
+            assert exc is source_error
+        else:
+            assert not source_fails
+    assert run.fetched == 3
+    assert "database is locked" in caplog.text
+    with ingest_run("next", db=db) as next_run:
+        record_counts(stored=1)
+    assert next_run.stored == 1
+    assert run.stored == 0
+    assert db.execute(
+        "SELECT status, stored FROM ingest_runs WHERE source='next'"
+    ).fetchone() == ("success", 1)
+
+
+def test_gauge_insert_failure_marks_ledger_failed(db, monkeypatch):
+    import sqlite3
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from sqlite_utils.db import Table
+
+    from src.services import stream_gauge
+
+    monkeypatch.setattr(stream_gauge, "get_db", lambda: db)
+    monkeypatch.setattr(stream_gauge._wsc, "fetch_nearby_stations", lambda *a: [
+        {"STATION_NUMBER": "1", "LATITUDE": 51, "LONGITUDE": -114}
+    ])
+    reading = SimpleNamespace(
+        station_id="1", station_name="Gauge", river_name="Bow", lat=51, lng=-114,
+        jurisdiction="CA-AB", water_level_m=1, discharge_cms=1, level_trend=None,
+        discharge_trend=None, level_grade=None, reading_datetime=datetime.now(),
+        fetched_at=datetime.now(),
+    )
+    monkeypatch.setattr(stream_gauge._wsc, "fetch_station_reading", lambda *a: reading)
+
+    def fail(*args, **kwargs):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(Table, "insert", fail)
+    with ingest_run("WSC", db=db):
+        assert stream_gauge.fetch_and_store(51, -114) == 0
+    assert db.execute(
+        "SELECT fetched, stored, skipped, status, error FROM ingest_runs"
+    ).fetchone() == (1, 0, 1, "failed", "OperationalError: database is locked")

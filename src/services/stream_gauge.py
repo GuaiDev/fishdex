@@ -194,7 +194,7 @@ def _first_reporting(candidates: list, timeout: float) -> NearestGauge | None:
 
 def fetch_and_store(lat: float, lng: float, radius_km: float = 50) -> int:
     """Fetch nearby gauge readings and store them. Called by the ingest CLI."""
-    from src.services.ingest_runs import record_counts
+    from src.services.ingest_runs import record_counts, record_error
 
     stations = _wsc.fetch_nearby_stations(lat, lng, radius_km)
     if not stations:
@@ -242,8 +242,9 @@ def fetch_and_store(lat: float, lng: float, radius_km: float = 50) -> int:
             written = db.conn.total_changes - before
             record_counts(stored=written, skipped=int(not written))
             count += 1
-        except Exception:
+        except Exception as exc:
             record_counts(skipped=1)
+            record_error(exc)
 
     return count
 
