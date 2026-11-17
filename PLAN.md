@@ -43,7 +43,7 @@ What exists and works, in one paragraph each. The audits are longer; this is the
 
 **Trip logging backend.** `POST /log-trip` (free text parsed by Sonnet, or structured `catches_json`, timer fields) and `/log-trip/photo`; `GET /sessions`; `PATCH /sessions/{id}`. After a log, enrichment stores a conditions snapshot and returns at most one follow-up question and one templated "pattern" (slump, species gap, technique). There is no explanation of why an outing went the way it did.
 
-**Personalization backend.** `GET /profile` with inferred orientation, two behaviour signals (explore dial, water type), concept literacy, and declared overrides (`PUT /profile/declared/{key}`). Coaching renders the angler's style into its prompt. The chat system prompt still reads the single-user `data/user_profile.json` and the legacy `trips` table. No questionnaire. Per-user home is on PR #63, not merged.
+**Personalization backend.** `GET /profile` with inferred orientation, two behaviour signals (explore dial, water type), concept literacy, and declared overrides (`PUT /profile/declared/{key}`). Coaching renders the angler's style into its prompt. For current chat profile storage and legacy-data handling, see [README usage](README.md#how-to-run). No questionnaire. Per-user home delivery is tracked in P0.2 below.
 
 **Species imagery.** A provenance-checked pipeline with 14 approved illustrations of 69 species; every other species gets one shared silhouette; a credits page is generated. Served by `/fishdex`, which hard-codes `CA-ON`.
 
