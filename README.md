@@ -227,8 +227,10 @@ of work (for example, pages, stations, or resources), so fetched is not a row to
 An empty-majority warning uses the thresholds defined in
 [`src/services/ingest_runs.py`](src/services/ingest_runs.py). Recorded errors mark
 the run failed even when an adapter continues with partial results; these caught
-errors do not necessarily make the CLI exit non-zero. Interrupted runs can remain
-`running` if finalization never executes.
+errors do not necessarily make the CLI exit non-zero. Ledger write failures are
+logged while ingestion continues: a failed start can leave no row, and a failed
+finalization can leave a row `running`. Interrupted runs can also remain `running`
+if finalization never executes.
 
 Inspect `GET /admin/dashboard` with the `X-Api-Key` header: `ingest_status.runs`
 contains the latest 100 ledger rows, newest first, alongside the existing
