@@ -14,6 +14,8 @@ from src.storage.species_ranges import (
 
 def _make_db(fast_db):
     return fast_db
+
+
 def _sample_ranges() -> list[SpeciesRange]:
     return [
         SpeciesRange(

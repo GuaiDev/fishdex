@@ -24,6 +24,8 @@ LAT, LNG = 43.5, -79.7
 @pytest.fixture()
 def db(fast_db):
     return fast_db
+
+
 # ── synthesis cache ──────────────────────────────────────────────────────────
 
 

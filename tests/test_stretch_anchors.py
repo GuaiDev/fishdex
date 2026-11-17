@@ -63,7 +63,6 @@ def _template_db(migrated_template_db):
 def db(db_factory, tmp_path, _template_db):
     import shutil
 
-    
     path = tmp_path / "anchors.db"
     shutil.copy(_template_db, path)
     return db_factory(path)

@@ -9,7 +9,8 @@ from src.services.synthesis_cache import get_cached_synthesis, store_synthesis
 
 @pytest.fixture()
 def db_conn(fast_db):
-    # Real schema copied from session template with fast test pragmas.
+    # Use the real schema: a hand-rolled table previously hid drift when the
+    # jurisdiction column was added.
     return fast_db
 
 

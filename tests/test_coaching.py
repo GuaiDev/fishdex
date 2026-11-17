@@ -14,7 +14,8 @@ import pytest
 
 @pytest.fixture
 def db_conn(fast_db):
-    # fast_db is a migrated, fast-pragmas copy; matches production schema.
+    # Keep the migrated user_id columns on stops/sessions: omitting them would
+    # hide the cross-user isolation failures these tests cover.
     return fast_db
 
 

@@ -5,7 +5,6 @@ import json
 import pytest
 
 
-
 @pytest.fixture
 def db_conn(db_factory, tmp_path):
     return db_factory(path=tmp_path / "test.db")

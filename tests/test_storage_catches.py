@@ -12,11 +12,17 @@ from src.storage.catches import (
 
 def _session_and_stop(db):
     session_id = db["sessions"].insert({"date": "2026-06-01"}).last_pk
-    stop_id = db["stops"].insert({
-        "session_id": session_id,
-        "location_text": "Bronte Creek",
-        "species_caught": "[]",
-    }).last_pk
+    stop_id = (
+        db["stops"]
+        .insert(
+            {
+                "session_id": session_id,
+                "location_text": "Bronte Creek",
+                "species_caught": "[]",
+            }
+        )
+        .last_pk
+    )
     return session_id, stop_id
 
 
@@ -25,7 +31,11 @@ def test_insert_catch_returns_id(fast_db):
     session_id, stop_id = _session_and_stop(db)
 
     catch_id = insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1, species="creek chub",
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="creek chub",
         photo_url="/photos/abc123.jpg",
     )
     assert isinstance(catch_id, int)
@@ -37,8 +47,14 @@ def test_get_catches_for_session_round_trips_photo_fields(fast_db):
     session_id, stop_id = _session_and_stop(db)
 
     insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1, species="rainbow darter",
-        photo_url="/photos/xyz789.jpg", photo_lat=43.4, photo_lng=-79.7,
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="rainbow darter",
+        photo_url="/photos/xyz789.jpg",
+        photo_lat=43.4,
+        photo_lng=-79.7,
         photo_taken_at="2026-06-01T14:00:00",
     )
 
@@ -93,8 +109,14 @@ def test_insert_catch_round_trips_biggest_size_cm(fast_db):
     session_id, stop_id = _session_and_stop(db)
 
     insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass",
-        count=2, biggest_size_cm=35.5, bait="spinnerbait",
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="smallmouth bass",
+        count=2,
+        biggest_size_cm=35.5,
+        bait="spinnerbait",
     )
     catches = get_catches_for_session(db, session_id)
     assert catches[0]["biggest_size_cm"] == 35.5
@@ -107,7 +129,11 @@ def test_insert_catch_round_trips_caught_at(fast_db):
     session_id, stop_id = _session_and_stop(db)
 
     insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1, species="pumpkinseed",
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="pumpkinseed",
         caught_at="2026-07-19T14:00:00",
     )
     catches = get_catches_for_session(db, session_id)
@@ -126,21 +152,30 @@ def test_update_personal_best_if_higher_sets_and_beats(fast_db):
         db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass"
     )
 
-    assert update_personal_best_if_higher(
-        db, user_id=1, species="smallmouth bass", size_cm=30.0, catch_id=catch_id
-    ) is True
+    assert (
+        update_personal_best_if_higher(
+            db, user_id=1, species="smallmouth bass", size_cm=30.0, catch_id=catch_id
+        )
+        is True
+    )
     assert get_personal_best(db, 1, "smallmouth bass") == 30.0
 
     # A smaller size does not update it and reports no change.
-    assert update_personal_best_if_higher(
-        db, user_id=1, species="smallmouth bass", size_cm=25.0, catch_id=catch_id
-    ) is False
+    assert (
+        update_personal_best_if_higher(
+            db, user_id=1, species="smallmouth bass", size_cm=25.0, catch_id=catch_id
+        )
+        is False
+    )
     assert get_personal_best(db, 1, "smallmouth bass") == 30.0
 
     # A bigger size does.
-    assert update_personal_best_if_higher(
-        db, user_id=1, species="smallmouth bass", size_cm=40.0, catch_id=catch_id
-    ) is True
+    assert (
+        update_personal_best_if_higher(
+            db, user_id=1, species="smallmouth bass", size_cm=40.0, catch_id=catch_id
+        )
+        is True
+    )
     assert get_personal_best(db, 1, "smallmouth bass") == 40.0
 
 
@@ -166,8 +201,12 @@ def test_confirm_catch_species_reattributes_personal_best(fast_db):
     db = fast_db
     session_id, stop_id = _session_and_stop(db)
     catch_id = insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1,
-        species="unidentified fish sp.", biggest_size_cm=20.0,
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="unidentified fish sp.",
+        biggest_size_cm=20.0,
         species_confirmed=False,
     )
     update_personal_best_if_higher(
@@ -176,7 +215,8 @@ def test_confirm_catch_species_reattributes_personal_best(fast_db):
     assert get_personal_best(db, 1, "rock bass") is None
 
     assert confirm_catch_species(db, catch_id, user_id=1, species="Rock Bass") == {
-        "found": True, "is_new_pb": True,
+        "found": True,
+        "is_new_pb": True,
     }
 
     assert get_personal_best(db, 1, "rock bass") == 20.0
@@ -193,8 +233,13 @@ def test_confirm_catch_species_removes_stale_placeholder_pb(fast_db):
     db = fast_db
     session_id, stop_id = _session_and_stop(db)
     catch_id = insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1,
-        species="warmouth", biggest_size_cm=36.83, species_confirmed=False,
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="warmouth",
+        biggest_size_cm=36.83,
+        species_confirmed=False,
     )
     update_personal_best_if_higher(
         db, user_id=1, species="warmouth", size_cm=36.83, catch_id=catch_id
@@ -202,7 +247,8 @@ def test_confirm_catch_species_removes_stale_placeholder_pb(fast_db):
     assert get_personal_best(db, 1, "warmouth") == 36.83
 
     assert confirm_catch_species(db, catch_id, user_id=1, species="smallmouth bass") == {
-        "found": True, "is_new_pb": True,
+        "found": True,
+        "is_new_pb": True,
     }
 
     assert get_personal_best(db, 1, "smallmouth bass") == 36.83
@@ -221,8 +267,13 @@ def test_confirm_catch_species_does_not_delete_unrelated_pb_under_old_species_na
 
     # A real, already-confirmed warmouth catch holds the PB.
     real_warmouth_catch = insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1,
-        species="warmouth", biggest_size_cm=25.0, species_confirmed=True,
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="warmouth",
+        biggest_size_cm=25.0,
+        species_confirmed=True,
     )
     update_personal_best_if_higher(
         db, user_id=1, species="warmouth", size_cm=25.0, catch_id=real_warmouth_catch
@@ -231,8 +282,13 @@ def test_confirm_catch_species_does_not_delete_unrelated_pb_under_old_species_na
     # A second, unrelated catch was also provisionally guessed "warmouth"
     # (smaller, so it never overtook the stored PB) and gets corrected.
     other_catch = insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1,
-        species="warmouth", biggest_size_cm=10.0, species_confirmed=False,
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="warmouth",
+        biggest_size_cm=10.0,
+        species_confirmed=False,
     )
     update_personal_best_if_higher(
         db, user_id=1, species="warmouth", size_cm=10.0, catch_id=other_catch
@@ -240,7 +296,8 @@ def test_confirm_catch_species_does_not_delete_unrelated_pb_under_old_species_na
     assert get_personal_best(db, 1, "warmouth") == 25.0  # unchanged by the smaller guess
 
     assert confirm_catch_species(db, other_catch, user_id=1, species="rock bass") == {
-        "found": True, "is_new_pb": True,
+        "found": True,
+        "is_new_pb": True,
     }
 
     # The real warmouth PB (owned by the other catch) must survive.
@@ -257,20 +314,31 @@ def test_confirm_catch_species_is_new_pb_false_when_not_a_record(fast_db):
     session_id, stop_id = _session_and_stop(db)
 
     existing_record_catch = insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1,
-        species="rock bass", biggest_size_cm=30.0, species_confirmed=True,
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="rock bass",
+        biggest_size_cm=30.0,
+        species_confirmed=True,
     )
     update_personal_best_if_higher(
         db, user_id=1, species="rock bass", size_cm=30.0, catch_id=existing_record_catch
     )
 
     smaller_catch = insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1,
-        species="unidentified fish sp.", biggest_size_cm=15.0, species_confirmed=False,
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="unidentified fish sp.",
+        biggest_size_cm=15.0,
+        species_confirmed=False,
     )
 
     assert confirm_catch_species(db, smaller_catch, user_id=1, species="rock bass") == {
-        "found": True, "is_new_pb": False,
+        "found": True,
+        "is_new_pb": False,
     }
     assert get_personal_best(db, 1, "rock bass") == 30.0  # untouched — 15.0 never beat it
 
@@ -278,5 +346,6 @@ def test_confirm_catch_species_is_new_pb_false_when_not_a_record(fast_db):
 def test_confirm_catch_species_not_found_returns_false(fast_db):
     db = fast_db
     assert confirm_catch_species(db, 9999, user_id=1, species="rock bass") == {
-        "found": False, "is_new_pb": False,
+        "found": False,
+        "is_new_pb": False,
     }

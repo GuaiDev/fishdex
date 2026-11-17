@@ -19,6 +19,8 @@ from src.storage.species_ranges import upsert_species_ranges
 @pytest.fixture
 def db(fast_db):
     return fast_db
+
+
 def _species(**overrides) -> SpeciesRange:
     base = dict(
         species="Least Darter",
@@ -53,11 +55,16 @@ def test_unverified_status_is_tagged_inference_not_record(db):
 
 
 def test_verified_not_at_risk_clears_the_flag_and_cites_its_source(db):
-    upsert_species_ranges(db, [_species(
-        status_source="COSEWIC assessments, Nov 2025",
-        status_source_url="https://cosewic.ca/",
-        status_last_checked_at=datetime.now(UTC),
-    )])
+    upsert_species_ranges(
+        db,
+        [
+            _species(
+                status_source="COSEWIC assessments, Nov 2025",
+                status_source_url="https://cosewic.ca/",
+                status_last_checked_at=datetime.now(UTC),
+            )
+        ],
+    )
     c = describe_species(db, "Least Darter")
     assert c.sar_alert is False
     assert c.conservation_status.provenance.kind is ProvenanceKind.RECORD
@@ -65,12 +72,21 @@ def test_verified_not_at_risk_clears_the_flag_and_cites_its_source(db):
 
 
 def test_verified_listed_species_still_flags(db):
-    upsert_species_ranges(db, [_species(
-        species="Redside Dace", scientific_name="Clinostomus elongatus",
-        sara_status="Endangered", ontario_status="Endangered", cosewic_status="Endangered",
-        status_source="SARA Schedule 1", status_source_url="https://x/",
-        status_last_checked_at=datetime.now(UTC),
-    )])
+    upsert_species_ranges(
+        db,
+        [
+            _species(
+                species="Redside Dace",
+                scientific_name="Clinostomus elongatus",
+                sara_status="Endangered",
+                ontario_status="Endangered",
+                cosewic_status="Endangered",
+                status_source="SARA Schedule 1",
+                status_source_url="https://x/",
+                status_last_checked_at=datetime.now(UTC),
+            )
+        ],
+    )
     c = describe_species(db, "Redside Dace")
     assert c.sar_alert is True
     assert "Endangered" in c.sar_reason
@@ -104,7 +120,8 @@ def test_verification_rejects_a_status_it_does_not_recognise(db):
     summary = apply_verified_statuses(
         db,
         {"etheostoma microperca": {"sara_status": "Probably Fine"}},
-        source="Test registry", source_url="https://example.org/",
+        source="Test registry",
+        source_url="https://example.org/",
     )
     assert summary["rejected_values"]
     assert describe_species(db, "Least Darter").sar_alert is True
@@ -115,8 +132,10 @@ def test_species_absent_from_the_registry_stays_unverified(db):
 
     upsert_species_ranges(db, [_species()])
     summary = apply_verified_statuses(
-        db, {"some other fish": {"sara_status": "Not at Risk"}},
-        source="Test registry", source_url="https://example.org/",
+        db,
+        {"some other fish": {"sara_status": "Not at Risk"}},
+        source="Test registry",
+        source_url="https://example.org/",
     )
     assert summary["verified"] == 0
     assert describe_species(db, "Least Darter").sar_alert is True
@@ -284,9 +303,7 @@ def test_statuses_the_registry_is_silent_on_are_cleared_not_inherited(db, tmp_pa
         db, load_registry_file(path), source="COSEWIC 2024", source_url="https://x"
     )
     assert summary["verified"] == 1
-    assert summary["cleared_generated_statuses"] == [
-        "Redside Dace: sara_status, ontario_status"
-    ]
+    assert summary["cleared_generated_statuses"] == ["Redside Dace: sara_status, ontario_status"]
 
     row = db["species_ranges"].get("Redside Dace")
     assert row["cosewic_status"] == "Endangered"
@@ -321,9 +338,7 @@ def test_reapplying_the_same_export_moves_the_checked_date_not_the_status(db, tm
     apply_verified_statuses(db, registry, source="COSEWIC 2024", source_url="https://x")
     first = db["species_ranges"].get("Least Darter")
 
-    summary = apply_verified_statuses(
-        db, registry, source="COSEWIC 2024", source_url="https://x"
-    )
+    summary = apply_verified_statuses(db, registry, source="COSEWIC 2024", source_url="https://x")
     second = db["species_ranges"].get("Least Darter")
 
     assert second["status_last_checked_at"] > first["status_last_checked_at"]
@@ -467,9 +482,7 @@ def test_a_stale_assessment_date_is_not_inherited(db, tmp_path):
     assert db["species_ranges"].get("Least Darter")["status_assessed_on"] == "1989-04"
 
     undated = tmp_path / "undated.csv"
-    undated.write_text(
-        "species,cosewic_status\nLeast Darter,Not at Risk\n", encoding="utf-8"
-    )
+    undated.write_text("species,cosewic_status\nLeast Darter,Not at Risk\n", encoding="utf-8")
     apply_verified_statuses(
         db, load_registry_file(undated), source="SARO 2025", source_url="https://y"
     )
@@ -487,9 +500,7 @@ def test_withheld_angling_note_is_not_reported_as_missing_coverage(db):
     upsert_species_ranges(db, [_species(fishing_notes="Rare microfishing target.")])
     ctx = describe_species(db, "Least Darter")
 
-    assert ctx.angling_note.empty_reason is (
-        EmptyReason.SUPPRESSED_ON_CONSERVATION_GROUNDS
-    )
+    assert ctx.angling_note.empty_reason is (EmptyReason.SUPPRESSED_ON_CONSERVATION_GROUNDS)
     out = render_species_context(ctx)
     assert "deliberately not shown" in out
     assert "does not cover this area" not in out

@@ -34,6 +34,8 @@ def _no_enrichment(monkeypatch):
 @pytest.fixture()
 def db(fast_db):
     return fast_db
+
+
 def _stop(point=None, photo=None, species=None, name="Bronte Creek") -> dict:
     stop = {"location_text": name, "location_name": name, "species_caught": species or []}
     if point:

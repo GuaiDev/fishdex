@@ -107,7 +107,9 @@ def test_validator_rejection_is_counted_not_silent():
     assert "2025-11-05" not in {r.sampled_at.isoformat() for r in readings}
 
 
-def test_compliance_location_types_never_reach_stored_readings(db_factory, tmp_path, monkeypatch, gz_fixture):
+def test_compliance_location_types_never_reach_stored_readings(
+    db_factory, tmp_path, monkeypatch, gz_fixture
+):
     _, stats = wq.parse_results(FIXTURE, *FRASER, radius_km=100)
     assert stats.rows_not_ambient == 4
 
@@ -305,7 +307,9 @@ def test_ingest_stores_readings_and_returns_count(db_factory, tmp_path, monkeypa
     assert db["water_quality_readings"].count == n
 
 
-def test_bc_readings_reach_the_water_slice_with_their_own_source(db_factory, tmp_path, monkeypatch, gz_fixture):
+def test_bc_readings_reach_the_water_slice_with_their_own_source(
+    db_factory, tmp_path, monkeypatch, gz_fixture
+):
     from src.services.context import describe
 
     db_path = tmp_path / "t.db"

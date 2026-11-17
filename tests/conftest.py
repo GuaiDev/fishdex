@@ -10,7 +10,7 @@ from src.storage.database import get_db, migrate
 
 @pytest.fixture(scope="session")
 def migrated_template_db(tmp_path_factory):
-    """Build the schema once per session and copy the file per test."""
+    """Build the schema once per pytest process (once per worker under xdist)."""
     path = tmp_path_factory.mktemp("template-session") / "template.db"
     template = get_db(path)
     migrate(template)
@@ -89,6 +89,11 @@ def _no_untapped_cache(monkeypatch, tmp_path):
     monkeypatch.setattr(untapped_potential, "_PARQUET_PATH", tmp_path / "no_untapped.parquet")
 
 
+# Ordinary tests copy the migrated template instead of running migrations on
+# every open. The import-time connection hook also covers module-scoped fixtures
+# and seeds empty databases opened directly after the template is ready.
+# `raw_db` restores production connection settings and leaves schema setup to
+# the test, so migration tests can exercise the real opening behaviour.
 _auto_migrate = {"on": True, "template": None}
 
 

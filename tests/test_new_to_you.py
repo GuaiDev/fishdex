@@ -44,7 +44,7 @@ def _template_db(migrated_template_db):
 
 @pytest.fixture
 def db(db_factory, tmp_path, _template_db):
-    
+
     path = tmp_path / "n2y.db"
     shutil.copy(_template_db, path)
     db = db_factory(path)

@@ -82,7 +82,9 @@ def test_cache_hit_skips_http(tmp_path):
 def test_service_stores_segments(db_factory, tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, return_value=_mock_response(_load())), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.ingest.jurisdictions.ca_mb.ingest.get_db", lambda: db_factory(db_path))
+        monkeypatch.setattr(
+            "src.ingest.jurisdictions.ca_mb.ingest.get_db", lambda: db_factory(db_path)
+        )
         segs, barriers = ingest_mb_hydro_network(49.9, -97.14, radius_km=50)
 
     assert segs == 3
@@ -93,14 +95,18 @@ def test_service_stores_segments(db_factory, tmp_path, monkeypatch):
     assert {r["segment_source"] for r in rows} == {"WaLLAS"}
 
 
-def test_service_does_not_overwrite_other_province_with_same_raw_id(db_factory, tmp_path, monkeypatch):
+def test_service_does_not_overwrite_other_province_with_same_raw_id(
+    db_factory, tmp_path, monkeypatch
+):
     db_path = tmp_path / "t.db"
     db = db_factory(db_path)
     db["stream_segments"].insert(
         {"ogf_id": 101, "name": "BC creek", "jurisdiction": "CA-BC"}, pk="ogf_id"
     )
     with patch(_HTTPX, return_value=_mock_response(_load())), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.ingest.jurisdictions.ca_mb.ingest.get_db", lambda: db_factory(db_path))
+        monkeypatch.setattr(
+            "src.ingest.jurisdictions.ca_mb.ingest.get_db", lambda: db_factory(db_path)
+        )
         ingest_mb_hydro_network(49.9, -97.14, radius_km=50)
 
     rows = list(db_factory(db_path)["stream_segments"].rows)

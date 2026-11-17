@@ -82,7 +82,9 @@ def test_cache_hit_skips_http(tmp_path):
 def test_service_stores_observations(db_factory, tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, side_effect=_server), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: db_factory(db_path))
+        monkeypatch.setattr(
+            "src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: db_factory(db_path)
+        )
         n = ingest_sk_fish_observations(52.13, -106.67, radius_km=50)
 
     assert n == 3

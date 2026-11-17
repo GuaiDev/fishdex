@@ -197,7 +197,7 @@ def test_no_hydro_table_means_no_names_not_an_error(db_factory, tmp_path, migrat
     shutil.copy(migrated_template_db, path)
     empty = db_factory(path)
     place = place_mod.resolve(empty, lat=MOUTH[0], lng=MOUTH[1])
-    assert place_mod.water_names_at(empty, place, ['Credit River']) is None
+    assert place_mod.water_names_at(empty, place, ["Credit River"]) is None
 
 
 # -- the panel ---------------------------------------------------------------------

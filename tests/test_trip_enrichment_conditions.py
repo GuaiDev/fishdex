@@ -3,7 +3,6 @@
 import pytest
 
 
-
 @pytest.fixture
 def db_conn(db_factory, tmp_path):
     return db_factory(path=tmp_path / "test.db")
@@ -75,7 +74,10 @@ def test_session_conditions_stored(db_conn):
 
     # Very short timeout forces API calls to fail, but derived fields still store
     result = enrich_session_conditions(
-        db_conn, sid, 42.919, -79.767,
+        db_conn,
+        sid,
+        42.919,
+        -79.767,
         datetime(2025, 6, 20, 10, 0, 0),
         timeout_seconds=0.01,
         user_id=1,

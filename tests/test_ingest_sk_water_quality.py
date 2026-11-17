@@ -81,7 +81,9 @@ def test_no_date_warns(tmp_path, caplog):
 def test_service_stores_readings(db_factory, tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, return_value=_mock_response(_load())), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: db_factory(db_path))
+        monkeypatch.setattr(
+            "src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: db_factory(db_path)
+        )
         n = ingest_sk_water_quality(52.13, -106.67, radius_km=50)
 
     assert n == 2

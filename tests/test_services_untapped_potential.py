@@ -298,13 +298,15 @@ def test_adventure_mode_rewards_low_access():
 def test_structural_bonus_confluence_scores_higher():
     """Confluence segment scores higher than identical non-confluence segment."""
 
-    df = pd.DataFrame({
-        "observation_pressure": [0.2, 0.2],
-        "access_score": [0.5, 0.5],
-        "is_confluence_segment": [True, False],
-        "distance_to_nearest_confluence_km": [0.0, 5.0],
-        "connected_to_waterbody": [False, False],
-    })
+    df = pd.DataFrame(
+        {
+            "observation_pressure": [0.2, 0.2],
+            "access_score": [0.5, 0.5],
+            "is_confluence_segment": [True, False],
+            "distance_to_nearest_confluence_km": [0.0, 5.0],
+            "connected_to_waterbody": [False, False],
+        }
+    )
     bonus = _structural_bonus(df)
     assert float(bonus.iloc[0]) > float(bonus.iloc[1])
     assert float(bonus.iloc[0]) == pytest.approx(1.4)  # +0.4 for confluence
@@ -313,11 +315,13 @@ def test_structural_bonus_confluence_scores_higher():
 def test_structural_bonus_waterbody_adds_to_score():
     """connected_to_waterbody adds +0.3 bonus."""
 
-    df = pd.DataFrame({
-        "is_confluence_segment": [False, False],
-        "distance_to_nearest_confluence_km": [5.0, 5.0],
-        "connected_to_waterbody": [True, False],
-    })
+    df = pd.DataFrame(
+        {
+            "is_confluence_segment": [False, False],
+            "distance_to_nearest_confluence_km": [5.0, 5.0],
+            "connected_to_waterbody": [True, False],
+        }
+    )
     bonus = _structural_bonus(df)
     assert float(bonus.iloc[0]) == pytest.approx(1.3)
     assert float(bonus.iloc[1]) == pytest.approx(1.0)
@@ -326,11 +330,13 @@ def test_structural_bonus_waterbody_adds_to_score():
 def test_structural_bonus_capped_at_two():
     """Confluence + waterbody bonus is capped at 2.0."""
 
-    df = pd.DataFrame({
-        "is_confluence_segment": [True],
-        "distance_to_nearest_confluence_km": [0.0],
-        "connected_to_waterbody": [True],
-    })
+    df = pd.DataFrame(
+        {
+            "is_confluence_segment": [True],
+            "distance_to_nearest_confluence_km": [0.0],
+            "connected_to_waterbody": [True],
+        }
+    )
     bonus = _structural_bonus(df)
     # 1.0 + 0.4 + 0.3 = 1.7 → not capped in this case
     assert float(bonus.iloc[0]) == pytest.approx(1.7)
@@ -388,6 +394,7 @@ def _setup_full_env(tmp_path, monkeypatch, fast_db):
 def test_dismiss_tool_inserts_record(tmp_path, fast_db, monkeypatch):
     """dismiss_segment tool call inserts a row into dismissed_segments."""
     import src.storage.database as db_mod
+
     monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
 
     db = fast_db

@@ -86,7 +86,9 @@ def test_unresolved_waterbody_kept_with_null_coords_and_warns(tmp_path, caplog):
 def test_service_stores_rows(db_factory, tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, side_effect=_server), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: db_factory(db_path))
+        monkeypatch.setattr(
+            "src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: db_factory(db_path)
+        )
         n = ingest_sk_stocking(52.13, -106.67, radius_km=50)
 
     assert n == 3

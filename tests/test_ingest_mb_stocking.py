@@ -84,7 +84,9 @@ def test_cache_hit_skips_http(tmp_path):
 def test_ingest_stores_records_and_is_idempotent(db_factory, tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, return_value=_mock_response(_load())), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.ingest.jurisdictions.ca_mb.ingest.get_db", lambda: db_factory(db_path))
+        monkeypatch.setattr(
+            "src.ingest.jurisdictions.ca_mb.ingest.get_db", lambda: db_factory(db_path)
+        )
         n = ingest_mb_stocking(*_lat_lng(), radius_km=50)
         assert n == 2
         db = db_factory(db_path)

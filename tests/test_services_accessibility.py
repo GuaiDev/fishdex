@@ -288,20 +288,29 @@ def _insert_crown_land(db, crown_id: str, lat: float, lng: float) -> None:
     from shapely.wkt import dumps as wkt_dumps
 
     d = 0.01  # ~1km square
-    poly = Polygon([
-        (lng - d, lat - d), (lng + d, lat - d),
-        (lng + d, lat + d), (lng - d, lat + d),
-        (lng - d, lat - d),
-    ])
+    poly = Polygon(
+        [
+            (lng - d, lat - d),
+            (lng + d, lat - d),
+            (lng + d, lat + d),
+            (lng - d, lat + d),
+            (lng - d, lat - d),
+        ]
+    )
     bounds = poly.bounds
     centroid = poly.centroid
     if "crown_land" not in db.table_names():
         db["crown_land"].create(
             {
-                "crown_id": str, "land_use_type": str, "geom_wkt": str,
-                "centroid_lat": float, "centroid_lng": float,
-                "bbox_minx": float, "bbox_miny": float,
-                "bbox_maxx": float, "bbox_maxy": float,
+                "crown_id": str,
+                "land_use_type": str,
+                "geom_wkt": str,
+                "centroid_lat": float,
+                "centroid_lng": float,
+                "bbox_minx": float,
+                "bbox_miny": float,
+                "bbox_maxx": float,
+                "bbox_maxy": float,
                 "fetched_at": str,
             },
             pk="crown_id",
@@ -313,8 +322,10 @@ def _insert_crown_land(db, crown_id: str, lat: float, lng: float) -> None:
             "geom_wkt": wkt_dumps(poly),
             "centroid_lat": centroid.y,
             "centroid_lng": centroid.x,
-            "bbox_minx": bounds[0], "bbox_miny": bounds[1],
-            "bbox_maxx": bounds[2], "bbox_maxy": bounds[3],
+            "bbox_minx": bounds[0],
+            "bbox_miny": bounds[1],
+            "bbox_maxx": bounds[2],
+            "bbox_maxy": bounds[3],
             "fetched_at": "2026-01-01T00:00:00",
         },
         replace=True,
@@ -331,13 +342,15 @@ def test_crown_land_pip(fast_db):
     tree, geoms = _build_crown_index(db)
     assert tree is not None
 
-    coords = np.array([
-        [inside_lat, inside_lng],
-        [outside_lat, outside_lng],
-    ])
+    coords = np.array(
+        [
+            [inside_lat, inside_lng],
+            [outside_lat, outside_lng],
+        ]
+    )
     flags = _vectorized_crown_flag(tree, geoms, coords)
-    assert flags[0] is True or flags[0] == 1   # inside → True
-    assert not flags[1]                          # outside → False
+    assert flags[0] is True or flags[0] == 1  # inside → True
+    assert not flags[1]  # outside → False
 
 
 def test_access_note_crown_land():

@@ -17,6 +17,8 @@ from src.services.context.user import as_recorded_insight
 @pytest.fixture
 def db(fast_db):
     return fast_db
+
+
 # -- a logged stop is not a database row ---------------------------------------
 
 

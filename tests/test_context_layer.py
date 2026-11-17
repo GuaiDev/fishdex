@@ -23,6 +23,8 @@ from src.services.context.user import build_user_layer
 @pytest.fixture
 def db(fast_db):
     return fast_db
+
+
 def _add_stop(
     db,
     *,
@@ -38,19 +40,21 @@ def _add_stop(
 ):
     db["sessions"].insert({"date": date, "user_id": user_id})
     sid = db.execute("SELECT MAX(id) FROM sessions").fetchone()[0]
-    db["stops"].insert({
-        "session_id": sid,
-        "user_id": user_id,
-        "location_text": name,
-        "location_name": name,
-        "lat": lat,
-        "lng": lng,
-        "species_caught": json.dumps(list(species)),
-        "party_species_caught": json.dumps([]),
-        "was_productive": 1 if productive else 0,
-        "technique": technique,
-        "water_clarity": clarity,
-    })
+    db["stops"].insert(
+        {
+            "session_id": sid,
+            "user_id": user_id,
+            "location_text": name,
+            "location_name": name,
+            "lat": lat,
+            "lng": lng,
+            "species_caught": json.dumps(list(species)),
+            "party_species_caught": json.dumps([]),
+            "was_productive": 1 if productive else 0,
+            "technique": technique,
+            "water_clarity": clarity,
+        }
+    )
 
 
 # ── provenance and empty-reason contract ──────────────────────────────────────
@@ -139,11 +143,13 @@ def test_blocklist_rejects_malformed_urls():
 
 
 def test_filter_web_results_drops_blocked_sources():
-    kept = filter_web_results([
-        {"url": "https://inaturalist.org/a"},
-        {"url": "https://fishbrain.com/b"},
-        {"url": "https://ontario.ca/c"},
-    ])
+    kept = filter_web_results(
+        [
+            {"url": "https://inaturalist.org/a"},
+            {"url": "https://fishbrain.com/b"},
+            {"url": "https://ontario.ca/c"},
+        ]
+    )
     assert [r["url"] for r in kept] == [
         "https://inaturalist.org/a",
         "https://ontario.ca/c",
@@ -181,14 +187,16 @@ def test_resolve_unknown_name_returns_none_not_a_guess(db):
 
 def _add_segment(db, ogf_id, name, lat, lng, stream_order=3):
     """OHN segments carry geometry as WKT, not a centroid pair."""
-    db["stream_segments"].insert({
-        "ogf_id": ogf_id,
-        "name": name,
-        "watercourse_type": "Stream",
-        "geom_wkt": f"LINESTRING({lng - 0.001} {lat - 0.001}, {lng + 0.001} {lat + 0.001})",
-        "stream_order": stream_order,
-        "jurisdiction": "CA-ON",
-    })
+    db["stream_segments"].insert(
+        {
+            "ogf_id": ogf_id,
+            "name": name,
+            "watercourse_type": "Stream",
+            "geom_wkt": f"LINESTRING({lng - 0.001} {lat - 0.001}, {lng + 0.001} {lat + 0.001})",
+            "stream_order": stream_order,
+            "jurisdiction": "CA-ON",
+        }
+    )
 
 
 def test_segment_centroid_is_averaged_from_wkt(db):
@@ -311,11 +319,18 @@ def test_empty_records_distinguishes_no_coverage_from_no_sightings(db):
     ctx = describe(db, lat=43.4, lng=-79.75, caller="map_tap")
     assert ctx.records.empty_reason is EmptyReason.SOURCE_DOES_NOT_COVER_AREA
 
-    db["observations"].insert({
-        "observation_id": 1, "species": "Semotilus atromaculatus", "common_name": "Creek Chub",
-        "lat": 10.0, "lng": 10.0, "observed_on": "2025-01-01", "source": "iNaturalist",
-        "jurisdiction": "CA-ON",
-    })
+    db["observations"].insert(
+        {
+            "observation_id": 1,
+            "species": "Semotilus atromaculatus",
+            "common_name": "Creek Chub",
+            "lat": 10.0,
+            "lng": 10.0,
+            "observed_on": "2025-01-01",
+            "source": "iNaturalist",
+            "jurisdiction": "CA-ON",
+        }
+    )
     ctx2 = describe(db, lat=43.4, lng=-79.75, caller="map_tap")
     assert ctx2.records.empty_reason is EmptyReason.NO_RECORDS_IN_RADIUS
 
@@ -394,22 +409,22 @@ def test_explore_reports_ties_at_the_top(monkeypatch, db):
 
     import src.services.context as ctx_mod
 
-    tied = pd.DataFrame({
-        "ogf_id": [1, 2, 3],
-        "centroid_lat": [43.4, 43.41, 43.42],
-        "centroid_lng": [-79.75, -79.76, -79.77],
-        "stream_order": [3, 3, 3],
-        "watercourse_name": ["A", "B", "C"],
-        "watercourse_type": ["Stream"] * 3,
-        "untapped_score_balanced": [1.89, 1.89, 0.5],
-        "observation_pressure": [0.1, 0.1, 0.4],
-        "access_score": [0.3, 0.3, 0.3],
-        "is_confluence_segment": [False] * 3,
-        "do_median_mgl": [float("nan")] * 3,
-    })
-    monkeypatch.setattr(
-        "src.services.untapped_potential.load_cached_untapped", lambda: tied
+    tied = pd.DataFrame(
+        {
+            "ogf_id": [1, 2, 3],
+            "centroid_lat": [43.4, 43.41, 43.42],
+            "centroid_lng": [-79.75, -79.76, -79.77],
+            "stream_order": [3, 3, 3],
+            "watercourse_name": ["A", "B", "C"],
+            "watercourse_type": ["Stream"] * 3,
+            "untapped_score_balanced": [1.89, 1.89, 0.5],
+            "observation_pressure": [0.1, 0.1, 0.4],
+            "access_score": [0.3, 0.3, 0.3],
+            "is_confluence_segment": [False] * 3,
+            "do_median_mgl": [float("nan")] * 3,
+        }
     )
+    monkeypatch.setattr("src.services.untapped_potential.load_cached_untapped", lambda: tied)
     resp = ctx_mod.explore(db, lat=43.41, lng=-79.76, radius_km=20)
     assert resp.tied_at_top == 2
 
@@ -460,12 +475,24 @@ def test_substrate_reads_the_real_geology_field(db):
 
     The mismatch meant real substrate was fetched, then silently discarded.
     """
-    db["geology_units"].insert({
-        "unit_id": "G1", "tile_id": "T1", "unit_code": "coarse", "unit_name": "coarse",
-        "primary_material": "coarse", "substrate_class": "coarse", "jurisdiction": "CA-ON",
-        "centroid_lat": 43.40, "centroid_lng": -79.75,
-        "bbox_minx": -79.8, "bbox_miny": 43.3, "bbox_maxx": -79.7, "bbox_maxy": 43.5,
-    }, alter=True)
+    db["geology_units"].insert(
+        {
+            "unit_id": "G1",
+            "tile_id": "T1",
+            "unit_code": "coarse",
+            "unit_name": "coarse",
+            "primary_material": "coarse",
+            "substrate_class": "coarse",
+            "jurisdiction": "CA-ON",
+            "centroid_lat": 43.40,
+            "centroid_lng": -79.75,
+            "bbox_minx": -79.8,
+            "bbox_miny": 43.3,
+            "bbox_maxx": -79.7,
+            "bbox_maxy": 43.5,
+        },
+        alter=True,
+    )
     ctx = describe(db, lat=43.40, lng=-79.75, caller="map_tap")
     assert ctx.water.substrate.value == "coarse"
     assert "gravel" in (ctx.water.substrate.meaning or "")
@@ -473,12 +500,23 @@ def test_substrate_reads_the_real_geology_field(db):
 
 def test_measured_but_unremarkable_ph_is_not_reported_as_absent(db):
     """A mid-range pH was measured. Calling that 'nothing recorded' is false."""
-    db["water_quality_readings"].insert({
-        "record_id": "W1", "station_id": "S1", "station_name": "t",
-        "lat": 43.40, "lng": -79.75, "jurisdiction": "CA-ON",
-        "sampled_at": "2024-06-01", "do_mgl": None, "ph": 7.2,
-        "temp_c": None, "conductivity_us_cm": None, "turbidity_fnu": None,
-    }, alter=True)
+    db["water_quality_readings"].insert(
+        {
+            "record_id": "W1",
+            "station_id": "S1",
+            "station_name": "t",
+            "lat": 43.40,
+            "lng": -79.75,
+            "jurisdiction": "CA-ON",
+            "sampled_at": "2024-06-01",
+            "do_mgl": None,
+            "ph": 7.2,
+            "temp_c": None,
+            "conductivity_us_cm": None,
+            "turbidity_fnu": None,
+        },
+        alter=True,
+    )
     ph = describe(db, lat=43.40, lng=-79.75, caller="map_tap").water.ph
     assert ph.is_empty
     assert ph.empty_reason is EmptyReason.RECORDED_BUT_NOT_DECISION_RELEVANT
@@ -514,12 +552,19 @@ def test_place_resolution_does_not_truncate_the_segment_scan(db):
 
 
 def _add_barrier(db, lat, lng, ogf_id=1):
-    db["barriers"].insert({
-        "ogf_id": ogf_id, "barrier_type": "dam",
-        "geom_wkt": f"POINT({lng} {lat})",
-        "nearest_segment_ogf_id": ogf_id, "snap_distance_m": 10.0,
-        "jurisdiction": "CA-ON",
-    }, alter=True, pk="ogf_id", replace=True)
+    db["barriers"].insert(
+        {
+            "ogf_id": ogf_id,
+            "barrier_type": "dam",
+            "geom_wkt": f"POINT({lng} {lat})",
+            "nearest_segment_ogf_id": ogf_id,
+            "snap_distance_m": 10.0,
+            "jurisdiction": "CA-ON",
+        },
+        alter=True,
+        pk="ogf_id",
+        replace=True,
+    )
 
 
 def test_barrier_absence_requires_local_coverage_not_just_a_nonempty_table(db):
@@ -529,7 +574,7 @@ def test_barrier_absence_requires_local_coverage_not_just_a_nonempty_table(db):
     limited, so a corpus covering just southern Ontario would let a query at
     52N assert "fish can move through freely" from no local evidence.
     """
-    _add_barrier(db, 43.40, -79.75)          # southern Ontario only
+    _add_barrier(db, 43.40, -79.75)  # southern Ontario only
     _add_segment(db, 1, "Far Creek", 52.0, -87.0)
 
     far = describe(db, lat=52.0, lng=-87.0, caller="map_tap").structure.barriers_upstream
@@ -553,11 +598,17 @@ def test_unpopulated_column_is_not_reported_as_absent_data(db):
     Segments exist here, so "nothing recorded within the search radius" would
     blame the world for a gap in our own pipeline.
     """
-    db["stream_segments"].insert({
-        "ogf_id": 501, "name": "No Order Creek", "watercourse_type": "Stream",
-        "geom_wkt": "LINESTRING(-79.751 43.399, -79.749 43.401)",
-        "stream_order": None, "jurisdiction": "CA-ON",
-    }, alter=True)
+    db["stream_segments"].insert(
+        {
+            "ogf_id": 501,
+            "name": "No Order Creek",
+            "watercourse_type": "Stream",
+            "geom_wkt": "LINESTRING(-79.751 43.399, -79.749 43.401)",
+            "stream_order": None,
+            "jurisdiction": "CA-ON",
+        },
+        alter=True,
+    )
     order = describe(db, lat=43.40, lng=-79.75, caller="map_tap").structure.stream_order
     assert order.is_empty
     assert order.empty_reason is EmptyReason.FIELD_NOT_POPULATED_BY_SOURCE
