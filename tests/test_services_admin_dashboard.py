@@ -406,8 +406,8 @@ def test_catch_stats_avg_catches_per_session(fast_db):
     assert result["avg_catches_per_session"] == 1.5  # 3 catches / 2 sessions
 
 
-def test_api_cost_breakdowns_preserve_unknown_and_partial_estimates(tmp_path):
-    db = _make_db(tmp_path)
+def test_api_cost_breakdowns_preserve_unknown_and_partial_estimates(fast_db):
+    db = _make_db(fast_db)
     _seed_users(db, n=2)
     for caller, user_id, price in [
         ("unknown", 1, None),
