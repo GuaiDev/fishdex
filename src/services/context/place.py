@@ -278,11 +278,14 @@ def _named_segment(
     """
     if "stream_segments" not in db.table_names():
         return None
-    rows = list(
-        db["stream_segments"].rows_where(
-            "LOWER(name) LIKE ? AND name IS NOT NULL", [pattern], limit=500
-        )
-    )
+    indexed = any(row[1] == "idx_stream_segments_lower_name" for row in
+                  db.execute("PRAGMA index_list(stream_segments)").fetchall())
+    index_hint = " INDEXED BY idx_stream_segments_lower_name" if indexed else ""
+    rows = list(db.query(
+        f"SELECT * FROM stream_segments{index_hint} "
+        "WHERE LOWER(name) LIKE :pattern AND name IS NOT NULL ORDER BY rowid LIMIT 500",
+        {"pattern": pattern},
+    ))
 
     candidates: list[tuple[float, float, str, int]] = []
     for row in rows:
@@ -393,27 +396,23 @@ def segments_near(db: Database, lat: float, lng: float, radius_km: float) -> lis
 
     if _stream_segments_have_rtree(db):
         rows = db.execute(
-            "SELECT s.ogf_id, s.centroid_lat, s.centroid_lng, s.geom_wkt "
+            "SELECT s.rowid, s.ogf_id, s.centroid_lat, s.centroid_lng, s.geom_wkt "
             "FROM stream_segments_rtree r "
             "JOIN stream_segments s ON s.rowid = r.id "
             "WHERE r.max_lon >= ? AND r.min_lon <= ? "
-            "  AND r.max_lat >= ? AND r.min_lat <= ?",
+            "  AND r.max_lat >= ? AND r.min_lat <= ? "
+            "  AND s.min_lat IS NOT NULL AND s.min_lon IS NOT NULL "
+            "UNION ALL "
+            "SELECT rowid, ogf_id, centroid_lat, centroid_lng, geom_wkt "
+            "FROM stream_segments INDEXED BY idx_stream_segments_missing_spatial "
+            "WHERE min_lat IS NULL OR min_lon IS NULL "
+            "ORDER BY 1",
             (min_lng, max_lng, min_lat, max_lat),
         ).fetchall()
-        for ogf_id, clat, clng, geom_wkt in rows:
-            if ogf_id is None:
-                continue
-            if _consider(int(ogf_id), clat, clng, geom_wkt):
+        for _, ogf_id, clat, clng, geom_wkt in rows:
+            if ogf_id is not None and _consider(int(ogf_id), clat, clng, geom_wkt):
                 return out
-        # Rows inserted without spatial columns are invisible to the R*Tree bbox.
-        # Scan only that (normally empty) set so direct inserts still resolve.
-        null_rows = db.execute(
-            "SELECT ogf_id, centroid_lat, centroid_lng, geom_wkt FROM stream_segments "
-            "WHERE ogf_id IS NOT NULL AND min_lat IS NULL AND min_lon IS NULL"
-        ).fetchall()
-        for ogf_id, clat, clng, geom_wkt in null_rows:
-            if _consider(int(ogf_id), clat, clng, geom_wkt):
-                return out
+        return out
         return out
 
     for row in db["stream_segments"].rows_where("ogf_id IS NOT NULL", []):

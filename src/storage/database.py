@@ -1974,10 +1974,15 @@ def _ensure_stream_segments_rtree(db: Database) -> None:
     """Create the stream_segments R*Tree companion and sync triggers. Idempotent."""
     if "stream_segments" not in db.table_names():
         return
+    # hydro_segments is a separate graph table keyed to its own rowids.
     db.execute(
         "CREATE VIRTUAL TABLE IF NOT EXISTS stream_segments_rtree "
         "USING rtree(id, min_lon, max_lon, min_lat, max_lat)"
     )
+    db.execute("CREATE INDEX IF NOT EXISTS idx_stream_segments_missing_spatial "
+               "ON stream_segments(min_lat, min_lon) WHERE min_lat IS NULL OR min_lon IS NULL")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_stream_segments_lower_name "
+               "ON stream_segments(LOWER(name))")
     db.execute(
         """
         CREATE TRIGGER IF NOT EXISTS stream_segments_rtree_ai
@@ -2053,6 +2058,7 @@ def migrate_stream_segments_spatial_index(db: Database) -> None:
             )
             db.conn.commit()
     _ensure_stream_segments_rtree(db)
+    db.execute("SAVEPOINT rebuild_stream_segments_rtree")
     try:
         db.execute("DELETE FROM stream_segments_rtree")
         db.execute(
@@ -2063,9 +2069,11 @@ def migrate_stream_segments_spatial_index(db: Database) -> None:
             "WHERE (min_lon IS NOT NULL OR centroid_lng IS NOT NULL) "
             "  AND (min_lat IS NOT NULL OR centroid_lat IS NOT NULL)"
         )
-        db.conn.commit()
+        db.execute("RELEASE SAVEPOINT rebuild_stream_segments_rtree")
     except Exception:
-        pass
+        db.execute("ROLLBACK TO SAVEPOINT rebuild_stream_segments_rtree")
+        db.execute("RELEASE SAVEPOINT rebuild_stream_segments_rtree")
+        raise
 
 
 MIGRATIONS: tuple[Migration, ...] = (
