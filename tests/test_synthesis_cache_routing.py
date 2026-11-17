@@ -3,17 +3,15 @@
 import pytest
 
 from src.services.synthesis_cache import get_cached_synthesis, store_synthesis
-from src.storage.database import get_db
 
 # ── db fixture ────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture()
-def db_conn(tmp_path):
-    # Real schema (via ensure_schema/migrations), not a hand-rolled CREATE TABLE —
-    # a hand-rolled copy previously drifted from the real schema and would have
-    # silently failed to catch the jurisdiction column being added.
-    return get_db(tmp_path / "test.db")
+def db_conn(fast_db):
+    # Use the real schema: a hand-rolled table previously hid drift when the
+    # jurisdiction column was added.
+    return fast_db
 
 
 # ── location extraction tests (live Haiku calls) ──────────────────────────────

@@ -7,7 +7,6 @@ import pytest
 
 from src.models.reddit_post import RedditPost
 from src.services.reddit import search_reddit_for_agent
-from src.storage.database import get_db
 from src.storage.reddit_posts import upsert_posts
 
 
@@ -42,8 +41,8 @@ def _make_post(
 
 
 @pytest.fixture()
-def populated_db(tmp_path):
-    db = get_db(tmp_path / "test.db")
+def populated_db(fast_db):
+    db = fast_db
     posts = [
         _make_post(
             "p1",

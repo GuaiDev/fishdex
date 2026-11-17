@@ -12,12 +12,11 @@ import pytest
 
 from src.services.context import recompute_user_layer, user_layer
 from src.storage import user_patterns
-from src.storage.database import get_db
 
 
 @pytest.fixture
-def db(tmp_path):
-    return get_db(tmp_path / "patterns.db")
+def db(fast_db):
+    return fast_db
 
 
 def _add_stop(db, *, user_id=1, species=("creek chub",), productive=True, clarity=None):

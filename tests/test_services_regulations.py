@@ -9,7 +9,6 @@ from src.services.regulations import (
     _extract_species_context,
     get_regulations_for_agent,
 )
-from src.storage.database import get_db
 from src.storage.regulations import upsert_regulation_chunks
 
 
@@ -28,9 +27,9 @@ def _make_chunk(zone: int, text: str = "") -> RegulationChunk:
 
 
 @pytest.fixture()
-def populated_db(tmp_path, monkeypatch):
+def populated_db(db_factory, tmp_path, monkeypatch):
     db_path = tmp_path / "test.db"
-    db = get_db(db_path)
+    db = db_factory(db_path)
     chunks = [_make_chunk(z) for z in [5, 16, 20]]
     upsert_regulation_chunks(db, chunks)
     monkeypatch.setattr("src.services.regulations.get_db", lambda: db)
@@ -38,9 +37,9 @@ def populated_db(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def empty_db(tmp_path, monkeypatch):
+def empty_db(db_factory, tmp_path, monkeypatch):
     db_path = tmp_path / "empty.db"
-    db = get_db(db_path)
+    db = db_factory(db_path)
     monkeypatch.setattr("src.services.regulations.get_db", lambda: db)
     return db
 

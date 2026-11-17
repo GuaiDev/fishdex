@@ -12,13 +12,12 @@ import json
 import pytest
 
 from src.services.context.place import _known_place_names, mentions_a_place
-from src.storage.database import get_db
 
 
 @pytest.fixture
-def db(tmp_path):
+def db(fast_db):
     _known_place_names.cache_clear()
-    database = get_db(tmp_path / "router.db")
+    database = fast_db
     database["stream_segments"].insert(
         {
             "ogf_id": 1,

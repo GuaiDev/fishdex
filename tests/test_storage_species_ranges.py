@@ -3,7 +3,6 @@
 import json
 
 from src.models.species_range import SpeciesRange
-from src.storage.database import get_db
 from src.storage.species_ranges import (
     is_species_at_risk,
     query_sar_species,
@@ -13,8 +12,8 @@ from src.storage.species_ranges import (
 )
 
 
-def _make_db(tmp_path):
-    return get_db(tmp_path / "test.db")
+def _make_db(fast_db):
+    return fast_db
 
 
 def _sample_ranges() -> list[SpeciesRange]:
@@ -74,8 +73,8 @@ def _sample_ranges() -> list[SpeciesRange]:
     ]
 
 
-def test_upsert_and_query_exact(tmp_path):
-    db = _make_db(tmp_path)
+def test_upsert_and_query_exact(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     result = query_species_range(db, "Brook Trout")
     assert result is not None
@@ -83,31 +82,31 @@ def test_upsert_and_query_exact(tmp_path):
     assert result.native_to_ontario is True
 
 
-def test_query_case_insensitive(tmp_path):
-    db = _make_db(tmp_path)
+def test_query_case_insensitive(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     result = query_species_range(db, "brook trout")
     assert result is not None
     assert result.species == "Brook Trout"
 
 
-def test_query_partial_match(tmp_path):
-    db = _make_db(tmp_path)
+def test_query_partial_match(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     result = query_species_range(db, "redhorse")
     assert result is not None
     assert "Redhorse" in result.species
 
 
-def test_query_unknown_returns_none(tmp_path):
-    db = _make_db(tmp_path)
+def test_query_unknown_returns_none(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     result = query_species_range(db, "platypus")
     assert result is None
 
 
-def test_upsert_idempotent(tmp_path):
-    db = _make_db(tmp_path)
+def test_upsert_idempotent(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     upsert_species_ranges(db, _sample_ranges())
     result = query_species_range(db, "Smallmouth Bass")
@@ -116,16 +115,16 @@ def test_upsert_idempotent(tmp_path):
     assert count == len(_sample_ranges())
 
 
-def test_jurisdictions_present_roundtrip(tmp_path):
-    db = _make_db(tmp_path)
+def test_jurisdictions_present_roundtrip(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     result = query_species_range(db, "Smallmouth Bass")
     assert isinstance(result.jurisdictions_present, list)
     assert "CA-ON" in result.jurisdictions_present
 
 
-def test_query_sar_returns_only_at_risk(tmp_path):
-    db = _make_db(tmp_path)
+def test_query_sar_returns_only_at_risk(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     sar = query_sar_species(db, "CA-ON")
     names = [s.species for s in sar]
@@ -136,8 +135,8 @@ def test_query_sar_returns_only_at_risk(tmp_path):
     assert "Smallmouth Bass" not in names
 
 
-def test_query_sar_jurisdiction_filter(tmp_path):
-    db = _make_db(tmp_path)
+def test_query_sar_jurisdiction_filter(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     # Redside Dace only has CA-ON; Greater Redhorse has CA-ON and CA-QC
     sar_qc = query_sar_species(db, "CA-QC")
@@ -146,22 +145,22 @@ def test_query_sar_jurisdiction_filter(tmp_path):
     assert "Redside Dace" not in names  # not in CA-QC jurisdictions_present
 
 
-def test_is_species_at_risk_true(tmp_path):
-    db = _make_db(tmp_path)
+def test_is_species_at_risk_true(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     assert is_species_at_risk(db, "Greater Redhorse") is True
     assert is_species_at_risk(db, "redside dace") is True
 
 
-def test_is_species_at_risk_false(tmp_path):
-    db = _make_db(tmp_path)
+def test_is_species_at_risk_false(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     assert is_species_at_risk(db, "Smallmouth Bass") is False
     assert is_species_at_risk(db, "brook trout") is False
 
 
-def test_is_species_at_risk_unknown(tmp_path):
-    db = _make_db(tmp_path)
+def test_is_species_at_risk_unknown(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     assert is_species_at_risk(db, "narwhal") is False
 
@@ -172,8 +171,8 @@ def test_is_species_at_risk_unknown(tmp_path):
 # earlier jurisdiction's jurisdictions_present list and status fields.
 
 
-def test_merged_upsert_unions_jurisdictions_present_for_shared_species(tmp_path):
-    db = _make_db(tmp_path)
+def test_merged_upsert_unions_jurisdictions_present_for_shared_species(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())  # seeds Smallmouth Bass w/ CA-ON, US-MI, US-OH
 
     upsert_species_ranges_merged(
@@ -202,8 +201,8 @@ def test_merged_upsert_unions_jurisdictions_present_for_shared_species(tmp_path)
     assert set(result.jurisdictions_present) == {"CA-ON", "US-MI", "US-OH", "CA-QC"}
 
 
-def test_merged_upsert_preserves_existing_status_fields(tmp_path):
-    db = _make_db(tmp_path)
+def test_merged_upsert_preserves_existing_status_fields(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())  # Smallmouth Bass has ontario_status set
 
     upsert_species_ranges_merged(
@@ -233,8 +232,8 @@ def test_merged_upsert_preserves_existing_status_fields(tmp_path):
     assert row["sara_status"] == "Not at Risk"
 
 
-def test_merged_upsert_appends_general_range_instead_of_replacing(tmp_path):
-    db = _make_db(tmp_path)
+def test_merged_upsert_appends_general_range_instead_of_replacing(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
 
     upsert_species_ranges_merged(
@@ -264,8 +263,8 @@ def test_merged_upsert_appends_general_range_instead_of_replacing(tmp_path):
     assert "Quebec — centroid (47.146, -74.768)" in row["general_range"]
 
 
-def test_merged_upsert_inserts_fresh_row_for_new_species(tmp_path):
-    db = _make_db(tmp_path)
+def test_merged_upsert_inserts_fresh_row_for_new_species(fast_db):
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
 
     upsert_species_ranges_merged(
@@ -295,9 +294,9 @@ def test_merged_upsert_inserts_fresh_row_for_new_species(tmp_path):
     assert result.jurisdictions_present == ["CA-QC"]
 
 
-def test_merged_upsert_does_not_regress_existing_species_count(tmp_path):
+def test_merged_upsert_does_not_regress_existing_species_count(fast_db):
     """A no-op re-ingest of the same jurisdiction must not create duplicate rows."""
-    db = _make_db(tmp_path)
+    db = _make_db(fast_db)
     upsert_species_ranges(db, _sample_ranges())
     before = db["species_ranges"].count
 

@@ -1,27 +1,47 @@
-"""Fixtures shared by the spots and water-body tests: a throwaway database per test."""
+"""Fixtures shared across tests: fast throwaway databases, per test."""
+
+import shutil
+import sqlite3
 
 import pytest
 
+from src.storage.database import get_db, migrate
 
-@pytest.fixture(scope="module")
-def _template_db(tmp_path_factory):
-    """Schema setup costs over a second; build it once and copy the file per test."""
-    from src.storage.database import get_db
 
-    path = tmp_path_factory.mktemp("template") / "template.db"
-    get_db(path).conn.close()
+@pytest.fixture(scope="session")
+def migrated_template_db(tmp_path_factory):
+    """Build the schema once per pytest process (once per worker under xdist)."""
+    path = tmp_path_factory.mktemp("template-session") / "template.db"
+    template = get_db(path)
+    migrate(template)
+    template.conn.close()
+    _auto_migrate["template"] = path
     return path
 
 
+@pytest.fixture(scope="session")
+def _template_db(migrated_template_db):
+    return migrated_template_db
+
+
 @pytest.fixture
-def db(tmp_path, _template_db):
-    import shutil
+def db_factory(migrated_template_db):
+    def copy_database(path):
+        if not path.exists():
+            shutil.copy(migrated_template_db, path)
+        return get_db(path)
 
-    from src.storage.database import get_db
+    return copy_database
 
-    path = tmp_path / "spots.db"
-    shutil.copy(_template_db, path)
-    return get_db(path)
+
+@pytest.fixture
+def db(tmp_path, db_factory):
+    return db_factory(tmp_path / "spots.db")
+
+
+@pytest.fixture
+def fast_db(tmp_path, db_factory):
+    return db_factory(tmp_path / "test.db")
 
 
 @pytest.fixture
@@ -69,13 +89,12 @@ def _no_untapped_cache(monkeypatch, tmp_path):
     monkeypatch.setattr(untapped_potential, "_PARQUET_PATH", tmp_path / "no_untapped.parquet")
 
 
-# `get_db()` only opens the file now; the schema is built by `migrate`, once, at
-# deploy. Tests open a fresh temporary database at nearly every turn and expect
-# the schema to be there, so migrate right after each open, and only when the
-# database is behind (a read when it is not). The patch sits at import time so
-# module-scoped fixtures get it too. A test that needs the bare production
-# behaviour, `get_db()` and nothing else, opts out with `@pytest.mark.raw_db`.
-_auto_migrate = {"on": True}
+# Ordinary tests copy the migrated template instead of running migrations on
+# every open. The import-time connection hook also covers module-scoped fixtures
+# and seeds empty databases opened directly after the template is ready.
+# `raw_db` restores production connection settings and leaves schema setup to
+# the test, so migration tests can exercise the real opening behaviour.
+_auto_migrate = {"on": True, "template": None}
 
 
 def _install_auto_migrate() -> None:
@@ -83,10 +102,30 @@ def _install_auto_migrate() -> None:
 
     real = database._configure_connection
 
+    def _fast_test_pragmas(db):
+        conn = db.conn
+        # Test DBs are disposable; avoid fsync and WAL files for speed.
+        conn.execute("PRAGMA busy_timeout = 5000")
+        try:
+            conn.execute("PRAGMA journal_mode = MEMORY")
+        except Exception:
+            pass
+        conn.execute("PRAGMA synchronous = OFF")
+        conn.execute("PRAGMA temp_store = MEMORY")
+
     def configure_then_migrate(db):
-        real(db)
         if _auto_migrate["on"]:
-            database.migrate(db)
+            _fast_test_pragmas(db)
+        else:
+            real(db)
+        if _auto_migrate["on"]:
+            template = _auto_migrate["template"]
+            if template is not None and not db.table_names():
+                source = sqlite3.connect(template)
+                try:
+                    source.backup(db.conn)
+                finally:
+                    source.close()
 
     database._configure_connection = configure_then_migrate
 
@@ -95,7 +134,7 @@ _install_auto_migrate()
 
 
 @pytest.fixture(autouse=True)
-def _raw_db_opt_out(request):
+def _raw_db_opt_out(request, migrated_template_db):
     if request.node.get_closest_marker("raw_db"):
         _auto_migrate["on"] = False
         yield
@@ -105,15 +144,14 @@ def _raw_db_opt_out(request):
 
 
 @pytest.fixture(autouse=True)
-def _llm_ledger_in_tmp(monkeypatch, tmp_path):
+def _llm_ledger_in_tmp(monkeypatch, tmp_path, db_factory):
     """The gateway writes an `llm_usage` row per call; it must never reach the real database."""
     from src.llm import ledger
-    from src.storage.database import get_db
 
     path = tmp_path / "llm_ledger.db"
 
     def _open():
-        db = get_db(path)
+        db = db_factory(path)
         ledger.create_table(db)
         return db
 

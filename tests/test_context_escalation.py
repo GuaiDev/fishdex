@@ -153,10 +153,9 @@ def test_species_filter_reaches_the_prompt():
 
 
 @pytest.fixture
-def db(tmp_path):
-    from src.storage.database import get_db
+def db(fast_db):
 
-    return get_db(tmp_path / "esc.db")
+    return fast_db
 
 
 def _spy(monkeypatch):

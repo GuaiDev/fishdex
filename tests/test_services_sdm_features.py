@@ -1,7 +1,5 @@
 """Tests for SDM feature matrix helpers. All use synthetic data — no live DB."""
 
-from pathlib import Path
-
 import networkx as nx
 import numpy as np
 
@@ -340,13 +338,10 @@ def _y_network():
     ]
 
 
-def test_build_feature_matrix_integration(tmp_path: Path):
+def test_build_feature_matrix_integration(tmp_path, fast_db):
     from unittest.mock import patch
 
-    from src.storage.database import get_db
-
-    db = get_db(tmp_path / "test.db")
-
+    db = fast_db
     edges = _y_network()
     for start, end, ogf_id, length, clat, clng in edges:
         db["stream_segments"].insert(
@@ -560,8 +555,8 @@ def test_confluence_detection():
     G.add_edge(hub, C, ogf_id=3, length_m=1000.0)
 
     centroids = {
-        1: (43.7, -79.55),   # midpoint A→hub
-        2: (43.75, -79.5),   # midpoint B→hub
+        1: (43.7, -79.55),  # midpoint A→hub
+        2: (43.75, -79.5),  # midpoint B→hub
         3: (43.65, -79.45),  # midpoint hub→C
     }
     strahler = {1: 2, 2: 2, 3: 3}  # two tributaries are order 2+ → real confluence
@@ -641,31 +636,43 @@ def test_confluence_distance():
     assert dists[4] > 10.0  # should be many km away
 
 
-def test_waterbody_proximity(tmp_path):
+def test_waterbody_proximity(fast_db):
     """Segment within 200m of a pond gets connected_to_waterbody=True."""
-    from src.storage.database import get_db
 
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     if "water_features" not in db.table_names():
         db["water_features"].create(
             {
-                "osm_id": str, "feature_type": str, "name": str,
-                "lat": float, "lng": float, "jurisdiction": str,
-                "area_m2": float, "tags": str, "fetched_at": str,
+                "osm_id": str,
+                "feature_type": str,
+                "name": str,
+                "lat": float,
+                "lng": float,
+                "jurisdiction": str,
+                "area_m2": float,
+                "tags": str,
+                "fetched_at": str,
             },
             pk="osm_id",
         )
     # Insert a pond very close to segment 1 (~150m away)
-    db["water_features"].insert({
-        "osm_id": "w1", "feature_type": "pond", "name": "Test Pond",
-        "lat": 43.7013, "lng": -79.5000,   # ~150m north of 43.7, -79.5
-        "jurisdiction": "CA-ON", "area_m2": 5000.0,
-        "tags": "{}", "fetched_at": "2026-01-01T00:00:00",
-    })
+    db["water_features"].insert(
+        {
+            "osm_id": "w1",
+            "feature_type": "pond",
+            "name": "Test Pond",
+            "lat": 43.7013,
+            "lng": -79.5000,  # ~150m north of 43.7, -79.5
+            "jurisdiction": "CA-ON",
+            "area_m2": 5000.0,
+            "tags": "{}",
+            "fetched_at": "2026-01-01T00:00:00",
+        }
+    )
 
     centroids = {
-        1: (43.7, -79.5),     # close to pond
-        2: (43.8, -79.5),     # far from pond (~11km)
+        1: (43.7, -79.5),  # close to pond
+        2: (43.8, -79.5),  # far from pond (~11km)
     }
     dists = _compute_waterbody_proximity(db, centroids)
 

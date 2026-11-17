@@ -13,7 +13,6 @@ from src.services.pins.labels import LINK_RADIUS_M
 from src.services.trip_logger import log_session
 from src.storage import pins as store
 from src.storage.catches import get_personal_best
-from src.storage.database import get_db
 
 HOME = (43.5000, -79.7000)
 # ~100 m north of HOME: inside the link radius.
@@ -33,8 +32,8 @@ def _no_enrichment(monkeypatch):
 
 
 @pytest.fixture()
-def db(tmp_path):
-    return get_db(tmp_path / "test.db")
+def db(fast_db):
+    return fast_db
 
 
 def _stop(point=None, photo=None, species=None, name="Bronte Creek") -> dict:
@@ -412,8 +411,8 @@ def test_map_payload_lists_unpinned_stops_with_their_candidates(db):
     assert [c["pin_id"] for c in stop["candidates"]] == [pin_id]
 
 
-def test_migration_is_idempotent(tmp_path):
-    db = get_db(tmp_path / "again.db")
+def test_migration_is_idempotent(fast_db):
+    db = fast_db
     store.ensure_tables(db)
     store.ensure_tables(db)
     columns = {c.name for c in db["sessions"].columns}

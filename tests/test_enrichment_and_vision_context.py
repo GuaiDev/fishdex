@@ -12,12 +12,11 @@ import pytest
 
 from src.services.context.render import render_logged_stop, render_recorded_insight
 from src.services.context.user import as_recorded_insight
-from src.storage.database import get_db
 
 
 @pytest.fixture
-def db(tmp_path):
-    return get_db(tmp_path / "wiring.db")
+def db(fast_db):
+    return fast_db
 
 
 # -- a logged stop is not a database row ---------------------------------------

@@ -34,21 +34,16 @@ WORLD = (-180.0, -90.0, 180.0, 90.0)
 
 
 @pytest.fixture(scope="module")
-def _template_db(tmp_path_factory):
-    from src.storage.database import get_db
-
-    path = tmp_path_factory.mktemp("filter_template") / "template.db"
-    get_db(path).conn.close()
-    return path
+def _template_db(migrated_template_db):
+    return migrated_template_db
 
 
 @pytest.fixture
-def db(tmp_path, _template_db):
-    from src.storage.database import get_db
+def db(db_factory, tmp_path, _template_db):
 
     path = tmp_path / "filter.db"
     shutil.copy(_template_db, path)
-    db = get_db(path)
+    db = db_factory(path)
     upsert_species_ranges(
         db,
         [

@@ -14,7 +14,6 @@ from unittest.mock import MagicMock, patch
 
 from src.ingest.jurisdictions.ca_sk import stocking
 from src.ingest.jurisdictions.ca_sk.ingest import ingest_sk_stocking
-from src.storage.database import get_db
 
 FIXTURES = Path(__file__).parent / "fixtures"
 _POINTS = json.loads((FIXTURES / "sk_fish_atlas_points.json").read_text())
@@ -84,12 +83,14 @@ def test_unresolved_waterbody_kept_with_null_coords_and_warns(tmp_path, caplog):
     assert "no resolvable coordinates" in " ".join(r.getMessage() for r in caplog.records)
 
 
-def test_service_stores_rows(tmp_path, monkeypatch):
+def test_service_stores_rows(db_factory, tmp_path, monkeypatch):
     db_path = tmp_path / "t.db"
     with patch(_HTTPX, side_effect=_server), patch(_CACHE, tmp_path):
-        monkeypatch.setattr("src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: get_db(db_path))
+        monkeypatch.setattr(
+            "src.ingest.jurisdictions.ca_sk.ingest.get_db", lambda: db_factory(db_path)
+        )
         n = ingest_sk_stocking(52.13, -106.67, radius_km=50)
 
     assert n == 3
-    rows = list(get_db(db_path)["stocking_records"].rows)
+    rows = list(db_factory(db_path)["stocking_records"].rows)
     assert {r["jurisdiction"] for r in rows} == {"CA-SK"}

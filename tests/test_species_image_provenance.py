@@ -69,8 +69,8 @@ def test_unknown_status_is_rejected():
 # ── table ──────────────────────────────────────────────────────────────────
 
 
-def test_table_exists_after_schema_setup_and_round_trips(tmp_path):
-    db = get_db(tmp_path / "t.db")
+def test_table_exists_after_schema_setup_and_round_trips(fast_db):
+    db = fast_db
     assert store.get_species_images(db) == {}
 
     store.replace_species_images(db, [_approved()])
@@ -78,16 +78,16 @@ def test_table_exists_after_schema_setup_and_round_trips(tmp_path):
     assert store.get_species_images(db)["Micropterus dolomieu"] == _approved()
 
 
-def test_replace_drops_species_no_longer_listed(tmp_path):
-    db = get_db(tmp_path / "t.db")
+def test_replace_drops_species_no_longer_listed(fast_db):
+    db = fast_db
     store.replace_species_images(db, [_approved(), _approved(species_id="Esox lucius")])
     store.replace_species_images(db, [_approved()])
 
     assert list(store.get_species_images(db)) == ["Micropterus dolomieu"]
 
 
-def test_images_by_id_resyncs_a_stale_table(tmp_path):
-    db = get_db(tmp_path / "t.db")
+def test_images_by_id_resyncs_a_stale_table(fast_db):
+    db = fast_db
     store.replace_species_images(db, [_approved(species_id="Esox lucius")])
 
     served = service.images_by_id(db)
@@ -144,8 +144,12 @@ def test_selection_naming_an_unknown_species_is_an_error():
 
 
 @pytest.fixture(scope="module")
-def committed(tmp_path_factory) -> dict[str, SpeciesImage]:
-    db = get_db(tmp_path_factory.mktemp("db") / "committed.db")
+def committed(tmp_path_factory, migrated_template_db) -> dict[str, SpeciesImage]:
+    import shutil
+
+    path = tmp_path_factory.mktemp("db") / "committed.db"
+    shutil.copy(migrated_template_db, path)
+    db = get_db(path)
     service.sync_species_images(db)
     return store.get_species_images(db)
 

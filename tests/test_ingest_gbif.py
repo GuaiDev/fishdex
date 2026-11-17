@@ -278,14 +278,13 @@ def test_unparseable_sample_size_does_not_raise():
     assert obs.species  # the rest of the record survived
 
 
-def test_survey_fields_round_trip_through_storage(tmp_path: Path):
-    from src.storage.database import get_db
+def test_survey_fields_round_trip_through_storage(fast_db):
     from src.storage.gbif_observations import (
         query_gbif_observations,
         upsert_gbif_observations,
     )
 
-    db = get_db(tmp_path / "t.db")
+    db = fast_db
     obs = [_parse_observation(r) for r in _survey_records()]
     upsert_gbif_observations(db, obs)
 

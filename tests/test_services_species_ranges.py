@@ -4,7 +4,6 @@ import json
 
 from src.models.species_range import SpeciesRange
 from src.services.species_ranges import _STATUS_SEVERITY, _in_ontario
-from src.storage.database import get_db
 from src.storage.species_ranges import (
     query_sar_species,
     query_species_range,
@@ -12,8 +11,8 @@ from src.storage.species_ranges import (
 )
 
 
-def _seed_db(tmp_path):
-    db = get_db(tmp_path / "test.db")
+def _seed_db(fast_db):
+    db = fast_db
     ranges = [
         SpeciesRange(
             species="Brook Trout",
@@ -64,9 +63,9 @@ def _seed_db(tmp_path):
     return db
 
 
-def _make_service(tmp_path):
+def _make_service(fast_db):
     """Return service functions wired to the test DB."""
-    db = _seed_db(tmp_path)
+    db = _seed_db(fast_db)
 
     def get_range(species, lat=None, lng=None):
         sr = query_species_range(db, species)
@@ -113,15 +112,15 @@ def _make_service(tmp_path):
     return get_range, get_sar
 
 
-def test_unknown_species_returns_not_found(tmp_path):
-    get_range, _ = _make_service(tmp_path)
+def test_unknown_species_returns_not_found(fast_db):
+    get_range, _ = _make_service(fast_db)
     result = json.loads(get_range("platypus"))
     assert result["found"] is False
     assert "note" in result
 
 
-def test_sar_species_returns_sar_alert(tmp_path):
-    get_range, _ = _make_service(tmp_path)
+def test_sar_species_returns_sar_alert(fast_db):
+    get_range, _ = _make_service(fast_db)
     result = json.loads(get_range("Greater Redhorse"))
     assert result["found"] is True
     assert result["sar_alert"] is True
@@ -129,42 +128,42 @@ def test_sar_species_returns_sar_alert(tmp_path):
     assert len(result["handling_guidance"]) > 0
 
 
-def test_non_sar_species_no_alert(tmp_path):
-    get_range, _ = _make_service(tmp_path)
+def test_non_sar_species_no_alert(fast_db):
+    get_range, _ = _make_service(fast_db)
     result = json.loads(get_range("Brook Trout"))
     assert result["found"] is True
     assert result["sar_alert"] is False
 
 
-def test_plausible_in_ontario(tmp_path):
-    get_range, _ = _make_service(tmp_path)
+def test_plausible_in_ontario(fast_db):
+    get_range, _ = _make_service(fast_db)
     # Toronto coords — within Ontario
     result = json.loads(get_range("Brook Trout", lat=43.6532, lng=-79.3832))
     assert result["is_plausible_at_location"] is True
 
 
-def test_not_plausible_outside_ontario(tmp_path):
-    get_range, _ = _make_service(tmp_path)
+def test_not_plausible_outside_ontario(fast_db):
+    get_range, _ = _make_service(fast_db)
     # London, UK — outside Ontario
     result = json.loads(get_range("Brook Trout", lat=51.5074, lng=-0.1278))
     assert result["is_plausible_at_location"] is False
 
 
-def test_plausible_none_when_no_coords(tmp_path):
-    get_range, _ = _make_service(tmp_path)
+def test_plausible_none_when_no_coords(fast_db):
+    get_range, _ = _make_service(fast_db)
     result = json.loads(get_range("Brook Trout"))
     assert result["is_plausible_at_location"] is None
 
 
-def test_get_sar_returns_list(tmp_path):
-    _, get_sar = _make_service(tmp_path)
+def test_get_sar_returns_list(fast_db):
+    _, get_sar = _make_service(fast_db)
     result = json.loads(get_sar("CA-ON"))
     assert result["count"] > 0
     names = [e["species"] for e in result["species_at_risk"]]
     assert "Greater Redhorse" in names
 
 
-def test_get_sar_empty_jurisdiction(tmp_path):
-    _, get_sar = _make_service(tmp_path)
+def test_get_sar_empty_jurisdiction(fast_db):
+    _, get_sar = _make_service(fast_db)
     result = json.loads(get_sar("US-TX"))
     assert result["count"] == 0

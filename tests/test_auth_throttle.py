@@ -6,11 +6,10 @@ from sqlite_utils import Database
 from sqlite_utils.db import Table
 
 from src.auth.auth import get_user_from_token
-from src.storage.database import get_db
 
 
-def _setup(tmp_path):
-    db = get_db(tmp_path / "test.db")
+def _setup(tmp_path, db_factory):
+    db = db_factory(tmp_path / "test.db")
     db["users"].insert(
         {
             "id": 1,
@@ -37,8 +36,8 @@ def _setup(tmp_path):
     return db
 
 
-def test_get_user_from_token_updates_when_stale(tmp_path):
-    db = _setup(tmp_path)
+def test_get_user_from_token_updates_when_stale(tmp_path, db_factory):
+    db = _setup(tmp_path, db_factory)
     old = (datetime.now() - timedelta(minutes=10)).isoformat()
     db["user_sessions"].update(1, {"last_used_at": old})
     db["users"].update(1, {"last_seen_at": old})
@@ -53,8 +52,8 @@ def test_get_user_from_token_updates_when_stale(tmp_path):
     assert db_user["last_seen_at"] != old
 
 
-def test_get_user_from_token_skips_write_within_window(tmp_path):
-    db = _setup(tmp_path)
+def test_get_user_from_token_skips_write_within_window(tmp_path, db_factory):
+    db = _setup(tmp_path, db_factory)
     recent = (datetime.now() - timedelta(minutes=1)).isoformat()
     db["user_sessions"].update(1, {"last_used_at": recent})
     db["users"].update(1, {"last_seen_at": recent})
@@ -69,8 +68,8 @@ def test_get_user_from_token_skips_write_within_window(tmp_path):
     assert db_user["last_seen_at"] == recent
 
 
-def test_concurrent_stale_callers_touch_timestamps_once(tmp_path, monkeypatch):
-    db = _setup(tmp_path)
+def test_concurrent_stale_callers_touch_timestamps_once(tmp_path, monkeypatch, db_factory):
+    db = _setup(tmp_path, db_factory)
     old = (datetime.now() - timedelta(minutes=10)).isoformat()
     db["user_sessions"].update(1, {"last_used_at": old})
     db["users"].update(1, {"last_seen_at": old})

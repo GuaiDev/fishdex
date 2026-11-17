@@ -6,7 +6,6 @@ No model accuracy assertions — outputs are data-dependent.
 
 import json
 import logging
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -19,7 +18,6 @@ from src.services.sdm_training import (
     prepare_species_data,
     train_species_model,
 )
-from src.storage.database import get_db
 
 # ── synthetic helpers ─────────────────────────────────────────────────────────
 
@@ -168,9 +166,9 @@ def _coords_at(df: pd.DataFrame, indices: list[int]) -> list[tuple[float, float]
 # ── prepare_species_data ──────────────────────────────────────────────────────
 
 
-def test_prepare_species_data_loads_presence_records(tmp_path: Path):
+def test_prepare_species_data_loads_presence_records(fast_db):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     _add_obs(db, "Semotilus atromaculatus", _coords_at(df, range(5, 15)))
 
     X, y = prepare_species_data("Semotilus atromaculatus", db, df)
@@ -181,9 +179,9 @@ def test_prepare_species_data_loads_presence_records(tmp_path: Path):
     assert X.index.name == "ogf_id"
 
 
-def test_prepare_species_data_combines_inat_and_gbif(tmp_path: Path):
+def test_prepare_species_data_combines_inat_and_gbif(fast_db):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     _add_obs(db, "Perca flavescens", _coords_at(df, range(5, 10)))  # 5 iNat
     _add_gbif(db, "Perca flavescens", _coords_at(df, range(20, 25)))  # 5 GBIF
 
@@ -193,7 +191,7 @@ def test_prepare_species_data_combines_inat_and_gbif(tmp_path: Path):
     assert len(X) >= 5
 
 
-def test_prepare_species_data_includes_trip_log_only_species(tmp_path: Path):
+def test_prepare_species_data_includes_trip_log_only_species(fast_db):
     """Trip-log catches alone produce presence rows — the query's output survives.
 
     tests/test_trip_log_sdm.py proves the trip-log query selects the right
@@ -202,8 +200,7 @@ def test_prepare_species_data_includes_trip_log_only_species(tmp_path: Path):
     result, so an empty X means the handoff is broken rather than the query.
     """
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
-
+    db = fast_db
     caught_at = [30, 31, 32]
     for lat, lng in _coords_at(df, caught_at):
         _add_trip_log_stop(db, ["creek chub"], lat, lng)
@@ -230,11 +227,10 @@ def test_prepare_species_data_includes_trip_log_only_species(tmp_path: Path):
     assert X.index.name == "ogf_id"
 
 
-def test_prepare_species_data_stocking_exclusion(tmp_path: Path):
+def test_prepare_species_data_stocking_exclusion(fast_db):
     df = _make_features().copy()
     df.loc[df["ogf_id"] <= 15, "is_stocked_within_5yr"] = True
-    db = get_db(tmp_path / "test.db")
-
+    db = fast_db
     # Observations on stocked segments + clean segments
     stocked_coords = _coords_at(df, range(0, 8))
     clean_coords = _coords_at(df, range(30, 38))
@@ -249,19 +245,18 @@ def test_prepare_species_data_stocking_exclusion(tmp_path: Path):
     assert not any(df.loc[df["ogf_id"].isin(X_with.index), "is_stocked_within_5yr"])
 
 
-def test_prepare_species_data_no_records_returns_empty(tmp_path: Path):
+def test_prepare_species_data_no_records_returns_empty(fast_db):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
-
+    db = fast_db
     X, y = prepare_species_data("Ghost fish", db, df)
 
     assert len(X) == 0
     assert len(y) == 0
 
 
-def test_prepare_species_data_bass_pooling(tmp_path: Path):
+def test_prepare_species_data_bass_pooling(fast_db):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # Add records for both Micropterus species
     _add_obs(db, "Micropterus nigricans", _coords_at(df, range(5, 10)))
     _add_obs(db, "Micropterus salmoides", _coords_at(df, range(20, 25)))
@@ -276,9 +271,9 @@ def test_prepare_species_data_bass_pooling(tmp_path: Path):
 # ── generate_pseudo_absences ──────────────────────────────────────────────────
 
 
-def test_generate_pseudo_absences_ratio(tmp_path: Path):
+def test_generate_pseudo_absences_ratio(fast_db):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # Background observations on many segments
     _add_obs(db, "Other fish", _coords_at(df, range(0, _N)))
 
@@ -290,9 +285,9 @@ def test_generate_pseudo_absences_ratio(tmp_path: Path):
     assert len(absences) > 0
 
 
-def test_generate_pseudo_absences_no_target_species_overlap(tmp_path: Path):
+def test_generate_pseudo_absences_no_target_species_overlap(fast_db):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     _add_obs(db, "Background fish", _coords_at(df, range(0, 40)))
 
     presence_ids = [1, 2, 3, 4, 5]
@@ -302,9 +297,9 @@ def test_generate_pseudo_absences_no_target_species_overlap(tmp_path: Path):
     assert not (set(absences) & set(presence_ids))
 
 
-def test_generate_pseudo_absences_min_distance_buffer(tmp_path: Path):
+def test_generate_pseudo_absences_min_distance_buffer(fast_db):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # Background observations across all segments
     _add_obs(db, "Background", _coords_at(df, range(0, _N)))
 
@@ -323,9 +318,9 @@ def test_generate_pseudo_absences_min_distance_buffer(tmp_path: Path):
         assert dist > 0.09, f"Absence {abs_id} too close to presence"
 
 
-def test_generate_pseudo_absences_no_background_returns_empty(tmp_path: Path):
+def test_generate_pseudo_absences_no_background_returns_empty(fast_db):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # No background observations at all
     presence_ids = [1, 2, 3]
     absences = generate_pseudo_absences(presence_ids, df, db)
@@ -335,9 +330,9 @@ def test_generate_pseudo_absences_no_background_returns_empty(tmp_path: Path):
 # ── train_species_model (smoke tests) ────────────────────────────────────────
 
 
-def _setup_smoke_db(tmp_path: Path, df: pd.DataFrame, species: str) -> object:
+def _setup_smoke_db(fast_db, df: pd.DataFrame, species: str) -> object:
     """Create a test DB with 20 presence records and a background population."""
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # 20 presence records for target species
     _add_obs(db, species, _coords_at(df, range(10, 30)))
     # Background observations (many other species + locations)
@@ -346,9 +341,9 @@ def _setup_smoke_db(tmp_path: Path, df: pd.DataFrame, species: str) -> object:
     return db
 
 
-def test_train_species_model_smoke(tmp_path: Path):
+def test_train_species_model_smoke(fast_db):
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, "Semotilus atromaculatus")
+    db = _setup_smoke_db(fast_db, df, "Semotilus atromaculatus")
 
     result = train_species_model("Semotilus atromaculatus", db, df)
 
@@ -365,9 +360,9 @@ def test_train_species_model_smoke(tmp_path: Path):
     assert "model" in result
 
 
-def test_train_species_model_auc_returned(tmp_path: Path):
+def test_train_species_model_auc_returned(fast_db):
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, "Perca flavescens")
+    db = _setup_smoke_db(fast_db, df, "Perca flavescens")
 
     result = train_species_model("Perca flavescens", db, df)
 
@@ -377,9 +372,9 @@ def test_train_species_model_auc_returned(tmp_path: Path):
     assert result["spatial_cv_folds_used"] >= 0
 
 
-def test_train_species_model_feature_importances_sum_to_one(tmp_path: Path):
+def test_train_species_model_feature_importances_sum_to_one(fast_db):
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, "Lepomis gibbosus")
+    db = _setup_smoke_db(fast_db, df, "Lepomis gibbosus")
 
     result = train_species_model("Lepomis gibbosus", db, df)
 
@@ -391,9 +386,9 @@ def test_train_species_model_feature_importances_sum_to_one(tmp_path: Path):
     assert abs(total - 1.0) < 1e-5, f"Importances sum to {total}, expected ~1.0"
 
 
-def test_train_species_model_raises_on_insufficient_data(tmp_path: Path):
+def test_train_species_model_raises_on_insufficient_data(fast_db):
     df = _make_features()
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     # Only 3 presence records — below threshold
     _add_obs(db, "Rare fish", _coords_at(df, range(5, 8)))
 
@@ -404,9 +399,9 @@ def test_train_species_model_raises_on_insufficient_data(tmp_path: Path):
 # ── predict_all_segments ─────────────────────────────────────────────────────
 
 
-def test_predict_all_segments_returns_series(tmp_path: Path):
+def test_predict_all_segments_returns_series(fast_db):
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, "Catostomus commersonii")
+    db = _setup_smoke_db(fast_db, df, "Catostomus commersonii")
 
     result = train_species_model("Catostomus commersonii", db, df)
     preds = predict_all_segments(result, df)
@@ -416,9 +411,9 @@ def test_predict_all_segments_returns_series(tmp_path: Path):
     assert preds.index.name == "ogf_id"
 
 
-def test_predict_all_segments_values_in_0_1(tmp_path: Path):
+def test_predict_all_segments_values_in_0_1(fast_db):
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, "Ambloplites rupestris")
+    db = _setup_smoke_db(fast_db, df, "Ambloplites rupestris")
 
     result = train_species_model("Ambloplites rupestris", db, df)
     preds = predict_all_segments(result, df)
@@ -426,7 +421,7 @@ def test_predict_all_segments_values_in_0_1(tmp_path: Path):
     assert preds.between(0.0, 1.0).all(), "Some probabilities outside [0, 1]"
 
 
-def test_calibration_improves_the_brier_score(tmp_path: Path):
+def test_calibration_improves_the_brier_score(fast_db):
     """Calibration is worth having only if the probabilities get better.
 
     This replaces an assertion that fewer than 5% of predictions sat at
@@ -450,7 +445,7 @@ def test_calibration_improves_the_brier_score(tmp_path: Path):
 
     species = "Etheostoma caeruleum"
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, species)
+    db = _setup_smoke_db(fast_db, df, species)
 
     X_pres, _ = prepare_species_data(species, db, df)
     absence_ids = generate_pseudo_absences(X_pres.index.tolist(), df, db, ratio=2)
@@ -470,7 +465,7 @@ def test_calibration_improves_the_brier_score(tmp_path: Path):
     )
 
 
-def test_calibrated_probabilities_are_monotonic_in_the_raw_score(tmp_path: Path):
+def test_calibrated_probabilities_are_monotonic_in_the_raw_score(fast_db):
     """Calibration may rescale the ranking, never reverse it.
 
     Isotonic regression is monotonic by construction, so a violation here
@@ -484,7 +479,7 @@ def test_calibrated_probabilities_are_monotonic_in_the_raw_score(tmp_path: Path)
 
     species = "Etheostoma caeruleum"
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, species)
+    db = _setup_smoke_db(fast_db, df, species)
 
     X_pres, _ = prepare_species_data(species, db, df)
     absence_ids = generate_pseudo_absences(X_pres.index.tolist(), df, db, ratio=2)
@@ -578,9 +573,9 @@ def test_spatial_cv_reports_partial_evaluation():
         assert f"{res.folds_used}/4" in res.describe()
 
 
-def test_train_species_model_carries_the_cv_reason(tmp_path: Path):
+def test_train_species_model_carries_the_cv_reason(fast_db):
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, "Ambloplites rupestris")
+    db = _setup_smoke_db(fast_db, df, "Ambloplites rupestris")
 
     result = train_species_model("Ambloplites rupestris", db, df)
 
@@ -596,16 +591,16 @@ def test_train_species_model_carries_the_cv_reason(tmp_path: Path):
 # ── feature-set drift must not predict silently ───────────────────────────────
 
 
-def test_model_records_the_feature_set_it_was_trained_on(tmp_path: Path):
+def test_model_records_the_feature_set_it_was_trained_on(fast_db):
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, "Culaea inconstans")
+    db = _setup_smoke_db(fast_db, df, "Culaea inconstans")
 
     result = train_species_model("Culaea inconstans", db, df)
 
     assert result["features"] == list(_ALL_FEATURES)
 
 
-def test_predict_refuses_a_model_trained_on_other_features(tmp_path: Path):
+def test_predict_refuses_a_model_trained_on_other_features(fast_db):
     """The regression this guards.
 
     Nine models sat on disk trained with length_m in the feature set. Removing
@@ -616,7 +611,7 @@ def test_predict_refuses_a_model_trained_on_other_features(tmp_path: Path):
     from src.services.sdm_training import predict_all_segments
 
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, "Etheostoma caeruleum")
+    db = _setup_smoke_db(fast_db, df, "Etheostoma caeruleum")
     result = train_species_model("Etheostoma caeruleum", db, df)
 
     # a model from before the change: trained with one extra feature
@@ -626,13 +621,13 @@ def test_predict_refuses_a_model_trained_on_other_features(tmp_path: Path):
         predict_all_segments(result, df)
 
 
-def test_predict_warns_on_a_model_with_no_feature_record(tmp_path: Path, caplog):
+def test_predict_warns_on_a_model_with_no_feature_record(fast_db, caplog):
     """Models saved before feature tracking cannot be checked. That is a third
     state -- not verified, not known-bad -- and it is said out loud."""
     from src.services.sdm_training import predict_all_segments
 
     df = _make_features()
-    db = _setup_smoke_db(tmp_path, df, "Perca flavescens")
+    db = _setup_smoke_db(fast_db, df, "Perca flavescens")
     result = train_species_model("Perca flavescens", db, df)
     result.pop("features")
 

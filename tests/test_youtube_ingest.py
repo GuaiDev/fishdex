@@ -1,6 +1,5 @@
 """Tests for YouTube transcript ingest module. No real API calls."""
 
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -12,7 +11,6 @@ from src.ingest.community.youtube_ingest import (
     ingest_query,
     search_knowledge,
 )
-from src.storage.database import get_db
 
 # --- Pure unit tests (no DB, no network) ---
 
@@ -58,9 +56,7 @@ def test_fetch_transcript_no_transcript(monkeypatch):
 
     mock_list = MagicMock()
     mock_list.find_manually_created_transcript.side_effect = Exception("no manual")
-    mock_list.find_generated_transcript.side_effect = NoTranscriptFound(
-        "vid", ["en"], {}
-    )
+    mock_list.find_generated_transcript.side_effect = NoTranscriptFound("vid", ["en"], {})
 
     def fake_list(self, video_id):
         return mock_list
@@ -77,8 +73,8 @@ def test_fetch_transcript_no_transcript(monkeypatch):
 
 
 @pytest.fixture
-def tmp_db(tmp_path: Path):
-    return get_db(tmp_path / "test.db")
+def tmp_db(fast_db):
+    return fast_db
 
 
 def test_ingest_deduplication(tmp_db, monkeypatch):
@@ -123,9 +119,7 @@ def test_ingest_no_transcript_skipped(tmp_db, monkeypatch):
     monkeypatch.setattr(
         "src.ingest.community.youtube_ingest.search_youtube", lambda q, max_results: [video]
     )
-    monkeypatch.setattr(
-        "src.ingest.community.youtube_ingest.fetch_transcript", lambda vid: None
-    )
+    monkeypatch.setattr("src.ingest.community.youtube_ingest.fetch_transcript", lambda vid: None)
     monkeypatch.setenv("YOUTUBE_API_KEY", "fake-key")
 
     result = ingest_query("test", tmp_db, max_videos=1)

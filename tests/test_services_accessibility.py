@@ -1,7 +1,6 @@
 """Tests for access score computation. All use synthetic data — no live calls."""
 
 import json
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -18,7 +17,6 @@ from src.services.accessibility import (
     compute_access_scores,
 )
 from src.services.untapped_potential import _access_note
-from src.storage.database import get_db
 
 # ── synthetic helpers ─────────────────────────────────────────────────────────
 
@@ -119,15 +117,15 @@ def test_park_modifier_values():
     assert _PARK_MODIFIERS["Wilderness"] == pytest.approx(-0.4)
 
 
-def test_park_index_empty_db(tmp_path: Path):
-    db = get_db(tmp_path / "test.db")
+def test_park_index_empty_db(fast_db):
+    db = fast_db
     tree, data = _build_park_index(db)
     assert tree is None
     assert data == []
 
 
-def test_park_containment_recreational(tmp_path: Path):
-    db = get_db(tmp_path / "test.db")
+def test_park_containment_recreational(fast_db):
+    db = fast_db
     # Segment inside a Recreational park
     seg_lat, seg_lng = 43.65, -79.38
     _insert_park(db, "park_rec", "Recreational", seg_lat, seg_lng)
@@ -138,8 +136,8 @@ def test_park_containment_recreational(tmp_path: Path):
     assert mods[0] == pytest.approx(0.3)
 
 
-def test_park_containment_wilderness(tmp_path: Path):
-    db = get_db(tmp_path / "test.db")
+def test_park_containment_wilderness(fast_db):
+    db = fast_db
     seg_lat, seg_lng = 43.70, -79.40
     _insert_park(db, "park_wild", "Wilderness", seg_lat, seg_lng)
 
@@ -149,8 +147,8 @@ def test_park_containment_wilderness(tmp_path: Path):
     assert mods[0] == pytest.approx(-0.4)
 
 
-def test_park_outside_polygon_gets_zero(tmp_path: Path):
-    db = get_db(tmp_path / "test.db")
+def test_park_outside_polygon_gets_zero(fast_db):
+    db = fast_db
     # Park far from segment
     _insert_park(db, "park_far", "Recreational", 45.0, -75.0)
 
@@ -224,11 +222,11 @@ def test_road_proximity_uses_parking_as_proxy():
 # ── full compute_access_scores test ──────────────────────────────────────────
 
 
-def test_compute_access_scores_output_range(tmp_path: Path, monkeypatch):
+def test_compute_access_scores_output_range(tmp_path, fast_db, monkeypatch):
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(30)
     scores = compute_access_scores(db, fm)
     assert len(scores) == 30
@@ -236,11 +234,11 @@ def test_compute_access_scores_output_range(tmp_path: Path, monkeypatch):
     assert scores.max() <= 1.0
 
 
-def test_compute_access_scores_fishing_spot_beats_no_access(tmp_path: Path, monkeypatch):
+def test_compute_access_scores_fishing_spot_beats_no_access(tmp_path, fast_db, monkeypatch):
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(10)
 
     # Put a fishing spot right next to segment 1 (43.5, -80.0)
@@ -252,11 +250,11 @@ def test_compute_access_scores_fishing_spot_beats_no_access(tmp_path: Path, monk
     assert scores.iloc[0] > scores.iloc[9]
 
 
-def test_compute_access_scores_nature_reserve_penalizes(tmp_path: Path, monkeypatch):
+def test_compute_access_scores_nature_reserve_penalizes(tmp_path, fast_db, monkeypatch):
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(5)
 
     seg0_lat, seg0_lng = fm.iloc[0]["centroid_lat"], fm.iloc[0]["centroid_lng"]
@@ -271,11 +269,11 @@ def test_compute_access_scores_nature_reserve_penalizes(tmp_path: Path, monkeypa
     assert scores.iloc[1] > scores.iloc[0]
 
 
-def test_compute_access_scores_writes_parquet(tmp_path: Path, monkeypatch):
+def test_compute_access_scores_writes_parquet(tmp_path, fast_db, monkeypatch):
     import src.services.accessibility as acc_mod
 
     monkeypatch.setattr(acc_mod, "_PARQUET_PATH", tmp_path / "access_scores.parquet")
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     fm = _make_feature_matrix(5)
     compute_access_scores(db, fm)
     assert (tmp_path / "access_scores.parquet").exists()
@@ -290,20 +288,29 @@ def _insert_crown_land(db, crown_id: str, lat: float, lng: float) -> None:
     from shapely.wkt import dumps as wkt_dumps
 
     d = 0.01  # ~1km square
-    poly = Polygon([
-        (lng - d, lat - d), (lng + d, lat - d),
-        (lng + d, lat + d), (lng - d, lat + d),
-        (lng - d, lat - d),
-    ])
+    poly = Polygon(
+        [
+            (lng - d, lat - d),
+            (lng + d, lat - d),
+            (lng + d, lat + d),
+            (lng - d, lat + d),
+            (lng - d, lat - d),
+        ]
+    )
     bounds = poly.bounds
     centroid = poly.centroid
     if "crown_land" not in db.table_names():
         db["crown_land"].create(
             {
-                "crown_id": str, "land_use_type": str, "geom_wkt": str,
-                "centroid_lat": float, "centroid_lng": float,
-                "bbox_minx": float, "bbox_miny": float,
-                "bbox_maxx": float, "bbox_maxy": float,
+                "crown_id": str,
+                "land_use_type": str,
+                "geom_wkt": str,
+                "centroid_lat": float,
+                "centroid_lng": float,
+                "bbox_minx": float,
+                "bbox_miny": float,
+                "bbox_maxx": float,
+                "bbox_maxy": float,
                 "fetched_at": str,
             },
             pk="crown_id",
@@ -315,17 +322,19 @@ def _insert_crown_land(db, crown_id: str, lat: float, lng: float) -> None:
             "geom_wkt": wkt_dumps(poly),
             "centroid_lat": centroid.y,
             "centroid_lng": centroid.x,
-            "bbox_minx": bounds[0], "bbox_miny": bounds[1],
-            "bbox_maxx": bounds[2], "bbox_maxy": bounds[3],
+            "bbox_minx": bounds[0],
+            "bbox_miny": bounds[1],
+            "bbox_maxx": bounds[2],
+            "bbox_maxy": bounds[3],
             "fetched_at": "2026-01-01T00:00:00",
         },
         replace=True,
     )
 
 
-def test_crown_land_pip(tmp_path: Path):
+def test_crown_land_pip(fast_db):
     """Segment centroid inside a crown land polygon gets is_crown_land=True."""
-    db = get_db(tmp_path / "test.db")
+    db = fast_db
     inside_lat, inside_lng = 43.75, -79.75
     outside_lat, outside_lng = 43.50, -79.50
     _insert_crown_land(db, "cl_1", inside_lat, inside_lng)
@@ -333,13 +342,15 @@ def test_crown_land_pip(tmp_path: Path):
     tree, geoms = _build_crown_index(db)
     assert tree is not None
 
-    coords = np.array([
-        [inside_lat, inside_lng],
-        [outside_lat, outside_lng],
-    ])
+    coords = np.array(
+        [
+            [inside_lat, inside_lng],
+            [outside_lat, outside_lng],
+        ]
+    )
     flags = _vectorized_crown_flag(tree, geoms, coords)
-    assert flags[0] is True or flags[0] == 1   # inside → True
-    assert not flags[1]                          # outside → False
+    assert flags[0] is True or flags[0] == 1  # inside → True
+    assert not flags[1]  # outside → False
 
 
 def test_access_note_crown_land():

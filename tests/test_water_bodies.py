@@ -1286,15 +1286,11 @@ def test_geometry_false_returns_the_same_waters_as_the_full_answer(lake_client, 
     assert lean["meta"]["type_counts"] == full["meta"]["type_counts"]
 
 
-def test_bbox_still_uses_the_real_outline_when_geometry_is_not_sent(tmp_path, _template_db):
+def test_bbox_still_uses_the_real_outline_when_geometry_is_not_sent(fast_db):
     """A box that overlaps the stored box but misses the line is out, with or without shapes."""
-    import shutil
-
-    from src.storage.database import get_db
     from src.storage.water_bodies import write_water_bodies
 
-    shutil.copy(_template_db, tmp_path / "l.db")
-    db = get_db(tmp_path / "l.db")
+    db = fast_db
     # An L-shaped river: its box covers the corner nobody can fish.
     l_shape = {"type": "LineString", "coordinates": [[-80.0, 44.0], [-80.0, 43.0], [-79.0, 43.0]]}
     write_water_bodies(

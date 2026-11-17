@@ -17,10 +17,9 @@ class _Profile:
 
 
 @pytest.fixture
-def db(tmp_path, monkeypatch):
-    from src.storage.database import get_db
+def db(fast_db, monkeypatch):
 
-    database = get_db(tmp_path / "tools.db")
+    database = fast_db
     monkeypatch.setattr(tools, "get_db", lambda: database)
     # describe_place must never fire a live search or a live weather fetch.
     from src.models.context import EmptyReason
@@ -139,9 +138,7 @@ def test_describe_place_does_not_include_live_conditions(db):
 # -- write paths ---------------------------------------------------------------
 
 
-def test_recording_an_insight_reports_related_ones_without_a_second_tool(
-    db, monkeypatch
-):
+def test_recording_an_insight_reports_related_ones_without_a_second_tool(db, monkeypatch):
     """The conflict check moved inside the write, so it cannot be skipped."""
     calls = {"checked": False}
 
@@ -149,9 +146,7 @@ def test_recording_an_insight_reports_related_ones_without_a_second_tool(
         calls["checked"] = True
         return json.dumps({"conflicts": []})
 
-    monkeypatch.setattr(
-        "src.services.insights.check_conflicts_for_agent_service", _check
-    )
+    monkeypatch.setattr("src.services.insights.check_conflicts_for_agent_service", _check)
     monkeypatch.setattr(
         "src.services.insights.record_behavioral_insight_for_agent",
         lambda **kwargs: json.dumps({"ok": True}),
@@ -206,8 +201,6 @@ def test_a_failing_conflict_check_does_not_block_the_write(db, monkeypatch):
 
 
 def test_dismiss_segment_still_works(db):
-    out = json.loads(
-        tools.execute_tool("dismiss_segment", {"ogf_id": 42, "reason": "private"})
-    )
+    out = json.loads(tools.execute_tool("dismiss_segment", {"ogf_id": 42, "reason": "private"}))
     assert out["success"] is True
     assert out["ogf_id"] == 42

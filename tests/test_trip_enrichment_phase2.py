@@ -15,15 +15,14 @@ import pytest
 
 from src.models.stream_gauge import NearestGauge, StreamGaugeReading
 from src.services import trip_enrichment_conditions as tec
-from src.storage.database import get_db
 
 FIXTURES = Path(__file__).parent / "fixtures"
 weather = importlib.import_module("src.ingest.global.weather")
 
 
 @pytest.fixture
-def db(tmp_path):
-    return get_db(path=tmp_path / "test.db")
+def db(db_factory, tmp_path):
+    return db_factory(path=tmp_path / "test.db")
 
 
 @pytest.fixture

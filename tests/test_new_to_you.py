@@ -38,21 +38,16 @@ DACE = ("Clinostomus elongatus", "Redside Dace")
 
 
 @pytest.fixture(scope="module")
-def _template_db(tmp_path_factory):
-    from src.storage.database import get_db
-
-    path = tmp_path_factory.mktemp("n2y_template") / "template.db"
-    get_db(path).conn.close()
-    return path
+def _template_db(migrated_template_db):
+    return migrated_template_db
 
 
 @pytest.fixture
-def db(tmp_path, _template_db):
-    from src.storage.database import get_db
+def db(db_factory, tmp_path, _template_db):
 
     path = tmp_path / "n2y.db"
     shutil.copy(_template_db, path)
-    db = get_db(path)
+    db = db_factory(path)
     upsert_species_ranges(
         db,
         [

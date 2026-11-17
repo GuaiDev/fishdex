@@ -5,34 +5,45 @@ import pytest
 from src.models.species_range import SpeciesRange
 from src.services.fishdex import get_fishdex_data
 from src.storage.catches import insert_catch, update_personal_best_if_higher
-from src.storage.database import get_db
 from src.storage.species_ranges import upsert_species_ranges
 
 
 def _session_and_stop(db, user_id=1):
     session_id = db["sessions"].insert({"date": "2026-06-01"}).last_pk
-    stop_id = db["stops"].insert({
-        "session_id": session_id,
-        "location_text": "Bronte Creek",
-        "species_caught": "[]",
-    }).last_pk
+    stop_id = (
+        db["stops"]
+        .insert(
+            {
+                "session_id": session_id,
+                "location_text": "Bronte Creek",
+                "species_caught": "[]",
+            }
+        )
+        .last_pk
+    )
     return session_id, stop_id
 
 
-def test_no_catches_returns_empty_caught_species(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_no_catches_returns_empty_caught_species(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     data = get_fishdex_data(db, user_id=1, jurisdiction="CA-ON")
     assert data["caughtSpecies"] == []
 
 
-def test_caught_species_aggregates_count_and_family(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_caught_species_aggregates_count_and_family(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     session_id, stop_id = _session_and_stop(db)
 
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="creek chub")
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="creek chub")
-    insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="rock bass",
-                 photo_url="/photos/rockbass.jpg")
+    insert_catch(
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="rock bass",
+        photo_url="/photos/rockbass.jpg",
+    )
 
     data = get_fishdex_data(db, user_id=1, jurisdiction="CA-ON")
     by_name = {c["commonName"]: c for c in data["caughtSpecies"]}
@@ -47,8 +58,8 @@ def test_caught_species_aggregates_count_and_family(tmp_path):
     assert by_name["Rock Bass"]["representativePhotoUrl"] == "/photos/rockbass.jpg"
 
 
-def test_catch_with_no_photo_has_none_representative_photo(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_catch_with_no_photo_has_none_representative_photo(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
 
@@ -56,8 +67,8 @@ def test_catch_with_no_photo_has_none_representative_photo(tmp_path):
     assert data["caughtSpecies"][0]["representativePhotoUrl"] is None
 
 
-def test_no_size_data_never_fabricates_personal_best(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_no_size_data_never_fabricates_personal_best(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
 
@@ -67,11 +78,15 @@ def test_no_size_data_never_fabricates_personal_best(tmp_path):
     assert catch["maxLengthInches"] is None
 
 
-def test_personal_best_from_stored_table_reported_in_inches(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_personal_best_from_stored_table_reported_in_inches(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     session_id, stop_id = _session_and_stop(db)
     catch_id = insert_catch(
-        db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass",
+        db,
+        stop_id=stop_id,
+        session_id=session_id,
+        user_id=1,
+        species="smallmouth bass",
         biggest_size_cm=35.56,
     )
     update_personal_best_if_higher(
@@ -84,20 +99,29 @@ def test_personal_best_from_stored_table_reported_in_inches(tmp_path):
     assert catch["maxLengthInches"] == pytest.approx(14.0, abs=0.01)
 
 
-def test_region_pool_filters_by_jurisdiction_and_carries_family(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
-    upsert_species_ranges(db, [
-        SpeciesRange(
-            species="Smallmouth Bass", scientific_name="Micropterus dolomieu",
-            native_to_ontario=True, native_to_great_lakes=True,
-            general_range="Ontario", jurisdictions_present=["CA-ON"],
-        ),
-        SpeciesRange(
-            species="Some BC Fish", scientific_name="Nonexistent fishium",
-            native_to_ontario=False, native_to_great_lakes=False,
-            general_range="BC", jurisdictions_present=["CA-BC"],
-        ),
-    ])
+def test_region_pool_filters_by_jurisdiction_and_carries_family(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
+    upsert_species_ranges(
+        db,
+        [
+            SpeciesRange(
+                species="Smallmouth Bass",
+                scientific_name="Micropterus dolomieu",
+                native_to_ontario=True,
+                native_to_great_lakes=True,
+                general_range="Ontario",
+                jurisdictions_present=["CA-ON"],
+            ),
+            SpeciesRange(
+                species="Some BC Fish",
+                scientific_name="Nonexistent fishium",
+                native_to_ontario=False,
+                native_to_great_lakes=False,
+                general_range="BC",
+                jurisdictions_present=["CA-BC"],
+            ),
+        ],
+    )
 
     data = get_fishdex_data(db, user_id=1, jurisdiction="CA-ON")
     pool_names = {s["commonName"] for s in data["regionSpeciesPool"]}
@@ -109,15 +133,21 @@ def test_region_pool_filters_by_jurisdiction_and_carries_family(tmp_path):
     assert bass["familyCommonName"] == "Bass & Sunfish"
 
 
-def test_caught_species_uses_canonical_capitalization_from_pool(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
-    upsert_species_ranges(db, [
-        SpeciesRange(
-            species="Smallmouth Bass", scientific_name="Micropterus dolomieu",
-            native_to_ontario=True, native_to_great_lakes=True,
-            general_range="Ontario", jurisdictions_present=["CA-ON"],
-        ),
-    ])
+def test_caught_species_uses_canonical_capitalization_from_pool(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
+    upsert_species_ranges(
+        db,
+        [
+            SpeciesRange(
+                species="Smallmouth Bass",
+                scientific_name="Micropterus dolomieu",
+                native_to_ontario=True,
+                native_to_great_lakes=True,
+                general_range="Ontario",
+                jurisdictions_present=["CA-ON"],
+            ),
+        ],
+    )
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
 
@@ -127,17 +157,24 @@ def test_caught_species_uses_canonical_capitalization_from_pool(tmp_path):
 
 def _range(common, sci):
     return SpeciesRange(
-        species=common, scientific_name=sci, native_to_ontario=True,
-        native_to_great_lakes=True, general_range="Ontario", jurisdictions_present=["CA-ON"],
+        species=common,
+        scientific_name=sci,
+        native_to_ontario=True,
+        native_to_great_lakes=True,
+        general_range="Ontario",
+        jurisdictions_present=["CA-ON"],
     )
 
 
-def test_every_species_carries_one_image_shape(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
-    upsert_species_ranges(db, [
-        _range("Smallmouth Bass", "Micropterus dolomieu"),
-        _range("Northern Pike", "Esox lucius"),
-    ])
+def test_every_species_carries_one_image_shape(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
+    upsert_species_ranges(
+        db,
+        [
+            _range("Smallmouth Bass", "Micropterus dolomieu"),
+            _range("Northern Pike", "Esox lucius"),
+        ],
+    )
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="northern pike")
@@ -148,12 +185,17 @@ def test_every_species_carries_one_image_shape(tmp_path):
         assert set(entry["image"]) == {"url", "thumbUrl", "status", "creator", "licence"}
 
 
-def test_species_with_an_approved_image_gets_it_and_the_rest_get_the_placeholder(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
-    upsert_species_ranges(db, [
-        _range("Smallmouth Bass", "Micropterus dolomieu"),
-        _range("Northern Pike", "Esox lucius"),
-    ])
+def test_species_with_an_approved_image_gets_it_and_the_rest_get_the_placeholder(
+    db_factory, tmp_path
+):
+    db = db_factory(path=tmp_path / "test.db")
+    upsert_species_ranges(
+        db,
+        [
+            _range("Smallmouth Bass", "Micropterus dolomieu"),
+            _range("Northern Pike", "Esox lucius"),
+        ],
+    )
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="northern pike")
@@ -176,8 +218,8 @@ def test_species_with_an_approved_image_gets_it_and_the_rest_get_the_placeholder
     assert pike["creator"] is None and pike["licence"] is None
 
 
-def test_a_catch_the_species_list_does_not_know_gets_the_placeholder(tmp_path):
-    db = get_db(path=tmp_path / "test.db")
+def test_a_catch_the_species_list_does_not_know_gets_the_placeholder(db_factory, tmp_path):
+    db = db_factory(path=tmp_path / "test.db")
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="mystery fish")
 
@@ -186,10 +228,10 @@ def test_a_catch_the_species_list_does_not_know_gets_the_placeholder(tmp_path):
     assert image["status"] == "placeholder"
 
 
-def test_every_image_url_points_at_a_file_the_static_mount_serves(tmp_path):
+def test_every_image_url_points_at_a_file_the_static_mount_serves(db_factory, tmp_path):
     from pathlib import Path
 
-    db = get_db(path=tmp_path / "test.db")
+    db = db_factory(path=tmp_path / "test.db")
     upsert_species_ranges(db, [_range("Smallmouth Bass", "Micropterus dolomieu")])
     session_id, stop_id = _session_and_stop(db)
     insert_catch(db, stop_id=stop_id, session_id=session_id, user_id=1, species="smallmouth bass")

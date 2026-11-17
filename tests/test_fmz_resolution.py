@@ -10,26 +10,34 @@ import json
 
 import pytest
 
-from src.storage.database import get_db
 from src.storage.fmz_boundaries import boundary_count, resolve_zone
 
 OAKVILLE = (43.4675, -79.6877)
 
 
 @pytest.fixture
-def db(tmp_path):
-    return get_db(tmp_path / "fmz.db")
+def db(fast_db):
+    return fast_db
 
 
 def _add_zone(db, zone, name, minx, miny, maxx, maxy):
-    db["fmz_boundaries"].upsert({
-        "zone": zone, "zone_name": name, "jurisdiction": "CA-ON",
-        "geom_wkt": (
-            f"POLYGON(({minx} {miny}, {maxx} {miny}, {maxx} {maxy}, "
-            f"{minx} {maxy}, {minx} {miny}))"
-        ),
-        "bbox_minx": minx, "bbox_miny": miny, "bbox_maxx": maxx, "bbox_maxy": maxy,
-    }, pk="zone", alter=True)
+    db["fmz_boundaries"].upsert(
+        {
+            "zone": zone,
+            "zone_name": name,
+            "jurisdiction": "CA-ON",
+            "geom_wkt": (
+                f"POLYGON(({minx} {miny}, {maxx} {miny}, {maxx} {maxy}, "
+                f"{minx} {maxy}, {minx} {miny}))"
+            ),
+            "bbox_minx": minx,
+            "bbox_miny": miny,
+            "bbox_maxx": maxx,
+            "bbox_maxy": maxy,
+        },
+        pk="zone",
+        alter=True,
+    )
 
 
 def test_no_boundaries_loaded_refuses_rather_than_guessing(db):
@@ -59,14 +67,23 @@ def test_bbox_hit_without_polygon_containment_still_refuses(db):
     That conflation is exactly what the old rectangle table did.
     """
     # An L-shaped zone whose bounding box covers Oakville but whose polygon does not.
-    db["fmz_boundaries"].upsert({
-        "zone": 5, "zone_name": "Elsewhere", "jurisdiction": "CA-ON",
-        "geom_wkt": (
-            "POLYGON((-80.0 43.2, -79.0 43.2, -79.0 43.3, -79.9 43.3, "
-            "-79.9 44.0, -80.0 44.0, -80.0 43.2))"
-        ),
-        "bbox_minx": -80.0, "bbox_miny": 43.2, "bbox_maxx": -79.0, "bbox_maxy": 44.0,
-    }, pk="zone", alter=True)
+    db["fmz_boundaries"].upsert(
+        {
+            "zone": 5,
+            "zone_name": "Elsewhere",
+            "jurisdiction": "CA-ON",
+            "geom_wkt": (
+                "POLYGON((-80.0 43.2, -79.0 43.2, -79.0 43.3, -79.9 43.3, "
+                "-79.9 44.0, -80.0 44.0, -80.0 43.2))"
+            ),
+            "bbox_minx": -80.0,
+            "bbox_miny": 43.2,
+            "bbox_maxx": -79.0,
+            "bbox_maxy": 44.0,
+        },
+        pk="zone",
+        alter=True,
+    )
     r = resolve_zone(db, *OAKVILLE)
     assert not r.resolved, "a bounding-box hit is not containment"
 

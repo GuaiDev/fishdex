@@ -15,7 +15,6 @@ from src.services.trip_parser import (
     parse_trip_from_text,
     resolve_location,
 )
-from src.storage.database import get_db
 
 
 def _mock_client(payload: dict) -> MagicMock:
@@ -163,9 +162,9 @@ def test_snap_to_segment_called_with_parsed_coords(mock_get_client):
 
 
 @pytest.fixture
-def db_conn(tmp_path):
+def db_conn(db_factory, tmp_path):
     """Test DB seeded with a handful of realistic Ontario stream segments."""
-    db = get_db(path=tmp_path / "test.db")
+    db = db_factory(path=tmp_path / "test.db")
     db["stream_segments"].insert_all(
         [
             {  # Credit River near Streetsville
