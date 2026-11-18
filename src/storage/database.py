@@ -1985,7 +1985,7 @@ def _ensure_stream_segments_rtree(db: Database) -> None:
         """
         CREATE TRIGGER IF NOT EXISTS stream_segments_rtree_ai
         AFTER INSERT ON stream_segments BEGIN
-            INSERT INTO stream_segments_rtree(id, min_lon, max_lon, min_lat, max_lat)
+            INSERT OR REPLACE INTO stream_segments_rtree(id, min_lon, max_lon, min_lat, max_lat)
             VALUES (new.rowid, COALESCE(new.min_lon, new.centroid_lng),
                     COALESCE(new.max_lon, new.centroid_lng),
                     COALESCE(new.min_lat, new.centroid_lat),
