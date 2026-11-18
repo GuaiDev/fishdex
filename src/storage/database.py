@@ -879,8 +879,6 @@ def _create_baseline_schema(db: Database) -> None:
         db["stream_segments"].create_index(["name"], if_not_exists=True)
         db["stream_segments"].create_index(["start_node"], if_not_exists=True)
         db["stream_segments"].create_index(["end_node"], if_not_exists=True)
-    _ensure_stream_segments_rtree(db)
-
     if "barriers" not in db.table_names():
         db["barriers"].create(
             {

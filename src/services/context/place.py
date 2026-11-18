@@ -278,6 +278,7 @@ def _named_segment(
     """
     if "stream_segments" not in db.table_names():
         return None
+    # Name lookup scales with names, not radius; the R*Tree-backed radius query is the indexed path covered by the latency target.
     indexed = any(row[1] == "idx_stream_segments_lower_name" for row in
                   db.execute("PRAGMA index_list(stream_segments)").fetchall())
     index_hint = " INDEXED BY idx_stream_segments_lower_name" if indexed else ""
