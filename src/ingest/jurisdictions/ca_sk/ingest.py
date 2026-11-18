@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 SK_OGF_ID_OFFSET = 30000000000
 
 
-
 def ingest_sk_hydro_network(
     lat: float,
     lon: float,

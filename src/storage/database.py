@@ -1920,15 +1920,20 @@ class Migration:
 # migrations were numbered; every step is idempotent, so a database that predates
 # this table simply runs them all once and records that it did.
 
+
 def _stream_segment_spatial_from_wkt(geom_wkt: str | None) -> dict:
     number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
     pairs = re.findall(rf"(?:\(|,)\s*({number})\s+({number})", geom_wkt or "")
     if not pairs:
-        return dict.fromkeys(("min_lon", "max_lon", "min_lat", "max_lat", "centroid_lat", "centroid_lng"))
+        return dict.fromkeys(
+            ("min_lon", "max_lon", "min_lat", "max_lat", "centroid_lat", "centroid_lng")
+        )
     lngs, lats = zip(*((float(lng), float(lat)) for lng, lat in pairs))
     return {
-        "min_lon": min(lngs), "max_lon": max(lngs),
-        "min_lat": min(lats), "max_lat": max(lats),
+        "min_lon": min(lngs),
+        "max_lon": max(lngs),
+        "min_lat": min(lats),
+        "max_lat": max(lats),
         "centroid_lat": sum(lats) / len(lats),
         "centroid_lng": sum(lngs) / len(lngs),
     }
@@ -1937,13 +1942,17 @@ def _stream_segment_spatial_from_wkt(geom_wkt: str | None) -> dict:
 def _stream_segment_spatial(row) -> dict | None:
     """Derive bbox and centroid for a stream_segments row from its WKT/centroid."""
     if isinstance(row, dict):
-        def _get(k): return row.get(k)
+
+        def _get(k):
+            return row.get(k)
     else:
+
         def _get(k):
             try:
                 return row[k]
             except Exception:
                 return None
+
     spatial = _stream_segment_spatial_from_wkt(_get("geom_wkt"))
     if spatial["centroid_lat"] is not None:
         return spatial
@@ -1952,9 +1961,12 @@ def _stream_segment_spatial(row) -> dict | None:
         try:
             clat_f, clng_f = float(clat), float(clng)
             return {
-                "min_lon": clng_f, "max_lon": clng_f,
-                "min_lat": clat_f, "max_lat": clat_f,
-                "centroid_lat": clat_f, "centroid_lng": clng_f,
+                "min_lon": clng_f,
+                "max_lon": clng_f,
+                "min_lat": clat_f,
+                "max_lat": clat_f,
+                "centroid_lat": clat_f,
+                "centroid_lng": clng_f,
             }
         except Exception:
             return None
@@ -1970,10 +1982,13 @@ def _ensure_stream_segments_rtree(db: Database) -> None:
         "CREATE VIRTUAL TABLE IF NOT EXISTS stream_segments_rtree "
         "USING rtree(id, min_lon, max_lon, min_lat, max_lat)"
     )
-    db.execute("CREATE INDEX IF NOT EXISTS idx_stream_segments_missing_spatial "
-               "ON stream_segments(min_lat, min_lon) WHERE min_lat IS NULL OR min_lon IS NULL")
-    db.execute("CREATE INDEX IF NOT EXISTS idx_stream_segments_lower_name "
-               "ON stream_segments(LOWER(name))")
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_segments_missing_spatial "
+        "ON stream_segments(min_lat, min_lon) WHERE min_lat IS NULL OR min_lon IS NULL"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_segments_lower_name ON stream_segments(LOWER(name))"
+    )
     db.execute(
         """
         CREATE TRIGGER IF NOT EXISTS stream_segments_rtree_ai
@@ -2016,9 +2031,12 @@ def migrate_stream_segments_spatial_index(db: Database) -> None:
         return
     cols = {c.name for c in db["stream_segments"].columns}
     for col, decl in [
-        ("min_lon", "REAL"), ("max_lon", "REAL"),
-        ("min_lat", "REAL"), ("max_lat", "REAL"),
-        ("centroid_lat", "REAL"), ("centroid_lng", "REAL"),
+        ("min_lon", "REAL"),
+        ("max_lon", "REAL"),
+        ("min_lat", "REAL"),
+        ("max_lat", "REAL"),
+        ("centroid_lat", "REAL"),
+        ("centroid_lng", "REAL"),
     ]:
         if col not in cols:
             try:
@@ -2028,19 +2046,33 @@ def migrate_stream_segments_spatial_index(db: Database) -> None:
     cols = {c.name for c in db["stream_segments"].columns}
     needed = {"min_lon", "max_lon", "min_lat", "max_lat", "centroid_lat", "centroid_lng"}
     if needed.issubset(cols):
-        rows = list(db.execute(
-            "SELECT rowid, ogf_id, geom_wkt, centroid_lat, centroid_lng, min_lon, min_lat, max_lon, max_lat "
-            "FROM stream_segments"
-        ).fetchall())
+        rows = list(
+            db.execute(
+                "SELECT rowid, ogf_id, geom_wkt, centroid_lat, centroid_lng, "
+                "min_lon, min_lat, max_lon, max_lat "
+                "FROM stream_segments"
+            ).fetchall()
+        )
         updates = []
         for _rowid, ogf_id, geom_wkt, clat, clng, min_lon, min_lat, max_lon, max_lat in rows:
             if None not in (min_lon, min_lat, max_lon, max_lat, clat, clng):
                 continue
-            sp = _stream_segment_spatial({"geom_wkt": geom_wkt, "centroid_lat": clat, "centroid_lng": clng})
+            sp = _stream_segment_spatial(
+                {"geom_wkt": geom_wkt, "centroid_lat": clat, "centroid_lng": clng}
+            )
             if not sp:
                 continue
-            updates.append((sp["min_lon"], sp["max_lon"], sp["min_lat"], sp["max_lat"],
-                            sp["centroid_lat"], sp["centroid_lng"], ogf_id))
+            updates.append(
+                (
+                    sp["min_lon"],
+                    sp["max_lon"],
+                    sp["min_lat"],
+                    sp["max_lat"],
+                    sp["centroid_lat"],
+                    sp["centroid_lng"],
+                    ogf_id,
+                )
+            )
         if updates:
             db.conn.executemany(
                 "UPDATE stream_segments SET min_lon=?, max_lon=?, min_lat=?, max_lat=?, "

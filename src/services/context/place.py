@@ -58,9 +58,7 @@ def resolve(
     return None
 
 
-_COORD_RE = re.compile(
-    r"(-?\d{1,3}\.\d{3,})\s*[,/ ]\s*(-?\d{1,3}\.\d{3,})"
-)
+_COORD_RE = re.compile(r"(-?\d{1,3}\.\d{3,})\s*[,/ ]\s*(-?\d{1,3}\.\d{3,})")
 
 
 @lru_cache(maxsize=4)
@@ -240,9 +238,7 @@ def _from_name(db: Database, query: str, radius_km: float, user_id: int) -> Plac
 # ── lookups ───────────────────────────────────────────────────────────────────
 
 
-def _user_logged_place(
-    db: Database, pattern: str, user_id: int
-) -> tuple[float, float, str] | None:
+def _user_logged_place(db: Database, pattern: str, user_id: int) -> tuple[float, float, str] | None:
     if "stops" not in db.table_names():
         return None
     rows = list(
@@ -261,9 +257,7 @@ def _user_logged_place(
     return float(lat), float(lng), str(name)
 
 
-def _named_segment(
-    db: Database, pattern: str
-) -> tuple[float, float, str, int, int] | None:
+def _named_segment(db: Database, pattern: str) -> tuple[float, float, str, int, int] | None:
     """Nearest matching watercourse, plus how many others share the name.
 
     Ontario has several Sixteen Mile Creeks. Taking the first row the database
@@ -278,15 +272,20 @@ def _named_segment(
     """
     if "stream_segments" not in db.table_names():
         return None
-    # Name lookup scales with names, not radius; the R*Tree-backed radius query is the indexed path covered by the latency target.
-    indexed = any(row[1] == "idx_stream_segments_lower_name" for row in
-                  db.execute("PRAGMA index_list(stream_segments)").fetchall())
+    # Name lookup scales with names, not radius; the R*Tree-backed radius query is the indexed path
+    # covered by the latency target.
+    indexed = any(
+        row[1] == "idx_stream_segments_lower_name"
+        for row in db.execute("PRAGMA index_list(stream_segments)").fetchall()
+    )
     index_hint = " INDEXED BY idx_stream_segments_lower_name" if indexed else ""
-    rows = list(db.query(
-        f"SELECT * FROM stream_segments{index_hint} "
-        "WHERE LOWER(name) LIKE :pattern AND name IS NOT NULL ORDER BY rowid LIMIT 500",
-        {"pattern": pattern},
-    ))
+    rows = list(
+        db.query(
+            f"SELECT * FROM stream_segments{index_hint} "
+            "WHERE LOWER(name) LIKE :pattern AND name IS NOT NULL ORDER BY rowid LIMIT 500",
+            {"pattern": pattern},
+        )
+    )
 
     candidates: list[tuple[float, float, str, int]] = []
     for row in rows:
@@ -315,9 +314,7 @@ def _named_segment(
     # same watercourse at the scale this app works at.
     chosen = candidates[0]
     others = sum(
-        1
-        for c in candidates
-        if abs(c[0] - chosen[0]) > 0.25 or abs(c[1] - chosen[1]) > 0.25
+        1 for c in candidates if abs(c[0] - chosen[0]) > 0.25 or abs(c[1] - chosen[1]) > 0.25
     )
     if others == 0 and len(distinct_names) > 1:
         others = len(distinct_names) - 1
@@ -386,7 +383,9 @@ def segments_near(db: Database, lat: float, lng: float, radius_km: float) -> lis
         if ogf_id in seen:
             return False
         if clat is None or clng is None:
-            clat, clng = _segment_centroid({"geom_wkt": geom_wkt, "centroid_lat": clat, "centroid_lng": clng})
+            clat, clng = _segment_centroid(
+                {"geom_wkt": geom_wkt, "centroid_lat": clat, "centroid_lng": clng}
+            )
         if clat is None or clng is None:
             return False
         if abs(float(clat) - lat) <= deg and abs(float(clng) - lng) <= deg:

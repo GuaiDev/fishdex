@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 MB_OGF_ID_OFFSET = 20000000000
 
 
-
 def ingest_mb_hydro_network(
     lat: float,
     lon: float,

@@ -24,7 +24,6 @@ from src.storage.database import _stream_segment_spatial_from_wkt, get_db
 logger = logging.getLogger(__name__)
 
 
-
 def ingest_bc_hydro_network(
     lat: float,
     lon: float,

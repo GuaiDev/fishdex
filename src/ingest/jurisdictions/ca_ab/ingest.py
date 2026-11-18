@@ -93,7 +93,6 @@ def ingest_ab_hydro_network(
     return len(segments), 0
 
 
-
 def ingest_ab_regulations() -> int:
     """Fetch Alberta fishing regulations. Returns chunk count (currently 0 — stub)."""
     _mod = importlib.import_module("src.ingest.jurisdictions.ca_ab.regulations")
