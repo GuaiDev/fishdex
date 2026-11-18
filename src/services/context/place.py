@@ -58,9 +58,7 @@ def resolve(
     return None
 
 
-_COORD_RE = re.compile(
-    r"(-?\d{1,3}\.\d{3,})\s*[,/ ]\s*(-?\d{1,3}\.\d{3,})"
-)
+_COORD_RE = re.compile(r"(-?\d{1,3}\.\d{3,})\s*[,/ ]\s*(-?\d{1,3}\.\d{3,})")
 
 
 @lru_cache(maxsize=4)
@@ -240,9 +238,7 @@ def _from_name(db: Database, query: str, radius_km: float, user_id: int) -> Plac
 # ── lookups ───────────────────────────────────────────────────────────────────
 
 
-def _user_logged_place(
-    db: Database, pattern: str, user_id: int
-) -> tuple[float, float, str] | None:
+def _user_logged_place(db: Database, pattern: str, user_id: int) -> tuple[float, float, str] | None:
     if "stops" not in db.table_names():
         return None
     rows = list(
@@ -261,9 +257,7 @@ def _user_logged_place(
     return float(lat), float(lng), str(name)
 
 
-def _named_segment(
-    db: Database, pattern: str
-) -> tuple[float, float, str, int, int] | None:
+def _named_segment(db: Database, pattern: str) -> tuple[float, float, str, int, int] | None:
     """Nearest matching watercourse, plus how many others share the name.
 
     Ontario has several Sixteen Mile Creeks. Taking the first row the database
@@ -278,9 +272,18 @@ def _named_segment(
     """
     if "stream_segments" not in db.table_names():
         return None
+    # Name lookup scales with names, not radius; the R*Tree-backed radius query is the indexed path
+    # covered by the latency target.
+    indexed = any(
+        row[1] == "idx_stream_segments_lower_name"
+        for row in db.execute("PRAGMA index_list(stream_segments)").fetchall()
+    )
+    index_hint = " INDEXED BY idx_stream_segments_lower_name" if indexed else ""
     rows = list(
-        db["stream_segments"].rows_where(
-            "LOWER(name) LIKE ? AND name IS NOT NULL", [pattern], limit=500
+        db.query(
+            f"SELECT * FROM stream_segments{index_hint} "
+            "WHERE LOWER(name) LIKE :pattern AND name IS NOT NULL ORDER BY rowid LIMIT 500",
+            {"pattern": pattern},
         )
     )
 
@@ -311,9 +314,7 @@ def _named_segment(
     # same watercourse at the scale this app works at.
     chosen = candidates[0]
     others = sum(
-        1
-        for c in candidates
-        if abs(c[0] - chosen[0]) > 0.25 or abs(c[1] - chosen[1]) > 0.25
+        1 for c in candidates if abs(c[0] - chosen[0]) > 0.25 or abs(c[1] - chosen[1]) > 0.25
     )
     if others == 0 and len(distinct_names) > 1:
         others = len(distinct_names) - 1
@@ -355,27 +356,72 @@ def _named_water_feature(db: Database, pattern: str) -> tuple[float, float, str]
 _MAX_SEGMENTS_PER_PLACE = 500
 
 
+def _stream_segments_have_rtree(db: Database) -> bool:
+    return "stream_segments_rtree" in db.table_names()
+
+
 def segments_near(db: Database, lat: float, lng: float, radius_km: float) -> list[int]:
     """OHN segment IDs whose centroid falls within radius_km.
 
-    Ontario holds ~309k segments, so the bounding box is pushed into SQL rather
-    than scanned in Python. Segments store geometry as WKT with no centroid
-    columns, so the prefilter runs on the first vertex encoded in the WKT
-    string, then Python confirms against the true averaged centroid.
+    Ontario holds ~309k segments, so the bbox filter is pushed into the
+    `stream_segments_rtree` spatial index (filled at ingest, keyed by the
+    segment rowid). Candidates from the index are confirmed against the stored
+    true centroid, so the result matches a full scan. When the R*Tree has not
+    been built yet, or rows lack spatial columns, falls back to scanning
+    centroids derived from stored geometry rather than dropping candidates.
     """
     if "stream_segments" not in db.table_names():
         return []
     deg = radius_km / _KM_PER_DEGREE
+    min_lat, max_lat = lat - deg, lat + deg
+    min_lng, max_lng = lng - deg, lng + deg
 
     out: list[int] = []
+    seen: set[int] = set()
+
+    def _consider(ogf_id: int, clat, clng, geom_wkt=None) -> bool:
+        if ogf_id in seen:
+            return False
+        if clat is None or clng is None:
+            clat, clng = _segment_centroid(
+                {"geom_wkt": geom_wkt, "centroid_lat": clat, "centroid_lng": clng}
+            )
+        if clat is None or clng is None:
+            return False
+        if abs(float(clat) - lat) <= deg and abs(float(clng) - lng) <= deg:
+            seen.add(ogf_id)
+            out.append(ogf_id)
+            return len(out) >= _MAX_SEGMENTS_PER_PLACE
+        return False
+
+    if _stream_segments_have_rtree(db):
+        rows = db.execute(
+            "SELECT s.rowid, s.ogf_id, s.centroid_lat, s.centroid_lng, s.geom_wkt "
+            "FROM stream_segments_rtree r "
+            "JOIN stream_segments s ON s.rowid = r.id "
+            "WHERE r.max_lon >= ? AND r.min_lon <= ? "
+            "  AND r.max_lat >= ? AND r.min_lat <= ? "
+            "  AND s.min_lat IS NOT NULL AND s.min_lon IS NOT NULL "
+            "UNION ALL "
+            "SELECT rowid, ogf_id, centroid_lat, centroid_lng, geom_wkt "
+            "FROM stream_segments INDEXED BY idx_stream_segments_missing_spatial "
+            "WHERE min_lat IS NULL OR min_lon IS NULL "
+            "ORDER BY 1",
+            (min_lng, max_lng, min_lat, max_lat),
+        ).fetchall()
+        for _, ogf_id, clat, clng, geom_wkt in rows:
+            if ogf_id is not None and _consider(int(ogf_id), clat, clng, geom_wkt):
+                return out
+        return out
+        return out
+
     for row in db["stream_segments"].rows_where("ogf_id IS NOT NULL", []):
         clat, clng = _segment_centroid(row)
-        if clat is None or clng is None:
+        ogf_id = row.get("ogf_id")
+        if ogf_id is None:
             continue
-        if abs(clat - lat) <= deg and abs(clng - lng) <= deg:
-            out.append(int(row["ogf_id"]))
-            if len(out) >= _MAX_SEGMENTS_PER_PLACE:
-                break
+        if _consider(int(ogf_id), clat, clng, row.get("geom_wkt")):
+            break
     return out
 
 

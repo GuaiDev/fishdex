@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -866,13 +867,19 @@ def _create_baseline_schema(db: Database) -> None:
                 "end_node": str,
                 "jurisdiction": str,
                 "ingested_at": str,
+                # Spatial columns filled at ingest from geom_wkt; feed the R*Tree.
+                "min_lon": float,
+                "max_lon": float,
+                "min_lat": float,
+                "max_lat": float,
+                "centroid_lat": float,
+                "centroid_lng": float,
             },
             pk="ogf_id",
         )
         db["stream_segments"].create_index(["name"], if_not_exists=True)
         db["stream_segments"].create_index(["start_node"], if_not_exists=True)
         db["stream_segments"].create_index(["end_node"], if_not_exists=True)
-
     if "barriers" not in db.table_names():
         db["barriers"].create(
             {
@@ -1912,6 +1919,186 @@ class Migration:
 # as a new step at the end. Version 1 is everything the app created before
 # migrations were numbered; every step is idempotent, so a database that predates
 # this table simply runs them all once and records that it did.
+
+
+def _stream_segment_spatial_from_wkt(geom_wkt: str | None) -> dict:
+    number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+    pairs = re.findall(rf"(?:\(|,)\s*({number})\s+({number})", geom_wkt or "")
+    if not pairs:
+        return dict.fromkeys(
+            ("min_lon", "max_lon", "min_lat", "max_lat", "centroid_lat", "centroid_lng")
+        )
+    lngs, lats = zip(*((float(lng), float(lat)) for lng, lat in pairs))
+    return {
+        "min_lon": min(lngs),
+        "max_lon": max(lngs),
+        "min_lat": min(lats),
+        "max_lat": max(lats),
+        "centroid_lat": sum(lats) / len(lats),
+        "centroid_lng": sum(lngs) / len(lngs),
+    }
+
+
+def _stream_segment_spatial(row) -> dict | None:
+    """Derive bbox and centroid for a stream_segments row from its WKT/centroid."""
+    if isinstance(row, dict):
+
+        def _get(k):
+            return row.get(k)
+    else:
+
+        def _get(k):
+            try:
+                return row[k]
+            except Exception:
+                return None
+
+    spatial = _stream_segment_spatial_from_wkt(_get("geom_wkt"))
+    if spatial["centroid_lat"] is not None:
+        return spatial
+    clat, clng = _get("centroid_lat"), _get("centroid_lng")
+    if clat is not None and clng is not None:
+        try:
+            clat_f, clng_f = float(clat), float(clng)
+            return {
+                "min_lon": clng_f,
+                "max_lon": clng_f,
+                "min_lat": clat_f,
+                "max_lat": clat_f,
+                "centroid_lat": clat_f,
+                "centroid_lng": clng_f,
+            }
+        except Exception:
+            return None
+    return None
+
+
+def _ensure_stream_segments_rtree(db: Database) -> None:
+    """Create the stream_segments R*Tree companion and sync triggers. Idempotent."""
+    if "stream_segments" not in db.table_names():
+        return
+    # hydro_segments is a separate graph table keyed to its own rowids.
+    db.execute(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS stream_segments_rtree "
+        "USING rtree(id, min_lon, max_lon, min_lat, max_lat)"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_segments_missing_spatial "
+        "ON stream_segments(min_lat, min_lon) WHERE min_lat IS NULL OR min_lon IS NULL"
+    )
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_stream_segments_lower_name ON stream_segments(LOWER(name))"
+    )
+    db.execute(
+        """
+        CREATE TRIGGER IF NOT EXISTS stream_segments_rtree_ai
+        AFTER INSERT ON stream_segments BEGIN
+            INSERT OR REPLACE INTO stream_segments_rtree(id, min_lon, max_lon, min_lat, max_lat)
+            VALUES (new.rowid, COALESCE(new.min_lon, new.centroid_lng),
+                    COALESCE(new.max_lon, new.centroid_lng),
+                    COALESCE(new.min_lat, new.centroid_lat),
+                    COALESCE(new.max_lat, new.centroid_lat));
+        END
+        """
+    )
+    db.execute(
+        """
+        CREATE TRIGGER IF NOT EXISTS stream_segments_rtree_au
+        AFTER UPDATE OF min_lon, max_lon, min_lat, max_lat, centroid_lat, centroid_lng
+        ON stream_segments BEGIN
+            DELETE FROM stream_segments_rtree WHERE id = old.rowid;
+            INSERT INTO stream_segments_rtree(id, min_lon, max_lon, min_lat, max_lat)
+            VALUES (new.rowid, COALESCE(new.min_lon, new.centroid_lng),
+                    COALESCE(new.max_lon, new.centroid_lng),
+                    COALESCE(new.min_lat, new.centroid_lat),
+                    COALESCE(new.max_lat, new.centroid_lat));
+        END
+        """
+    )
+    db.execute(
+        """
+        CREATE TRIGGER IF NOT EXISTS stream_segments_rtree_ad
+        AFTER DELETE ON stream_segments BEGIN
+            DELETE FROM stream_segments_rtree WHERE id = old.rowid;
+        END
+        """
+    )
+
+
+def migrate_stream_segments_spatial_index(db: Database) -> None:
+    """Add bbox/centroid columns and R*Tree to stream_segments and backfill. Idempotent."""
+    if "stream_segments" not in db.table_names():
+        return
+    cols = {c.name for c in db["stream_segments"].columns}
+    for col, decl in [
+        ("min_lon", "REAL"),
+        ("max_lon", "REAL"),
+        ("min_lat", "REAL"),
+        ("max_lat", "REAL"),
+        ("centroid_lat", "REAL"),
+        ("centroid_lng", "REAL"),
+    ]:
+        if col not in cols:
+            try:
+                db.execute(f"ALTER TABLE stream_segments ADD COLUMN {col} {decl}")
+            except Exception:
+                pass
+    cols = {c.name for c in db["stream_segments"].columns}
+    needed = {"min_lon", "max_lon", "min_lat", "max_lat", "centroid_lat", "centroid_lng"}
+    if needed.issubset(cols):
+        rows = list(
+            db.execute(
+                "SELECT rowid, ogf_id, geom_wkt, centroid_lat, centroid_lng, "
+                "min_lon, min_lat, max_lon, max_lat "
+                "FROM stream_segments"
+            ).fetchall()
+        )
+        updates = []
+        for _rowid, ogf_id, geom_wkt, clat, clng, min_lon, min_lat, max_lon, max_lat in rows:
+            if None not in (min_lon, min_lat, max_lon, max_lat, clat, clng):
+                continue
+            sp = _stream_segment_spatial(
+                {"geom_wkt": geom_wkt, "centroid_lat": clat, "centroid_lng": clng}
+            )
+            if not sp:
+                continue
+            updates.append(
+                (
+                    sp["min_lon"],
+                    sp["max_lon"],
+                    sp["min_lat"],
+                    sp["max_lat"],
+                    sp["centroid_lat"],
+                    sp["centroid_lng"],
+                    ogf_id,
+                )
+            )
+        if updates:
+            db.conn.executemany(
+                "UPDATE stream_segments SET min_lon=?, max_lon=?, min_lat=?, max_lat=?, "
+                "centroid_lat=?, centroid_lng=? WHERE ogf_id=?",
+                updates,
+            )
+            db.conn.commit()
+    _ensure_stream_segments_rtree(db)
+    db.execute("SAVEPOINT rebuild_stream_segments_rtree")
+    try:
+        db.execute("DELETE FROM stream_segments_rtree")
+        db.execute(
+            "INSERT INTO stream_segments_rtree(id, min_lon, max_lon, min_lat, max_lat) "
+            "SELECT rowid, COALESCE(min_lon, centroid_lng), COALESCE(max_lon, centroid_lng), "
+            "COALESCE(min_lat, centroid_lat), COALESCE(max_lat, centroid_lat) "
+            "FROM stream_segments "
+            "WHERE (min_lon IS NOT NULL OR centroid_lng IS NOT NULL) "
+            "  AND (min_lat IS NOT NULL OR centroid_lat IS NOT NULL)"
+        )
+        db.execute("RELEASE SAVEPOINT rebuild_stream_segments_rtree")
+    except Exception:
+        db.execute("ROLLBACK TO SAVEPOINT rebuild_stream_segments_rtree")
+        db.execute("RELEASE SAVEPOINT rebuild_stream_segments_rtree")
+        raise
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "baseline_schema", _create_baseline_schema),
     Migration(2, "catches_species_confirmation", migrate_catches_species_confirmation),
@@ -1946,6 +2133,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(27, "hydro_segments", _ensure_hydro_segments),
     Migration(28, "llm_usage", _ensure_llm_usage),
     Migration(29, "ingest_runs", migrate_ingest_runs),
+    Migration(30, "stream_segments_spatial_index", migrate_stream_segments_spatial_index),
 )
 
 assert [m.version for m in MIGRATIONS] == list(range(1, len(MIGRATIONS) + 1))

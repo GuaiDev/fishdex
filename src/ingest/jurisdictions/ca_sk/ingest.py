@@ -17,7 +17,7 @@ from datetime import datetime
 
 from src.jurisdictions.plugin import AreaContext
 from src.services.ingest_runs import record_counts
-from src.storage.database import get_db
+from src.storage.database import _stream_segment_spatial_from_wkt, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,7 @@ def ingest_sk_hydro_network(
             "jurisdiction": s.jurisdiction,
             "segment_source": s.segment_source,
             "ingested_at": now,
+            **_stream_segment_spatial_from_wkt(s.geom_wkt),
         }
         for s in segments
     ]
