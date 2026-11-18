@@ -19,7 +19,7 @@ import networkx as nx
 
 from src.models.hydrology import ConnectivityResult, HydroBarrier, StreamSegment
 from src.services.ingest_runs import record_counts
-from src.storage.database import get_db
+from src.storage.database import _stream_segment_spatial_from_wkt, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -455,32 +455,6 @@ def find_connected_tributaries_for_agent(
     )
 
 
-
-def _stream_segment_spatial_from_wkt(geom_wkt: str | None) -> dict:
-    """Compute bbox/centroid columns for a stream_segments row from its WKT."""
-    if not geom_wkt:
-        return {"min_lon": None, "max_lon": None, "min_lat": None, "max_lat": None,
-                "centroid_lat": None, "centroid_lng": None}
-    try:
-        inner = geom_wkt[geom_wkt.index("(") + 1 : geom_wkt.rindex(")")].strip("() ")
-        pts = [p.strip() for p in inner.split(",") if p.strip()]
-        lngs, lats = [], []
-        for p in pts:
-            parts = p.split()
-            if len(parts) >= 2:
-                lngs.append(float(parts[0]))
-                lats.append(float(parts[1]))
-        if not lngs or not lats:
-            raise ValueError
-        return {
-            "min_lon": min(lngs), "max_lon": max(lngs),
-            "min_lat": min(lats), "max_lat": max(lats),
-            "centroid_lat": sum(lats) / len(lats),
-            "centroid_lng": sum(lngs) / len(lngs),
-        }
-    except Exception:
-        return {"min_lon": None, "max_lon": None, "min_lat": None, "max_lat": None,
-                "centroid_lat": None, "centroid_lng": None}
 
 def ingest_hydro_network(
     lat: float,

@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -1919,6 +1920,20 @@ class Migration:
 # migrations were numbered; every step is idempotent, so a database that predates
 # this table simply runs them all once and records that it did.
 
+def _stream_segment_spatial_from_wkt(geom_wkt: str | None) -> dict:
+    number = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+    pairs = re.findall(rf"(?:\(|,)\s*({number})\s+({number})", geom_wkt or "")
+    if not pairs:
+        return dict.fromkeys(("min_lon", "max_lon", "min_lat", "max_lat", "centroid_lat", "centroid_lng"))
+    lngs, lats = zip(*((float(lng), float(lat)) for lng, lat in pairs))
+    return {
+        "min_lon": min(lngs), "max_lon": max(lngs),
+        "min_lat": min(lats), "max_lat": max(lats),
+        "centroid_lat": sum(lats) / len(lats),
+        "centroid_lng": sum(lngs) / len(lngs),
+    }
+
+
 def _stream_segment_spatial(row) -> dict | None:
     """Derive bbox and centroid for a stream_segments row from its WKT/centroid."""
     if isinstance(row, dict):
@@ -1929,32 +1944,10 @@ def _stream_segment_spatial(row) -> dict | None:
                 return row[k]
             except Exception:
                 return None
-    wkt = _get("geom_wkt")
+    spatial = _stream_segment_spatial_from_wkt(_get("geom_wkt"))
+    if spatial["centroid_lat"] is not None:
+        return spatial
     clat, clng = _get("centroid_lat"), _get("centroid_lng")
-    coords = None
-    if wkt:
-        try:
-            inner = wkt[wkt.index("(") + 1 : wkt.rindex(")")].strip("() ")
-            pts = [p.strip() for p in inner.split(",") if p.strip()]
-            lngs, lats = [], []
-            for p in pts:
-                parts = p.split()
-                if len(parts) >= 2:
-                    lngs.append(float(parts[0]))
-                    lats.append(float(parts[1]))
-            if lngs and lats:
-                coords = (lngs, lats)
-                clat = sum(lats) / len(lats)
-                clng = sum(lngs) / len(lngs)
-        except Exception:
-            coords = None
-    if coords:
-        lngs, lats = coords
-        return {
-            "min_lon": min(lngs), "max_lon": max(lngs),
-            "min_lat": min(lats), "max_lat": max(lats),
-            "centroid_lat": clat, "centroid_lng": clng,
-        }
     if clat is not None and clng is not None:
         try:
             clat_f, clng_f = float(clat), float(clng)
