@@ -481,6 +481,22 @@ def signup(body: dict):
     }
 
 
+@app.post("/auth/logout")
+def logout(authorization: str = Header(None)):
+    """Revoke the bearer token on this request; it answers 401 from now on."""
+    from src.auth.auth import get_user_from_token, revoke_token
+    from src.storage.database import get_db
+
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization.replace("Bearer ", "").strip()
+    db = get_db()
+    if not get_user_from_token(db, token):
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    revoke_token(db, token)
+    return {"ok": True}
+
+
 @app.get("/auth/me")
 def me(user: dict = Depends(get_current_user)):
     """Return current user info."""
@@ -1154,7 +1170,6 @@ def confirm_catch_species_endpoint(
 @app.post("/admin/token")
 def get_admin_token(_: None = Depends(verify_api_key)):
     """Generate a fresh admin token. Protected by API key only."""
-    from datetime import datetime, timedelta
 
     from src.storage.database import get_db
 
@@ -1163,13 +1178,9 @@ def get_admin_token(_: None = Depends(verify_api_key)):
     if not existing:
         raise HTTPException(status_code=404, detail="Admin user (id=1) not found in the database.")
 
-    token = secrets.token_urlsafe(32)
-    expires = (datetime.now() + timedelta(days=90)).isoformat()
-    db.execute(
-        "INSERT INTO user_sessions (user_id, token, expires_at, last_used_at) VALUES (1, ?, ?, ?)",
-        [token, expires, datetime.now().isoformat()],
-    )
-    db.conn.commit()
+    from src.auth.auth import create_session
+
+    token = create_session(db, 1)
     return {"token": token, "bearer": f"Bearer {token}"}
 
 

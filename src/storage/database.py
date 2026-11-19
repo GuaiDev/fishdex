@@ -2099,6 +2099,28 @@ def migrate_stream_segments_spatial_index(db: Database) -> None:
         raise
 
 
+def migrate_hash_session_tokens(db: Database) -> None:
+    """Migration 31: store sha256(token) instead of the token in user_sessions.
+
+    Rewrites plaintext rows in place; rows already shaped like a hash are left alone, so
+    it is safe to re-run. get_user_from_token still accepts a plaintext row that an older
+    server wrote mid-deploy, and upgrades it on first use.
+    """
+    import hashlib
+
+    from src.auth.auth import is_hashed_token
+
+    if "user_sessions" not in db.table_names():
+        return
+    for row in db.execute("SELECT id, token FROM user_sessions").fetchall():
+        if is_hashed_token(row[1]):
+            continue
+        db.execute(
+            "UPDATE user_sessions SET token = ? WHERE id = ?",
+            [hashlib.sha256(row[1].encode()).hexdigest(), row[0]],
+        )
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(1, "baseline_schema", _create_baseline_schema),
     Migration(2, "catches_species_confirmation", migrate_catches_species_confirmation),
@@ -2134,6 +2156,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(28, "llm_usage", _ensure_llm_usage),
     Migration(29, "ingest_runs", migrate_ingest_runs),
     Migration(30, "stream_segments_spatial_index", migrate_stream_segments_spatial_index),
+    Migration(31, "hash_session_tokens", migrate_hash_session_tokens),
 )
 
 assert [m.version for m in MIGRATIONS] == list(range(1, len(MIGRATIONS) + 1))

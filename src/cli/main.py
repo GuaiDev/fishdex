@@ -1305,6 +1305,22 @@ def invite(note: str = typer.Option("", "--note", "-n", help="Note for this invi
         console.print(f"Note: {note}")
 
 
+@app.command("revoke-tokens")
+def revoke_tokens(
+    user: str = typer.Option(..., "--user", "-u", help="Username whose sessions to revoke"),
+) -> None:
+    """Sign a user out everywhere: delete every session token they hold."""
+    from src.auth.auth import revoke_user_tokens
+
+    db = get_db()
+    row = next(db["users"].rows_where("LOWER(username) = ?", [user.lower()]), None)
+    if not row:
+        console.print(f"[red]No user named {user!r}.[/red]")
+        raise typer.Exit(1)
+    n = revoke_user_tokens(db, row["id"])
+    console.print(f"[green]Revoked {n} session(s) for {row['username']}.[/green]")
+
+
 @app.command()
 def users() -> None:
     """List all registered users and their usage."""
@@ -1348,9 +1364,7 @@ def users() -> None:
 @app.command()
 def token() -> None:
     """Get or refresh the admin Bearer token for the web API."""
-    import secrets
     import sys
-    from datetime import datetime, timedelta
 
     sys.path.insert(0, "src")
     from src.storage.database import ensure_schema
@@ -1365,17 +1379,9 @@ def token() -> None:
             console.print("No admin user found.")
             return
 
-        new_token = secrets.token_urlsafe(32)
-        expires = (datetime.now() + timedelta(days=90)).isoformat()
-        db["user_sessions"].insert(
-            {
-                "user_id": 1,
-                "token": new_token,
-                "expires_at": expires,
-                "last_used_at": datetime.now().isoformat(),
-            }
-        )
-        db.conn.commit()
+        from src.auth.auth import create_session
+
+        new_token = create_session(db, 1)
 
         console.print("\n[green]Admin token (valid 90 days):[/green]")
         console.print(f"Bearer {new_token}")
