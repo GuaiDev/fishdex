@@ -525,7 +525,7 @@ def test_confirm_species_endpoint_returns_is_new_pb(monkeypatch, tmp_path):
 
     from PIL import Image
 
-    from src.auth.auth import _create_token
+    from src.auth.auth import create_session
     from src.services import photo_storage
     from src.storage.database import get_db
 
@@ -566,7 +566,7 @@ def test_confirm_species_endpoint_returns_is_new_pb(monkeypatch, tmp_path):
     # confirm-species requires a real Bearer token (no X-Api-Key fallback,
     # unlike /log-trip) — mint one for user_id=1, the same admin/apikey
     # fallback user the catch above was inserted under.
-    token = _create_token(get_db(), user_id=1)
+    token = create_session(get_db(), user_id=1)
     confirm_response = client.post(
         f"/catches/{catch_id}/confirm-species",
         json={"species": "smallmouth bass"},

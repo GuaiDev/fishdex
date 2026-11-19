@@ -102,7 +102,7 @@ def redeem_invite_code(
             },
         )
         db.conn.commit()
-        token = _create_token(db, user_id)
+        token = create_session(db, user_id)
     except Exception:
         # No account without its answers: undo the user rather than keep a half-made one.
         _undo_account(db, user_id, invite["id"])
@@ -151,9 +151,6 @@ def create_session(db: Database, user_id: int, days: int = 90) -> str:
     )
     db.conn.commit()
     return token
-
-
-_create_token = create_session
 
 
 def _find_session(db: Database, token: str) -> dict | None:

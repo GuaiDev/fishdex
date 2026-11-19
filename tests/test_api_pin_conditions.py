@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.auth.auth import _create_token
+from src.auth.auth import create_session
 from src.models.context import EmptyReason
 from src.models.pin import PinConditionRow
 from src.models.stream_gauge import NearestGauge, StreamGaugeReading
@@ -107,7 +107,7 @@ def world():
     db["users"].insert({"id": 3, "username": "bob", "role": "beta"})
     out = {"db": db}
     for name, uid in (("a", 2), ("b", 3)):
-        headers = {"Authorization": f"Bearer {_create_token(db, uid)}"}
+        headers = {"Authorization": f"Bearer {create_session(db, uid)}"}
         pin = client.post(
             "/pins",
             json={"name": f"{name}'s pin", "lat": SPOT[0], "lng": SPOT[1]},

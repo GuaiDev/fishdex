@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.auth.auth import _create_token
+from src.auth.auth import create_session
 from src.services.pins.labels import LINK_RADIUS_M, RATING_LABELS
 from src.storage.database import get_db
 
@@ -32,7 +32,7 @@ def _isolated(tmp_path, monkeypatch):
 
 @pytest.fixture()
 def headers():
-    return {"Authorization": f"Bearer {_create_token(get_db(), 1)}"}
+    return {"Authorization": f"Bearer {create_session(get_db(), 1)}"}
 
 
 def _log(headers, point=HOME, **body):
