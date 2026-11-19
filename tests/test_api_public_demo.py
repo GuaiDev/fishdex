@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.auth.auth import _create_token
+from src.auth.auth import create_session
 from src.storage.database import get_db
 
 client = TestClient(app)
@@ -78,7 +78,7 @@ def test_a_bad_token_is_still_refused_not_treated_as_demo():
 
 
 def test_a_real_token_still_works_on_demo_routes():
-    token = _create_token(get_db(), 1)
+    token = create_session(get_db(), 1)
     r = client.get("/map/spots", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     r = client.get(
@@ -142,7 +142,7 @@ def test_demo_spots_are_tier_one_even_when_more_is_asked_for():
 
 def test_signed_in_callers_still_get_every_tier():
     _seed_spots()
-    token = _create_token(get_db(), 1)
+    token = create_session(get_db(), 1)
     r = client.get(
         f"/map/spots?tier=3&bbox={HOME_BBOX}", headers={"Authorization": f"Bearer {token}"}
     )
@@ -160,7 +160,7 @@ def test_demo_spots_are_limited_to_a_modest_area():
     assert "river_mouth:n795000_435000" in _ids(huge)
     none = client.get("/map/spots?tier=1")
     assert _ids(none) == {"river_mouth:n795000_435000"}
-    token = _create_token(get_db(), 1)
+    token = create_session(get_db(), 1)
     full = client.get(
         "/map/spots?tier=1&bbox=-90,40,-70,50", headers={"Authorization": f"Bearer {token}"}
     )
@@ -171,7 +171,7 @@ def test_demo_cannot_open_a_spot_above_tier_one():
     _seed_spots()
     assert client.get("/map/spots/river_mouth:n796000_436000").status_code == 404
     assert client.get("/map/spots/river_mouth:n795000_435000").status_code == 200
-    token = _create_token(get_db(), 1)
+    token = create_session(get_db(), 1)
     r = client.get(
         "/map/spots/river_mouth:n796000_436000", headers={"Authorization": f"Bearer {token}"}
     )
@@ -200,7 +200,7 @@ def test_demo_section_tier_is_clamped_to_one(monkeypatch):
     assert seen[1][2] == 1
 
     seen.clear()
-    token = _create_token(get_db(), 1)
+    token = create_session(get_db(), 1)
     auth = {"Authorization": f"Bearer {token}"}
     client.get("/map/sections?tier=3&bbox=-90,40,-70,50", headers=auth)
     client.get("/map/sections/abc?tier=3", headers=auth)

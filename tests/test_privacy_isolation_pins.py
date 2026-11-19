@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.auth.auth import _create_token
+from src.auth.auth import create_session
 from src.services.trip_logger import log_session
 from src.storage import pins as store
 from src.storage.database import get_db
@@ -42,7 +42,7 @@ def world():
     db["users"].insert({"id": 3, "username": "bob", "role": "beta"})
     out = {"db": db}
     for name, uid, spot in (("a", 2, A_SPOT), ("b", 3, B_SPOT)):
-        headers = {"Authorization": f"Bearer {_create_token(db, uid)}"}
+        headers = {"Authorization": f"Bearer {create_session(db, uid)}"}
         pin = client.post(
             "/pins",
             json={"name": f"{name}'s secret run", "lat": spot[0], "lng": spot[1], "notes": "x"},

@@ -72,7 +72,7 @@ def redeem_invite_code(db: Database, code: str, username: str, display_name: str
     )
     db.conn.commit()
 
-    token = _create_token(db, user_id)
+    token = create_session(db, user_id)
     return {"success": True, "token": token, "user_id": user_id}
 
 
@@ -106,9 +106,6 @@ def create_session(db: Database, user_id: int, days: int = 90) -> str:
     )
     db.conn.commit()
     return token
-
-
-_create_token = create_session
 
 
 def _find_session(db: Database, token: str) -> dict | None:
