@@ -268,6 +268,93 @@ def test_log_trip_photo_saves_file_and_logs_session(monkeypatch, tmp_path):
     assert (tmp_path / "photos").exists()
 
 
+def test_photo_access_is_owner_only(monkeypatch, tmp_path):
+    import io
+    from pathlib import Path
+
+    from fastapi import UploadFile
+    from PIL import Image
+
+    from src.auth.auth import _create_token
+    from src.services import photo_storage
+    from src.storage.database import get_db
+
+    monkeypatch.setattr(photo_storage, "PHOTOS_DIR", tmp_path / "photos")
+    buf = io.BytesIO()
+    Image.new("RGB", (10, 10)).save(buf, format="JPEG")
+    photo = photo_storage.save_photo(
+        UploadFile(file=io.BytesIO(buf.getvalue()), headers={"content-type": "image/jpeg"})
+    )
+    db = get_db()
+    owner = db["users"].insert({"username": "photo-owner"}).last_pk
+    other = db["users"].insert({"username": "photo-other"}).last_pk
+    owner_headers = {"Authorization": f"Bearer {_create_token(db, owner)}"}
+    other_headers = {"Authorization": f"Bearer {_create_token(db, other)}"}
+    session = db["sessions"].insert({"user_id": owner, "date": "2026-11-19"}).last_pk
+    stop = db["stops"].insert({"session_id": session, "location_text": "Creek"}).last_pk
+    catch = (
+        db["catches"]
+        .insert(
+            {
+                "stop_id": stop,
+                "session_id": session,
+                "user_id": owner,
+                "species": "creek chub",
+                "photo_path": photo["path"],
+                "photo_url": photo["url"],
+            }
+        )
+        .last_pk
+    )
+    db.conn.commit()
+
+    assert client.get(photo["url"]).status_code == 401
+    assert client.get(photo["url"], headers=other_headers).status_code == 404
+    # The JSON-only logging route accepts photo URLs, but never a disk path.
+    db["catches"].insert(
+        {
+            "stop_id": stop,
+            "session_id": session,
+            "user_id": other,
+            "species": "creek chub",
+            "photo_url": photo["url"],
+        }
+    )
+    db.conn.commit()
+    assert client.get(photo["url"], headers=other_headers).status_code == 404
+    response = client.get(photo["url"], headers=owner_headers)
+    assert response.status_code == 200
+    assert response.content == Path(photo["path"]).read_bytes()
+    assert response.headers["cache-control"] == "private, no-store"
+    assert client.get("/photos/missing.jpg", headers=owner_headers).status_code == 404
+
+    db["catches"].delete(catch)
+    db.conn.commit()
+    assert client.get(photo["url"], headers=owner_headers).status_code == 404
+    db.conn.close()
+
+
+def test_log_trip_photo_rejects_100_megapixel_png(monkeypatch, tmp_path):
+    import io
+
+    from PIL import Image
+
+    from src.services import photo_storage
+
+    monkeypatch.setattr(photo_storage, "PHOTOS_DIR", tmp_path / "photos")
+    buf = io.BytesIO()
+    Image.new("1", (10000, 10000)).save(buf, format="PNG")
+    response = client.post(
+        "/log-trip/photo",
+        data={"text": "Caught a fish"},
+        files={"photo": ("large.png", buf.getvalue(), "image/png")},
+        headers=_apikey_headers(monkeypatch),
+    )
+    assert response.status_code == 400
+    assert "40 million pixels" in response.json()["detail"]
+    assert not (tmp_path / "photos").exists()
+
+
 @REQUIRES_API
 def test_log_trip_with_photo_metadata():
     """Photo GPS and timestamp should be accepted and reflected in response."""

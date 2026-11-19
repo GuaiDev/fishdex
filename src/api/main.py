@@ -76,7 +76,7 @@ from fastapi import (  # noqa: E402
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from fastapi.responses import JSONResponse  # noqa: E402
+from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
@@ -327,11 +327,35 @@ _static_dir = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(_static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
-# Catch photos, saved under DATA_DIR/photos by src/services/photo_storage.py
-from src.services.photo_storage import PHOTOS_DIR  # noqa: E402
 
-PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/photos", StaticFiles(directory=str(PHOTOS_DIR)), name="photos")
+@app.get("/photos/{name}")
+def get_photo(name: str, user: dict = Depends(get_current_user)):
+    """Serve a catch photo only to the catch's owner."""
+    from src.services.photo_storage import PHOTOS_DIR
+    from src.storage.database import get_db
+
+    root = PHOTOS_DIR.resolve()
+    path = (root / name).resolve()
+    if path.parent != root or not path.is_file():
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    db = get_db()
+    try:
+        # JSON trip logs can carry a client-supplied URL. Only an uploaded
+        # photo also has the server-written disk path; a copied URL grants nothing.
+        owned = any(
+            Path(row["photo_path"]).resolve() == path
+            for row in db.query(
+                "SELECT photo_path FROM catches "
+                "WHERE user_id = ? AND photo_url = ? AND photo_path IS NOT NULL",
+                [user["id"], f"/photos/{name}"],
+            )
+        )
+    finally:
+        db.conn.close()
+    if not owned:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return FileResponse(path, headers={"Cache-Control": "private, no-store"})
 
 
 def _hour_to_time_of_day(hour: int) -> str:
@@ -852,7 +876,7 @@ def log_trip_with_photo(
     see /log-trip's docstring), photos[] (optional, additive — extra photo
     files, one per catches_json entry by index position; the multi-catch
     UI doesn't send these yet, only `photo`, but the backend now accepts
-    them). Stores photos on the server and returns the primary one's public
+    them). Stores photos on the server and returns the primary one's authenticated
     URL.
     """
     from src.services.photo_storage import save_photo
