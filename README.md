@@ -197,7 +197,7 @@ Server-side ingest routes permanently refuse requests with HTTP 410 and CLI dire
 
 ### Running locally and hosting
 
-`make serve` runs the FastAPI backend on `127.0.0.1:8000` against the local database at `data/fishing.db`; set `DATA_DIR` to keep the database and catch photos somewhere else. `SERVE_HOST=0.0.0.0 make serve` makes it reachable from a phone on the same network.
+`make serve` runs the FastAPI backend on `127.0.0.1:8000` against the local database at `data/fishing.db`; set `DATA_DIR` to keep the database and catch photos somewhere else. `SERVE_HOST=0.0.0.0 make serve` makes it reachable from a phone on the same network; browsers are then only allowed from loopback origins unless `FISHBOT_CORS_ORIGINS` is set. `/docs` and `/openapi.json` are off unless `FISHBOT_ENABLE_DOCS=1`.
 
 `POST /chat` takes `message`, optional `conversation_history` (a list of `role`/`content`
 objects), and optional `session_id`. Only non-empty plain-text user and assistant history
