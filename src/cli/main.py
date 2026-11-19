@@ -76,7 +76,11 @@ def _cli(
     # `get_db()` no longer migrates, so a command opening a fresh or older database
     # would hit a missing table. Bring it current once, here; when it already is,
     # this is a read. `migrate` does its own, loudly, and `--help` touches nothing.
-    if ctx.invoked_subcommand not in (None, "migrate") and not ctx.resilient_parsing:
+    # `import-shared` requires an initialized target and must never migrate users.
+    if (
+        ctx.invoked_subcommand not in (None, "migrate", "import-shared")
+        and not ctx.resilient_parsing
+    ):
         if "--help" not in sys.argv:
             from src.storage.database import migrate as run_migrations
 
@@ -145,6 +149,22 @@ def _home_profile(db, user_id: int) -> UserProfile:
         return UserProfile(home_jurisdiction="CA-ON")
     home, jurisdiction = stored
     return UserProfile(home_location=home, home_jurisdiction=jurisdiction or "CA-ON")
+
+
+@app.command("import-shared")
+def import_shared_command(source: str = typer.Argument(..., help="Seed database file")) -> None:
+    """Replace corpus and map tables only; preserve all personal data."""
+    import sqlite3
+    from pathlib import Path
+
+    from src.storage.database import DB_PATH
+    from src.storage.ownership import import_shared
+
+    try:
+        import_shared(Path(source), DB_PATH, report=console.print)
+    except (OSError, ValueError, sqlite3.Error) as exc:
+        console.print(f"[red]Import failed; transaction rolled back:[/red] {exc}")
+        raise typer.Exit(1) from exc
 
 
 @app.command()

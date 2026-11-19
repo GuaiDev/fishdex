@@ -27,10 +27,11 @@ project is a static build (`buildCommand` + `outputDirectory`).
 
 - **Baked into the image from git (small):** `data/processed` parquets, models and map JSON,
   `data/curation`, `data/registry`, `data/species_images` CSVs.
-- **Must be seeded onto the volume:** `data/fishing.db` (and `data/photos/` if you have catch
-  photos). The database holds your records, users, sessions, spots and ingested observations, and
-  is not reproducible by a quick re-ingest. Check its size with `ls -lh data/fishing.db`; the 3 GB
-  volume leaves plenty of room.
+- **Shared seed imported onto the volume:** copy `data/fishing.db` to `/data/seed.db`,
+  then run `fishbot import-shared /data/seed.db`. Corpus and map tables are replaced
+  in one transaction; personal tables (including users, sessions, pins and catches)
+  are preserved. Never upload a replacement over `/data/fishing.db`. The target
+  schema is initialized by deployment; migrate both databases before importing.
 - **Re-ingested or refetched on demand (do not upload):** `data/cache/` (API response cache,
   rebuilt as the app calls out; it lives on the volume so it survives restarts) and `data/raw/`
   (source downloads, only needed to re-run ingest).
@@ -45,10 +46,10 @@ project is a static build (`buildCommand` + `outputDirectory`).
 5. Set secrets (you pick the values; use `python -c "import secrets; print(secrets.token_urlsafe(32))"`
    for the key): `fly secrets set ANTHROPIC_API_KEY=... FISHBOT_API_KEY=...`
 6. `fly deploy`
-7. Seed the database onto the volume. Stop the machine from writing first
-   (`fly machine stop`), then `fly machine start` and
-   `fly ssh sftp shell` → `put data/fishing.db /data/fishing.db` (and `put` photos into
-   `/data/photos/` if any). Restart with `fly machine restart`.
+7. Copy the shared seed with `fly ssh sftp shell` → `put data/fishing.db /data/seed.db`.
+   Import with `fly ssh console -C "python -m src.cli.main import-shared /data/seed.db"`.
+   Review the printed before/after row counts. The import leaves personal tables intact
+   and rolls back on any failure. Never put a seed at `/data/fishing.db`.
 8. Check `https://<app>.fly.dev/health/live` returns `{"status":"ok"}` and
    `https://<app>.fly.dev/health/ready` returns `{"status":"ready", ...}`.
 9. Make your token on the host: `fly ssh console -C "python -m src.cli.main token"`.
@@ -75,7 +76,8 @@ the server-wide cap; the account budget still applies.
 
 `GET /health/live` reports process liveness without checking data. Fly uses
 `GET /health/ready`, which returns 200 with `status: ready` only when the database
-opens, its schema version matches the application, and the map checks below pass.
+opens, its schema version matches the application, the map checks below pass, and Ontario has at least one row in each of `spots`,
+`water_bodies`, `species_ranges` and `stream_segments`.
 Otherwise it returns 503 with `status: not_ready` and individual `checks` results.
 The legacy `/health` endpoint remains available but does not verify readiness.
 
@@ -96,23 +98,23 @@ in a same-count artifact. Handle those changes by reseeding the database using
 the procedure below, with map segments rebuilt from the new artifact. The digest
 identifies the baked file, not the loaded database contents.
 
-Before uploading a replacement database for a changed `data/processed/map_data.json`,
-stop any local API using it, back up `data/fishing.db`, and clear only its map segments:
+Before uploading a seed for a changed `data/processed/map_data.json`, rebuild its
+`map_segments` from the matching artifact locally. Stop any local API using the
+seed and back it up first. Clear only the local seed's map segments:
 
 ```sh
 uv run python -c 'from src.storage.database import get_db; db = get_db(); db.execute("DELETE FROM map_segments"); db.conn.commit(); db.conn.close()'
 ```
 
-Repeat step 7 with that database and deploy the matching artifact. API startup
-imports the artifact when `map_segments` is empty; it leaves nonempty tables alone.
-Confirm `/health/ready` succeeds after restart. This preserves other tables,
-including users and records; do not substitute a fresh empty database.
+Start the local API once to populate the empty table from the artifact, then stop it.
+Deploy the matching artifact and repeat step 7: upload to `/data/seed.db` and run
+`import-shared`. Confirm `/health/ready` succeeds. Same-count content changes also
+require an import: the artifact digest identifies the baked file, not loaded rows.
 
-After `make build-anchors` (live OpenStreetMap, slow: minutes per stretch, cached afterwards)
-rebuilds the anchors and spots in `data/fishing.db`, repeat step 7 with the new file: stop the
-machine, `put data/fishing.db /data/fishing.db`, then `fly machine restart`. Check with
-`GET /map/spots?tier=3&kind=below_dam` that the new below-dam spots are present. The public demo
-only serves tier 1 spots, so a spot ranked tier 2 or 3 appears for signed-in users only.
+After `make build-anchors` rebuilds the anchors and spots locally (live OpenStreetMap,
+slow and cached afterwards), repeat step 7 with that seed. Check with
+`GET /map/spots?tier=3&kind=below_dam` that the new below-dam spots are present. The
+public demo only serves tier 1 spots; tier 2 or 3 requires sign-in.
 
 ## Notes
 
