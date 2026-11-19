@@ -3,7 +3,7 @@ Retroactively enrich historical sessions that have coordinates but no
 conditions data. Fetches weather from Open-Meteo archive API and water
 quality from local PWQMN data.
 
-Usage: uv run python scripts/enrich_historical_sessions.py [--dry-run]
+Usage: uv run python scripts/historical/enrich_historical_sessions.py [--dry-run]
 """
 import sys
 import argparse

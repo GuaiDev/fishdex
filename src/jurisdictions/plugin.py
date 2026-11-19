@@ -21,7 +21,7 @@ GLOBAL_SOURCE = "global"
 """The worldwide bundle (iNaturalist, GBIF, WSC, OSM). Runs for any area, so it
 belongs to no plugin."""
 
-SourceStatus = Literal["implemented", "planned", "not_applicable"]
+SourceStatus = Literal["implemented", "planned", "not_applicable", "disabled"]
 
 
 @dataclass(frozen=True)
@@ -129,7 +129,12 @@ class JurisdictionPlugin:
     notes: str = ""
 
     def source_status(self, name: str) -> bool | None:
-        """True implemented, False planned, None not applicable, as the old
-        `data_sources` dict reported it."""
+        """True implemented, False planned or disabled, None not applicable, as
+        the old `data_sources` dict reported it."""
         status = self.sources[name].status
-        return {"implemented": True, "planned": False, "not_applicable": None}[status]
+        return {
+            "implemented": True,
+            "planned": False,
+            "disabled": False,
+            "not_applicable": None,
+        }[status]

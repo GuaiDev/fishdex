@@ -1,17 +1,14 @@
 # FishDex Backlog
 
-Last updated: July 18 2026 (session 7 — Claude Code session: multi-catch logging + admin dashboard catch stats)
-Previously: FishBot
+Last updated: November 19 2026 (written record reconciled for the invite-only beta). Dated sections below are kept as history, not as current plans.
 
-## Project rename
-FishBot → FishDex. The name reflects the collection mechanic (personal
-Pokédex for fishing). "Bot" undersold the product and alienated senior
-anglers. FishDex works for beginners and experts, scales beyond Ontario.
+## Project rename (history)
+[history] Previously: FishBot. The rename to FishDex reflects the collection mechanic (personal Pokédex for fishing) and works for beginners and experts.
 
-## Architecture split
-Development now split into two tracks:
-- **Frontend:** Lovable-based UI rebuild, map redesign, branding
-- **Backend:** Intelligence improvements, data expansion, coaching
+## Architecture split (history)
+The frontend rebuild track was cancelled; the client is now the plain static app under `app/`. The backend track continues.
+- [history] Frontend: Lovable-based UI rebuild, map redesign, branding
+- Backend: Intelligence improvements, data expansion, coaching
 
 ---
 
@@ -26,18 +23,18 @@ Development now split into two tracks:
 # FRONTEND TRACK
 
 ## Branding ✅
-- Name: FishDex (was FishBot)
+- Name: FishDex ([history] was FishBot)
 - Tagline: "Find fish. Explore water."
 - Color palette: #0A0C10 background, #1D9E75 accent, dark minimal
 - Aesthetic: Linear/Raycast dark precision, not outdoorsy
-- Lovable prompt written and saved at docs/fishdex_lovable_prompt.md
+- [history] Lovable prompt written and saved at docs/fishdex_lovable_prompt.md
 
-## React UI (current, to be replaced) ✅
-Built as prototype, will be replaced by Lovable build:
+## React UI (history — prototype, removed from the repository)
+[history] Built as a prototype that was never replaced by a Lovable build:
 - Chat, Log Trip, Trips, Map screens
 - Multi-user auth gate
-- react-leaflet@4.2.1 (v5 incompatible with React 18)
-- Deployed at /app on Railway
+- [history] react-leaflet@4.2.1 (v5 incompatible with React 18)
+- [history] Deployed at /app on Railway
 
 ### Multi-catch logging UI ✅ (July 18 2026)
 Log Trip rebuilt as a session-based flow: session notes captured once (EXIF from
@@ -47,12 +44,12 @@ entries. SpeciesConfirmCard and EXIF parsing kept unchanged.
 
 (The web app, including `web/dist/`, has since been removed from the repository.)
 
-## Lovable UI rebuild 📋
-Use docs/fishdex_lovable_prompt.md to build FishDex in Lovable.
+## Lovable UI rebuild (history — cancelled; the client is the static app in `app/`)
+[history] Use docs/fishdex_lovable_prompt.md to build FishDex in Lovable.
 Reference images needed: Fishbrain map, FishAI explore, Beli personal map,
 Linear dark UI.
 Screens: Login, Chat, Log Trip, Map, Trips (renamed "My FishDex")
-Key: react-leaflet@4.2.1, dark theme, collection mechanic feel.
+[history] Key: react-leaflet@4.2.1, dark theme, collection mechanic feel.
 
 ## Map redesign — two-level architecture 📋
 The design document this once cited (docs/map_redesign_design_doc.md) was never
@@ -92,7 +89,7 @@ Saved spots appear on the Personal map and as a "Saved by me" badge/filter in Ex
 - fishing_stretches table
 - stretch_segments table (many-to-one OHN → stretch)
 - stretch_anchors table (confluences, dams, access points)
-- pins, pin_links, pin_recalled_visits, pin_shares tables (phases 1 and 4 of the pins plan)
+- pins, pin_links, pin_recalled_visits tables (pins phases 1–3 built; phases 4–5 deferred)
 
 ### Build plan (4 sessions)
 1. Stretch definition — algorithmic clustering + manual curation ✅ built.
@@ -121,7 +118,11 @@ Saved spots appear on the Personal map and as a "Saved by me" badge/filter in Ex
    user's pins by match, distance, last visited or favourites, each row with its reason
    (docs/pin-match-api.md). Indicator name and layout are still placeholders in `labels.py`.
    The species filter for Today is not built; catches stay queryable by species.
-4. React/Lovable UI — two-level map with pin states
+   Pins phases 1–3 are built; phase 4 (pin sharing) is deferred past beta — it
+   conflicts with the rule that spot discovery output stays personal — and phase 5
+   (Google Maps import) is deferred because Takeout CSVs carry no coordinates.
+4. [history] React/Lovable UI — two-level map with pin states; cancelled, the
+   client is the plain static app under `app/`
 
 ## Social layer (future, NOT on map) 💡
 Catches and PBs only, never spot locations.
@@ -209,7 +210,7 @@ Trip log flywheel wired in.
 
 ### Map segments ✅
 47,454 OHN segments imported into map_segments table.
-Auto-import on Railway startup.
+[history] Auto-import on Railway startup; hosting is now Fly.io plus Vercel.
 /map/segments and /map/my-stops endpoints.
 
 ## Multi-jurisdiction ingest pipeline ✅ (June 28 2026)
@@ -351,12 +352,12 @@ Test suite updated to match new signatures (35 tests pass).
 **Jurisdiction configuration**: see the [jurisdiction checklist](../src/ingest/jurisdictions/JURISDICTION_TEMPLATE.md).
 
 ### Bug fixes — session 3 (June 28 2026)
-Bugs found and fixed during first Railway test run of multi-province adapters:
+[history] Bugs found and fixed during first Railway test run of multi-province adapters:
 - **openpyxl** added to pyproject.toml (required by NuSEDS and AB stocking XLSX adapters)
 - **CHS tidal**: wrong base URL (`api-sine` → `api-iwls`); missing `/api/v1` prefix on endpoints;
   API requires `from`/`to` date params (400 without them) — now sends today 00:00Z to +7 days,
   rounded to midnight so cache key is stable within a day
-- **DFO SAR range**: replaced GDB/fiona approach (GDAL unavailable on Railway) with ESRI REST;
+- **DFO SAR range**: [history] replaced GDB/fiona approach (GDAL unavailable on Railway) with ESRI REST;
   initial service path `CritHab_HabEss_2025` was 404 — corrected to `dfo_sara_critical_habitat`;
   field names corrected (`COMMON_E`, `SCIENTIFIC`, `SARASTAT_E`); bbox tiles returned 0 features
   because `inSR=4326` was missing — layer is Web Mercator and the server was interpreting
@@ -562,7 +563,7 @@ East Coast, West Coast, Gulf.
 Critical path for activating personal model at scale.
 Reduces logging friction: speak → transcribe → parse → log.
 Whisper API or similar.
-Build after Lovable UI is stable.
+[history] Build after the Lovable UI is stable; that rebuild was cancelled, so this is deferred.
 
 ## Admin dashboard ✅ (July 17 2026)
 `GET /admin/dashboard`, X-Api-Key protected (src/services/admin_dashboard.py). Returns:
@@ -593,7 +594,7 @@ personal_bests already does.
 ## Token management 📋
 /admin/token endpoint added (X-Api-Key only, no Bearer needed).
 fishbot token CLI command added.
-Still friction: local DB ≠ Railway DB.
+[history] Still friction: local DB ≠ Railway DB.
 Accepted split for now.
 
 ## Aquarium feature 💡
@@ -614,27 +615,23 @@ Design pending:
 
 ## Infrastructure
 
-### Railway deployment 🔨
-> Superseded 2026-10-09: Railway was dropped. The app is served with `make serve`
-> and the weekly ingest runs locally with `make weekly-ingest` — see README.
-> Public hosting is now Vercel + Fly.io — see `deploy/README.md`.
+### Railway deployment (history — dropped 2026-10-09)
+[history] Public hosting moved to Vercel (client) plus Fly.io (API) — see `deploy/README.md`.
+Local work uses `make serve` and `make weekly-ingest`.
 
-URL: https://web-production-e2094.up.railway.app
-Volume vol_wc8gnr3fyrcdcydx is attached but DATA_DIR env var is NOT set in
-Railway dashboard. Database is writing to the container's ephemeral filesystem
-and is wiped on every redeploy.
-Fix: set DATA_DIR to the volume's mount path in Railway → service → Variables.
-Once set, db_path in /admin/db-stats response will show an absolute path
-confirming the volume is being used.
+[history] URL: https://web-production-e2094.up.railway.app
+[history] Volume vol_wc8gnr3fyrcdcydx was attached but DATA_DIR was not set in the
+[history] Railway dashboard, so the database was wiped on every redeploy. The fix
+[history] below (set DATA_DIR to the volume mount) was never applied.
 
 ### Token refresh ✅
 POST /admin/token with X-Api-Key returns fresh Bearer token.
 No Bootstrap needed going forward.
 
-### Local vs Railway split
-Local: Jason's 22 sessions, all behavioral insights, full trip history.
-Railway: Fresh database, beta tester data.
-Accepted split — local for personal analysis, Railway for beta.
+### Local vs Railway split (history)
+[history] Local: Jason's 22 sessions, all behavioral insights, full trip history.
+[history] Railway: Fresh database, beta tester data.
+[history] That split ended with the move to Fly.io plus Vercel.
 
 ### /chat endpoint message assembly bug ✅ (June 27 2026)
 Endpoint was reading body.get("messages", []) instead of building the messages
@@ -643,7 +640,7 @@ Result: curl calls with {"message": "..."} produced an empty messages array,
 causing "at least one message is required" from the Claude API.
 Fix: endpoint now builds messages from history + appends current message.
 make run was unaffected (CLI bypasses the HTTP endpoint entirely).
-Deploy status: committed (067b616), Railway redeploy pending confirmation.
+[history] Deploy status: committed (067b616), Railway redeploy pending confirmation.
 
 ### FISS context overflow — fixed ✅ (June 29 2026)
 46,294 FISS observations were being returned to Claude, exceeding context limits.
@@ -654,16 +651,16 @@ real dates sort first; FISS sentinel dates (1900-01-01) sort last.
 Files: src/storage/observations.py, src/services/observations.py, src/services/gbif.py.
 
 ### /admin/db-stats diagnostic endpoint 🔨 (June 29 2026)
-Temporary endpoint for Railway database diagnosis. Returns:
+[history] Temporary endpoint for Railway database diagnosis. Returns:
 - db_path: resolved DB_PATH (shows whether relative or absolute)
 - db_exists: bool — whether the file actually exists at that path
 - data_dir_env: value of DATA_DIR env var, or "NOT SET"
 - observations_by_source: count/lat-lng/date range per source (iNat, FISS, etc.)
 - gbif_by_source: count/lat-lng/date range for gbif_observations table
-Remove once Railway persistence is confirmed working.
+[history] Remove once Railway persistence is confirmed working.
 
 ### OSM 30-day cache skip ✅ (June 29 2026)
-OSM ingest was causing Railway OOM when multiple cron areas ran concurrently —
+[history] OSM ingest was causing Railway OOM when multiple cron areas ran concurrently —
 Overpass requests backed up and memory built under rate limiting.
 Fix: fetch_and_store() checks water_features for any rows within the 50km radius
 with fetched_at >= 30 days ago. If found, returns DB counts immediately without
@@ -691,7 +688,7 @@ body: dict directly. Harmless but should be cleaned up or wired in.
 See [README.md](../README.md#running-locally-and-hosting) for the current refresh
 workflow, scheduling, and retired API route behavior.
 
-### Railway logging root cause fixed ✅ (June 28 2026)
+### Railway logging root cause fixed ✅ (history — June 28 2026)
 Background task INFO messages were silently dropped — uvicorn's dictConfig leaves the
 root logger at WARNING. Fixed: logging.basicConfig(stdout, INFO) at module import +
 lifespan re-asserts setLevel(INFO) after uvicorn's own setup runs.

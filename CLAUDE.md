@@ -1,6 +1,6 @@
 ## Project
 
-Personal fishing exploration bot. Multi-jurisdiction (Canada + US), Ontario first. **Phase 1 complete** — all data ingestion layers built and verified. Gamification, aquarium, trip planner, map UI all deferred. NOT for public release.
+Personal fishing exploration bot. Multi-jurisdiction (Canada + US), Ontario first. **Phase 1 complete** — all data ingestion layers built and verified. Gamification, aquarium and trip planner deferred; the map UI exists in `app/`. The goal is a small invite-only beta (no open sign-up), with the API on Fly.io and the client on Vercel.
 
 ## My fishing context
 

@@ -4,7 +4,7 @@ Calls log_trip() for each entry, which internally calls parse_trip_from_text()
 and snaps to the nearest OHN segment. Trips whose location can't be resolved
 are skipped with a notice.
 
-Usage: uv run python scripts/batch_log_historical_trips.py
+Usage: uv run python scripts/historical/batch_log_historical_trips.py
 """
 
 import time

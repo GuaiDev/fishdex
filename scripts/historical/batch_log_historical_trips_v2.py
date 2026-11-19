@@ -4,7 +4,7 @@ For each trip: parses it, prints the full JSON for human review, then waits for
 Enter (log) or "skip" + Enter (discard). Nothing is inserted without explicit
 confirmation.
 
-Usage: uv run python scripts/batch_log_historical_trips_v2.py
+Usage: uv run python scripts/historical/batch_log_historical_trips_v2.py
 """
 
 import json

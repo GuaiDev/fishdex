@@ -381,7 +381,6 @@ def ingest(
     from src.services.geology import ingest_geology_data
     from src.services.hydrology import ingest_hydro_network
     from src.services.insights import seed_dispersal_insights
-    from src.services.reddit import fetch_and_store as reddit_fetch_and_store
     from src.services.regulations import ingest_fmz_boundaries, ingest_regulations
     from src.services.species_ranges import load_and_store as species_load_and_store
     from src.services.stocking import ingest_stocking_data
@@ -450,12 +449,17 @@ def ingest(
         "Loading Ontario species range database…",
         species_load_and_store,
     )
-    _run_source(
-        r,
-        "Reddit",
-        "Fetching Reddit fishing community posts…",
-        reddit_fetch_and_store,
-    )
+    from src.ingest.jurisdictions.ca_on.plugin import PLUGIN as _ON_PLUGIN
+
+    if _ON_PLUGIN.sources["reddit"].status != "disabled":
+        from src.services.reddit import fetch_and_store as reddit_fetch_and_store
+
+        _run_source(
+            r,
+            "Reddit",
+            "Fetching Reddit fishing community posts…",
+            reddit_fetch_and_store,
+        )
     _run_source(
         r,
         "Ontario Hydro Network",

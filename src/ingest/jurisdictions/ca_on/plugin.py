@@ -102,6 +102,11 @@ PLUGIN = JurisdictionPlugin(
             ttl_constant=f"{_ca_on}.geology:_TTL",
             note=f"MRD 128 surficial geology. Run by `{_BY}`.",
         ),
+        "reddit": SourceSpec(
+            status="disabled",
+            note="Reddit scraping is off for beta: no corpus is shipped and the "
+            "unauthenticated JSON endpoint is against Reddit's terms at scale.",
+        ),
     },
     cron_areas=(
         CronArea("Grand River Dunnville", 42.917, -79.774, 50),
