@@ -209,6 +209,7 @@ Water quality parameters (dissolved oxygen, pH, temperature) are a separate cate
 
 ## Where things live
 
+- Beta plan: read PLAN.md
 - Product spec: `docs/planning/` (read before suggesting any feature)
 - System prompt: `prompts/system.md` (edit without code changes)
 - This file: read every session start
