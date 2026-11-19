@@ -690,7 +690,7 @@ def _log_trip_core(
     Photo GPS overrides text-parsed location for the primary stop.
     photo_path (internal disk path, never returned to clients) flows through
     to the catches table for photo-serving bookkeeping; photo_url is the
-    public URL clients use to display the image.
+    URL clients use to display the image (access requirements are in README.md).
 
     catches_json (optional) carries the multi-catch logging UI's structured
     per-catch count/size/bait/photo — see _normalize_structured_catches and
