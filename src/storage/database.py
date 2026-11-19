@@ -11,7 +11,7 @@ from pathlib import Path
 
 from sqlite_utils import Database
 
-# Respect DATA_DIR env var for Railway persistent volumes; default to local data/
+# Keep hosted data on the persistent volume selected by DATA_DIR.
 DB_PATH = Path(os.environ.get("DATA_DIR", "data")) / "fishing.db"
 
 logger = logging.getLogger(__name__)

@@ -49,7 +49,7 @@ What exists and works, in one paragraph each. The audits are longer; this is the
 
 **Client.** `app/` is a plain static site (no framework): Map, Coach, Field guide (live strip plus an iframe mockup), and two sample tabs (Anglers, Theme). It calls only `/auth/me`, `/auth/signup`, the map routes and `/chat`. **There is no trip logging, no pins, no collection, no profile, no sign-out and no feedback in the client.** Link-token handling is fixed and tested (7 JS tests pass).
 
-**Hosting.** Fly.io API (1 GB, auto-stop, zero minimum machines) plus a Vercel static site. **The hosted API has been unreachable (TLS handshake fails) since at least 2026-11-14; the Vercel page loads.** Railway was dropped on 2026-10-09; only comments mention it. Data reaches the host by copying the whole database file over SFTP, which would overwrite users. Backups are Fly's default daily volume snapshots with no restore drill.
+[history — baseline] **Hosting.** Fly.io API (1 GB, auto-stop, zero minimum machines) plus a Vercel static site. **The hosted API has been unreachable (TLS handshake fails) since at least 2026-11-14; the Vercel page loads.** Railway was dropped on 2026-10-09; only comments mention it. Data reaches the host by copying the whole database file over SFTP, which would overwrite users. Backups are Fly's default daily volume snapshots with no restore drill.
 
 **Test suite.** 2,835 tests collect. On this NixOS machine they need `LD_LIBRARY_PATH` set to a gcc and zlib lib directory (missing `libstdc++.so.6`); with that and fsync off for test databases the full suite runs. `make lint` passes. See section 8 for the run result.
 
@@ -74,7 +74,7 @@ What exists and works, in one paragraph each. The audits are longer; this is the
 | Licensing and attribution | Licences stored per record and per source | Nothing rendered except OSM tile credit; Reddit scraping adapter present | P0, P5 |
 | Stability | Migrate-once, WAL, CI | Suite slow without T9; card latency 2.7 s without T3; `new_to_me` 128 s; parquet re-read per call | P0, P1 |
 | An operator who can see what is happening | Admin dashboard, ledgers | No one-screen beta status; no runbook | P6 |
-| Written record that matches the code | CLAUDE.md, PRODUCT.md, backlog | All three contradict the code (no client, Railway, FishBot, "not for release") | P0 |
+| Written record that matches the code | CLAUDE.md, PRODUCT.md, backlog | [history — baseline; reconciled in P0.5] All three contradicted the code (no client, Railway, FishBot, "not for release") | P0 |
 
 Unnecessary for beta and cut or deferred (section 6 has the full list with reasons): pin sharing, Google Maps import, database split, map artifact publishing, card precompute, hydro store and region expansion, presence benchmark, golden LLM set, Postgres, PMTiles, staging environment, bathymetry, aquarium, social, voice, Reddit/YouTube community search.
 
@@ -416,8 +416,8 @@ Run on the hosted app from a phone on cellular, with a fresh invite code. Record
 - Profile routes present; questionnaire mentioned only in docstrings; coaching renders angler style; chat prompt reads `UserProfile` and the legacy trips table.
 - Species images: 14 approved rows in `selection.csv`, 57 files under `src/api/static/species`, credits page present; `/fishdex` hard-codes CA-ON.
 - Security residues: CORS default `*`, no `docs_url` setting, five raw-detail 500s, `/photos` static mount, no sha256 in auth, no logout route, malformed expiry swallowed, resolver unscoped, `start_session` takes no user id.
-- Hosting: `fly.toml` 1 GB / min 0 / readiness check; Vercel build script; Railway mentioned only in comments and the backlog; hosted API TLS EOF on `/health/live` and `/health/ready` on 2026-11-17; Vercel `/app/` 200 with `config.js` pointing at Fly.
-- Docs: PRODUCT.md says API-only and FishBot; CLAUDE.md line 3 says map UI deferred and not for release; README describes the public demo and Fly/Vercel; CI runs lint and test; zero tracked `__pycache__` files (the health audit's claim is stale); two tracked zero-byte `fishbot.db` files; the personal trip scripts are present.
+- [history — baseline] Hosting: `fly.toml` 1 GB / min 0 / readiness check; Vercel build script; Railway mentioned only in comments and the backlog; hosted API TLS EOF on `/health/live` and `/health/ready` on 2026-11-17; Vercel `/app/` 200 with `config.js` pointing at Fly.
+- [history — baseline] Docs: PRODUCT.md says API-only and FishBot; CLAUDE.md line 3 says map UI deferred and not for release; README describes the public demo and Fly/Vercel; CI runs lint and test; zero tracked `__pycache__` files (the health audit's claim is stale); two tracked zero-byte `fishbot.db` files; the personal trip scripts are present.
 - PRs: #66 and #63 open with checks passing; T3 and T9 exist as single-commit local branches; no T18 branch.
 - Ontario audit ships: S2 coverage-check merged (#58), S5 fail-closed merged (#59), #53 found missed dams; S3, S6, S7, S9 not found in history (not re-measured).
 - `make lint` passes. 2,835 tests collect with the `LD_LIBRARY_PATH` workaround. Full suite: 2,831 passed, 4 skipped, 0 failed in 4 min 19 s with fsync off for test databases (the default run is fsync-bound and takes far longer, which is what P0.3 fixes).

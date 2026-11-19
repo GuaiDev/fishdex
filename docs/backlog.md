@@ -6,7 +6,7 @@ Last updated: November 19 2026 (written record reconciled for the invite-only be
 [history] Previously: FishBot. The rename to FishDex reflects the collection mechanic (personal Pokédex for fishing) and works for beginners and experts.
 
 ## Architecture split (history)
-The frontend rebuild track was cancelled; the client is now the plain static app under `app/`. The backend track continues.
+The frontend rebuild track was cancelled; see [PRODUCT.md](../PRODUCT.md#platform) for the current client. The backend track continues.
 - [history] Frontend: Lovable-based UI rebuild, map redesign, branding
 - Backend: Intelligence improvements, data expansion, coaching
 
@@ -44,7 +44,7 @@ entries. SpeciesConfirmCard and EXIF parsing kept unchanged.
 
 (The web app, including `web/dist/`, has since been removed from the repository.)
 
-## Lovable UI rebuild (history — cancelled; the client is the static app in `app/`)
+## Lovable UI rebuild (history — cancelled)
 [history] Use docs/fishdex_lovable_prompt.md to build FishDex in Lovable.
 Reference images needed: Fishbrain map, FishAI explore, Beli personal map,
 Linear dark UI.
@@ -121,8 +121,8 @@ Saved spots appear on the Personal map and as a "Saved by me" badge/filter in Ex
    Pins phases 1–3 are built; phase 4 (pin sharing) is deferred past beta — it
    conflicts with the rule that spot discovery output stays personal — and phase 5
    (Google Maps import) is deferred because Takeout CSVs carry no coordinates.
-4. [history] React/Lovable UI — two-level map with pin states; cancelled, the
-   client is the plain static app under `app/`
+4. [history] React/Lovable UI — two-level map with pin states; cancelled.
+   See [PRODUCT.md](../PRODUCT.md#platform) for the current client.
 
 ## Social layer (future, NOT on map) 💡
 Catches and PBs only, never spot locations.
@@ -210,7 +210,7 @@ Trip log flywheel wired in.
 
 ### Map segments ✅
 47,454 OHN segments imported into map_segments table.
-[history] Auto-import on Railway startup; hosting is now Fly.io plus Vercel.
+[history] Auto-import on Railway startup. Current hosting: [deploy/README.md](../deploy/README.md).
 /map/segments and /map/my-stops endpoints.
 
 ## Multi-jurisdiction ingest pipeline ✅ (June 28 2026)
@@ -616,8 +616,7 @@ Design pending:
 ## Infrastructure
 
 ### Railway deployment (history — dropped 2026-10-09)
-[history] Public hosting moved to Vercel (client) plus Fly.io (API) — see `deploy/README.md`.
-Local work uses `make serve` and `make weekly-ingest`.
+Current hosting and operator commands: [deploy/README.md](../deploy/README.md) and [README.md](../README.md#running-locally-and-hosting).
 
 [history] URL: https://web-production-e2094.up.railway.app
 [history] Volume vol_wc8gnr3fyrcdcydx was attached but DATA_DIR was not set in the
@@ -631,7 +630,7 @@ No Bootstrap needed going forward.
 ### Local vs Railway split (history)
 [history] Local: Jason's 22 sessions, all behavioral insights, full trip history.
 [history] Railway: Fresh database, beta tester data.
-[history] That split ended with the move to Fly.io plus Vercel.
+[history] That split ended; see [deploy/README.md](../deploy/README.md) for current hosting.
 
 ### /chat endpoint message assembly bug ✅ (June 27 2026)
 Endpoint was reading body.get("messages", []) instead of building the messages

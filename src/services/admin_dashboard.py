@@ -171,7 +171,7 @@ def _ingest_status(db: Database) -> dict[str, Any]:
 def _catch_stats(db: Database, species_limit: int = 10, pb_limit: int = 10) -> dict[str, Any]:
     """Catch-level visibility (all users): volume, species mix, personal
     bests, and catches-per-session — this was previously only checkable by
-    SSHing into the Railway container and querying the SQLite file directly.
+    connecting to the host and querying the SQLite file directly.
 
     species counts every logged catch (species_confirmed or not — "logged"
     is about volume of activity, not whether the user has since confirmed

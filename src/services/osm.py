@@ -220,7 +220,7 @@ def fetch_and_store(lat: float, lng: float) -> tuple[int, int]:
 
     Skips the Overpass fetch entirely if fresh data (< 30 days old) already
     exists within the fetch radius — prevents redundant calls and the concurrent
-    memory pressure that causes Railway OOM when multiple ingests overlap.
+    memory pressure that can exhaust the host when multiple ingests overlap.
     Returns (0, 0) if Overpass is unavailable.
     """
     from src.services.ingest_runs import record_counts, record_error

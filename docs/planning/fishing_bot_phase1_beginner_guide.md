@@ -316,7 +316,7 @@ Still in Claude Code, paste this:
 > Now create `CLAUDE.md` at the root of the project. This is the file you'll read every time we work together. Keep it under 100 lines. Include:
 >
 > **## Project**
-> One paragraph: personal fishing exploration bot, multi-jurisdiction (Canada + US), Phase 1 = data brain, Phase 2 = gamification + aquarium + trip planning (designed for, not built yet). NOT for public release.
+> Use the current project status from [CLAUDE.md](../../CLAUDE.md#project); this historical setup guide does not own the release policy.
 >
 > **## About me**
 > - Home: Toronto, Ontario (CA-ON)

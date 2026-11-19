@@ -308,7 +308,7 @@ When the plan is right, let it execute.
 > Now create CLAUDE.md at the repo root. Keep under 100 lines. Structure:
 > 
 > ## Project
-> Personal fishing exploration bot. Multi-jurisdiction (Canada + US). Built on open/legal data sources. NOT for public release until I say so.
+> Use the current project status from [CLAUDE.md](../../CLAUDE.md#project); do not copy this historical setup guide as the release policy.
 > 
 > ## My fishing context
 > - Home: Toronto, Ontario (CA-ON)
