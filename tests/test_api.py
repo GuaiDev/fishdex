@@ -70,6 +70,8 @@ def test_readiness_requires_matching_nonempty_map(map_count, expected_count, mon
     from src.storage.database import get_db
 
     monkeypatch.setattr(main, "_map_artifact_info", lambda: ("artifact-digest", expected_count))
+    _populate_ready_tables()
+
     db = get_db()
     db.conn.executemany(
         "INSERT INTO map_segments (ogf_id, lat, lng) VALUES (?, 45, -79)",
@@ -85,6 +87,47 @@ def test_readiness_requires_matching_nonempty_map(map_count, expected_count, mon
     assert body["checks"]["map_artifact_consistent"] is consistent
     assert body["map_artifact_digest"] == "artifact-digest"
     assert body["map_rows"]["map_segments"] == map_count
+
+
+def _populate_ready_tables(jurisdiction="CA-ON"):
+    from src.storage.database import get_db
+    from tests.test_storage_ownership import _insert_required
+
+    db = get_db()
+    for table, key in (("spots", "spot_id"), ("water_bodies", "water_body_id")):
+        _insert_required(db, table, **{key: "ready", "jurisdiction": jurisdiction})
+    db["species_ranges"].insert({"species": "test", "jurisdictions_present": f'["{jurisdiction}"]'})
+    db["stream_segments"].insert({"ogf_id": 1, "jurisdiction": jurisdiction})
+    db.conn.commit()
+    db.conn.close()
+
+
+@pytest.mark.parametrize("missing", ["spots", "water_bodies", "species_ranges", "stream_segments"])
+def test_readiness_names_missing_jurisdiction_table(missing, monkeypatch):
+    from src.api import main
+    from src.storage.database import get_db
+
+    _populate_ready_tables()
+    db = get_db()
+    db.execute(f'DELETE FROM "{missing}"')
+    db["map_segments"].insert({"ogf_id": 1, "lat": 43, "lng": -79})
+    db.conn.commit()
+    db.conn.close()
+    monkeypatch.setattr(main, "_map_artifact_info", lambda: ("digest", 1))
+    body = client.get("/health/ready")
+    assert body.status_code == 503
+    assert body.json()["checks"][f"{missing}_row_floor"] is False
+    assert body.json()["map_rows"][missing] == 0
+
+
+def test_readiness_does_not_count_other_jurisdictions(monkeypatch):
+    from src.api import main
+
+    _populate_ready_tables("US-MI")
+    monkeypatch.setattr(main, "_map_artifact_info", lambda: ("digest", 1))
+    body = client.get("/health/ready").json()
+    for table in ("spots", "water_bodies", "species_ranges", "stream_segments"):
+        assert body["checks"][f"{table}_row_floor"] is False
 
 
 @REQUIRES_API

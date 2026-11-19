@@ -426,6 +426,25 @@ def health_ready():
             map_digest is not None and map_rows > 0 and map_rows == segment_floor
         )
         checks["map_row_floors"] = segment_floor is not None and map_rows >= segment_floor
+
+        # Beta serves Ontario. Species ranges record membership as a JSON list;
+        # the other three datasets carry a single jurisdiction per row.
+        jurisdiction = "CA-ON"
+        details["served_jurisdiction"] = jurisdiction
+        for table in ("spots", "water_bodies", "species_ranges", "stream_segments"):
+            count = 0
+            if table in tables:
+                predicate = (
+                    "EXISTS (SELECT 1 FROM json_each(jurisdictions_present) WHERE value = ?)"
+                    if table == "species_ranges"
+                    else "jurisdiction = ?"
+                )
+                count = db.execute(
+                    f'SELECT COUNT(*) FROM "{table}" WHERE {predicate}', [jurisdiction]
+                ).fetchone()[0]
+            details["row_floors"][table] = 1
+            details["map_rows"][table] = count
+            checks[f"{table}_row_floor"] = count >= 1
     except Exception:
         checks.setdefault("db_opens", False)
         checks["schema_version"] = False
