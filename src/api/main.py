@@ -194,6 +194,25 @@ def get_current_user_or_apikey(
 _log = logging.getLogger(__name__)
 
 
+def _internal_error(request: Request, exc: Exception) -> HTTPException:
+    """A generic 500 for the client; the real exception goes to the log, keyed by request id.
+
+    str(exc) can carry file paths, SQL and library internals, none of which belong in a
+    response body. The id in the body matches the X-Request-ID header and the log line.
+    """
+    request_id = getattr(request.state, "request_id", "unknown")
+    _log.error(
+        "unhandled_exception request_id=%s route=%s",
+        request_id,
+        request.url.path,
+        exc_info=exc,
+    )
+    return HTTPException(
+        status_code=500,
+        detail=f"Internal server error. Quote request id {request_id} if you report this.",
+    )
+
+
 @asynccontextmanager
 async def lifespan(app):
     # Re-assert INFO level after uvicorn's own logging.config.dictConfig() runs.
@@ -258,11 +277,18 @@ async def lifespan(app):
     yield
 
 
+# The interactive docs and the schema list every route and parameter, so they stay off unless
+# FISHBOT_ENABLE_DOCS=1 (local development).
+_docs_enabled = os.environ.get("FISHBOT_ENABLE_DOCS", "").strip() == "1"
+
 app = FastAPI(
     title="FishBot API",
     description="Personal fishing intelligence platform",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
 
@@ -306,10 +332,22 @@ async def request_observability(request: Request, call_next):
 
 
 # CORS: FISHBOT_CORS_ORIGINS is a comma-separated list of origins allowed to call the API from
-# a browser (the hosted app's address). Unset keeps the local default of "any origin", which is
-# fine on localhost. Auth is a Bearer header, never a cookie, so credentials stay off.
-_cors_raw = os.environ.get("FISHBOT_CORS_ORIGINS", "*")
-_cors_origins = [o.strip().rstrip("/") for o in _cors_raw.split(",") if o.strip()] or ["*"]
+# a browser (the hosted app's address); "*" opts in to any origin. Unset allows only loopback
+# origins (localhost, 127.0.0.1, [::1] on any port), which is what `make app` needs. Auth is a
+# Bearer header, never a cookie, so credentials stay off.
+_LOOPBACK_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+_cors_raw = os.environ.get("FISHBOT_CORS_ORIGINS", "").strip()
+_cors_origins = [o.strip().rstrip("/") for o in _cors_raw.split(",") if o.strip()]
+
+# `serve` records its bind address here (uvicorn started any other way leaves it unset).
+_bind_host = os.environ.get("FISHBOT_BIND_HOST", "").strip()
+if _bind_host and _bind_host not in _LOOPBACK_HOSTS and not _cors_origins:
+    _log.warning(
+        "API is bound to %s but FISHBOT_CORS_ORIGINS is unset, so browsers may only call it "
+        "from loopback origins. Set FISHBOT_CORS_ORIGINS to the app's address.",
+        _bind_host,
+    )
 
 # Added before CORS so CORS wraps it and a 413 still reaches the browser readable.
 app.add_middleware(BodySizeLimitMiddleware)
@@ -317,6 +355,7 @@ app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
+    allow_origin_regex=None if _cors_origins else _LOOPBACK_ORIGIN_REGEX,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -524,7 +563,7 @@ def _reserve_model_spend(user: dict, cost: int = 1) -> None:
 
 
 @app.post("/chat")
-def chat(body: dict, user: dict = Depends(get_current_user)):
+def chat(request: Request, body: dict, user: dict = Depends(get_current_user)):
     """Send a message to FishBot; see README.md for the request and limit contract."""
     from src.agent.chat import run_chat_api
 
@@ -537,7 +576,7 @@ def chat(body: dict, user: dict = Depends(get_current_user)):
     try:
         return run_chat_api(messages, session_id=session_id, user_id=user["id"])
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _internal_error(request, e) from e
 
 
 def _normalize_structured_catches(
@@ -790,7 +829,7 @@ def _log_trip_core(
 
 
 @app.post("/log-trip")
-def log_trip(body: dict, user: dict = Depends(get_current_user_or_apikey)):
+def log_trip(request: Request, body: dict, user: dict = Depends(get_current_user_or_apikey)):
     """Log a fishing trip from natural language, with optional photo metadata.
 
     Body: {
@@ -828,11 +867,12 @@ def log_trip(body: dict, user: dict = Depends(get_current_user_or_apikey)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _internal_error(request, e) from e
 
 
 @app.post("/log-trip/photo")
 def log_trip_with_photo(
+    request: Request,
     text: str = Form(...),
     photo: UploadFile = File(...),
     photo_lat: float | None = Form(None),
@@ -896,11 +936,11 @@ def log_trip_with_photo(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _internal_error(request, e) from e
 
 
 @app.get("/sessions")
-def get_sessions(user: dict = Depends(get_current_user)):
+def get_sessions(request: Request, user: dict = Depends(get_current_user)):
     """Return logged sessions for the current user."""
     from src.storage.catches import get_catches_for_sessions
     from src.storage.database import get_db
@@ -976,7 +1016,7 @@ def get_sessions(user: dict = Depends(get_current_user)):
             )
         return {"sessions": sessions}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _internal_error(request, e) from e
 
 
 # Regional fallback when a user has no GPS grant and no located trips yet —
@@ -1076,7 +1116,7 @@ def get_conditions(
 
 
 @app.get("/fishdex")
-def get_fishdex(user: dict = Depends(get_current_user)):
+def get_fishdex(request: Request, user: dict = Depends(get_current_user)):
     """Return real caught-species + regional pool data for the My FishDex screen.
 
     Jurisdiction is hardcoded to CA-ON for now (this app is Ontario-first per
@@ -1091,7 +1131,7 @@ def get_fishdex(user: dict = Depends(get_current_user)):
     try:
         return get_fishdex_data(db, user["id"], jurisdiction="CA-ON")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise _internal_error(request, e) from e
 
 
 @app.get("/catches/pending")

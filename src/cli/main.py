@@ -112,8 +112,12 @@ def serve(
     reload: bool = typer.Option(False, "--reload", help="Enable auto-reload (dev only)"),
 ) -> None:
     """Start the FishBot API server."""
+    import os
+
     import uvicorn
 
+    # Lets the app warn when it is reachable beyond this machine without a CORS list.
+    os.environ["FISHBOT_BIND_HOST"] = host
     uvicorn.run("src.api.main:app", host=host, port=port, reload=reload)
 
 
