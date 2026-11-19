@@ -3,7 +3,9 @@ Simple invite-code auth for FishBot beta.
 No email, no OAuth. Generate codes, friends enter them, they get accounts.
 """
 
+import hashlib
 import os
+import re
 import secrets
 from datetime import datetime, timedelta
 
@@ -119,19 +121,79 @@ def _undo_account(db: Database, user_id: int, invite_id: int) -> None:
         )
 
 
-def _create_token(db: Database, user_id: int) -> str:
+_SHA256_HEX = re.compile(r"[0-9a-f]{64}")
+
+
+def hash_token(token: str) -> str:
+    """The form a session token is stored in: sha256 hex of the token the client holds.
+
+    Tokens are 256 bits of randomness, so a plain unsalted hash is enough; the point is
+    that a copy of the database does not contain anything a client can send as a bearer.
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def is_hashed_token(stored: str) -> bool:
+    return bool(_SHA256_HEX.fullmatch(stored or ""))
+
+
+def create_session(db: Database, user_id: int, days: int = 90) -> str:
+    """Insert a session row holding only the token's hash; return the token itself, once."""
     token = secrets.token_urlsafe(32)
-    expires = (datetime.now() + timedelta(days=90)).isoformat()
+    expires = (datetime.now() + timedelta(days=days)).isoformat()
     db["user_sessions"].insert(
         {
             "user_id": user_id,
-            "token": token,
+            "token": hash_token(token),
             "expires_at": expires,
             "last_used_at": datetime.now().isoformat(),
         }
     )
     db.conn.commit()
     return token
+
+
+_create_token = create_session
+
+
+def _find_session(db: Database, token: str) -> dict | None:
+    """Look a session up by hash, falling back to the legacy plaintext row.
+
+    The legacy fallback never matches a stored value shaped like a hash, so a leaked
+    hash cannot be replayed as a token. A legacy row that is found is upgraded in place.
+    """
+    session = next(db["user_sessions"].rows_where("token = ?", [hash_token(token)]), None)
+    if session or is_hashed_token(token):
+        return session
+    session = next(db["user_sessions"].rows_where("token = ?", [token]), None)
+    if session and not is_hashed_token(session["token"]):
+        try:
+            with db.conn:
+                db.execute(
+                    "UPDATE user_sessions SET token = ? WHERE id = ? AND token = ?",
+                    [hash_token(token), session["id"], token],
+                )
+        except Exception:
+            pass  # still valid this request; the migration or the next request hashes it
+        return session
+    return None
+
+
+def revoke_token(db: Database, token: str) -> bool:
+    """Delete the session this token opens (both stored forms). True if one was removed."""
+    session = _find_session(db, token)
+    if not session:
+        return False
+    db.execute("DELETE FROM user_sessions WHERE id = ?", [session["id"]])
+    db.conn.commit()
+    return True
+
+
+def revoke_user_tokens(db: Database, user_id: int) -> int:
+    """Delete every session of a user. Returns how many were removed."""
+    cur = db.execute("DELETE FROM user_sessions WHERE user_id = ?", [user_id])
+    db.conn.commit()
+    return cur.rowcount
 
 
 def get_user_from_token(db: Database, token: str) -> dict | None:
@@ -146,20 +208,17 @@ def get_user_from_token(db: Database, token: str) -> dict | None:
     if not token:
         return None
 
-    session = next(
-        db["user_sessions"].rows_where("token = ?", [token]),
-        None,
-    )
+    session = _find_session(db, token)
     if not session:
         return None
 
-    if session.get("expires_at"):
-        try:
-            expires = datetime.fromisoformat(session["expires_at"])
-            if datetime.now() > expires:
-                return None
-        except Exception:
-            pass
+    # A session whose expiry is missing or unreadable is refused, never treated as eternal.
+    try:
+        expires = datetime.fromisoformat(session["expires_at"])
+    except (TypeError, ValueError):
+        return None
+    if datetime.now() > expires:
+        return None
 
     user = next(
         db["users"].rows_where("id = ? AND is_active = 1", [session["user_id"]]),
