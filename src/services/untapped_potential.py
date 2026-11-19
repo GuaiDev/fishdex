@@ -247,11 +247,33 @@ def compute_untapped_potential(
     return result
 
 
+# `explore()` and the card builder both read this ~8 MB parquet on every call,
+# and a single spot build reads it several times. Keep the parsed frame in
+# memory until the file changes. The key is the file's mtime (so a rebuild is
+# picked up without a restart) plus its path (so repointing _PARQUET_PATH never
+# serves another file's frame).
+_cached_untapped: pd.DataFrame | None = None
+_cached_untapped_key: tuple[Path, int] | None = None
+
+
 def load_cached_untapped() -> pd.DataFrame | None:
-    """Load cached untapped potential parquet, or None if not computed."""
+    """Load cached untapped potential parquet, or None if not computed.
+
+    The parsed parquet is reused in-process until the file's modification time
+    changes, so repeated calls read the 8 MB file only once. A rebuild writes a
+    new mtime and is picked up on the next call without a restart.
+    """
+    global _cached_untapped, _cached_untapped_key
     if not _PARQUET_PATH.exists():
+        _cached_untapped = None
+        _cached_untapped_key = None
         return None
-    return pd.read_parquet(_PARQUET_PATH)
+    key = (_PARQUET_PATH, _PARQUET_PATH.stat().st_mtime_ns)
+    if _cached_untapped is not None and _cached_untapped_key == key:
+        return _cached_untapped
+    _cached_untapped = pd.read_parquet(_PARQUET_PATH)
+    _cached_untapped_key = key
+    return _cached_untapped
 
 
 # ── enrichment helpers ────────────────────────────────────────────────────────
