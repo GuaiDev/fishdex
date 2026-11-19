@@ -24,9 +24,7 @@ _OAUTH_BASE = "https://oauth.reddit.com"
 _TOKEN_URL = "https://www.reddit.com/api/v1/access_token"
 _CACHE_DIR = Path("data/cache/reddit")
 _CACHE_TTL_SECONDS = 86400  # 24 hours
-_USER_AGENT = (
-    "fishdex/1.0 (personal fishing exploration tool; github.com/GuaiDev/fishdex)"
-)
+_USER_AGENT = "fishdex/1.0 (personal fishing exploration tool; github.com/GuaiDev/fishdex)"
 _RATE_LIMIT_DELAY = 1.5  # seconds between requests (public API)
 _STARTUP_DELAY = 2.0  # Reddit blocks requests that arrive too fast after startup
 
