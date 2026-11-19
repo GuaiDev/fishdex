@@ -4,7 +4,7 @@ These trips had edge cases (multi-stop days, vague dates, lake locations) that
 the old flat parsed_trips schema couldn't handle. The new sessions + stops schema
 handles them cleanly.
 
-Usage: uv run python scripts/relog_skipped_trips.py
+Usage: uv run python scripts/historical/relog_skipped_trips.py
 """
 
 import json

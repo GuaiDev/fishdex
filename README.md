@@ -8,6 +8,8 @@ Fishdex answers fishing questions from a local corpus of integrated public datas
 
 (The repository, Python package and CLI command are still named `fishbot`.)
 
+**For beta testers.** FishDex is being prepared for a small invite-only beta: Ontario only, no open sign-up, with authenticated features limited to invited testers. The client you use is the plain static app in `app/`, served from Vercel; the API runs on Fly.io. Sign in with the invite code the operator gave you. Your pins, trips and catches stay personal — there is no sharing.
+
 ## The thesis
 
 Most fishing apps take one of two shapes. Either they rank the popular spots better than the last app did, or they hand you a model's confidence score — 87% — and ask you to trust it. Both fail the same way for the angler who wants to find water nobody has written about.

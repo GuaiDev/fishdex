@@ -1,12 +1,12 @@
 # Personalized Fishing AI Bot — Build Roadmap
 
-A pragmatic, phased plan for vibe-coding this in Claude Code, from CLI prototype to web/mobile app.
+Historical roadmap from the CLI prototype stage. The current beta work is tracked in [PLAN.md](../../PLAN.md); the current client is described in [PRODUCT.md](../../PRODUCT.md#platform).
 
 ---
 
 ## Guiding Principles
 
-1. **Ship the CLI bot first, UI last.** Get the brain working before you build the body. A working terminal chatbot that knows about your local fishing scene is more valuable than a half-finished React app.
+1. [history] **Ship the CLI bot first, UI last.** Get the brain working before you build the body. A working terminal chatbot that knows about your local fishing scene is more valuable than a half-finished React app.
 2. **One data source at a time.** Don't try to ingest Reddit, YouTube, iNaturalist, and forums in week one. Pick one, get the loop working end-to-end, then add the next.
 3. **Persist everything.** Cached API responses, your trip logs, scraped pages — store them locally as JSON/SQLite from day one. You'll thank yourself.
 4. **Let Claude Code do the boring parts.** Schema design, API wrappers, scrapers, map integration. Save your energy for product decisions.
@@ -24,7 +24,7 @@ A pragmatic, phased plan for vibe-coding this in Claude Code, from CLI prototype
 | Vector search | **sqlite-vec** locally, **pgvector** in prod | For semantic search over scraped content |
 | Backend (later) | **FastAPI** | Fast to write, plays well with async scrapers |
 | Frontend (later) | **Next.js + Leaflet** (free) or **Mapbox GL** (better UX, paid above free tier) | Leaflet for MVP, Mapbox if you outgrow it |
-| Mobile (eventually) | **React Native (Expo)** or **PWA** | Expo if you want app stores; PWA if you don't |
+| Mobile (history) | **React Native (Expo)** or **PWA** | Expo if you want app stores; PWA if you don't |
 
 ---
 
@@ -155,9 +155,9 @@ Once the foundation is solid, the AI features get fun:
 
 ## Phase 7 — Web App → Mobile (when you're ready)
 
-- Deploy the Next.js app to **Vercel** (free), backend to **Railway** or **Fly.io**.
+For current hosting and deployment instructions, see [deploy/README.md](../../deploy/README.md).
 - Migrate SQLite → Postgres on **Supabase** (free tier, includes auth and PostGIS).
-- For mobile: easiest path is making the web app a **PWA** first (installable, offline-capable). Only go React Native / Expo if you need camera/GPS integration that PWAs handle poorly.
+- [history] For mobile: easiest path is making the web app a **PWA** first (installable, offline-capable). Only go React Native / Expo if you need camera/GPS integration that PWAs handle poorly.
 
 ---
 

@@ -1,6 +1,6 @@
 """
 One-time script to seed the angler context from existing session summaries.
-Run with: uv run python scripts/seed_angler_context.py
+Run with: uv run python scripts/historical/seed_angler_context.py
 """
 
 import sys

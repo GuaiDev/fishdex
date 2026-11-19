@@ -6,21 +6,21 @@ product
 
 ## Platform
 
-API backend only. The client UI is being rebuilt separately and is not in this repository.
+A FastAPI backend plus the client UI: a plain static app under `app/` in this repository, with no framework or build step.
 
 ## Users
 
-Right now the only user is the builder: an intermediate angler based in Oakville, ON, fishing streams and small lakes, targeting every species from popular gamefish down to microfishing targets (darters, dace, madtoms, shiners, chubs, lampreys). Exploration matters more than catch optimization. The app is used both stream-side — outdoors, one-handed, often in direct daylight — and at a desk between trips for planning.
+The current user is the builder: an intermediate angler based in Oakville, ON, fishing streams and small lakes, targeting every species from popular gamefish down to microfishing targets (darters, dace, madtoms, shiners, chubs, lampreys). Exploration matters more than catch optimization. The app is used both stream-side — outdoors, one-handed, often in direct daylight — and at a desk between trips for planning.
 
-The plan is to expand deliberately: a small trusted group next, then a full-scale multi-user app once the data layer and product are solid. Design should stay direct and personal at every stage rather than assuming an anonymous mass audience too early.
+The goal is a small invite-only beta group of anglers across real outings, Ontario only. There is no open sign-up; a wider release is deferred. Design should stay direct and personal at every stage rather than assuming an anonymous mass audience too early.
 
 ## Product Purpose
 
-FishBot pairs a chat-based coaching bot with a habitat-and-presence intelligence layer, a map, and trip logging. It isn't a lookup tool — it exists to help an angler explore untapped water well, backed by data that actually distinguishes where fish live from where people report catching them. Success is dual: fast, trustworthy answers and easy logging in the moment, and a deeper planning/exploration tool to sit with between trips.
+FishDex pairs a chat-based coaching bot with a habitat-and-presence intelligence layer, a map, and trip logging. It isn't a lookup tool — it exists to help an angler explore untapped water well, backed by data that actually distinguishes where fish live from where people report catching them. Success is dual: fast, trustworthy answers and easy logging in the moment, and a deeper planning/exploration tool to sit with between trips.
 
 ## Positioning
 
-FishBot gets the habitat and presence prediction right — separating fish presence from angler pressure instead of collapsing crowdsourced reports into one score — and pairs that rigor with a bot that understands what anglers actually want from a coach, not just what they literally typed. Convenience features (voice logging, pulling in saved Google Maps pins) and, later, light social features exist to make exploration feel effortless, not to replace the exploration itself.
+FishDex gets the habitat and presence prediction right — separating fish presence from angler pressure instead of collapsing crowdsourced reports into one score — and pairs that rigor with a bot that understands what anglers actually want from a coach, not just what they literally typed. Convenience features (voice logging, pulling in saved Google Maps pins) and, later, light social features exist to make exploration feel effortless, not to replace the exploration itself.
 
 ## Brand Personality
 
@@ -38,7 +38,7 @@ Coach, don't just answer. The interface should reflect understanding of what the
 
 Convenience is in service of exploration, not a replacement for it. Friction-reducing features (voice logging, pin import) exist to free up attention for exploring more water, not to make the app feel more "featured."
 
-Built for one, ready for a few. The product currently serves a single power user and will grow to a small trusted group before any wider release — interactions should stay direct and personal rather than defaulting to generic multi-tenant patterns before they're needed.
+Built for one, ready for a few. The product serves one power user and is being prepared for a small invite-only beta group — interactions should stay direct and personal rather than defaulting to generic multi-tenant patterns before they're needed.
 
 Precise, never cold. Sharp, data-forward answers delivered with warmth. Personality and light gamification are welcome, but never at the expense of the data feeling trustworthy.
 

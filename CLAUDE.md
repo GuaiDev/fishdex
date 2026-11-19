@@ -1,6 +1,6 @@
 ## Project
 
-Personal fishing exploration bot. Multi-jurisdiction (Canada + US), Ontario first. **Phase 1 complete** — all data ingestion layers built and verified. Gamification, aquarium, trip planner, map UI all deferred. NOT for public release.
+Personal fishing exploration bot. Multi-jurisdiction (Canada + US), Ontario first. **Phase 1 complete** — all data ingestion layers built and verified. Gamification, aquarium and trip planner deferred; the map UI exists in `app/`. The goal is a small invite-only beta (no open sign-up), with the API on Fly.io and the client on Vercel.
 
 ## My fishing context
 
@@ -209,6 +209,7 @@ Water quality parameters (dissolved oxygen, pH, temperature) are a separate cate
 
 ## Where things live
 
+- Beta plan: read PLAN.md
 - Product spec: `docs/planning/` (read before suggesting any feature)
 - System prompt: `prompts/system.md` (edit without code changes)
 - This file: read every session start
@@ -231,7 +232,7 @@ All sub-phases committed as of 2026-05-26. Phase 2 planning begins next session.
 | 1h | OpenStreetMap water features + access | `global/osm.py` | 25,914 water features, 23,852 access points, 35 barriers |
 | 1i | MNRF stocking history | `ca_on/stocking.py` | 12,756 stocking records |
 | 1j | Native range maps + Species at Risk overlays | `ca_on/species_ranges.py` | 64 species ranges |
-| 1k | Reddit community RAG with technique extraction | — | (RAG index; 0 posts cached) |
+| 1k | Reddit community RAG with technique extraction | — | Historical RAG index; current source policy: `src/ingest/jurisdictions/ca_on/plugin.py` |
 | 1l | Conservation Authority fish surveys | — | BLOCKED — see note below |
 | 1m | Ontario Hydro Network + stream connectivity graph | `ca_on/hydro_network.py` | 28,473 stream segments |
 | 1n | MNRF regulations parser | `ca_on/regulations.py` | 20 FMZ regulation chunks |

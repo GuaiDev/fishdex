@@ -1,6 +1,6 @@
 """
 Test the YouTube ingest pipeline with a small batch of queries.
-Run with: uv run python scripts/test_youtube_ingest.py
+Run with: uv run python scripts/historical/test_youtube_ingest.py
 """
 
 import sys

@@ -1,4 +1,4 @@
-"""Catch photo storage — saves uploaded photo files to the Railway persistent volume.
+"""Catch photo storage — saves uploaded photo files under the configured data directory.
 
 Files land under DATA_DIR/photos, alongside fishing.db, keyed by an unguessable
 UUID filename. Served back out via the /photos StaticFiles mount in src/api/main.py.
@@ -6,7 +6,7 @@ UUID filename. Served back out via the /photos StaticFiles mount in src/api/main
 Uploads are resized and re-encoded on the way in (see save_photo) rather than
 stored at original resolution — these are catch-ID photos for in-app display,
 not archival originals, and full-resolution phone photos (2-8MB HEIC/JPEG each)
-were filling the Railway volume fast. Only the resized copy is kept; the
+would quickly fill a small persistent volume. Only the resized copy is kept; the
 original bytes are discarded after processing.
 """
 

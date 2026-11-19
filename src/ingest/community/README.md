@@ -3,7 +3,7 @@
 Adapters for community-generated content where ToS permits.
 
 Planned modules:
-- `reddit.py` — public Reddit API (r/FishingOntario, r/Fishing, r/microfishing, etc.)
+- `reddit.py` — existing adapter; Ontario enablement and its rationale are owned by the `reddit` source in [`ca_on/plugin.py`](../jurisdictions/ca_on/plugin.py).
 - `youtube.py` — YouTube Data API v3 + transcript extraction via youtube-transcript-api
 - `forums.py` — polite scraping of public fishing forums (robots.txt respected, 1-2s delay)
 - `tournament_results.py` — Bassmaster, FLW, MLF, regional Ontario tournament results

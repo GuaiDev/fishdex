@@ -58,6 +58,13 @@ def test_ontario_weekly_areas_are_the_four_global_only_areas():
     assert all(a.sources == ["global"] for a in areas)
 
 
+def test_ontario_reddit_source_is_disabled_for_beta():
+    from src.ingest.jurisdictions.ca_on.plugin import PLUGIN as ON
+
+    assert ON.sources["reddit"].status == "disabled"
+    assert ON.source_status("reddit") is False
+
+
 # ── the manifests are internally true ─────────────────────────────────────────
 
 

@@ -1,4 +1,4 @@
-"""FishBot FastAPI server.
+"""FishDex FastAPI server.
 
 Exposes the chat agent over HTTP for mobile and web clients.
 Start with: uv run fishbot serve
@@ -23,7 +23,7 @@ from rich.logging import RichHandler
 # basicConfig is a no-op if handlers are already attached (e.g. a parent process
 # configured logging); the explicit setLevel always runs and prevents the root
 # logger's default WARNING level from silently dropping INFO messages in
-# background tasks on Railway.
+# background tasks.
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.DEBUG,
@@ -61,8 +61,8 @@ for _handler in logging.getLogger().handlers[:]:
 
 # These sit below basicConfig on purpose — see the comment above. Importing
 # FastAPI first lets it attach handlers to the root logger, after which
-# basicConfig becomes a no-op and background-task INFO messages vanish on
-# Railway. Same reason the PHOTOS_DIR import further down already carries one.
+# basicConfig becomes a no-op and background-task INFO messages vanish.
+# Same reason the PHOTOS_DIR import further down already carries one.
 from fastapi import (  # noqa: E402
     Depends,
     FastAPI,
@@ -525,7 +525,7 @@ def _reserve_model_spend(user: dict, cost: int = 1) -> None:
 
 @app.post("/chat")
 def chat(body: dict, user: dict = Depends(get_current_user)):
-    """Send a message to FishBot; see README.md for the request and limit contract."""
+    """Send a message to FishDex; see README.md for the request and limit contract."""
     from src.agent.chat import run_chat_api
 
     message = require_text(body.get("message"), "message", MAX_MESSAGE_CHARS)

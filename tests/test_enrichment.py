@@ -14,7 +14,7 @@ def test_retroactive_script_imports():
 
     spec = importlib.util.spec_from_file_location(
         "enrich_historical",
-        "scripts/enrich_historical_sessions.py",
+        "scripts/historical/enrich_historical_sessions.py",
     )
     assert spec is not None
 
