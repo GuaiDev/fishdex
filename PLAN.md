@@ -344,7 +344,7 @@ Parallel tracks once P0 is done: (1) P1 host and security; (2) P3 client screens
 | DL-20 | The public read-only demo stays on. | The species leak that made it dangerous (F4) is closed by #59; no demo route reaches a model; it is useful for showing testers what they are joining. |
 | DL-21 | The captain adopted this plan for all later work (2026-11-20). | The captain said to adopt the beta plan for all later work, so every later FishDex prompt starts from section 0 and its phase, and changes direction through new `DL` entries. |
 | DL-22 | Supersedes the premise of DL-16: the questionnaire design is assumed ready in time, so P4 is not planned around the home-only fallback. | The captain said to assume the questionnaire design will be ready in time. Home-first and skippable questions still stand as design; only the plan for P4's "Cut if short" fallback is no longer the working assumption. P4 still must not block the core loop (P3). |
-| DL-23 | Supersedes the "never" wording of DL-4 and DEF-2: pin sharing is undecided. Public pin sharing is not wanted, sharing between anglers is acceptable, and beta includes neither. | The captain said no decision is made for now, that public pin sharing is not the best, and that sharing between anglers is fine. CLAUDE.md's ethical rule against broadcasting spot lists still covers the public case; no schema or code exists for any sharing. |
+| DL-23 | Supersedes the "never" wording of DL-4 and DEF-2: pin sharing is undecided. Public pin sharing is not wanted; sharing between anglers is acceptable. | The captain said no decision is made for now, that public pin sharing is not the best, and that sharing between anglers is fine. CLAUDE.md's ethical rule against broadcasting spot lists still covers the public case; no schema or code exists for any sharing. |
 
 ---
 
@@ -441,4 +441,4 @@ Run on the hosted app from a phone on cellular, with a fresh invite code. Record
 | 2026-11-19 | P1.12 | done | branch `fm/fishdex-beta-p1-explore-cache`; one read for two calls asserted in `tests/test_services_untapped_potential.py` |
 | 2026-11-20 | DL-21 | added | Captain adopted this plan for all later work |
 | 2026-11-20 | DL-22 | added | Supersedes DL-16's premise: questionnaire design assumed ready in time; P4 not planned around the home-only fallback |
-| 2026-11-20 | DL-23 | added | Supersedes "never" in DL-4 and DEF-2: pin sharing undecided; public not wanted, between anglers acceptable; not in beta either way |
+| 2026-11-20 | DL-23 | added | Supersedes "never" in DL-4 and DEF-2: pin sharing undecided; public not wanted, between anglers acceptable |
