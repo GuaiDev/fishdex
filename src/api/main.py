@@ -356,7 +356,7 @@ _LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 _cors_raw = os.environ.get("FISHBOT_CORS_ORIGINS", "").strip()
 _cors_origins = [o.strip().rstrip("/") for o in _cors_raw.split(",") if o.strip()]
 
-# `serve` and the Dockerfile record their bind address here (uvicorn started by hand leaves it unset).
+# `serve` and the Dockerfile record their bind address here (uvicorn run by hand leaves it unset).
 _bind_host = os.environ.get("FISHBOT_BIND_HOST", "").strip()
 if _bind_host and _bind_host not in _LOOPBACK_HOSTS and not _cors_origins:
     _log.warning(
