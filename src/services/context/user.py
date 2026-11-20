@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 _TARGET_MIN_CATCHES = 3
 
 
-def build_user_layer(db: Database, user_id: int = 1) -> UserLayer:
+def build_user_layer(db: Database, *, user_id: int) -> UserLayer:
     """Recompute the derived layer for one user.
 
     Called when a session is logged, not per question — the coaching path
@@ -228,7 +228,7 @@ _INSIGHT_SQL = """
 
 
 def build_species_history(
-    db: Database, species: str, user_id: int = 1
+    db: Database, species: str, *, user_id: int
 ) -> SpeciesHistory:
     """What this angler has actually done with one species.
 

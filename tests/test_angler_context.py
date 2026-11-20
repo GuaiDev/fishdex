@@ -18,7 +18,7 @@ def test_load_context_empty(tmp_path: Path):
     from src.storage.angler_context import load_context
 
     db = _make_db(tmp_path)
-    result = load_context(db)
+    result = load_context(db, user_id=1)
     assert result is None
 
 
@@ -27,8 +27,8 @@ def test_save_and_load_context(tmp_path: Path):
     from src.storage.angler_context import load_context, save_context
 
     db = _make_db(tmp_path)
-    save_context(db, "## Active plans\n- Dunnville Saturday")
-    result = load_context(db)
+    save_context(db, "## Active plans\n- Dunnville Saturday", user_id=1)
+    result = load_context(db, user_id=1)
     assert result is not None
     assert "Dunnville" in result
 
@@ -48,8 +48,8 @@ def test_context_single_row(tmp_path: Path):
     from src.storage.angler_context import save_context
 
     db = _make_db(tmp_path)
-    save_context(db, "first")
-    save_context(db, "second")
+    save_context(db, "first", user_id=1)
+    save_context(db, "second", user_id=1)
     count = db.execute("SELECT COUNT(*) FROM angler_context").fetchone()[0]
     assert count == 1
 
@@ -59,9 +59,9 @@ def test_save_replaces_content(tmp_path: Path):
     from src.storage.angler_context import load_context, save_context
 
     db = _make_db(tmp_path)
-    save_context(db, "first version")
-    save_context(db, "second version")
-    assert load_context(db) == "second version"
+    save_context(db, "first version", user_id=1)
+    save_context(db, "second version", user_id=1)
+    assert load_context(db, user_id=1) == "second version"
 
 
 def test_empty_string_returns_none(tmp_path: Path):
@@ -69,8 +69,8 @@ def test_empty_string_returns_none(tmp_path: Path):
     from src.storage.angler_context import load_context, save_context
 
     db = _make_db(tmp_path)
-    save_context(db, "   ")
-    assert load_context(db) is None
+    save_context(db, "   ", user_id=1)
+    assert load_context(db, user_id=1) is None
 
 
 def test_close_and_update_skips_empty_session(tmp_path: Path):
@@ -80,8 +80,8 @@ def test_close_and_update_skips_empty_session(tmp_path: Path):
 
     db = _make_db(tmp_path)
     start_session(db, "empty-session")
-    close_and_update_context(db, "empty-session", [])
-    assert load_context(db) is None
+    close_and_update_context(db, "empty-session", [], user_id=1)
+    assert load_context(db, user_id=1) is None
 
 
 def test_schema_has_angler_context_table(tmp_path: Path):

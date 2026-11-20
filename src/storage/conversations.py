@@ -47,7 +47,7 @@ def end_session(db: Database, session_id: str, summary: str | None = None) -> No
 
 
 def generate_session_summary(
-    messages: list[dict], user_id: int = 1, session_id: str | None = None
+    messages: list[dict], *, user_id: int, session_id: str | None = None
 ) -> str:
     """Generate a compact summary of the session using Haiku."""
     text_messages = [
@@ -80,7 +80,8 @@ def close_and_update_context(
     db: Database,
     session_id: str,
     messages: list[dict],
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> None:
     """End a session: generate summary, merge into rolling angler context, mark ended.
 

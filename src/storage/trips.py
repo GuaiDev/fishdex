@@ -18,20 +18,22 @@ from src.models.catch import Catch
 from src.models.trip import Trip
 
 
-def insert_trip(db: Database, trip: Trip) -> int:
+def insert_trip(db: Database, trip: Trip, *, user_id: int) -> int:
     row = _trip_to_row(trip)
     row.pop("id", None)
+    row["user_id"] = user_id
     return db["trips"].insert(row).last_pk
 
 
-def get_trip(db: Database, trip_id: int) -> Trip | None:
-    rows = list(db["trips"].rows_where("id = ?", [trip_id]))
+def get_trip(db: Database, trip_id: int, *, user_id: int) -> Trip | None:
+    rows = list(db["trips"].rows_where("id = ? AND user_id = ?", [trip_id, user_id]))
     if not rows:
         return None
     return _row_to_trip(rows[0])
 
 
-def update_trip(db: Database, trip_id: int, **fields: Any) -> None:
+def update_trip(db: Database, trip_id: int, *, user_id: int, **fields: Any) -> None:
+    """Update a trip the user owns. Someone else's trip id is a no-op, not an edit."""
     encoded: dict[str, Any] = {}
     for key, value in fields.items():
         if key in {"species_caught", "conditions", "gear_used"}:
@@ -39,11 +41,17 @@ def update_trip(db: Database, trip_id: int, **fields: Any) -> None:
         else:
             encoded[key] = value
     encoded["updated_at"] = datetime.now().isoformat()
+    if get_trip(db, trip_id, user_id=user_id) is None:
+        return
     db["trips"].update(trip_id, encoded)
 
 
-def recent_trips(db: Database, limit: int = 5, status: str = "completed") -> list[Trip]:
-    rows = db["trips"].rows_where("status = ?", [status], order_by="date desc", limit=limit)
+def recent_trips(
+    db: Database, *, user_id: int, limit: int = 5, status: str = "completed"
+) -> list[Trip]:
+    rows = db["trips"].rows_where(
+        "status = ? AND user_id = ?", [status, user_id], order_by="date desc", limit=limit
+    )
     return [_row_to_trip(r) for r in rows]
 
 
@@ -76,10 +84,10 @@ def _row_to_trip(row: dict[str, Any]) -> Trip:
 # ── parsed_trips (NL trip logger) ─────────────────────────────────────────────
 
 
-def insert_parsed_trip(db: Any, trip_dict: dict) -> int:
+def insert_parsed_trip(db: Any, trip_dict: dict, *, user_id: int) -> int:
     """Insert a parsed trip into parsed_trips. Returns trip_id."""
     row: dict[str, Any] = {
-        "user_id": trip_dict.get("user_id", "default"),
+        "user_id": str(user_id),
         "logged_at": datetime.now().isoformat(),
         "trip_date": trip_dict.get("date"),
         "location_description": trip_dict.get("location_description", ""),
@@ -115,13 +123,15 @@ def insert_parsed_trip(db: Any, trip_dict: dict) -> int:
 
 def get_parsed_trips(
     db: Any,
+    *,
+    user_id: int,
     limit: int = 50,
     species: str | None = None,
     ogf_id: int | None = None,
 ) -> list[dict]:
     """Return parsed trips, most recent first."""
-    where_clauses = []
-    params: list[Any] = []
+    where_clauses = ["user_id = ?"]
+    params: list[Any] = [str(user_id)]
 
     if species:
         where_clauses.append("(species_caught LIKE ? OR species_observed LIKE ?)")
@@ -130,17 +140,19 @@ def get_parsed_trips(
         where_clauses.append("ogf_id = ?")
         params.append(ogf_id)
 
-    where = " AND ".join(where_clauses) if where_clauses else None
+    where = " AND ".join(where_clauses)
     rows = db["parsed_trips"].rows_where(where, params, order_by="logged_at desc", limit=limit)
     return [_decode_parsed_trip(r) for r in rows]
 
 
-def get_parsed_trips_near(db: Any, lat: float, lng: float, radius_km: float = 25.0) -> list[dict]:
-    """Return parsed trips within radius_km of the given coordinates."""
+def get_parsed_trips_near(
+    db: Any, lat: float, lng: float, *, user_id: int, radius_km: float = 25.0
+) -> list[dict]:
+    """Return the user's parsed trips within radius_km of the given coordinates."""
     deg = radius_km / 111.0
     rows = db["parsed_trips"].rows_where(
-        "lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?",
-        [lat - deg, lat + deg, lng - deg * 1.4, lng + deg * 1.4],
+        "user_id = ? AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?",
+        [str(user_id), lat - deg, lat + deg, lng - deg * 1.4, lng + deg * 1.4],
         order_by="logged_at desc",
     )
     results = []
@@ -154,15 +166,15 @@ def get_parsed_trips_near(db: Any, lat: float, lng: float, radius_km: float = 25
     return results
 
 
-def get_species_parsed_trips(db: Any, species: str) -> list[dict]:
-    """Return all trips where the species was caught or observed."""
-    return get_parsed_trips(db, limit=500, species=species)
+def get_species_parsed_trips(db: Any, species: str, *, user_id: int) -> list[dict]:
+    """Return the user's trips where the species was caught or observed."""
+    return get_parsed_trips(db, user_id=user_id, limit=500, species=species)
 
 
-def get_productive_segments(db: Any) -> list[int]:
-    """Return ogf_ids of segments with at least one productive=True trip."""
+def get_productive_segments(db: Any, *, user_id: int) -> list[int]:
+    """Return ogf_ids of segments with at least one productive=True trip by the user."""
     rows = db["parsed_trips"].rows_where(
-        "was_productive = 1 AND ogf_id IS NOT NULL"
+        "user_id = ? AND was_productive = 1 AND ogf_id IS NOT NULL", [str(user_id)]
     )
     return list({int(r["ogf_id"]) for r in rows})
 
