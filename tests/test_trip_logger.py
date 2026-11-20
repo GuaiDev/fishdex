@@ -58,7 +58,7 @@ def test_get_trips_at_location_by_name(db_conn):
         date="2025-05-15",
     )
 
-    result = get_trips_at_location(db_conn, location_query="Byng Island")
+    result = get_trips_at_location(db_conn, location_query="Byng Island", user_id=1)
     assert "channel catfish" in result
     assert "No logged trips" not in result
 
@@ -66,7 +66,7 @@ def test_get_trips_at_location_by_name(db_conn):
 def test_get_trips_at_location_no_match(db_conn):
     from src.services.trip_logger import get_trips_at_location
 
-    result = get_trips_at_location(db_conn, location_query="Nonexistent Lake")
+    result = get_trips_at_location(db_conn, location_query="Nonexistent Lake", user_id=1)
     assert "No logged trips" in result or "No trips logged" in result
 
 
@@ -78,7 +78,7 @@ def test_get_trips_at_location_multiple_visits(db_conn):
         db_conn, "Byng Island", "Byng Island", ["bowfin", "channel catfish"], date="2025-06-01"
     )
 
-    result = get_trips_at_location(db_conn, location_query="Byng Island")
+    result = get_trips_at_location(db_conn, location_query="Byng Island", user_id=1)
     assert "2 visits" in result
     assert "bowfin" in result
     assert "2025-05-10" in result
@@ -97,7 +97,7 @@ def test_get_trips_at_location_proximity(db_conn):
     )
 
     # Query by nearby coordinates, not name
-    result = get_trips_at_location(db_conn, lat=43.418, lng=-79.775, radius_km=2.0)
+    result = get_trips_at_location(db_conn, lat=43.418, lng=-79.775, radius_km=2.0, user_id=1)
     assert "rainbow darter" in result
     assert "No logged trips" not in result
 
@@ -107,7 +107,7 @@ def test_get_trips_at_location_blank_stop(db_conn):
 
     _insert_stop(db_conn, "Bronte Creek", "Bronte Creek at Burloak", species=[])
 
-    result = get_trips_at_location(db_conn, location_query="Bronte Creek")
+    result = get_trips_at_location(db_conn, location_query="Bronte Creek", user_id=1)
     assert "no fish (blank)" in result
     assert "No logged trips" not in result
 

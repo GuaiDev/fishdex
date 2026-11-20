@@ -40,7 +40,7 @@ def test_no_patterns_with_sparse_data(db_conn):
     _add_session_with_stop(db_conn, "Byng Island", 1, ["channel catfish"])
     _add_session_with_stop(db_conn, "Byng Island", 0)
 
-    result = detect_proactive_patterns(db_conn, [])
+    result = detect_proactive_patterns(db_conn, [], user_id=1)
     assert result is None
 
 
@@ -63,7 +63,7 @@ def test_species_gap_detected(db_conn):
         conclusion="Stonecat found under flat rocks in riffles",
         confidence="low",
         source_type="agent_synthesis",
-        source_detail="test",
+        source_detail="test", user_id=1,
     )
     insert_insight(db_conn, insight)
 
@@ -101,7 +101,7 @@ def test_species_gap_detected(db_conn):
 
     te._detect_species_gap = patched_gap
     try:
-        result = detect_proactive_patterns(db_conn, [])
+        result = detect_proactive_patterns(db_conn, [], user_id=1)
     finally:
         te._detect_species_gap = original
 
@@ -122,7 +122,7 @@ def test_slump_detected(db_conn):
     _add_session_with_stop(db_conn, "Byng Island", 0, [], "2025-06-01")
 
     current = [{"location_name": "Byng Island", "was_productive": False}]
-    result = detect_proactive_patterns(db_conn, current)
+    result = detect_proactive_patterns(db_conn, current, user_id=1)
 
     assert result is not None
     assert result["type"] == "location_slump"
@@ -139,7 +139,7 @@ def test_no_slump_without_current_session_visit(db_conn):
     _add_session_with_stop(db_conn, "Byng Island", 0, [], "2025-06-01")
 
     current = [{"location_name": "Credit River", "was_productive": True}]
-    result = detect_proactive_patterns(db_conn, current)
+    result = detect_proactive_patterns(db_conn, current, user_id=1)
 
     if result:
         assert result["type"] != "location_slump"
@@ -164,7 +164,7 @@ def test_enrich_session_returns_dict(db_conn):
         }
     )
 
-    result = enrich_session(db_conn, sid, use_llm=False)
+    result = enrich_session(db_conn, sid, use_llm=False, user_id=1)
     assert isinstance(result, dict)
     assert "followup_questions" in result
     assert "proactive_coaching" in result
@@ -178,7 +178,7 @@ def test_enrich_session_empty_stops_returns_dict(db_conn):
     db_conn["sessions"].insert({"date": "2025-06-14", "overall_notes": None})
     sid = db_conn.execute("SELECT MAX(id) FROM sessions").fetchone()[0]
 
-    result = enrich_session(db_conn, sid, use_llm=False)
+    result = enrich_session(db_conn, sid, use_llm=False, user_id=1)
     assert isinstance(result, dict)
     assert result["followup_questions"] == []
     assert result["proactive_coaching"] is None

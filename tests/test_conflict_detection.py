@@ -16,6 +16,7 @@ def _make_db(tmp_path) -> Database:
 
 def _catfish(**overrides) -> BehavioralInsight:
     base = dict(
+        user_id=1,
         species="channel catfish",
         condition_type="temporal",
         condition_context="midday-summer",
@@ -30,28 +31,28 @@ def _catfish(**overrides) -> BehavioralInsight:
 
 def test_no_conflicts_when_empty(tmp_path):
     db = _make_db(tmp_path)
-    result = check_conflicts(db, "channel catfish")
+    result = check_conflicts(db, "channel catfish", user_id=1)
     assert result == []
 
 
 def test_conflict_detected_by_species(tmp_path):
     db = _make_db(tmp_path)
     insert_insight(db, _catfish(condition_season="summer"))
-    conflicts = check_conflicts(db, "channel catfish", condition_season="summer")
+    conflicts = check_conflicts(db, "channel catfish", condition_season="summer", user_id=1)
     assert len(conflicts) >= 1
 
 
 def test_no_conflict_different_season(tmp_path):
     db = _make_db(tmp_path)
     insert_insight(db, _catfish(condition_season="summer"))
-    conflicts = check_conflicts(db, "channel catfish", condition_season="winter")
+    conflicts = check_conflicts(db, "channel catfish", condition_season="winter", user_id=1)
     assert len(conflicts) == 0
 
 
 def test_no_conflict_different_species(tmp_path):
     db = _make_db(tmp_path)
     insert_insight(db, _catfish())
-    conflicts = check_conflicts(db, "rainbow trout")
+    conflicts = check_conflicts(db, "rainbow trout", user_id=1)
     assert len(conflicts) == 0
 
 
@@ -64,7 +65,7 @@ def test_conflict_detected_by_proximity(tmp_path):
         lat=42.917,
         lng=-79.774,
     ))
-    conflicts = check_conflicts(db, "channel catfish", lat=42.918, lng=-79.775)
+    conflicts = check_conflicts(db, "channel catfish", lat=42.918, lng=-79.775, user_id=1)
     assert len(conflicts) >= 1
 
 
@@ -77,7 +78,7 @@ def test_no_conflict_far_location(tmp_path):
         lat=42.917,
         lng=-79.774,
     ))
-    conflicts = check_conflicts(db, "channel catfish", lat=43.5, lng=-80.5)
+    conflicts = check_conflicts(db, "channel catfish", lat=43.5, lng=-80.5, user_id=1)
     assert len(conflicts) == 0
 
 
@@ -85,14 +86,14 @@ def test_general_insight_included_regardless_of_location(tmp_path):
     """Insight with no lat/lng is general — included for any location query."""
     db = _make_db(tmp_path)
     insert_insight(db, _catfish())  # no lat/lng
-    conflicts = check_conflicts(db, "channel catfish", lat=43.5, lng=-80.5)
+    conflicts = check_conflicts(db, "channel catfish", lat=43.5, lng=-80.5, user_id=1)
     assert len(conflicts) == 1
 
 
 def test_season_any_always_conflicts(tmp_path):
     db = _make_db(tmp_path)
     insert_insight(db, _catfish(condition_season="any"))
-    conflicts = check_conflicts(db, "channel catfish", condition_season="winter")
+    conflicts = check_conflicts(db, "channel catfish", condition_season="winter", user_id=1)
     assert len(conflicts) == 1
 
 

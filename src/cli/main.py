@@ -99,10 +99,58 @@ def migrate() -> None:
     )
 
 
+_USER_OPTION = typer.Option(
+    None,
+    "--user",
+    "-u",
+    envvar="FISHBOT_USER",
+    help="Whose data this is (username). Required when the database has more than one user.",
+)
+
+
+def _cli_user_id(db, username: str | None) -> int:
+    """Which user a command acts for. Never guessed when more than one could be meant.
+
+    A named user must exist. With no name, the only user in the database is
+    unambiguous; with several, writing under the wrong one is how a second
+    angler's data lands in someone else's account, so the command stops and asks.
+    """
+    if "users" not in db.table_names():
+        console.print("[red]No users yet. Run `fishbot serve` once to create the database.[/red]")
+        raise typer.Exit(1)
+    if username:
+        row = db.execute(
+            "SELECT id FROM users WHERE LOWER(username) = LOWER(?)", [username]
+        ).fetchone()
+        if row is None:
+            console.print(f"[red]No user named '{username}'.[/red]")
+            raise typer.Exit(1)
+        return row[0]
+    rows = db.execute("SELECT id, username FROM users ORDER BY id").fetchall()
+    if len(rows) == 1:
+        return rows[0][0]
+    names = ", ".join(r[1] for r in rows) or "none"
+    console.print(
+        f"[red]Which user? Pass --user <username> (or set FISHBOT_USER). Users here: {names}.[/red]"
+    )
+    raise typer.Exit(1)
+
+
+def _home_profile(db, user_id: int) -> UserProfile:
+    stored = get_user_home(db, user_id)
+    if stored is None:
+        # data/user_profile.json is user 1's file; nobody else inherits it.
+        if user_id == 1:
+            return load_profile()
+        return UserProfile(home_jurisdiction="CA-ON")
+    home, jurisdiction = stored
+    return UserProfile(home_location=home, home_jurisdiction=jurisdiction or "CA-ON")
+
+
 @app.command()
-def run() -> None:
+def run(user: str | None = _USER_OPTION) -> None:
     """Start the fishing bot chat."""
-    run_chat()
+    run_chat(user_id=_cli_user_id(get_db(), user))
 
 
 @app.command()
@@ -117,19 +165,12 @@ def serve(
     uvicorn.run("src.api.main:app", host=host, port=port, reload=reload)
 
 
-def _home_profile(db) -> UserProfile:
-    stored = get_user_home(db, 1)
-    if stored is None:
-        return load_profile()
-    home, jurisdiction = stored
-    return UserProfile(home_location=home, home_jurisdiction=jurisdiction or "CA-ON")
-
-
 @app.command()
-def log() -> None:
+def log(user: str | None = _USER_OPTION) -> None:
     """Interactively log a fishing trip."""
     db = get_db()
-    profile = _home_profile(db)
+    user_id = _cli_user_id(db, user)
+    profile = _home_profile(db, user_id)
     today = date_type.today().isoformat()
 
     trip_date_str = typer.prompt("Date (YYYY-MM-DD)", default=today)
@@ -179,17 +220,18 @@ def log() -> None:
         what_didnt=what_didnt,
     )
 
-    trip_id = insert_trip(db, trip)
+    trip_id = insert_trip(db, trip, user_id=user_id)
     console.print(f"[green]Saved trip #{trip_id}[/green] — {location_name} on {trip_date_str}")
 
 
 @app.command()
 def recent(
     limit: int = typer.Option(10, "--limit", "-n", help="How many trips to show"),
+    user: str | None = _USER_OPTION,
 ) -> None:
     """Show recent trips."""
     db = get_db()
-    trips = recent_trips(db, limit=limit)
+    trips = recent_trips(db, user_id=_cli_user_id(db, user), limit=limit)
     if not trips:
         console.print("[dim]No trips logged yet. Run `fishbot log` to record one.[/dim]")
         return
@@ -215,11 +257,14 @@ def recent(
 
 
 @app.command()
-def profile() -> None:
+def profile(user: str | None = _USER_OPTION) -> None:
     """View and optionally edit your fishing profile."""
-    p = load_profile()
     db = get_db()
-    stored_home = get_user_home(db, 1)
+    user_id = _cli_user_id(db, user)
+    # The profile file (data/user_profile.json) is user 1's; other users have a
+    # stored home only.
+    p = load_profile() if user_id == 1 else UserProfile(home_jurisdiction="CA-ON")
+    stored_home = get_user_home(db, user_id)
     if stored_home is not None:
         p = p.model_copy(
             update={
@@ -270,8 +315,9 @@ def profile() -> None:
         fishing_style=fishing_style,
         preferences=preferences,
     )
-    save_profile(updated)
-    set_user_home(db, 1, home_location, home_jurisdiction)
+    if user_id == 1:
+        save_profile(updated)
+    set_user_home(db, user_id, home_location, home_jurisdiction)
     console.print("[green]Profile saved.[/green]")
 
 
@@ -371,6 +417,7 @@ def ingest(
     ),  # noqa: E501
     lat: float = typer.Option(None, "--lat", help="Override center latitude"),
     lng: float = typer.Option(None, "--lng", help="Override center longitude"),
+    user: str | None = _USER_OPTION,
 ) -> None:
     """Pull fish observations from iNaturalist and GBIF near your home location."""
     from src.services.gbif import fetch_and_store as gbif_fetch_and_store
@@ -378,7 +425,8 @@ def ingest(
     from src.services.osm import fetch_and_store as osm_fetch_and_store
     from src.services.stream_gauge import fetch_and_store as wsc_fetch_and_store
 
-    profile = _home_profile(get_db())
+    db = get_db()
+    profile = _home_profile(db, _cli_user_id(db, user))
 
     if lat is not None and lng is not None:
         center_lat, center_lng = lat, lng
@@ -1130,18 +1178,22 @@ def compute_untapped() -> None:
 
 
 @app.command()
-def context(clear: bool = typer.Option(False, "--clear", help="Clear the angler context")) -> None:
+def context(
+    clear: bool = typer.Option(False, "--clear", help="Clear the angler context"),
+    user: str | None = _USER_OPTION,
+) -> None:
     """View or clear the persistent angler context document."""
     from src.storage.angler_context import load_context, save_context
 
     db = get_db()
+    user_id = _cli_user_id(db, user)
 
     if clear:
-        save_context(db, "")
+        save_context(db, "", user_id=user_id)
         console.print("[green]Angler context cleared.[/green]")
         return
 
-    ctx = load_context(db)
+    ctx = load_context(db, user_id=user_id)
     if not ctx:
         console.print(
             "[dim]No angler context yet. Start chatting and it will build up automatically.[/dim]"
@@ -1157,19 +1209,21 @@ def context(clear: bool = typer.Option(False, "--clear", help="Clear the angler 
 @app.command()
 def history(
     sessions: int = typer.Option(5, "--sessions", "-n", help="Number of sessions to show"),
+    user: str | None = _USER_OPTION,
 ) -> None:
     """Show recent chat sessions."""
     db = get_db()
+    user_id = _cli_user_id(db, user)
     rows = list(
         db.execute(
             """
         SELECT session_id, started_at, turn_count, summary
         FROM chat_sessions
-        WHERE turn_count > 1
+        WHERE turn_count > 1 AND user_id = ?
         ORDER BY started_at DESC
         LIMIT ?
     """,
-            [sessions],
+            [user_id, sessions],
         ).fetchall()
     )
 

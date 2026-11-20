@@ -96,7 +96,7 @@ def test_explorer_log_reaches_the_species_prompt(db_conn, captured):  # noqa: F8
     from src.services.coaching import get_species_coaching
 
     _log_explorer(db_conn)
-    get_species_coaching(db_conn, "creek chub", "What should I look at on a new creek?")
+    get_species_coaching(db_conn, "creek chub", "What should I look at on a new creek?", user_id=1)
     assert "try new water" in captured["prompt"]
     assert "answered directly" in captured["prompt"]
 
@@ -105,7 +105,7 @@ def test_regular_log_reaches_the_species_prompt(db_conn, captured):  # noqa: F81
     from src.services.coaching import get_species_coaching
 
     _log_regular(db_conn)
-    get_species_coaching(db_conn, "creek chub")
+    get_species_coaching(db_conn, "creek chub", user_id=1)
     assert "same water" in captured["prompt"]
 
 
@@ -113,7 +113,7 @@ def test_thin_log_says_style_unknown(db_conn, captured):  # noqa: F811
     from src.services.coaching import get_species_coaching
 
     trip(db_conn, 1, "2025-06-01", 43.0, -79.0, name="one creek")
-    get_species_coaching(db_conn, "creek chub")
+    get_species_coaching(db_conn, "creek chub", user_id=1)
     assert "Style is not known yet" in captured["prompt"]
 
 
@@ -122,7 +122,7 @@ def test_explicit_questions_win_for_both_styles(db_conn, captured):  # noqa: F81
     from src.services.coaching import get_species_coaching
 
     _log_explorer(db_conn)
-    get_species_coaching(db_conn, "creek chub", "Tell me about creek 3 again.")
+    get_species_coaching(db_conn, "creek chub", "Tell me about creek 3 again.", user_id=1)
     prompt = captured["prompt"]
     assert "Tell me about creek 3 again." in prompt
     assert "answered directly, with this style left out" in prompt
@@ -140,7 +140,7 @@ def test_declared_override_reaches_the_prompt(db_conn, captured):  # noqa: F811
     from src.services.coaching import get_species_coaching
 
     store.set_declared(db_conn, 1, "signal:explore", 0.1, 1.0, is_override=True)
-    get_species_coaching(db_conn, "creek chub")
+    get_species_coaching(db_conn, "creek chub", user_id=1)
     assert "same water" in captured["prompt"]
     assert "set this themselves" in captured["prompt"]
 
@@ -154,7 +154,7 @@ def test_location_prompt_carries_style_and_rules(db_conn, captured):  # noqa: F8
          "lat": 43.5, "lng": -79.5},
         alter=True,
     )  # fmt: skip
-    get_location_coaching(db_conn, "Home Creek")
+    get_location_coaching(db_conn, "Home Creek", user_id=1)
     prompt = captured["prompt"]
     assert "same water" in prompt
     assert prompt.count("Never promise or predict size or catch outcomes") == 1
@@ -164,7 +164,7 @@ def test_location_prompt_carries_style_and_rules(db_conn, captured):  # noqa: F8
 def test_default_question_is_outcome_neutral(db_conn, captured):  # noqa: F811
     from src.services.coaching import get_species_coaching
 
-    get_species_coaching(db_conn, "creek chub")
+    get_species_coaching(db_conn, "creek chub", user_id=1)
     assert "catch more" not in captured["prompt"]
     assert "What could I try next with creek chub?" in captured["prompt"]
 
@@ -185,7 +185,7 @@ def test_listed_species_still_refuses_whatever_the_style(db_conn, captured, monk
         ),
     )
     _log_explorer(db_conn)
-    coaching.get_species_coaching(db_conn, "Redside Dace")
+    coaching.get_species_coaching(db_conn, "Redside Dace", user_id=1)
     prompt = captured["prompt"]
     assert "CONSERVATION OVERRIDE" in prompt
     assert prompt.rindex("CONSERVATION OVERRIDE") > prompt.index("Angler style")

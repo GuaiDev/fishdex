@@ -179,7 +179,7 @@ def db(fast_db):
 
 
 def test_the_pins_waters_are_the_named_ones_that_pass_close_by(db):
-    place = place_mod.resolve(db, lat=MOUTH[0], lng=MOUTH[1])
+    place = place_mod.resolve(db, lat=MOUTH[0], lng=MOUTH[1], user_id=1)
     among = ["CREDIT RIVER", "Far Creek", "Nowhere Creek"]
     assert place_mod.water_names_at(db, place, among) == ["Credit River"]
     assert place_mod.water_names_at(db, place, among, within_km=5) == ["Credit River", "Far Creek"]
@@ -188,7 +188,7 @@ def test_the_pins_waters_are_the_named_ones_that_pass_close_by(db):
 def test_the_pins_river_is_found_however_many_other_segments_surround_it(db):
     for i in range(10, 710):
         _segment(db, i, f"Other {i} Creek", MOUTH[0] + 0.01, MOUTH[1])
-    place = place_mod.resolve(db, lat=MOUTH[0], lng=MOUTH[1])
+    place = place_mod.resolve(db, lat=MOUTH[0], lng=MOUTH[1], user_id=1)
     assert place_mod.water_names_at(db, place, ["Credit River"]) == ["Credit River"]
 
 
@@ -196,7 +196,7 @@ def test_no_hydro_table_means_no_names_not_an_error(db_factory, tmp_path, migrat
     path = tmp_path / "empty.db"
     shutil.copy(migrated_template_db, path)
     empty = db_factory(path)
-    place = place_mod.resolve(empty, lat=MOUTH[0], lng=MOUTH[1])
+    place = place_mod.resolve(empty, lat=MOUTH[0], lng=MOUTH[1], user_id=1)
     assert place_mod.water_names_at(empty, place, ["Credit River"]) is None
 
 
@@ -226,7 +226,7 @@ def panel(db, network, monkeypatch):
         from src.models.pin import PinConditionRow
         from src.services.pins.conditions import _row
 
-        ctx = describe(db, lat=lat, lng=lng, caller="pin_panel")
+        ctx = describe(db, lat=lat, lng=lng, caller="pin_panel", user_id=1)
         now = datetime.now(UTC)
         return {
             spec["field"]: _row(spec, getattr(ctx.conditions, spec["field"]), now)
@@ -263,7 +263,7 @@ def test_a_pin_whose_water_is_unknown_gets_the_nearest_gauge_named_for_its_own_w
 ):
     bare = fast_db
     monkeypatch.setattr("src.services.weather.get_conditions_for_agent", lambda **kw: _weather())
-    ctx = describe(bare, lat=MOUTH[0], lng=MOUTH[1], caller="pin_panel")
+    ctx = describe(bare, lat=MOUTH[0], lng=MOUTH[1], caller="pin_panel", user_id=1)
     prov = ctx.conditions.flow_cms.provenance
     assert prov.water == "Cooksville Creek"
     assert prov.same_water is None

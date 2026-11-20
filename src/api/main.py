@@ -100,6 +100,7 @@ from src.models.pin import (  # noqa: E402
     TodaySort,
     TripPinRating,
 )
+from src.models.user_context import UserContext  # noqa: E402
 from src.models.weed_report import WeedReportCreate, WeedReportUpdate  # noqa: E402
 
 
@@ -189,6 +190,21 @@ def get_current_user_or_apikey(
             request.state.user_id = user["id"]
         return user
     raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+def get_user_context(user: dict = Depends(get_current_user)) -> UserContext:
+    """The signed-in caller, built once per request (FastAPI caches the dependency)."""
+    return UserContext.from_row(user)
+
+
+def get_demo_context(user: dict = Depends(get_user_or_demo)) -> UserContext:
+    """A signed-in caller, or the signed-out demo (`user_id` None, `is_demo` True)."""
+    return UserContext.from_row(user)
+
+
+def get_apikey_context(user: dict = Depends(get_current_user_or_apikey)) -> UserContext:
+    """A bearer-token caller, or the operator's API key (the admin user)."""
+    return UserContext.from_row(user)
 
 
 _log = logging.getLogger(__name__)
@@ -329,7 +345,7 @@ app.mount("/static", StaticFiles(directory=_static_dir), name="static")
 
 
 @app.get("/photos/{name}")
-def get_photo(name: str, user: dict = Depends(get_current_user)):
+def get_photo(name: str, user: UserContext = Depends(get_user_context)):
     """Serve a catch photo only to the catch's owner."""
     from src.services.photo_storage import PHOTOS_DIR
     from src.storage.database import get_db
@@ -348,7 +364,7 @@ def get_photo(name: str, user: dict = Depends(get_current_user)):
             for row in db.query(
                 "SELECT photo_path FROM catches "
                 "WHERE user_id = ? AND photo_url = ? AND photo_path IS NOT NULL",
-                [user["id"], f"/photos/{name}"],
+                [user.user_id, f"/photos/{name}"],
             )
         )
     finally:
@@ -385,7 +401,6 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     conversation_history: list[ChatMessage] | None = []
-    user_id: str | None = "default"
 
 
 class ChatResponse(BaseModel):
@@ -506,24 +521,24 @@ def signup(body: dict):
 
 
 @app.get("/auth/me")
-def me(user: dict = Depends(get_current_user)):
+def me(user: UserContext = Depends(get_user_context)):
     """Return current user info."""
     from src.auth.auth import check_rate_limit
     from src.storage.database import get_db
 
     db = get_db()
-    usage = check_rate_limit(db, user["id"], user.get("daily_message_limit", 50))
+    usage = check_rate_limit(db, user.user_id, user.daily_message_limit)
     return {
-        "user_id": user["id"],
-        "username": user["username"],
-        "display_name": user.get("display_name"),
-        "role": user.get("role"),
+        "user_id": user.user_id,
+        "username": user.username,
+        "display_name": user.display_name,
+        "role": user.role,
         "usage_today": usage["used"],
         "daily_limit": usage["limit"],
     }
 
 
-def _reserve_model_spend(user: dict, cost: int = 1) -> None:
+def _reserve_model_spend(user: UserContext, cost: int = 1) -> None:
     """Spend `cost` units of today's model budget, or raise 429 (own limit) / 503 (server's).
 
     Call this after cheap validation (so a malformed request is free) and before any
@@ -532,8 +547,8 @@ def _reserve_model_spend(user: dict, cost: int = 1) -> None:
     from src.auth.auth import reserve_usage
     from src.storage.database import get_db
 
-    limit = user.get("daily_message_limit", 50)
-    result = reserve_usage(get_db(), user["id"], limit, cost)
+    limit = user.daily_message_limit
+    result = reserve_usage(get_db(), user.user_id, limit, cost)
     if result["allowed"]:
         return
     if result["reason"] == "global":
@@ -548,7 +563,7 @@ def _reserve_model_spend(user: dict, cost: int = 1) -> None:
 
 
 @app.post("/chat")
-def chat(body: dict, user: dict = Depends(get_current_user)):
+def chat(body: dict, user: UserContext = Depends(get_user_context)):
     """Send a message to FishBot; see README.md for the request and limit contract."""
     from src.agent.chat import run_chat_api
 
@@ -559,7 +574,7 @@ def chat(body: dict, user: dict = Depends(get_current_user)):
 
     _reserve_model_spend(user)
     try:
-        return run_chat_api(messages, session_id=session_id, user_id=user["id"])
+        return run_chat_api(messages, session_id=session_id, user_id=user.user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -674,7 +689,7 @@ def _check_catches_json(catches_json: object) -> None:
 
 def _log_trip_core(
     text: str,
-    user: dict,
+    user: UserContext,
     photo_lat: float | None = None,
     photo_lng: float | None = None,
     photo_taken_at: str | None = None,
@@ -708,7 +723,7 @@ def _log_trip_core(
     started_at, ended_at = _trip_times(started_at, ended_at)
 
     db = get_db()
-    parsed = parse_session_from_text(text, db, user_id=user["id"])
+    parsed = parse_session_from_text(text, db, user_id=user.user_id)
     structured_catches = _normalize_structured_catches(catches_json, extra_photos)
 
     # Inject photo metadata into the first stop
@@ -751,7 +766,7 @@ def _log_trip_core(
     result = log_session(
         parsed,
         db,
-        user_id=user["id"],
+        user_id=user.user_id,
         structured_catches=structured_catches,
         fallback_lat=photo_lat,
         fallback_lng=photo_lng,
@@ -814,7 +829,7 @@ def _log_trip_core(
 
 
 @app.post("/log-trip")
-def log_trip(body: dict, user: dict = Depends(get_current_user_or_apikey)):
+def log_trip(body: dict, user: UserContext = Depends(get_apikey_context)):
     """Log a fishing trip from natural language, with optional photo metadata.
 
     Body: {
@@ -866,7 +881,7 @@ def log_trip_with_photo(
     photos: list[UploadFile] | None = File(default=None),
     started_at: str | None = Form(None),
     ended_at: str | None = Form(None),
-    user: dict = Depends(get_current_user_or_apikey),
+    user: UserContext = Depends(get_apikey_context),
 ):
     """Log a fishing trip with an actual photo file (multipart/form-data).
 
@@ -924,7 +939,7 @@ def log_trip_with_photo(
 
 
 @app.get("/sessions")
-def get_sessions(user: dict = Depends(get_current_user)):
+def get_sessions(user: UserContext = Depends(get_user_context)):
     """Return logged sessions for the current user."""
     from src.storage.catches import get_catches_for_sessions
     from src.storage.database import get_db
@@ -950,13 +965,13 @@ def get_sessions(user: dict = Depends(get_current_user)):
             ORDER BY s.id DESC
             LIMIT 50
         """,
-                [user["id"]],
+                [user.user_id],
             ).fetchall()
         )
 
         session_ids = [r[0] for r in rows]
         catches_by_session = get_catches_for_sessions(db, session_ids)
-        pins_by_session = pins_for_sessions(db, user["id"], session_ids)
+        pins_by_session = pins_for_sessions(db, user.user_id, session_ids)
 
         sessions = []
         for r in rows:
@@ -1011,7 +1026,7 @@ _DEFAULT_REGION = {"lat": 43.5, "lng": -79.8, "name": "Southern Ontario"}
 
 @app.get("/conditions")
 def get_conditions(
-    user: dict = Depends(get_current_user),
+    user: UserContext = Depends(get_user_context),
     lat: float | None = None,
     lng: float | None = None,
 ):
@@ -1053,7 +1068,7 @@ def get_conditions(
             ORDER BY s.id DESC
             LIMIT 1
             """,
-            [user["id"]],
+            [user.user_id],
         ).fetchone()
         if row and row[0] is not None:
             loc = {
@@ -1074,7 +1089,7 @@ def get_conditions(
     # Literacy-gated, and a panel refresh is not proof it was read, so showing
     # it here records no exposure; the client reports a sighting via
     # POST /profile/concept-events using `pressure_note_term_id`.
-    note = note_for_user(get_db(), user["id"], trend.trend)
+    note = note_for_user(get_db(), user.user_id, trend.trend)
 
     return {
         "location": {
@@ -1100,7 +1115,7 @@ def get_conditions(
 
 
 @app.get("/fishdex")
-def get_fishdex(user: dict = Depends(get_current_user)):
+def get_fishdex(user: UserContext = Depends(get_user_context)):
     """Return real caught-species + regional pool data for the My FishDex screen.
 
     Jurisdiction is hardcoded to CA-ON for now (this app is Ontario-first per
@@ -1113,20 +1128,20 @@ def get_fishdex(user: dict = Depends(get_current_user)):
 
     db = get_db()
     try:
-        return get_fishdex_data(db, user["id"], jurisdiction="CA-ON")
+        return get_fishdex_data(db, user.user_id, jurisdiction="CA-ON")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/catches/pending")
-def get_pending_catches_endpoint(user: dict = Depends(get_current_user)):
+def get_pending_catches_endpoint(user: UserContext = Depends(get_user_context)):
     """Catches awaiting species confirmation — text-parsed and/or photo-vision
     suggested, not yet reviewed by the user. Drives the confirm/correct UI."""
     from src.storage.catches import get_pending_catches_for_user
     from src.storage.database import get_db
 
     db = get_db()
-    rows = get_pending_catches_for_user(db, user["id"])
+    rows = get_pending_catches_for_user(db, user.user_id)
     pending = []
     for r in rows:
         suggested = json.loads(r["suggested_species"]) if r.get("suggested_species") else []
@@ -1144,7 +1159,7 @@ def get_pending_catches_endpoint(user: dict = Depends(get_current_user)):
 
 @app.post("/catches/{catch_id}/confirm-species")
 def confirm_catch_species_endpoint(
-    catch_id: int, body: dict, user: dict = Depends(get_current_user)
+    catch_id: int, body: dict, user: UserContext = Depends(get_user_context)
 ):
     """Commit the user's confirmed/corrected species for a catch.
 
@@ -1160,7 +1175,7 @@ def confirm_catch_species_endpoint(
         raise HTTPException(status_code=400, detail="'species' field is required")
 
     db = get_db()
-    result = confirm_catch_species(db, catch_id, user["id"], species)
+    result = confirm_catch_species(db, catch_id, user.user_id, species)
     if not result["found"]:
         raise HTTPException(status_code=404, detail="Catch not found")
     return {
@@ -1306,23 +1321,23 @@ def admin_dashboard(_: None = Depends(verify_api_key)):
 
 
 @app.post("/admin/invite")
-def create_invite(body: dict, user: dict = Depends(get_current_user)):
+def create_invite(body: dict, user: UserContext = Depends(get_user_context)):
     """Generate an invite code. Admin only."""
-    if user.get("role") != "admin":
+    if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     from src.auth.auth import generate_invite_code
     from src.storage.database import get_db
 
     db = get_db()
     note = body.get("note", "")
-    code = generate_invite_code(db, created_by=user["id"], note=note)
+    code = generate_invite_code(db, created_by=user.user_id, note=note)
     return {"code": code, "note": note}
 
 
 @app.get("/admin/invites")
-def list_invites(user: dict = Depends(get_current_user)):
+def list_invites(user: UserContext = Depends(get_user_context)):
     """List all invite codes. Admin only."""
-    if user.get("role") != "admin":
+    if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     from src.storage.database import get_db
 
@@ -1332,9 +1347,9 @@ def list_invites(user: dict = Depends(get_current_user)):
 
 
 @app.get("/admin/users")
-def list_users(user: dict = Depends(get_current_user)):
+def list_users(user: UserContext = Depends(get_user_context)):
     """List all users and their usage. Admin only."""
-    if user.get("role") != "admin":
+    if user.role != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     from src.storage.database import get_db
 
@@ -1385,7 +1400,7 @@ def get_map_segments(
     west: float,
     mode: str = "balanced",
     limit: int = 300,
-    user: dict = Depends(get_current_user),
+    user: UserContext = Depends(get_user_context),
 ):
     """Return stream segments within viewport bounds for explore mode."""
     from src.storage.database import get_db
@@ -1442,7 +1457,7 @@ def get_map_segments(
 @app.get("/map/stretches")
 def get_map_stretches(
     jurisdiction: str | None = None,
-    user: dict = Depends(get_current_user),
+    user: UserContext = Depends(get_user_context),
 ):
     """Named fishing stretches for the explore map's low-zoom level, as GeoJSON.
 
@@ -1456,7 +1471,7 @@ def get_map_stretches(
 
 
 @app.get("/map/stretches/{stretch_id}/anchors")
-def get_map_stretch_anchors(stretch_id: str, user: dict = Depends(get_current_user)):
+def get_map_stretch_anchors(stretch_id: str, user: UserContext = Depends(get_user_context)):
     """One stretch's anchors and segment lines for the explore map's zoomed level.
 
     Point features are confluences, dams and their tailwaters, lake mouths and
@@ -1490,11 +1505,11 @@ DEMO_MAX_SPAN_DEG = 1.0
 DEMO_DEFAULT_CENTER = (-79.7, 43.45)
 
 
-def _demo_limits(user: dict, box, tier: int):
+def _demo_limits(user: UserContext, box, tier: int):
     """The slice of spots a signed-out demo caller may see: tier 1 only, inside one
     modest box. A missing box becomes one around home; an oversized one is shrunk
     around its centre. Signed-in callers pass through unchanged."""
-    if not user.get("demo"):
+    if not user.is_demo:
         return box, tier
     half = DEMO_MAX_SPAN_DEG / 2
     if box is None:
@@ -1575,7 +1590,7 @@ def _parse_spot_filters(
 
 
 @app.get("/map/spots/labels")
-def get_map_spot_labels(user: dict = Depends(get_user_or_demo)):
+def get_map_spot_labels(user: UserContext = Depends(get_demo_context)):
     """Every user-facing word the spots map shows: chips, one-liners, layer names, and the
     labelled general-reasoning paragraph per kind. The web app reads this; it hardcodes none."""
     from src.services.spot_labels import labels_payload
@@ -1584,7 +1599,7 @@ def get_map_spot_labels(user: dict = Depends(get_user_or_demo)):
 
 
 @app.get("/terms")
-def get_terms(user: dict = Depends(get_current_user)):
+def get_terms(user: UserContext = Depends(get_user_context)):
     """The term registry: every map/habitat concept with its term_id, plain wording,
     technical wording, a factual definition and where the map gets that feature type.
     Which wording a person sees comes from GET /profile/presentation, not from here."""
@@ -1598,29 +1613,29 @@ def get_terms(user: dict = Depends(get_current_user)):
 
 
 @app.get("/profile")
-def get_profile(user: dict = Depends(get_current_user)):
+def get_profile(user: UserContext = Depends(get_user_context)):
     """The angler profile: orientation, size and small-species focus, and literacy per
     concept, each with its inferred and declared parts (value + source + weight) and the
     evidence behind it. For settings and for checking what the app has inferred."""
     from src.services.context import angler_profile
     from src.storage.database import get_db
 
-    return angler_profile(get_db(), user_id=user["id"]).model_dump()
+    return angler_profile(get_db(), user_id=user.user_id).model_dump()
 
 
 @app.get("/profile/presentation")
-def get_profile_presentation(user: dict = Depends(get_current_user)):
+def get_profile_presentation(user: UserContext = Depends(get_user_context)):
     """Per-element prominence (0..1) and label wording mode for the map, dex, log form
     and pins. Facts are never filtered; components decide how loudly to render."""
     from src.services.context import angler_profile
     from src.services.presentation import presentation
     from src.storage.database import get_db
 
-    return presentation(angler_profile(get_db(), user_id=user["id"]))
+    return presentation(angler_profile(get_db(), user_id=user.user_id))
 
 
 @app.post("/profile/concept-events", status_code=201)
-def post_concept_event(body: dict, user: dict = Depends(get_current_user)):
+def post_concept_event(body: dict, user: UserContext = Depends(get_user_context)):
     """Record literacy evidence: {"term_id": "confluence", "kind": "definition_opened" |
     "seen_on_map", "ref": optional id}. Folded in at the next logged session."""
     from src.storage import angler_profile as store
@@ -1629,7 +1644,7 @@ def post_concept_event(body: dict, user: dict = Depends(get_current_user)):
     try:
         event_id = store.record_event(
             get_db(),
-            user["id"],
+            user.user_id,
             str(body.get("term_id", "")),
             str(body.get("kind", "")),
             body.get("ref"),
@@ -1640,7 +1655,7 @@ def post_concept_event(body: dict, user: dict = Depends(get_current_user)):
 
 
 @app.put("/profile/declared/{key}")
-def put_declared_value(key: str, body: dict, user: dict = Depends(get_current_user)):
+def put_declared_value(key: str, body: dict, user: UserContext = Depends(get_user_context)):
     """Write a declared value: {"value": 0..1, "weight": 0..MAX (default 3), "override": bool}.
     A questionnaire writes a starting value that fades as trips are logged; settings
     writes an override that holds until cleared. Keys: orientation, size_focus,
@@ -1654,7 +1669,7 @@ def put_declared_value(key: str, body: dict, user: dict = Depends(get_current_us
         if not 0.0 <= value <= 1.0:
             raise ValueError("value must be 0..1")
         row = store.set_declared(
-            get_db(), user["id"], key, value, weight, is_override=bool(body.get("override"))
+            get_db(), user.user_id, key, value, weight, is_override=bool(body.get("override"))
         )
     except (KeyError, TypeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1662,13 +1677,13 @@ def put_declared_value(key: str, body: dict, user: dict = Depends(get_current_us
 
 
 @app.delete("/profile/declared/{key}")
-def delete_declared_value(key: str, user: dict = Depends(get_current_user)):
+def delete_declared_value(key: str, user: UserContext = Depends(get_user_context)):
     """Clear a declared value or override; the value goes back to behaviour alone."""
     from src.storage import angler_profile as store
     from src.storage.database import get_db
 
     try:
-        removed = store.clear_declared(get_db(), user["id"], key)
+        removed = store.clear_declared(get_db(), user.user_id, key)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not removed:
@@ -1690,7 +1705,7 @@ def get_map_spots(
     near: str | None = None,
     new_to_me: bool = False,
     response: Response = None,
-    user: dict = Depends(get_user_or_demo),
+    user: UserContext = Depends(get_demo_context),
 ):
     """Spots for the explore map, as GeoJSON points.
 
@@ -1710,7 +1725,7 @@ def get_map_spots(
     box, kinds, species_f, near_f = _parse_spot_filters(bbox, kind, tier, species, near)
     box, tier = _demo_limits(user, box, tier)
     if new_to_me:
-        if user.get("demo"):
+        if user.is_demo:
             raise HTTPException(status_code=401, detail="Sign in to see spots new to you")
         if box is None:
             raise HTTPException(status_code=422, detail="new_to_me needs a bbox")
@@ -1725,12 +1740,12 @@ def get_map_spots(
         species=species_f,
         near=near_f,
         new_to_me=new_to_me,
-        user_id=user["id"],
+        user_id=user.user_id,
     )
 
 
 @app.get("/map/spots/{spot_id}")
-def get_map_spot(spot_id: str, response: Response, user: dict = Depends(get_user_or_demo)):
+def get_map_spot(spot_id: str, response: Response, user: UserContext = Depends(get_demo_context)):
     """One spot in full: title, structure facts, separate signals, nearby parking and
     bridges, sources, the other spots on the same river, and `card`: the four resolved
     blocks a tap reveals (why it's interesting, you might find, why fish gather here,
@@ -1740,10 +1755,10 @@ def get_map_spot(spot_id: str, response: Response, user: dict = Depends(get_user
     from src.services.spots import get_spot_detail
     from src.storage.database import get_db
 
-    detail = get_spot_detail(get_db(), spot_id, user["id"])
-    if detail is None or (user.get("demo") and detail.get("tier", 1) > DEMO_MAX_TIER):
+    detail = get_spot_detail(get_db(), spot_id, user.user_id)
+    if detail is None or (user.is_demo and detail.get("tier", 1) > DEMO_MAX_TIER):
         raise HTTPException(status_code=404, detail=f"No spot with id {spot_id!r}")
-    if user.get("demo"):
+    if user.is_demo:
         detail["more_on_this_water"] = [
             o for o in detail["more_on_this_water"] if o["tier"] <= DEMO_MAX_TIER
         ]
@@ -1762,7 +1777,7 @@ def get_map_water_bodies(
     geometry: bool = True,
     simplify: float | None = None,
     zoom: float | None = None,
-    user: dict = Depends(get_current_user),
+    user: UserContext = Depends(get_user_context),
 ):
     """The rivers, creeks and lakes spots sit on, as GeoJSON.
 
@@ -1817,7 +1832,7 @@ def get_map_water_body(
     geometry: bool = True,
     simplify: float | None = None,
     zoom: float | None = None,
-    user: dict = Depends(get_current_user),
+    user: UserContext = Depends(get_user_context),
 ):
     """One water body in full: name and where the name came from, its shape, the
     curated stretches it is made of, and every spot on it. 404 for an unknown id.
@@ -1844,7 +1859,7 @@ def get_map_sections(
     tier: int = 2,
     jurisdiction: str | None = None,
     response: Response = None,
-    user: dict = Depends(get_user_or_demo),
+    user: UserContext = Depends(get_demo_context),
 ):
     """The overview map's layer: one shape per river section and per lake with an outline.
 
@@ -1875,7 +1890,7 @@ def get_map_sections(
     # The weed counts are the caller's own: never let a browser or proxy keep them for anyone else.
     response.headers["Cache-Control"] = "private, no-store"
     return sections_geojson(
-        get_db(), user["id"], bbox=box, types=types, jurisdiction=jurisdiction, max_tier=tier
+        get_db(), user.user_id, bbox=box, types=types, jurisdiction=jurisdiction, max_tier=tier
     )
 
 
@@ -1884,7 +1899,7 @@ def get_map_section(
     section_id: str,
     response: Response,
     tier: int = 2,
-    user: dict = Depends(get_user_or_demo),
+    user: UserContext = Depends(get_demo_context),
 ):
     """One section and every point of interest in it, as pins.
 
@@ -1899,9 +1914,9 @@ def get_map_section(
 
     if tier not in (1, 2, 3):
         raise HTTPException(status_code=422, detail="tier must be 1, 2 or 3")
-    if user.get("demo"):
+    if user.is_demo:
         tier = min(tier, DEMO_MAX_TIER)
-    detail = section_detail(get_db(), section_id, user["id"], max_tier=tier)
+    detail = section_detail(get_db(), section_id, user.user_id, max_tier=tier)
     if detail is None:
         raise HTTPException(status_code=404, detail=f"No section with id {section_id!r}")
     # The weed reports are the caller's own, so nothing here may be kept for the next person.
@@ -1913,7 +1928,7 @@ def get_map_section(
 def get_map_layers_getting_there(
     bbox: str | None = None,
     jurisdiction: str | None = None,
-    user: dict = Depends(get_current_user),
+    user: UserContext = Depends(get_user_context),
 ):
     from src.services.spots import getting_there_geojson
     from src.storage.database import get_db
@@ -1926,7 +1941,7 @@ def get_map_layers_getting_there(
 def get_map_layers_bridges(
     bbox: str | None = None,
     jurisdiction: str | None = None,
-    user: dict = Depends(get_current_user),
+    user: UserContext = Depends(get_user_context),
 ):
     from src.services.spots import bridges_geojson
     from src.storage.database import get_db
@@ -1936,7 +1951,7 @@ def get_map_layers_bridges(
 
 
 @app.get("/map/water-bodies/{water_body_id}/features")
-def get_map_water_body_features(water_body_id: str, user: dict = Depends(get_current_user)):
+def get_map_water_body_features(water_body_id: str, user: UserContext = Depends(get_user_context)):
     """A lake's shoreline features as GeoJSON: inlets, outlets, islands, points
     and peninsulas derived from its OHN outline, plus the piers, breakwaters and
     harbours OpenStreetMap maps on its shore. 404 for an unknown water body."""
@@ -1968,7 +1983,7 @@ def _weed_error(exc) -> HTTPException:
 
 
 @app.get("/map/weed-reports/labels")
-def get_weed_report_labels(user: dict = Depends(get_current_user)):
+def get_weed_report_labels(user: UserContext = Depends(get_user_context)):
     """Every user-facing word and tolerance for weed reports, from
     src/services/weed_reports/labels.py. The web app hardcodes none of it."""
     from src.services.weed_reports.labels import labels_payload
@@ -1980,7 +1995,7 @@ def get_weed_report_labels(user: dict = Depends(get_current_user)):
 def get_weed_report_layer(
     water_body_id: str | None = None,
     bbox: str | None = None,
-    user: dict = Depends(get_current_user),
+    user: UserContext = Depends(get_user_context),
 ):
     """The map layer: only the caller's own weed reports, as GeoJSON.
 
@@ -1989,24 +2004,24 @@ def get_weed_report_layer(
     """
     from src.services.weed_reports import weed_reports_geojson
 
-    return weed_reports_geojson(_weed_db(), user["id"], water_body_id, _parse_bbox(bbox))
+    return weed_reports_geojson(_weed_db(), user.user_id, water_body_id, _parse_bbox(bbox))
 
 
 @app.get("/map/weed-reports")
 def list_weed_report_routes(
     water_body_id: str | None = None,
     bbox: str | None = None,
-    user: dict = Depends(get_current_user),
+    user: UserContext = Depends(get_user_context),
 ):
     """The caller's own weed reports, newest sighting first, optionally for one water
     body and/or a box."""
     from src.services.weed_reports import list_weed_reports
 
-    return list_weed_reports(_weed_db(), user["id"], water_body_id, _parse_bbox(bbox))
+    return list_weed_reports(_weed_db(), user.user_id, water_body_id, _parse_bbox(bbox))
 
 
 @app.post("/map/weed-reports", status_code=201)
-def post_weed_report(body: WeedReportCreate, user: dict = Depends(get_current_user)):
+def post_weed_report(body: WeedReportCreate, user: UserContext = Depends(get_user_context)):
     """Report a weed edge: a point or a line on a water body, and the date you saw it.
 
     404 for an unknown water body; 422 when the position is not on or near the water
@@ -2014,17 +2029,17 @@ def post_weed_report(body: WeedReportCreate, user: dict = Depends(get_current_us
     from src.services.weed_reports import WeedReportError, create_weed_report
 
     try:
-        return create_weed_report(_weed_db(), user["id"], body)
+        return create_weed_report(_weed_db(), user.user_id, body)
     except WeedReportError as exc:
         raise _weed_error(exc) from exc
 
 
 @app.get("/map/weed-reports/{report_id}")
-def get_weed_report_detail(report_id: int, user: dict = Depends(get_current_user)):
+def get_weed_report_detail(report_id: int, user: UserContext = Depends(get_user_context)):
     """One of the caller's weed reports. 404 if it is not theirs."""
     from src.services.weed_reports import weed_report_payload
 
-    payload = weed_report_payload(_weed_db(), user["id"], report_id)
+    payload = weed_report_payload(_weed_db(), user.user_id, report_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="No such weed report")
     return payload
@@ -2032,7 +2047,7 @@ def get_weed_report_detail(report_id: int, user: dict = Depends(get_current_user
 
 @app.patch("/map/weed-reports/{report_id}")
 def patch_weed_report(
-    report_id: int, body: WeedReportUpdate, user: dict = Depends(get_current_user)
+    report_id: int, body: WeedReportUpdate, user: UserContext = Depends(get_user_context)
 ):
     """Change the position, date or note of one of the caller's reports. A new position is
     checked against the report's water body again. 404 if it is not theirs."""
@@ -2040,7 +2055,7 @@ def patch_weed_report(
 
     fields = {name: getattr(body, name) for name in body.model_fields_set}
     try:
-        payload = update_weed_report(_weed_db(), user["id"], report_id, fields)
+        payload = update_weed_report(_weed_db(), user.user_id, report_id, fields)
     except WeedReportError as exc:
         raise _weed_error(exc) from exc
     if payload is None:
@@ -2049,17 +2064,17 @@ def patch_weed_report(
 
 
 @app.delete("/map/weed-reports/{report_id}")
-def delete_weed_report_endpoint(report_id: int, user: dict = Depends(get_current_user)):
+def delete_weed_report_endpoint(report_id: int, user: UserContext = Depends(get_user_context)):
     """Delete one of the caller's weed reports. 404 if it is not theirs."""
     from src.storage.weed_reports import delete_weed_report
 
-    if not delete_weed_report(_weed_db(), user["id"], report_id):
+    if not delete_weed_report(_weed_db(), user.user_id, report_id):
         raise HTTPException(status_code=404, detail="No such weed report")
     return {"deleted": report_id}
 
 
 @app.get("/map/my-stops")
-def get_my_stops(user: dict = Depends(get_current_user)):
+def get_my_stops(user: UserContext = Depends(get_user_context)):
     """Return all of the user's logged stops with coordinates for personal map mode."""
     import json
 
@@ -2082,7 +2097,7 @@ def get_my_stops(user: dict = Depends(get_current_user)):
           AND (st.lat IS NOT NULL OR st.photo_lat IS NOT NULL)
         ORDER BY s.id DESC
     """,
-            [user["id"]],
+            [user.user_id],
         ).fetchall()
     )
 
@@ -2131,7 +2146,7 @@ def _pin_db():
 
 
 @app.get("/pins/labels")
-def get_pin_labels(user: dict = Depends(get_current_user)):
+def get_pin_labels(user: UserContext = Depends(get_user_context)):
     """Constants and wording for the pin UI, from src/services/pins/labels.py."""
     from src.services.pins.labels import labels_payload
 
@@ -2143,7 +2158,7 @@ def get_pins_today(
     sort: TodaySort = "match",
     lat: float | None = Query(None, ge=-90, le=90),
     lng: float | None = Query(None, ge=-180, le=180),
-    user: dict = Depends(get_current_user),
+    user: UserContext = Depends(get_user_context),
 ):
     """The Today view: the caller's own pins in the order they chose, each with a reason.
 
@@ -2155,28 +2170,28 @@ def get_pins_today(
     from src.services.pins.today import today_view
 
     try:
-        return today_view(_pin_db(), user["id"], sort, lat, lng)
+        return today_view(_pin_db(), user.user_id, sort, lat, lng)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.get("/pins")
-def get_pins(user: dict = Depends(get_current_user)):
+def get_pins(user: UserContext = Depends(get_user_context)):
     """The Personal map: the user's pins, and their located stops not yet pinned."""
     from src.services.pins import map_payload
 
-    return map_payload(_pin_db(), user["id"])
+    return map_payload(_pin_db(), user.user_id)
 
 
 @app.post("/pins", status_code=201)
-def post_pin(body: PinCreate, user: dict = Depends(get_current_user)):
+def post_pin(body: PinCreate, user: UserContext = Depends(get_user_context)):
     """Create a pin. from_stop_id is "Pin this spot" and links that stop."""
     from src.services.pins import create_pin, pin_detail
 
     db = _pin_db()
     created = create_pin(
         db,
-        user["id"],
+        user.user_id,
         body.name,
         body.lat,
         body.lng,
@@ -2187,24 +2202,24 @@ def post_pin(body: PinCreate, user: dict = Depends(get_current_user)):
     if created is None:
         raise HTTPException(status_code=404, detail="No such stop")
     return {
-        **pin_detail(db, user["id"], created["pin_id"]),
+        **pin_detail(db, user.user_id, created["pin_id"]),
         "inferred_stop_ids": created["inferred_stop_ids"],
     }
 
 
 @app.get("/pins/{pin_id}")
-def get_pin_detail(pin_id: int, user: dict = Depends(get_current_user)):
+def get_pin_detail(pin_id: int, user: UserContext = Depends(get_user_context)):
     """One pin: its facts, linked trips, and recalled records (marked recalled)."""
     from src.services.pins import pin_detail
 
-    detail = pin_detail(_pin_db(), user["id"], pin_id)
+    detail = pin_detail(_pin_db(), user.user_id, pin_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="No such pin")
     return detail
 
 
 @app.get("/pins/{pin_id}/conditions")
-def get_pin_conditions(pin_id: int, user: dict = Depends(get_current_user)):
+def get_pin_conditions(pin_id: int, user: UserContext = Depends(get_user_context)):
     """The pin's conditions panel: one row per fact, each with source and age.
 
     Rows carry value, unit, source, station, distance_km, observed_at, age_s and
@@ -2213,14 +2228,14 @@ def get_pin_conditions(pin_id: int, user: dict = Depends(get_current_user)):
     """
     from src.services.pins.conditions import pin_conditions
 
-    rows = pin_conditions(_pin_db(), user["id"], pin_id)
+    rows = pin_conditions(_pin_db(), user.user_id, pin_id)
     if rows is None:
         raise HTTPException(status_code=404, detail="No such pin")
     return rows
 
 
 @app.get("/pins/{pin_id}/match")
-def get_pin_match(pin_id: int, user: dict = Depends(get_current_user)):
+def get_pin_match(pin_id: int, user: UserContext = Depends(get_user_context)):
     """How today's conditions compare with the caller's own best-rated trips at this pin.
 
     Built only from the caller's rated trips here. With fewer than the minimum
@@ -2229,36 +2244,36 @@ def get_pin_match(pin_id: int, user: dict = Depends(get_current_user)):
     """
     from src.services.pins.match import pin_match
 
-    match = pin_match(_pin_db(), user["id"], pin_id)
+    match = pin_match(_pin_db(), user.user_id, pin_id)
     if match is None:
         raise HTTPException(status_code=404, detail="No such pin")
     return match
 
 
 @app.patch("/pins/{pin_id}")
-def patch_pin(pin_id: int, body: PinUpdate, user: dict = Depends(get_current_user)):
+def patch_pin(pin_id: int, body: PinUpdate, user: UserContext = Depends(get_user_context)):
     """Rename, edit notes, or set or clear the favourite flag."""
     from src.services.pins import pin_detail
     from src.storage.pins import update_pin
 
     db = _pin_db()
-    if not update_pin(db, user["id"], pin_id, body.model_dump(exclude_unset=True)):
+    if not update_pin(db, user.user_id, pin_id, body.model_dump(exclude_unset=True)):
         raise HTTPException(status_code=404, detail="No such pin")
-    return pin_detail(db, user["id"], pin_id)
+    return pin_detail(db, user.user_id, pin_id)
 
 
 @app.delete("/pins/{pin_id}")
-def delete_pin_endpoint(pin_id: int, user: dict = Depends(get_current_user)):
+def delete_pin_endpoint(pin_id: int, user: UserContext = Depends(get_user_context)):
     """Delete a pin. Its trips are unlinked and kept; its recalled records go with it."""
     from src.storage.pins import delete_pin
 
-    if not delete_pin(_pin_db(), user["id"], pin_id):
+    if not delete_pin(_pin_db(), user.user_id, pin_id):
         raise HTTPException(status_code=404, detail="No such pin")
     return {"deleted": pin_id}
 
 
 @app.post("/pins/{pin_id}/merge")
-def merge_pin(pin_id: int, body: PinMerge, user: dict = Depends(get_current_user)):
+def merge_pin(pin_id: int, body: PinMerge, user: UserContext = Depends(get_user_context)):
     """Merge this pin into into_pin_id: its trips and recalled records move there."""
     from src.services.pins import pin_detail
     from src.storage.pins import merge_pins
@@ -2266,39 +2281,43 @@ def merge_pin(pin_id: int, body: PinMerge, user: dict = Depends(get_current_user
     db = _pin_db()
     if pin_id == body.into_pin_id:
         raise HTTPException(status_code=400, detail="A pin cannot be merged into itself")
-    if not merge_pins(db, user["id"], pin_id, body.into_pin_id):
+    if not merge_pins(db, user.user_id, pin_id, body.into_pin_id):
         raise HTTPException(status_code=404, detail="No such pin")
-    return pin_detail(db, user["id"], body.into_pin_id)
+    return pin_detail(db, user.user_id, body.into_pin_id)
 
 
 @app.post("/pins/{pin_id}/links")
-def link_stop_to_pin(pin_id: int, body: PinLinkCreate, user: dict = Depends(get_current_user)):
+def link_stop_to_pin(
+    pin_id: int, body: PinLinkCreate, user: UserContext = Depends(get_user_context)
+):
     """Link one of the user's stops to this pin by hand (a confirmed link)."""
     from src.storage.pins import link_stop
 
-    link = link_stop(_pin_db(), user["id"], pin_id, body.stop_id, "confirmed")
+    link = link_stop(_pin_db(), user.user_id, pin_id, body.stop_id, "confirmed")
     if link is None:
         raise HTTPException(status_code=404, detail="No such pin or stop")
     return link
 
 
 @app.delete("/pins/{pin_id}/links/{stop_id}")
-def unlink_stop_from_pin(pin_id: int, stop_id: int, user: dict = Depends(get_current_user)):
+def unlink_stop_from_pin(pin_id: int, stop_id: int, user: UserContext = Depends(get_user_context)):
     """Undo a link. The stop and its trip are kept."""
     from src.storage.pins import unlink_stop
 
-    if not unlink_stop(_pin_db(), user["id"], pin_id, stop_id):
+    if not unlink_stop(_pin_db(), user.user_id, pin_id, stop_id):
         raise HTTPException(status_code=404, detail="No such link")
     return {"unlinked": stop_id}
 
 
 @app.post("/pins/{pin_id}/recalled", status_code=201)
-def add_recalled(pin_id: int, body: RecalledVisitCreate, user: dict = Depends(get_current_user)):
+def add_recalled(
+    pin_id: int, body: RecalledVisitCreate, user: UserContext = Depends(get_user_context)
+):
     """ "I've fished here before": recalled history, excluded from every statistic."""
     from src.storage.pins import add_recalled_visit
 
     recalled_id = add_recalled_visit(
-        _pin_db(), user["id"], pin_id, body.date_approx, body.species, body.rating
+        _pin_db(), user.user_id, pin_id, body.date_approx, body.species, body.rating
     )
     if recalled_id is None:
         raise HTTPException(status_code=404, detail="No such pin")
@@ -2306,16 +2325,18 @@ def add_recalled(pin_id: int, body: RecalledVisitCreate, user: dict = Depends(ge
 
 
 @app.delete("/pins/{pin_id}/recalled/{recalled_id}")
-def delete_recalled(pin_id: int, recalled_id: int, user: dict = Depends(get_current_user)):
+def delete_recalled(pin_id: int, recalled_id: int, user: UserContext = Depends(get_user_context)):
     from src.storage.pins import delete_recalled_visit
 
-    if not delete_recalled_visit(_pin_db(), user["id"], pin_id, recalled_id):
+    if not delete_recalled_visit(_pin_db(), user.user_id, pin_id, recalled_id):
         raise HTTPException(status_code=404, detail="No such recalled record")
     return {"deleted": recalled_id}
 
 
 @app.patch("/sessions/{session_id}")
-def patch_session(session_id: int, body: SessionUpdate, user: dict = Depends(get_current_user)):
+def patch_session(
+    session_id: int, body: SessionUpdate, user: UserContext = Depends(get_user_context)
+):
     """Rate a trip, or set or correct its start and end times.
 
     A field left out is unchanged; null clears it. A single-pin trip's rating
@@ -2326,7 +2347,7 @@ def patch_session(session_id: int, body: SessionUpdate, user: dict = Depends(get
     from src.storage.pins import get_session, update_session
 
     db = _pin_db()
-    current = get_session(db, user["id"], session_id)
+    current = get_session(db, user.user_id, session_id)
     if current is None:
         raise HTTPException(status_code=404, detail="No such trip")
     fields = body.model_dump(exclude_unset=True)
@@ -2342,17 +2363,17 @@ def patch_session(session_id: int, body: SessionUpdate, user: dict = Depends(get
             ends_first = False  # a stored legacy value we cannot compare
         if ends_first:
             raise HTTPException(status_code=400, detail="ended_at must be after started_at")
-    update_session(db, user["id"], session_id, fields)
-    return get_session(db, user["id"], session_id)
+    update_session(db, user.user_id, session_id, fields)
+    return get_session(db, user.user_id, session_id)
 
 
 @app.put("/sessions/{session_id}/pins/{pin_id}/rating")
 def put_trip_pin_rating(
-    session_id: int, pin_id: int, body: TripPinRating, user: dict = Depends(get_current_user)
+    session_id: int, pin_id: int, body: TripPinRating, user: UserContext = Depends(get_user_context)
 ):
     """Rate one pin of a trip that covered several. null clears it."""
     from src.storage.pins import set_trip_pin_rating
 
-    if not set_trip_pin_rating(_pin_db(), user["id"], session_id, pin_id, body.rating):
+    if not set_trip_pin_rating(_pin_db(), user.user_id, session_id, pin_id, body.rating):
         raise HTTPException(status_code=404, detail="That trip is not linked to that pin")
     return {"session_id": session_id, "pin_id": pin_id, "rating": body.rating}

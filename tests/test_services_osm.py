@@ -60,7 +60,7 @@ def test_dispersal_flag_present_for_isolated_pond_with_birds(tmp_path, monkeypat
     pond = _make_pond()
     monkeypatch.setattr(osm_svc._osm, "fetch_water_features", lambda *a, **kw: [pond])
 
-    result = json.loads(osm_svc.get_nearby_water_for_agent(43.65, -79.38))
+    result = json.loads(osm_svc.get_nearby_water_for_agent(43.65, -79.38, user_id=1))
     bodies = result["water_bodies"]
     assert len(bodies) == 1
     assert bodies[0].get("waterfowl_dispersal_flag") is True
@@ -80,7 +80,7 @@ def test_dispersal_flag_absent_when_stream_nearby(tmp_path, monkeypatch):
     pond = _make_pond()
     monkeypatch.setattr(osm_svc._osm, "fetch_water_features", lambda *a, **kw: [pond])
 
-    result = json.loads(osm_svc.get_nearby_water_for_agent(43.65, -79.38))
+    result = json.loads(osm_svc.get_nearby_water_for_agent(43.65, -79.38, user_id=1))
     bodies = result["water_bodies"]
     assert len(bodies) == 1
     assert "waterfowl_dispersal_flag" not in bodies[0]

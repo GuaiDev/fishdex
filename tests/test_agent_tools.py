@@ -77,7 +77,7 @@ def test_every_schema_is_well_formed():
 
 
 def test_unknown_tool_returns_an_error_not_an_exception():
-    out = json.loads(tools.execute_tool("get_tactical_recommendation", {}))
+    out = json.loads(tools.execute_tool("get_tactical_recommendation", {}, user_id=1))
     assert "error" in out
 
 
@@ -97,7 +97,7 @@ def test_home_coordinates_reach_the_schema_descriptions():
 
 def test_unresolvable_place_is_reported_as_a_resolution_failure(db):
     """Not the same as "we know nothing there", and it must not read like it."""
-    out = json.loads(tools.execute_tool("describe_place", {"query": "Nowhere Creek"}))
+    out = json.loads(tools.execute_tool("describe_place", {"query": "Nowhere Creek"}, user_id=1))
     assert out["resolved"] is False
     assert "resolution failure" in out["message"]
 
@@ -113,7 +113,7 @@ def test_describe_place_renders_provenance_and_empty_reasons(db):
         },
         alter=True,
     )
-    out = tools.execute_tool("describe_place", {"query": "Bronte Creek"})
+    out = tools.execute_tool("describe_place", {"query": "Bronte Creek"}, user_id=1)
     assert "Bronte Creek" in out
     assert "Species recorded" in out
     assert "statement about the corpus" in out
@@ -131,7 +131,7 @@ def test_describe_place_does_not_include_live_conditions(db):
         },
         alter=True,
     )
-    out = tools.execute_tool("describe_place", {"query": "Bronte Creek"})
+    out = tools.execute_tool("describe_place", {"query": "Bronte Creek"}, user_id=1)
     assert "Conditions now" not in out
 
 
@@ -164,7 +164,7 @@ def test_recording_an_insight_reports_related_ones_without_a_second_tool(db, mon
                 "source_type": "agent_synthesis",
                 "source_detail": "reasoning",
                 "evidence_count": 0,
-            },
+            }, user_id=1,
         )
     )
     assert calls["checked"] is True
@@ -193,7 +193,7 @@ def test_a_failing_conflict_check_does_not_block_the_write(db, monkeypatch):
                 "source_type": "trip_log",
                 "source_detail": "log",
                 "evidence_count": 1,
-            },
+            }, user_id=1,
         )
     )
     assert out["recorded"] == {"ok": True}
@@ -201,6 +201,8 @@ def test_a_failing_conflict_check_does_not_block_the_write(db, monkeypatch):
 
 
 def test_dismiss_segment_still_works(db):
-    out = json.loads(tools.execute_tool("dismiss_segment", {"ogf_id": 42, "reason": "private"}))
+    out = json.loads(tools.execute_tool("dismiss_segment", {"ogf_id": 42, "reason": "private"},
+        user_id=1,
+    ))
     assert out["success"] is True
     assert out["ogf_id"] == 42

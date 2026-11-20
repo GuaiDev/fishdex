@@ -217,10 +217,10 @@ def test_the_records_lookup_can_leave_out_the_bird_signal(db, monkeypatch):
     monkeypatch.setattr(slices, "_piscivore_field", boom)
     inat(db, *CHUB)
     place = Place(query="x", lat=43.5, lng=-79.6, radius_km=2.0)
-    lean = slices.build_records(db, place, with_piscivore=False)
+    lean = slices.build_records(db, place, with_piscivore=False, user_id=1)
     assert [r.common_name for r in lean.species] == ["Creek Chub"]
     empty = slices.build_records(
-        db, Place(query="y", lat=10, lng=10, radius_km=2.0), with_piscivore=False
+        db, Place(query="y", lat=10, lng=10, radius_km=2.0), with_piscivore=False, user_id=1
     )
     assert empty.species == []
 

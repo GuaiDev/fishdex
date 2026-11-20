@@ -187,12 +187,12 @@ def sources(monkeypatch):
 
 
 def _slice(db, now=None):
-    ctx = describe(db, lat=HOME[0], lng=HOME[1], caller="pin_panel")
+    ctx = describe(db, lat=HOME[0], lng=HOME[1], caller="pin_panel", user_id=1)
     return ctx.conditions
 
 
 def test_pin_panel_bundle_is_conditions_only(db, sources):
-    ctx = describe(db, lat=HOME[0], lng=HOME[1], caller="pin_panel")
+    ctx = describe(db, lat=HOME[0], lng=HOME[1], caller="pin_panel", user_id=1)
     assert ctx.bundle == "pin_panel"
     assert ctx.conditions is not None
     assert ctx.records is None and ctx.water is None and ctx.history is None
@@ -371,13 +371,13 @@ def test_each_field_uses_its_own_nearest_sample(db, sources):
 def test_the_panel_keeps_a_mid_range_ph_that_the_water_slice_withholds(db, sources):
     _sample(db, "W1", "S1", 43.41, -79.75, "2024-06-01", ph=7.2)
     assert _slice(db).ph.value == 7.2
-    water = describe(db, lat=HOME[0], lng=HOME[1], caller="map_tap").water
+    water = describe(db, lat=HOME[0], lng=HOME[1], caller="map_tap", user_id=1).water
     assert water.ph.empty_reason is EmptyReason.RECORDED_BUT_NOT_DECISION_RELEVANT
 
 
 def test_water_slice_chemistry_is_now_dated_not_an_undated_median(db, sources):
     _sample(db, "W1", "S1", 43.41, -79.75, "2024-06-01", do_mgl=3.0)
-    do = describe(db, lat=HOME[0], lng=HOME[1], caller="map_tap").water.dissolved_oxygen
+    do = describe(db, lat=HOME[0], lng=HOME[1], caller="map_tap", user_id=1).water.dissolved_oxygen
     assert do.value == 3.0
     assert do.provenance.observed_at == "2024-06-01"
     assert do.stale is True
@@ -397,7 +397,9 @@ def test_no_samples_in_range_is_a_radius_gap(db, sources):
 def test_prompt_rendering_marks_stale_values_and_names_the_station(db, sources):
     sources["gauge"] = _gauge(_ago(hours=9))
     text = render.render_conditions(
-        build_conditions(db, describe(db, lat=HOME[0], lng=HOME[1], caller="pin_panel").place)
+        build_conditions(db, describe(db, lat=HOME[0], lng=HOME[1], caller="pin_panel",
+            user_id=1,
+        ).place)
     )
     assert "flow on Credit River" in text and "stale" in text
     assert "CREDIT RIVER AT STREETSVILLE" in text
@@ -406,6 +408,6 @@ def test_prompt_rendering_marks_stale_values_and_names_the_station(db, sources):
 
 def test_bundles_for_chat_callers_still_get_conditions(db, sources):
     for caller in ("post_log", "coach", "full"):
-        ctx = describe(db, lat=HOME[0], lng=HOME[1], caller=caller, escalate=False)
+        ctx = describe(db, lat=HOME[0], lng=HOME[1], caller=caller, escalate=False, user_id=1)
         assert ctx.conditions is not None, caller
         assert ctx.conditions.flow_cms.value == 18.3
