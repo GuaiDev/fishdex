@@ -24,7 +24,7 @@ observations gbif_observations stream_gauge_readings stocking_records species_ra
 reddit_posts regulation_chunks water_quality_readings bird_observations
 stream_temperature_readings stream_temperature_summaries critical_habitat
 tidal_readings salmon_escapement fish_surveys knowledge_sources knowledge_chunks
-species_image
+species_image shared_insights
 """.split()
 )
 MAP_TABLES = frozenset(
