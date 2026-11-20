@@ -328,7 +328,8 @@ def _user_1_secrets(db, profile_path):
             jurisdiction="CA-ON",
             location_name="Sentinel Pond",
             notes="user one's private trip note",
-        ), user_id=1,
+        ),
+        user_id=1,
     )
     return [
         "Zebulon Falls",

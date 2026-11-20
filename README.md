@@ -109,7 +109,9 @@ Documented honestly rather than papered over — see `CLAUDE.md` for the full li
 # Install dependencies
 uv sync
 
-# Start the chat bot
+# Start the chat bot. With more than one user in the database, name whose
+# data it is: `uv run python -m src.cli.main run --user <username>`
+# (or set FISHBOT_USER). It never guesses between users.
 make run
 
 # Serve the API locally on http://localhost:8000

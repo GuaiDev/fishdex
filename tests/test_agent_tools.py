@@ -164,7 +164,8 @@ def test_recording_an_insight_reports_related_ones_without_a_second_tool(db, mon
                 "source_type": "agent_synthesis",
                 "source_detail": "reasoning",
                 "evidence_count": 0,
-            }, user_id=1,
+            },
+            user_id=1,
         )
     )
     assert calls["checked"] is True
@@ -193,7 +194,8 @@ def test_a_failing_conflict_check_does_not_block_the_write(db, monkeypatch):
                 "source_type": "trip_log",
                 "source_detail": "log",
                 "evidence_count": 1,
-            }, user_id=1,
+            },
+            user_id=1,
         )
     )
     assert out["recorded"] == {"ok": True}
@@ -201,8 +203,12 @@ def test_a_failing_conflict_check_does_not_block_the_write(db, monkeypatch):
 
 
 def test_dismiss_segment_still_works(db):
-    out = json.loads(tools.execute_tool("dismiss_segment", {"ogf_id": 42, "reason": "private"},
-        user_id=1,
-    ))
+    out = json.loads(
+        tools.execute_tool(
+            "dismiss_segment",
+            {"ogf_id": 42, "reason": "private"},
+            user_id=1,
+        )
+    )
     assert out["success"] is True
     assert out["ogf_id"] == 42

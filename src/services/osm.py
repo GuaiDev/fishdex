@@ -67,9 +67,7 @@ def get_nearby_water_for_agent(
 
     if not_in_trip_log:
         visited: set[str] = set()
-        for row in db["trips"].rows_where(
-            "location_name IS NOT NULL AND user_id = ?", [user_id]
-        ):
+        for row in db["trips"].rows_where("location_name IS NOT NULL AND user_id = ?", [user_id]):
             name = row.get("location_name")
             if name:
                 visited.add(name.lower())

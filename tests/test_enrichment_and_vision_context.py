@@ -122,7 +122,8 @@ def test_the_contradiction_prompt_uses_the_renderer(db, monkeypatch):
         confidence="medium",
         source_type="agent_synthesis",
         source_detail="assistant reasoning",
-        evidence_count=2, user_id=1,
+        evidence_count=2,
+        user_id=1,
     )
 
     _synthesize_nuanced_conclusion(insight, _ROW, True, 1)
@@ -146,7 +147,8 @@ def test_no_client_still_degrades_gracefully():
         confidence="low",
         source_type="trip_log",
         source_detail="log",
-        evidence_count=1, user_id=1,
+        evidence_count=1,
+        user_id=1,
     )
     out = _synthesize_nuanced_conclusion(insight, _ROW, False, 1)
     assert out.startswith("original")

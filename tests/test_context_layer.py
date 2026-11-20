@@ -587,7 +587,11 @@ def test_barrier_absence_requires_local_coverage_not_just_a_nonempty_table(db):
 def test_barrier_absence_is_a_real_claim_where_coverage_exists(db):
     """Symmetry check: with local coverage, zero barriers IS a fact."""
     _add_barrier(db, 43.40, -79.75)
-    near = describe(db, lat=43.42, lng=-79.76, caller="map_tap",
+    near = describe(
+        db,
+        lat=43.42,
+        lng=-79.76,
+        caller="map_tap",
         user_id=1,
     ).structure.barriers_upstream
     assert not near.is_empty

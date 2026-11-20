@@ -2225,9 +2225,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(29, "ingest_runs", migrate_ingest_runs),
     Migration(30, "stream_segments_spatial_index", migrate_stream_segments_spatial_index),
     Migration(31, "user_home", migrate_user_home),
-    Migration(
-        32, "trip_owners_and_shared_insights", migrate_trip_owners_and_shared_insights
-    ),
+    Migration(32, "trip_owners_and_shared_insights", migrate_trip_owners_and_shared_insights),
 )
 
 assert [m.version for m in MIGRATIONS] == list(range(1, len(MIGRATIONS) + 1))

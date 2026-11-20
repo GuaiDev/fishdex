@@ -66,7 +66,9 @@ def test_get_insights_condition_type_filter(tmp_path, monkeypatch):
     from src.services.insights import get_behavioral_insights_for_agent
 
     result = json.loads(
-        get_behavioral_insights_for_agent(species="brook trout", condition_type="habitat",
+        get_behavioral_insights_for_agent(
+            species="brook trout",
+            condition_type="habitat",
             user_id=1,
         )
     )
@@ -89,7 +91,8 @@ def test_record_unverified_blocked(tmp_path, monkeypatch):
             confidence="unverified",
             source_type="agent_synthesis",
             source_detail="just a guess",
-            evidence_count=0, user_id=1,
+            evidence_count=0,
+            user_id=1,
         )
     )
     assert "error" in result
@@ -119,7 +122,8 @@ def test_record_valid_insight(tmp_path, monkeypatch):
             source_type="trip_log",
             source_detail="8 personal outings Credit River spring 2026",
             evidence_count=8,
-            jurisdiction="CA-ON", user_id=1,
+            jurisdiction="CA-ON",
+            user_id=1,
         )
     )
     assert result["success"] is True

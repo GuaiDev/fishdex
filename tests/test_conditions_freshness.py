@@ -397,9 +397,16 @@ def test_no_samples_in_range_is_a_radius_gap(db, sources):
 def test_prompt_rendering_marks_stale_values_and_names_the_station(db, sources):
     sources["gauge"] = _gauge(_ago(hours=9))
     text = render.render_conditions(
-        build_conditions(db, describe(db, lat=HOME[0], lng=HOME[1], caller="pin_panel",
-            user_id=1,
-        ).place)
+        build_conditions(
+            db,
+            describe(
+                db,
+                lat=HOME[0],
+                lng=HOME[1],
+                caller="pin_panel",
+                user_id=1,
+            ).place,
+        )
     )
     assert "flow on Credit River" in text and "stale" in text
     assert "CREDIT RIVER AT STREETSVILLE" in text

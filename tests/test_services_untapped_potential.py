@@ -463,9 +463,13 @@ def test_dismiss_tool_inserts_record(tmp_path, fast_db, monkeypatch):
 
     from src.agent.chat import _execute_tool
 
-    result = _json.loads(_execute_tool("dismiss_segment", {"ogf_id": 42, "reason": "private"},
-        user_id=1,
-    ))
+    result = _json.loads(
+        _execute_tool(
+            "dismiss_segment",
+            {"ogf_id": 42, "reason": "private"},
+            user_id=1,
+        )
+    )
     assert result["success"] is True
     assert result["ogf_id"] == 42
 

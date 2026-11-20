@@ -63,7 +63,8 @@ def test_species_gap_detected(db_conn):
         conclusion="Stonecat found under flat rocks in riffles",
         confidence="low",
         source_type="agent_synthesis",
-        source_detail="test", user_id=1,
+        source_detail="test",
+        user_id=1,
     )
     insert_insight(db_conn, insight)
 
