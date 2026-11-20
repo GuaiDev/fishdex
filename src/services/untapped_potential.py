@@ -85,9 +85,7 @@ def compute_untapped_potential(
     # Exclude Virtual Flow segments — OHN connectivity segments through lakes,
     # not fishable stream reaches.
     if "watercourse_type" in feature_matrix.columns:
-        feature_matrix = feature_matrix[
-            feature_matrix["watercourse_type"] != "Virtual Flow"
-        ].copy()
+        feature_matrix = feature_matrix[feature_matrix["watercourse_type"] != "Virtual Flow"].copy()
     elif "stream_segments" in db.table_names():
         vf_ids = {
             r["ogf_id"]
@@ -227,9 +225,8 @@ def compute_untapped_potential(
     result = base.reset_index().sort_values("untapped_score", ascending=False)
 
     # Pressure sanity check — log Oakville-area stats (lat 43.3-43.6, lng -80.0 to -79.4)
-    oak_mask = (
-        result["centroid_lat"].between(43.3, 43.6)
-        & result["centroid_lng"].between(-80.0, -79.4)
+    oak_mask = result["centroid_lat"].between(43.3, 43.6) & result["centroid_lng"].between(
+        -80.0, -79.4
     )
     if oak_mask.any():
         oak = result[oak_mask]
@@ -247,11 +244,28 @@ def compute_untapped_potential(
     return result
 
 
+_cached_untapped: pd.DataFrame | None = None
+_cached_untapped_key: tuple[Path, int] | None = None
+
+
 def load_cached_untapped() -> pd.DataFrame | None:
-    """Load cached untapped potential parquet, or None if not computed."""
+    """Load cached untapped potential parquet, or None if not computed.
+
+    Reuse the parsed frame in-process while its path and nanosecond mtime match.
+    This avoids repeated parsing by Explore and card builds while picking up
+    rebuilds without a restart. A missing file clears the in-memory cache.
+    """
+    global _cached_untapped, _cached_untapped_key
     if not _PARQUET_PATH.exists():
+        _cached_untapped = None
+        _cached_untapped_key = None
         return None
-    return pd.read_parquet(_PARQUET_PATH)
+    key = (_PARQUET_PATH, _PARQUET_PATH.stat().st_mtime_ns)
+    if _cached_untapped is not None and _cached_untapped_key == key:
+        return _cached_untapped
+    _cached_untapped = pd.read_parquet(_PARQUET_PATH)
+    _cached_untapped_key = key
+    return _cached_untapped
 
 
 # ── enrichment helpers ────────────────────────────────────────────────────────
@@ -397,7 +411,6 @@ def _compute_mode_score(df: pd.DataFrame, mode: str) -> pd.Series:
     return base * _structural_bonus(df) * _remoteness_multiplier(density) * gate
 
 
-
 _SATURATED_DENSITY = 10_000.0
 """Reference density treated as fully sampled.
 
@@ -463,10 +476,7 @@ def _snap_trips_to_segments(db) -> list[int]:
 
     ogf_ids = fm["ogf_id"].tolist()
     coords = np.array(
-        [
-            [lat * 111.0, lng * 80.5]
-            for lat, lng in zip(fm["centroid_lat"], fm["centroid_lng"])
-        ]
+        [[lat * 111.0, lng * 80.5] for lat, lng in zip(fm["centroid_lat"], fm["centroid_lng"])]
     )
     tree = cKDTree(coords)
 

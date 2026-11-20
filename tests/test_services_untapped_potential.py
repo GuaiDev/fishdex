@@ -1,5 +1,6 @@
 """Tests for untapped potential scoring. All use synthetic data — no live calls."""
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -252,6 +253,65 @@ def test_untapped_ignores_sdm_predictions_entirely(tmp_path, fast_db, monkeypatc
         before.set_index("ogf_id")["untapped_score"],
         after.set_index("ogf_id")["untapped_score"],
     )
+
+
+# ── in-process cache (P1.12) ─────────────────────────────────────────────────
+
+
+def test_load_cached_untapped_reads_parquet_once_for_two_calls(tmp_path, monkeypatch):
+    """The 8 MB parquet is parsed once; the second call is served from memory."""
+    import src.services.untapped_potential as up_mod
+
+    parquet = tmp_path / "untapped.parquet"
+    pd.DataFrame({"ogf_id": [1, 2], "untapped_score": [0.9, 0.4]}).to_parquet(parquet, index=False)
+    monkeypatch.setattr(up_mod, "_PARQUET_PATH", parquet)
+
+    reads = []
+    real_read_parquet = up_mod.pd.read_parquet
+
+    def counting_read_parquet(path, *args, **kwargs):
+        reads.append(path)
+        return real_read_parquet(path, *args, **kwargs)
+
+    monkeypatch.setattr(up_mod.pd, "read_parquet", counting_read_parquet)
+
+    first = up_mod.load_cached_untapped()
+    second = up_mod.load_cached_untapped()
+
+    assert reads == [parquet]
+    pd.testing.assert_frame_equal(first, second)
+
+
+def test_load_cached_untapped_rereads_when_file_changes(tmp_path, monkeypatch):
+    """A rebuild with a new mtime invalidates the cached frame."""
+    import src.services.untapped_potential as up_mod
+
+    parquet = tmp_path / "untapped.parquet"
+    monkeypatch.setattr(up_mod, "_PARQUET_PATH", parquet)
+
+    pd.DataFrame({"ogf_id": [1], "untapped_score": [0.1]}).to_parquet(parquet, index=False)
+    first = up_mod.load_cached_untapped()
+    assert list(first["ogf_id"]) == [1]
+
+    pd.DataFrame({"ogf_id": [2], "untapped_score": [0.9]}).to_parquet(parquet, index=False)
+    bumped = parquet.stat().st_mtime_ns + 1_000_000_000
+    os.utime(parquet, ns=(bumped, bumped))
+
+    second = up_mod.load_cached_untapped()
+    assert list(second["ogf_id"]) == [2]
+
+
+def test_load_cached_untapped_drops_cache_when_file_disappears(tmp_path, monkeypatch):
+    """A removed parquet returns None instead of a stale in-memory frame."""
+    import src.services.untapped_potential as up_mod
+
+    parquet = tmp_path / "untapped.parquet"
+    pd.DataFrame({"ogf_id": [1]}).to_parquet(parquet, index=False)
+    monkeypatch.setattr(up_mod, "_PARQUET_PATH", parquet)
+
+    assert up_mod.load_cached_untapped() is not None
+    parquet.unlink()
+    assert up_mod.load_cached_untapped() is None
 
 
 # ── Phase 2e: find_exploration_targets ───────────────────────────────────────
