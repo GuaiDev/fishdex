@@ -193,6 +193,12 @@ trip text, or `catches_json` fields return 400. Oversized bodies on `/chat`, `/l
 The authoritative size and history caps are in
 [`src/api/request_limits.py`](src/api/request_limits.py).
 
+Catch photo URLs require the catch owner's bearer token in the `Authorization`
+header. `GET /photos/{name}` returns 401 without authentication and 404 when the
+photo is missing or belongs to another user. Photo uploads exceeding the pixel
+cap return 400 before resizing; the upload limits are defined in
+[`src/services/photo_storage.py`](src/services/photo_storage.py).
+
 These three routes share each account's daily budget: a chat or text trip submission costs
 one unit, and a photo trip costs one plus `PHOTO_COST` per uploaded photo (defined in
 [`src/api/request_limits.py`](src/api/request_limits.py)). Units are reserved atomically

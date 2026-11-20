@@ -82,6 +82,19 @@ def test_rejects_oversized_photo():
     assert "10MB" in exc.value.detail
 
 
+@pytest.mark.parametrize("size", [(8000, 5001), (10000, 10000)])
+def test_rejects_photos_over_pixel_cap(size, _photos_dir):
+    from src.services.photo_storage import save_photo
+
+    buf = io.BytesIO()
+    Image.new("1", size).save(buf, format="PNG")
+    with pytest.raises(HTTPException) as exc:
+        save_photo(_upload(buf.getvalue(), "image/png"))
+    assert exc.value.status_code == 400
+    assert "40 million pixels" in exc.value.detail
+    assert not _photos_dir.exists()
+
+
 def test_filenames_are_unguessable_uuids_not_client_supplied():
     from src.services.photo_storage import save_photo
 

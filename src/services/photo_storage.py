@@ -1,7 +1,7 @@
 """Catch photo storage — saves uploaded photo files to the Railway persistent volume.
 
 Files land under DATA_DIR/photos, alongside fishing.db, keyed by an unguessable
-UUID filename. Served back out via the /photos StaticFiles mount in src/api/main.py.
+UUID filename. Served back out via the owner-only /photos route in src/api/main.py.
 
 Uploads are resized and re-encoded on the way in (see save_photo) rather than
 stored at original resolution — these are catch-ID photos for in-app display,
@@ -13,6 +13,7 @@ original bytes are discarded after processing.
 import io
 import os
 import uuid
+import warnings
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
@@ -20,6 +21,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from pillow_heif import register_heif_opener
 
 register_heif_opener()  # lets Image.open() decode iPhone HEIC/HEIF photos
+Image.MAX_IMAGE_PIXELS = 40_000_000
 
 PHOTOS_DIR = Path(os.environ.get("DATA_DIR", "data")) / "photos"
 
@@ -57,7 +59,12 @@ def save_photo(upload: UploadFile, *, public_base: str = "/photos") -> dict:
         raise HTTPException(status_code=400, detail="Empty photo upload.")
 
     try:
-        Image.open(io.BytesIO(data)).verify()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(data)) as image:
+                image.verify()
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as e:
+        raise HTTPException(status_code=400, detail="Photo exceeds 40 million pixels.") from e
     except UnidentifiedImageError as e:
         raise HTTPException(status_code=400, detail="File is not a valid image.") from e
 
