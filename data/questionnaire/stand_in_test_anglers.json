@@ -1,0 +1,23 @@
+{
+  "_note": "Canned answers for `fishbot create-test-anglers`. They match the stand-in questions in questions.json by id and value; when the real questionnaire replaces that list, replace these too (the command refuses answers that do not fit).",
+  "anglers": {
+    "regular": {
+      "home": {"name": "Oakville, ON", "lat": 43.4675, "lng": -79.6877, "jurisdiction": "CA-ON"},
+      "water_type": "rivers",
+      "outing_style": "known_spot",
+      "species_interest": ["gamefish", "trout_salmon"]
+    },
+    "explorer": {
+      "home": {"name": "Guelph, ON", "lat": 43.5448, "lng": -80.2482, "jurisdiction": "CA-ON"},
+      "water_type": "streams",
+      "outing_style": "new_water",
+      "species_interest": ["small_native", "rough_fish"]
+    },
+    "pond": {
+      "home": {"name": "Burlington, ON", "lat": 43.3255, "lng": -79.799, "jurisdiction": "CA-ON"},
+      "water_type": "ponds",
+      "outing_style": "known_spot",
+      "species_interest": ["gamefish", "small_native"]
+    }
+  }
+}

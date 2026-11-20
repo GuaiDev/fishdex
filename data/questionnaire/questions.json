@@ -1,0 +1,42 @@
+{
+  "version": "stand-in-1",
+  "stand_in": true,
+  "questions": [
+    {
+      "id": "home",
+      "kind": "home",
+      "prompt": "Where is home? Your map and the coach start from here."
+    },
+    {
+      "id": "water_type",
+      "kind": "choice",
+      "prompt": "Which water do you reach for first?",
+      "options": [
+        {"value": "streams", "label": "Streams and creeks"},
+        {"value": "ponds", "label": "Ponds and small lakes"},
+        {"value": "rivers", "label": "Big rivers"},
+        {"value": "big_water", "label": "Big lakes and the shoreline"}
+      ]
+    },
+    {
+      "id": "outing_style",
+      "kind": "choice",
+      "prompt": "On a free afternoon, which sounds better?",
+      "options": [
+        {"value": "known_spot", "label": "Go back to a spot I know works"},
+        {"value": "new_water", "label": "Try water I have never fished"}
+      ]
+    },
+    {
+      "id": "species_interest",
+      "kind": "multi_choice",
+      "prompt": "What are you hoping to meet? Pick every group that interests you.",
+      "options": [
+        {"value": "gamefish", "label": "Bass, pike, walleye and other gamefish"},
+        {"value": "trout_salmon", "label": "Trout and salmon"},
+        {"value": "small_native", "label": "Darters, dace, madtoms, shiners and other small natives"},
+        {"value": "rough_fish", "label": "Carp, suckers, redhorse, gar and other big rough fish"}
+      ]
+    }
+  ]
+}

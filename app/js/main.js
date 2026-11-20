@@ -6,6 +6,7 @@ import { h, clear } from './util.js';
 import { initMap } from './map.js';
 import { initChat } from './chat.js';
 import { initGuide } from './guide.js';
+import { renderQuestions } from './onboard.js';
 
 const SCREENS = [
   { id: 'map', label: 'Map', icon: 'M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14' },
@@ -99,12 +100,34 @@ function showConnect(message, linkToken) {
       h('label', null, 'Invite code', code), h('label', null, 'Username', user),
       h('button', { class: 'btn', type: 'button', onclick: async () => {
         try {
-          const r = await api.signup(base.value.replace(/\/+$/, ''), code.value.trim(), user.value.trim());
-          finish({ base: base.value, token: r.token });
+          const apiBase = base.value.replace(/\/+$/, '');
+          const { questions } = await api.onboardingQuestions(apiBase);
+          showOnboarding(dlg, err, { apiBase, code: code.value.trim(), username: user.value.trim(), questions });
         } catch (e) { err.textContent = e.message; }
-      } }, 'Sign up')),
+      } }, 'Continue')),
     err));
   if (!dlg.open) dlg.showModal();
+}
+
+// The first-run questions. Every one must be answered before the account is created;
+// the only other way out is back to the connect dialog, which makes no account.
+function showOnboarding(dlg, err, { apiBase, code, username, questions }) {
+  const create = h('button', { class: 'btn primary', type: 'button', disabled: true }, 'Create account');
+  const qs = renderQuestions(questions, () => { create.disabled = !qs.complete(); });
+  create.addEventListener('click', async () => {
+    if (!qs.complete()) return;
+    try {
+      const r = await api.signup(apiBase, code, username, qs.answers());
+      api.saveConn({ base: apiBase, token: r.token });
+      dlg.close();
+      location.reload();
+    } catch (e) { err.textContent = e.message; }
+  });
+  clear(dlg).append(h('form', { method: 'dialog', class: 'connect-form', onsubmit: (e) => e.preventDefault() },
+    h('p', { class: 'kicker' }, 'FishDex'), h('h2', null, 'A few questions first'),
+    h('p', { class: 'muted' }, 'Answer all of them to create your account.'),
+    qs.el, create,
+    h('button', { class: 'btn', type: 'button', onclick: () => showConnect() }, 'Back'), err));
 }
 
 // A token that came in through a link: show whose account it is and save only on confirm.

@@ -7,11 +7,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.auth.auth import generate_invite_code, redeem_invite_code
+from src.auth.auth import generate_invite_code
 from src.services import presentation as pres
 from src.services.context import profile as prof
 from src.storage import angler_profile as store
 from src.storage import database
+from tests.signup_helpers import redeem_test_user
 from tests.test_angler_profile import spot, trip
 
 # ── presentation ─────────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ def api(tmp_path, monkeypatch, _template_db):
     handle = database.get_db()
 
     def login(name):
-        got = redeem_invite_code(handle, generate_invite_code(handle), name)
+        got = redeem_test_user(handle, generate_invite_code(handle), name)
         return {"id": got["user_id"], "h": {"Authorization": f"Bearer {got['token']}"}}
 
     class Api:

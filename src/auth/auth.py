@@ -9,6 +9,10 @@ from datetime import datetime, timedelta
 
 from sqlite_utils import Database
 
+from src.models.questionnaire import AnswerError, QuestionSet
+from src.storage import questionnaire as answer_store
+from src.storage.profile import set_user_home
+
 
 def generate_invite_code(db: Database, created_by: int = 1, note: str = "") -> str:
     """Generate a new invite code. Returns the code string."""
@@ -25,12 +29,34 @@ def generate_invite_code(db: Database, created_by: int = 1, note: str = "") -> s
     return code
 
 
-def redeem_invite_code(db: Database, code: str, username: str, display_name: str = "") -> dict:
+def redeem_invite_code(
+    db: Database,
+    code: str,
+    username: str,
+    display_name: str = "",
+    *,
+    questions: QuestionSet,
+    answers: dict,
+) -> dict:
     """
-    Redeem an invite code and create a user account.
+    Redeem an invite code and create a user account, from a complete set of answers.
+
+    This is the only function that creates an account. The answers are checked against
+    `questions` before anything is written, so a bad submission neither spends the invite
+    code nor leaves a half-made user; they are stored, and the home they name is set,
+    as part of creating the account.
     Returns {"success": True, "token": "...", "user_id": N}
-    or {"success": False, "error": "..."}
+    or {"success": False, "error": "...", "problems": {question_id: why}}.
     """
+    try:
+        clean = questions.validate_answers(answers)
+    except AnswerError as e:
+        return {
+            "success": False,
+            "error": "Every question must be answered.",
+            "problems": e.problems,
+        }
+
     code = code.strip().upper()
 
     invite = next(
@@ -60,18 +86,37 @@ def redeem_invite_code(db: Database, code: str, username: str, display_name: str
         .last_pk
     )
 
-    db["invite_codes"].update(
-        invite["id"],
-        {
-            "used_by": user_id,
-            "used_at": datetime.now().isoformat(),
-            "is_active": 0,
-        },
-    )
-    db.conn.commit()
-
-    token = _create_token(db, user_id)
+    try:
+        answer_store.save_answers(db, user_id, questions.version, clean)
+        home = questions.home_answer(clean)
+        if home is not None:
+            set_user_home(db, user_id, home, questions.home_jurisdiction(clean))
+        db["invite_codes"].update(
+            invite["id"],
+            {
+                "used_by": user_id,
+                "used_at": datetime.now().isoformat(),
+                "is_active": 0,
+            },
+        )
+        db.conn.commit()
+        token = _create_token(db, user_id)
+    except Exception:
+        # No account without its answers: undo the user rather than keep a half-made one.
+        _undo_account(db, user_id, invite["id"])
+        raise
     return {"success": True, "token": token, "user_id": user_id}
+
+
+def _undo_account(db: Database, user_id: int, invite_id: int) -> None:
+    with db.conn:
+        db.execute(f"DELETE FROM {answer_store.TABLE} WHERE user_id = ?", [user_id])
+        db.execute("DELETE FROM user_sessions WHERE user_id = ?", [user_id])
+        db.execute("DELETE FROM users WHERE id = ?", [user_id])
+        db.execute(
+            "UPDATE invite_codes SET used_by = NULL, used_at = NULL, is_active = 1 WHERE id = ?",
+            [invite_id],
+        )
 
 
 def _create_token(db: Database, user_id: int) -> str:
