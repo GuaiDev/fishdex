@@ -13,7 +13,7 @@ from src.models.catch import Catch
 from src.models.profile import Location, UserProfile
 from src.models.trip import Trip
 from src.storage.database import get_db
-from src.storage.profile import load_profile, save_profile
+from src.storage.profile import get_user_home, load_profile, save_profile, set_user_home
 from src.storage.trips import insert_trip, recent_trips
 
 # Verify TLS against the OS trust store rather than certifi's bundle. A machine
@@ -117,10 +117,19 @@ def serve(
     uvicorn.run("src.api.main:app", host=host, port=port, reload=reload)
 
 
+def _home_profile(db) -> UserProfile:
+    stored = get_user_home(db, 1)
+    if stored is None:
+        return load_profile()
+    home, jurisdiction = stored
+    return UserProfile(home_location=home, home_jurisdiction=jurisdiction or "CA-ON")
+
+
 @app.command()
 def log() -> None:
     """Interactively log a fishing trip."""
-    profile = load_profile()
+    db = get_db()
+    profile = _home_profile(db)
     today = date_type.today().isoformat()
 
     trip_date_str = typer.prompt("Date (YYYY-MM-DD)", default=today)
@@ -170,7 +179,6 @@ def log() -> None:
         what_didnt=what_didnt,
     )
 
-    db = get_db()
     trip_id = insert_trip(db, trip)
     console.print(f"[green]Saved trip #{trip_id}[/green] — {location_name} on {trip_date_str}")
 
@@ -210,6 +218,15 @@ def recent(
 def profile() -> None:
     """View and optionally edit your fishing profile."""
     p = load_profile()
+    db = get_db()
+    stored_home = get_user_home(db, 1)
+    if stored_home is not None:
+        p = p.model_copy(
+            update={
+                "home_location": stored_home[0],
+                "home_jurisdiction": stored_home[1] or p.home_jurisdiction,
+            }
+        )
     _print_profile(p)
 
     if not typer.confirm("Edit profile?", default=False):
@@ -254,6 +271,7 @@ def profile() -> None:
         preferences=preferences,
     )
     save_profile(updated)
+    set_user_home(db, 1, home_location, home_jurisdiction)
     console.print("[green]Profile saved.[/green]")
 
 
@@ -360,7 +378,7 @@ def ingest(
     from src.services.osm import fetch_and_store as osm_fetch_and_store
     from src.services.stream_gauge import fetch_and_store as wsc_fetch_and_store
 
-    profile = load_profile()
+    profile = _home_profile(get_db())
 
     if lat is not None and lng is not None:
         center_lat, center_lng = lat, lng

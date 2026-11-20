@@ -193,7 +193,7 @@ def _from_name(db: Database, query: str, radius_km: float, user_id: int) -> Plac
             resolution_note=f"matched your logged trips at {name}",
         )
 
-    hit = _named_segment(db, pattern)
+    hit = _named_segment(db, pattern, user_id)
     if hit:
         lat, lng, name, seg_id, others = hit
         note = f"matched OHN watercourse {name}"
@@ -257,7 +257,9 @@ def _user_logged_place(db: Database, pattern: str, user_id: int) -> tuple[float,
     return float(lat), float(lng), str(name)
 
 
-def _named_segment(db: Database, pattern: str) -> tuple[float, float, str, int, int] | None:
+def _named_segment(
+    db: Database, pattern: str, user_id: int
+) -> tuple[float, float, str, int, int] | None:
     """Nearest matching watercourse, plus how many others share the name.
 
     Ontario has several Sixteen Mile Creeks. Taking the first row the database
@@ -305,7 +307,7 @@ def _named_segment(db: Database, pattern: str) -> tuple[float, float, str, int, 
     if exact:
         candidates = exact
 
-    home = _home_point()
+    home = _home_point(db, user_id)
     if home is not None:
         candidates.sort(key=lambda c: (c[0] - home[0]) ** 2 + (c[1] - home[1]) ** 2)
 
@@ -321,16 +323,30 @@ def _named_segment(db: Database, pattern: str) -> tuple[float, float, str, int, 
     return (*chosen, others)
 
 
-def _home_point() -> tuple[float, float] | None:
+def _home_point(db: Database, user_id: int) -> tuple[float, float] | None:
+    """This user's home, from the database. None when they have not set one.
+
+    User 1 alone falls back to the legacy profile file, for a database that
+    predates per-user homes. Anyone else with no home gets no ranking, never the
+    captain's.
+    """
+    from src.storage.profile import get_user_home
+
+    stored = get_user_home(db, user_id)
+    if stored is not None:
+        home = stored[0]
+        return (home.lat, home.lng) if home is not None else None
+    if user_id != 1:
+        return None
     try:
         from src.storage.profile import load_profile
 
-        home = load_profile().home_location
+        legacy = load_profile().home_location
     except Exception:  # noqa: BLE001 - no profile is not an error here
         return None
-    if home is None:
+    if legacy is None:
         return None
-    return float(home.lat), float(home.lng)
+    return float(legacy.lat), float(legacy.lng)
 
 
 def _named_water_feature(db: Database, pattern: str) -> tuple[float, float, str] | None:

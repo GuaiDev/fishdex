@@ -5,6 +5,7 @@ import sqlite3
 
 import pytest
 
+import src.storage.profile as profile_mod
 from src.storage.database import get_db, migrate
 
 
@@ -13,7 +14,11 @@ def migrated_template_db(tmp_path_factory):
     """Build the schema once per pytest process (once per worker under xdist)."""
     path = tmp_path_factory.mktemp("template-session") / "template.db"
     template = get_db(path)
-    migrate(template)
+    # The user_home migration seeds user 1 from the profile file; the template must
+    # not inherit whatever data/user_profile.json the machine running tests has.
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(profile_mod, "PROFILE_PATH", path.parent / "no_profile.json")
+        migrate(template)
     template.conn.close()
     _auto_migrate["template"] = path
     return path

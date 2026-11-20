@@ -146,6 +146,19 @@ make lint
 make format
 ```
 
+Home and jurisdiction are stored per user in the database. On migration, an existing
+`data/user_profile.json` seeds user 1 only; a missing or unreadable file seeds nothing.
+Stored home and jurisdiction take precedence in chat and watercourse name ranking,
+including a jurisdiction saved without home coordinates. Other users never inherit
+user 1's home; without a stored jurisdiction, chat defaults to CA-ON.
+
+The single-user CLI commands use user 1: `uv run python -m src.cli.main profile`
+views and edits their home and jurisdiction in the database, `log` defaults to their
+stored jurisdiction, and `make ingest` uses their stored home unless coordinates are
+supplied explicitly. When user 1 has no stored home or
+jurisdiction, `log`, `ingest`, chat and name ranking all fall back to the JSON file. Other profile preferences
+remain in the JSON file, which the CLI profile editor still saves.
+
 Requires a `.env` file with:
 
 ```
