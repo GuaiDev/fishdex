@@ -342,6 +342,9 @@ Parallel tracks once P0 is done: (1) P1 host and security; (2) P3 client screens
 | DL-18 | `new_to_me` stays only if, after P0.4, the filter over the home box answers in under 2 s; otherwise hide it for beta and defer card precompute (T13). | Measured 128 s per request at baseline because it runs `describe()` per spot; the spatial index may be enough, and the honest test is to measure. |
 | DL-19 | Coverage beyond the home area is a notice, not a filter. | Presence, structure and remoteness are still real outside the OSM footprint (CLAUDE.md Phase 2d); only the access term is unmeasured, and the renderer already says so for Explore. |
 | DL-20 | The public read-only demo stays on. | The species leak that made it dangerous (F4) is closed by #59; no demo route reaches a model; it is useful for showing testers what they are joining. |
+| DL-21 | The captain adopted this plan for all later work (2026-11-20). | The captain said to adopt the beta plan for all later work, so every later FishDex prompt starts from section 0 and its phase, and changes direction through new `DL` entries. |
+| DL-22 | Supersedes the premise of DL-16: the questionnaire design is assumed ready in time, so P4 is not planned around the home-only fallback. | The captain said to assume the questionnaire design will be ready in time. Home-first and skippable questions still stand as design; only the plan for P4's "Cut if short" fallback is no longer the working assumption. P4 still must not block the core loop (P3). |
+| DL-23 | Supersedes the "never" wording of DL-4 and DEF-2: pin sharing is undecided. Public pin sharing is not wanted; sharing between anglers is acceptable. | The captain said no decision is made for now, that public pin sharing is not the best, and that sharing between anglers is fine. CLAUDE.md's ethical rule against broadcasting spot lists still covers the public case; no schema or code exists for any sharing. |
 
 ---
 
@@ -436,3 +439,6 @@ Run on the hosted app from a phone on cellular, with a fresh invite code. Record
 | 2026-11-17 | suite | measured | full suite at `5d5c979`: 2,831 passed, 4 skipped, 0 failed in 4 min 19 s (NixOS `LD_LIBRARY_PATH` workaround plus a scratch plugin setting `synchronous=OFF` on test DBs; the T9 branch makes that plugin unnecessary); `make lint` clean; JS link tests 7/7 |
 | 2026-11-19 | P1.8 | done | Owner-only photo route and 40-million-pixel upload cap; acceptance cases covered in `tests/test_api.py` and `tests/test_photo_storage.py`; branch `fm/fishdex-beta-p1-photos-auth` (PR pending validation handoff) |
 | 2026-11-19 | P1.12 | done | branch `fm/fishdex-beta-p1-explore-cache`; one read for two calls asserted in `tests/test_services_untapped_potential.py` |
+| 2026-11-20 | DL-21 | added | Captain adopted this plan for all later work |
+| 2026-11-20 | DL-22 | added | Supersedes DL-16's premise: questionnaire design assumed ready in time; P4 not planned around the home-only fallback |
+| 2026-11-20 | DL-23 | added | Supersedes "never" in DL-4 and DEF-2: pin sharing undecided; public not wanted, between anglers acceptable |
