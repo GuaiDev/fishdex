@@ -155,9 +155,8 @@ user 1's home; without a stored jurisdiction, chat defaults to CA-ON.
 The single-user CLI commands use user 1: `uv run python -m src.cli.main profile`
 views and edits their home and jurisdiction in the database, `log` defaults to their
 stored jurisdiction, and `make ingest` uses their stored home unless coordinates are
-supplied explicitly. For `log` and `ingest`, the JSON home is a fallback only when
-there is no user 1 database row. Chat and name ranking retain a legacy fallback for
-user 1 when neither home nor jurisdiction is stored. Other profile preferences
+supplied explicitly. When user 1 has no stored home or
+jurisdiction, `log`, `ingest`, chat and name ranking all fall back to the JSON file. Other profile preferences
 remain in the JSON file, which the CLI profile editor still saves.
 
 Requires a `.env` file with:
