@@ -275,7 +275,7 @@ def test_photo_access_is_owner_only(monkeypatch, tmp_path):
     from fastapi import UploadFile
     from PIL import Image
 
-    from src.auth.auth import _create_token
+    from src.auth.auth import create_session
     from src.services import photo_storage
     from src.storage.database import get_db
 
@@ -288,8 +288,8 @@ def test_photo_access_is_owner_only(monkeypatch, tmp_path):
     db = get_db()
     owner = db["users"].insert({"username": "photo-owner"}).last_pk
     other = db["users"].insert({"username": "photo-other"}).last_pk
-    owner_headers = {"Authorization": f"Bearer {_create_token(db, owner)}"}
-    other_headers = {"Authorization": f"Bearer {_create_token(db, other)}"}
+    owner_headers = {"Authorization": f"Bearer {create_session(db, owner)}"}
+    other_headers = {"Authorization": f"Bearer {create_session(db, other)}"}
     session = db["sessions"].insert({"user_id": owner, "date": "2026-11-19"}).last_pk
     stop = db["stops"].insert({"session_id": session, "location_text": "Creek"}).last_pk
     catch = (
