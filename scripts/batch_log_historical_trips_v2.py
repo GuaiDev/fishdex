@@ -149,7 +149,7 @@ def main() -> None:
             print("→ Skipped")
             skipped.append(i)
         else:
-            result = log_trip(db, trip_text.strip())
+            result = log_trip(db, trip_text.strip(), user_id=1)  # the captain's own history
             if result["trip_id"] is None:
                 print(f"→ Log failed: {result['confirmation']}")
                 skipped.append(i)

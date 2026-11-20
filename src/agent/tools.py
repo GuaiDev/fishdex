@@ -457,7 +457,7 @@ def tool_schemas(profile: Any) -> list[dict]:
 # ── dispatch ──────────────────────────────────────────────────────────────────
 
 
-def execute_tool(name: str, inputs: dict, user_id: int = 1) -> str:
+def execute_tool(name: str, inputs: dict, *, user_id: int) -> str:
     handler = _HANDLERS.get(name)
     if handler is None:
         return json.dumps({"error": f"Unknown tool: {name}"})
@@ -532,7 +532,7 @@ def _maybe_json(text: str | None):
         return text
 
 
-def _find_water(inputs: dict, _user_id: int) -> str:
+def _find_water(inputs: dict, user_id: int) -> str:
     from src.services.osm import get_access_points_for_agent, get_nearby_water_for_agent
 
     water = get_nearby_water_for_agent(
@@ -541,6 +541,7 @@ def _find_water(inputs: dict, _user_id: int) -> str:
         radius_km=inputs.get("radius_km", 25),
         feature_type=inputs.get("feature_type"),
         not_in_trip_log=inputs.get("not_in_trip_log", False),
+        user_id=user_id,
     )
     access = get_access_points_for_agent(
         lat=inputs["lat"], lng=inputs["lng"], radius_km=inputs.get("radius_km", 25)
@@ -635,7 +636,7 @@ def _fishing_summary(inputs: dict, user_id: int) -> str:
     blocks = [render_user_layer(user_layer(db, user_id=user_id))]
     species = inputs.get("species")
     if species:
-        blocks.append(render_species_history(species_history(db, species, user_id)))
+        blocks.append(render_species_history(species_history(db, species, user_id=user_id)))
     return "\n\n".join(blocks)
 
 

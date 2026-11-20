@@ -89,7 +89,8 @@ def get_species_coaching(
     db: Database,
     species: str,
     specific_question: str | None = None,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> str:
     """Coach on one species, across everywhere the angler has fished it."""
     history = species_history(db, species, user_id=user_id)
@@ -134,7 +135,8 @@ def get_location_coaching(
     db: Database,
     location_query: str,
     specific_question: str | None = None,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> str:
     """Coach on one place — the angler's history there plus what is recorded.
 

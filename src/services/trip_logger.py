@@ -237,7 +237,8 @@ def _enrich_conditions(
 def log_session(
     parsed_session: dict,
     db_conn: Database,
-    user_id: int = 1,
+    *,
+    user_id: int,
     structured_catches: list[dict] | None = None,
     fallback_lat: float | None = None,
     fallback_lng: float | None = None,
@@ -660,7 +661,8 @@ def log_trip(  # DEPRECATED — use log_session / parse_session_from_text instea
     text: str,
     user_lat: float | None = None,
     user_lng: float | None = None,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> dict:
     """Parse a natural-language trip description and persist it.
 
@@ -682,7 +684,7 @@ def log_trip(  # DEPRECATED — use log_session / parse_session_from_text instea
         }
 
     parsed["raw_text"] = text
-    trip_id = insert_parsed_trip(db, parsed)
+    trip_id = insert_parsed_trip(db, parsed, user_id=user_id)
 
     ogf_id = parsed.get("ogf_id")
     seg_name = parsed.get("segment_watercourse_name")
@@ -711,7 +713,7 @@ def log_trip(  # DEPRECATED — use log_session / parse_session_from_text instea
     }
 
 
-def get_trip_summary(db: Database, user_id: int = 1) -> str:
+def get_trip_summary(db: Database, *, user_id: int) -> str:
     """Return a natural-language summary of all logged trips for agent context."""
     has_stops = "stops" in db.table_names()
     has_parsed = "parsed_trips" in db.table_names()
@@ -749,7 +751,7 @@ def get_trip_summary(db: Database, user_id: int = 1) -> str:
         dates = [r[0] for r in session_dates]
 
     elif has_parsed:
-        trips = get_parsed_trips(db, limit=500)
+        trips = get_parsed_trips(db, user_id=user_id, limit=500)
         n_stops = len(trips)
         n_sessions = n_stops
         for t in trips:
@@ -794,7 +796,8 @@ def get_trips_at_location(
     lat: float | None = None,
     lng: float | None = None,
     radius_km: float = 2.0,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> str:
     """Return a summary of the user's logged stops at a specific location.
 
@@ -886,7 +889,8 @@ def _maybe_insert_species_insights(
     parsed: dict,
     ogf_id: int,
     seg_name: str | None,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> int:
     """Generate one presence insight per caught species at the snapped segment."""
     from src.models.behavioral_insight import BehavioralInsight

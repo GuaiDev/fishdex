@@ -46,6 +46,8 @@ def get_nearby_water_for_agent(
     radius_km: float = 25,
     feature_type: str | None = None,
     not_in_trip_log: bool = False,
+    *,
+    user_id: int,
 ) -> str:
     """Return JSON with fishable water bodies near a location, ranked by convenience."""
     features = _osm.fetch_water_features(lat, lng, radius_km)
@@ -65,7 +67,9 @@ def get_nearby_water_for_agent(
 
     if not_in_trip_log:
         visited: set[str] = set()
-        for row in db["trips"].rows_where("location_name IS NOT NULL"):
+        for row in db["trips"].rows_where(
+            "location_name IS NOT NULL AND user_id = ?", [user_id]
+        ):
             name = row.get("location_name")
             if name:
                 visited.add(name.lower())

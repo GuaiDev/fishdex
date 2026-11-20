@@ -5,20 +5,28 @@ from pathlib import Path
 
 from src.models.behavioral_insight import BehavioralInsight
 from src.storage.database import get_db
-from src.storage.insights import insert_insight, query_insights
+from src.storage.insights import (
+    insert_insight,
+    insert_shared_insight,
+    query_insights,
+    query_shared_insights,
+)
 
+# BehavioralInsight requires an owner; shared rows carry this placeholder, never a real user id.
+SHARED_OWNER = 0
 _DISPERSAL_SEED_PATH = Path("data/processed/dispersal_insights.json")
 
 
 def get_behavioral_insights_for_agent(
     species: str,
     condition_type: str | None = None,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> str:
     db = get_db()
     insights = query_insights(
         db, species=species, condition_type=condition_type, current_only=True, user_id=user_id
-    )
+    ) + query_shared_insights(db, species, condition_type, owned_by=user_id)
 
     if not insights:
         msg = f"No behavioral insights stored for '{species}'"
@@ -43,6 +51,7 @@ def get_behavioral_insights_for_agent(
                     "source_type": i.source_type,
                     "evidence_count": i.evidence_count,
                     "user_verified": i.user_verified,
+                    "shared": i.user_id == SHARED_OWNER,
                     "jurisdiction": i.jurisdiction,
                     "last_validated": i.last_validated.isoformat(),
                 }
@@ -53,7 +62,7 @@ def get_behavioral_insights_for_agent(
 
 
 def seed_dispersal_insights() -> int:
-    """Load waterfowl-dispersal behavioral insights from seed file; skip duplicates.
+    """Load waterfowl-dispersal behavioral insights into `shared_insights`; skip duplicates.
 
     Returns the number of newly inserted records (0 if already seeded).
     """
@@ -67,15 +76,9 @@ def seed_dispersal_insights() -> int:
     count = 0
     record_counts(fetched=len(raw) or 1, empty=int(not raw))
     for entry in raw:
-        existing = list(
-            db["behavioral_insights"].rows_where(
-                "user_id = 1 AND LOWER(species) = ? AND condition_context = ? AND is_current = 1",
-                [entry["species"].lower(), entry["condition_context"]],
-            )
-        )
-        if not existing:
-            insight = BehavioralInsight(**entry)
-            insert_insight(db, insight)
+        # Seeded insights are shared, not the captain's: they have no owner.
+        insight = BehavioralInsight(user_id=SHARED_OWNER, **entry)
+        if insert_shared_insight(db, insight) is not None:
             count += 1
             record_counts(stored=1)
         else:
@@ -98,7 +101,8 @@ def record_behavioral_insight_for_agent(
     recommendation: str | None = None,
     condition_season: str | None = None,
     location_name: str | None = None,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> str:
     if confidence == "unverified":
         return json.dumps(
@@ -224,7 +228,8 @@ def check_conflicts_for_agent_service(
     lat: float | None = None,
     lng: float | None = None,
     condition_season: str | None = None,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> str:
     from src.storage.insights import check_conflicts_for_agent
 

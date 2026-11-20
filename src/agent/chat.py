@@ -111,7 +111,8 @@ def _prompt_inputs(db: Any, user_id: int) -> tuple[Any, list, Any]:
                     "home_jurisdiction": jurisdiction or profile.home_jurisdiction,
                 }
             )
-        return profile, recent_trips(db, limit=5), get_jurisdiction(profile.home_jurisdiction)
+        trips = recent_trips(db, limit=5, user_id=user_id)
+        return profile, trips, get_jurisdiction(profile.home_jurisdiction)
     if stored is not None:
         home, jurisdiction = stored
         jurisdiction = jurisdiction or _DEFAULT_JURISDICTION
@@ -121,7 +122,7 @@ def _prompt_inputs(db: Any, user_id: int) -> tuple[Any, list, Any]:
 
 
 def _run_full_pipeline(
-    messages: list[dict], session_id: str, mode: str = "synthesis", user_id: int = 1
+    messages: list[dict], session_id: str, mode: str = "synthesis", *, user_id: int
 ) -> dict:
     """Non-streaming agentic loop. The synthesis path and fallback for all modes."""
     try:
@@ -217,7 +218,8 @@ def run_chat_api(
     messages: list[dict],
     session_id: str | None = None,
     routing_enabled: bool = True,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> dict:
     """Routed entry point. Classifies the latest user message and dispatches to the
     cheapest capable path. Falls back to the full pipeline on synthesis or any uncertainty.
@@ -370,7 +372,7 @@ def run_chat_api(
     return _run_full_pipeline(messages, session_id, mode=mode, user_id=user_id)
 
 
-def run_chat() -> None:
+def run_chat(*, user_id: int) -> None:
     console = Console()
 
     try:
@@ -380,14 +382,13 @@ def run_chat() -> None:
         return
 
     db = get_db()
-    # The CLI is single-user: everything it reads and writes belongs to user 1.
-    cli_user_id = 1
+    cli_user_id = user_id
     session_id = datetime.now().isoformat()
     start_session(db, session_id)
 
     profile, trips, home = _prompt_inputs(db, cli_user_id)
     system_prompt = assemble(load_template(), profile, trips, home)
-    angler_context = load_context(db)
+    angler_context = load_context(db, user_id=cli_user_id)
     if angler_context:
         system_prompt = system_prompt + "\n\n" + format_context_for_prompt(angler_context)
 
@@ -548,7 +549,8 @@ def _agentic_loop(
     tools: list[dict],
     console: Console,
     session_id: str | None = None,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> None:
     """Stream a response, handle tool calls, loop until end_turn."""
     db = get_db()
@@ -630,7 +632,7 @@ def _normalize_block(b: Any) -> dict:
     return {"type": b.type}
 
 
-def _execute_tool(name: str, inputs: dict, user_id: int = 1) -> str:
+def _execute_tool(name: str, inputs: dict, *, user_id: int) -> str:
     """Kept as a name because callers and tests import it; the work moved out."""
     return execute_tool(name, inputs, user_id=user_id)
 

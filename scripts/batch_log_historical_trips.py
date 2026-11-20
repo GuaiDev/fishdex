@@ -111,7 +111,7 @@ def main() -> None:
                 logged += 1
                 continue
 
-        result = log_trip(db, text)
+        result = log_trip(db, text, user_id=1)  # the captain's own history
 
         if result["trip_id"] is None:
             print(f"  SKIPPED — location unresolved: {result['confirmation']}\n")
