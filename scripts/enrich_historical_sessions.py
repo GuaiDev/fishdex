@@ -97,6 +97,7 @@ def main():
             result = enrich_session_conditions(
                 db, sid, use_lat, use_lng, dt,
                 timeout_seconds=10.0,
+                user_id=1,  # the captain's sessions
             )
             if result.get("stored"):
                 weather = result.get("weather", {})

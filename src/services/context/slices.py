@@ -47,7 +47,8 @@ def build_records(
     place: Place,
     species_filter: str | None = None,
     days_back: int = 3650,
-    user_id: int = 1,
+    *,
+    user_id: int,
     escalate: bool = False,
     with_piscivore: bool = True,
 ) -> RecordsSlice:
@@ -989,7 +990,7 @@ def _fill_water_samples(db: Database, place: Place, out: ConditionsSlice, now: d
 # ── history ───────────────────────────────────────────────────────────────────
 
 
-def build_history(db: Database, place: Place, user_id: int = 1) -> HistorySlice:
+def build_history(db: Database, place: Place, *, user_id: int) -> HistorySlice:
     """The user's own record at this place — including blanks.
 
     Blanks are half the analytical signal and the hardest behaviour to get,

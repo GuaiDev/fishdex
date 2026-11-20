@@ -50,7 +50,8 @@ def query_insights(
     species: str,
     condition_type: str | None = None,
     current_only: bool = True,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> list[BehavioralInsight]:
     # behavioral_insights is a per-user table (see migrate_user_fields). Without
     # this filter one angler's stored conclusions surface in another's conflict
@@ -67,6 +68,63 @@ def query_insights(
 
     rows = db["behavioral_insights"].rows_where(where, params, order_by="created_at desc")
     return [_row_to_insight(r) for r in rows]
+
+
+_SHARED_COLUMNS = (
+    "species", "condition_type", "condition_context", "conclusion", "confidence",
+    "source_type", "source_detail", "evidence_count", "jurisdiction", "lat", "lng",
+    "recommendation", "condition_season", "location_name", "last_validated", "created_at",
+)  # fmt: skip
+
+
+def insert_shared_insight(db: Database, insight: BehavioralInsight) -> int | None:
+    """Store a seeded insight everyone sees. Returns None if it is already there.
+
+    Shared insights have no owner: they come from a seed file, not from anyone's log,
+    so they never enter a user's own insights or the user layer derived from them.
+    """
+    row = _to_row(insight)
+    existing = db["shared_insights"].rows_where(
+        "LOWER(species) = ? AND condition_context = ?",
+        [insight.species.lower(), insight.condition_context],
+    )
+    if next(existing, None) is not None:
+        return None
+    return db["shared_insights"].insert({k: row[k] for k in _SHARED_COLUMNS}).last_pk  # type: ignore[return-value]
+
+
+def query_shared_insights(
+    db: Database,
+    species: str,
+    condition_type: str | None = None,
+    *,
+    owned_by: int | None = None,
+) -> list[BehavioralInsight]:
+    """Seeded insights matching a species, newest first.
+
+    With `owned_by`, a shared insight the user already holds as their own current
+    insight (same species and context, e.g. the copy an older seed run wrote under
+    user 1) is left out so it is not listed twice.
+    """
+    if "shared_insights" not in db.table_names():
+        return []
+    where = "LOWER(species) LIKE ?"
+    params: list[Any] = [f"%{species.lower()}%"]
+    if condition_type:
+        where += " AND condition_type = ?"
+        params.append(condition_type)
+    out = []
+    for r in db["shared_insights"].rows_where(where, params, order_by="created_at desc"):
+        if owned_by is not None and next(
+            db["behavioral_insights"].rows_where(
+                "user_id = ? AND LOWER(species) = ? AND condition_context = ? AND is_current = 1",
+                [owned_by, r["species"].lower(), r["condition_context"]],
+            ),
+            None,
+        ):
+            continue
+        out.append(_row_to_insight({**r, "user_id": 0, "is_current": 1, "user_verified": 0}))
+    return out
 
 
 def mark_user_verified(db: Database, insight_id: int) -> None:
@@ -131,7 +189,8 @@ def check_conflicts(
     lng: float | None = None,
     condition_season: str | None = None,
     radius_km: float = 1.0,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> list[BehavioralInsight]:
     """Find existing current insights that might conflict with a new recommendation.
 
@@ -168,7 +227,8 @@ def check_conflicts_for_agent(
     lat: float | None = None,
     lng: float | None = None,
     condition_season: str | None = None,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> str:
     """Agent-facing conflict check. Returns JSON describing any conflicts found."""
     import json

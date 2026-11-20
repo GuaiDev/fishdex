@@ -54,7 +54,7 @@ def db(fast_db):
     ],
 )
 def test_general_questions_name_no_place(db, message):
-    assert mentions_a_place(db, message) is None
+    assert mentions_a_place(db, message, user_id=1) is None
 
 
 @pytest.mark.parametrize(
@@ -66,11 +66,11 @@ def test_general_questions_name_no_place(db, message):
     ],
 )
 def test_a_named_water_is_detected(db, message, expected):
-    assert mentions_a_place(db, message) == expected
+    assert mentions_a_place(db, message, user_id=1) == expected
 
 
 def test_coordinates_count_as_a_place(db):
-    assert mentions_a_place(db, "What's at 43.4675, -79.6877?") is not None
+    assert mentions_a_place(db, "What's at 43.4675, -79.6877?", user_id=1) is not None
 
 
 def test_a_users_own_spot_name_counts_even_if_no_gazetteer_has_it(db):
@@ -86,7 +86,7 @@ def test_a_users_own_spot_name_counts_even_if_no_gazetteer_has_it(db):
         },
         alter=True,
     )
-    assert mentions_a_place(db, "was the back dam any good last year?") == "the back dam"
+    assert mentions_a_place(db, "was the back dam any good last year?", user_id=1) == "the back dam"
 
 
 def test_another_users_spot_name_does_not_count(db):
@@ -117,7 +117,7 @@ def test_longest_match_wins(db):
         alter=True,
     )
     _known_place_names.cache_clear()
-    assert mentions_a_place(db, "how about East Bronte Creek") == "east bronte creek"
+    assert mentions_a_place(db, "how about East Bronte Creek", user_id=1) == "east bronte creek"
 
 
 # -- the override itself --------------------------------------------------------
@@ -145,7 +145,7 @@ def _route(monkeypatch, db, message, classified_mode):
 
     monkeypatch.setattr(chat, "_run_full_pipeline", _fake_pipeline)
 
-    result = chat.run_chat_api([{"role": "user", "content": message}], session_id="t")
+    result = chat.run_chat_api([{"role": "user", "content": message}], session_id="t", user_id=1)
     return result, seen
 
 

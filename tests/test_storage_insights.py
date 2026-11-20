@@ -29,6 +29,7 @@ def _make_db(tmp_path):
 
 def _insight(**overrides) -> BehavioralInsight:
     base = dict(
+        user_id=1,
         species="brook trout",
         condition_type="behavioral",
         condition_context="post-cold-front",
@@ -95,7 +96,7 @@ def test_query_current_only(tmp_path):
     old_id = insert_insight(db, _insight())
     refine_insight(db, old_id, _insight(conclusion="Refined."))
 
-    results = query_insights(db, species="brook trout", current_only=True)
+    results = query_insights(db, species="brook trout", current_only=True, user_id=1)
     assert len(results) == 1
     assert results[0].is_current is True
 
@@ -105,7 +106,7 @@ def test_query_all_versions(tmp_path):
     old_id = insert_insight(db, _insight())
     refine_insight(db, old_id, _insight(conclusion="Refined."))
 
-    results = query_insights(db, species="brook trout", current_only=False)
+    results = query_insights(db, species="brook trout", current_only=False, user_id=1)
     assert len(results) == 2
 
 
@@ -114,7 +115,7 @@ def test_query_condition_type_filter(tmp_path):
     insert_insight(db, _insight(condition_type="behavioral"))
     insert_insight(db, _insight(condition_type="habitat", conclusion="Prefer riffle edges."))
 
-    behavioral = query_insights(db, species="brook trout", condition_type="behavioral")
+    behavioral = query_insights(db, species="brook trout", condition_type="behavioral", user_id=1)
     assert len(behavioral) == 1
     assert behavioral[0].condition_type == "behavioral"
 
@@ -123,10 +124,10 @@ def test_query_case_insensitive(tmp_path):
     db = _make_db(tmp_path)
     insert_insight(db, _insight(species="Brook Trout"))
 
-    results = query_insights(db, species="brook trout")
+    results = query_insights(db, species="brook trout", user_id=1)
     assert len(results) == 1
 
-    results2 = query_insights(db, species="BROOK")
+    results2 = query_insights(db, species="BROOK", user_id=1)
     assert len(results2) == 1
 
 
@@ -151,7 +152,7 @@ def test_contradict_insight(tmp_path):
 
 def test_empty_query(tmp_path):
     db = _make_db(tmp_path)
-    results = query_insights(db, species="walleye")
+    results = query_insights(db, species="walleye", user_id=1)
     assert results == []
 
 

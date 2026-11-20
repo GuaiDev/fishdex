@@ -73,7 +73,8 @@ def describe(
     segment_id: int | None = None,
     radius_km: float = 5.0,
     caller: CallerType = "full",
-    user_id: int = 1,
+    *,
+    user_id: int,
     species_filter: str | None = None,
     escalate: bool | None = None,
 ) -> PlaceContext | None:
@@ -129,7 +130,8 @@ def explore(
     min_stream_order: int = 3,
     limit: int = 10,
     mode: str = "balanced",
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> ExploreResponse:
     """Rank places the user hasn't been.
 
@@ -288,7 +290,7 @@ def describe_species(db: Database, name: str):
     return _describe(db, name)
 
 
-def user_layer(db: Database, user_id: int = 1, force: bool = False):
+def user_layer(db: Database, *, user_id: int, force: bool = False):
     """Derived patterns, the inferred angler profile, and known gaps.
 
     Served from the stored layer when the inputs have not changed. Recomputed
@@ -334,7 +336,7 @@ def _store_inferred_profile(db: Database, profile) -> None:
         )
 
 
-def angler_profile(db: Database, user_id: int = 1):
+def angler_profile(db: Database, *, user_id: int):
     """The angler profile for one user, declared values blended in.
 
     The inferred part comes from the stored layer (recomputed once per logged
@@ -350,7 +352,7 @@ def angler_profile(db: Database, user_id: int = 1):
     return blend(db, profile)
 
 
-def recompute_user_layer(db: Database, user_id: int = 1):
+def recompute_user_layer(db: Database, *, user_id: int):
     """Rebuild and store the derived layer. Call after writing a session.
 
     Separate from `user_layer(force=True)` only in intent: this is the name a
@@ -360,7 +362,7 @@ def recompute_user_layer(db: Database, user_id: int = 1):
     return user_layer(db, user_id=user_id, force=True)
 
 
-def species_history(db: Database, species: str, user_id: int = 1):
+def species_history(db: Database, species: str, *, user_id: int):
     """One angler's own record with one species — catches, blanks and insights."""
     from src.services.context.user import build_species_history
 

@@ -1562,6 +1562,55 @@ def migrate_user_fields(db: Database) -> None:
         pass
 
 
+def migrate_trip_owners_and_shared_insights(db: Database) -> None:
+    """Give `trips` an owner, and move seeded insights out of user 1's rows.
+
+    `trips` and the legacy `parsed_trips` predate multi-user, so every row in them
+    is the captain's: they are assigned to user 1 here, once, and a later write that
+    forgets its user_id stays NULL and visible rather than silently becoming his.
+    `shared_insights` holds what the seed commands load for everyone (the waterfowl
+    dispersal notes). Those used to be written as user 1's own insights, so no other
+    angler ever saw them and the captain could not tell them from his own.
+
+    `recommendations` has no writer and no reader in the app, so it gets no owner;
+    its storage module is retired and the empty table is left alone.
+    """
+    if "trips" in db.table_names():
+        if "user_id" not in {c.name for c in db["trips"].columns}:
+            db.execute("ALTER TABLE trips ADD COLUMN user_id INTEGER")
+            db.execute("UPDATE trips SET user_id = 1")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_trips_user ON trips (user_id, date)")
+    if "parsed_trips" in db.table_names():
+        db.execute(
+            "UPDATE parsed_trips SET user_id = '1' WHERE user_id IS NULL OR user_id = 'default'"
+        )
+    if "shared_insights" not in db.table_names():
+        db["shared_insights"].create(
+            {
+                "id": int,
+                "species": str,
+                "condition_type": str,
+                "condition_context": str,
+                "conclusion": str,
+                "confidence": str,
+                "source_type": str,
+                "source_detail": str,
+                "evidence_count": int,
+                "jurisdiction": str,
+                "lat": float,
+                "lng": float,
+                "recommendation": str,
+                "condition_season": str,
+                "location_name": str,
+                "last_validated": str,
+                "created_at": str,
+            },
+            pk="id",
+        )
+        db["shared_insights"].create_index(["species"], if_not_exists=True)
+    db.conn.commit()
+
+
 def migrate_stream_segments_multi_jurisdiction(db: Database) -> None:
     """Add stream_order and segment_source columns to stream_segments. Idempotent.
 
@@ -2176,6 +2225,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(29, "ingest_runs", migrate_ingest_runs),
     Migration(30, "stream_segments_spatial_index", migrate_stream_segments_spatial_index),
     Migration(31, "user_home", migrate_user_home),
+    Migration(32, "trip_owners_and_shared_insights", migrate_trip_owners_and_shared_insights),
 )
 
 assert [m.version for m in MIGRATIONS] == list(range(1, len(MIGRATIONS) + 1))

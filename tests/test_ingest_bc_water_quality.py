@@ -317,7 +317,7 @@ def test_bc_readings_reach_the_water_slice_with_their_own_source(
     monkeypatch.setattr("src.ingest.jurisdictions.ca_bc.ingest.get_db", lambda: db_factory(db_path))
     ingest_bc_water_quality(49.10, -123.02, radius_km=30)
 
-    water = describe(db_factory(db_path), lat=49.10, lng=-123.02, caller="map_tap").water
+    water = describe(db_factory(db_path), lat=49.10, lng=-123.02, caller="map_tap", user_id=1).water
     assert not water.dissolved_oxygen.is_empty
     assert "BC EnMoDS" in water.dissolved_oxygen.provenance.source
     assert "PWQMN" not in water.dissolved_oxygen.provenance.source

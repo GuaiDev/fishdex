@@ -66,7 +66,7 @@ def main():
         print(f"  Q: {spot['question'][:80]}...")
 
         messages = [{"role": "user", "content": spot["question"]}]
-        result = run_chat_api(messages)
+        result = run_chat_api(messages, user_id=1)  # the captain's prewarm
 
         mode = result.get("mode", "unknown")
         if mode == "synthesis_cache_hit":

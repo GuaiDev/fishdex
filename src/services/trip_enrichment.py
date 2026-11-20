@@ -40,7 +40,7 @@ def get_season(month: int) -> str:
     return "fall"
 
 
-def match_insights_to_stop(db: Database, stop: dict, user_id: int = 1) -> list:
+def match_insights_to_stop(db: Database, stop: dict, *, user_id: int) -> list:
     """Find behavioral insights that match this stop.
 
     Productive stops: match by species + location proximity + season.
@@ -195,7 +195,8 @@ def update_insight_confidence(
     was_productive: bool,
     stop: dict,
     use_llm: bool,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> BehavioralInsight:
     """Update insight confidence based on whether the trip confirmed or contradicted it.
 
@@ -319,7 +320,8 @@ def enrich_session(
     db: Database,
     session_id: int,
     use_llm: bool,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> dict:
     """Main entry point. Called after a session is logged.
 
@@ -381,7 +383,7 @@ _SLUMP_THRESHOLD = 2
 _LOW_SUCCESS_RATE = 0.40
 
 
-def _get_all_stops_summary(db: Database, user_id: int = 1) -> list[dict]:
+def _get_all_stops_summary(db: Database, *, user_id: int) -> list[dict]:
     """Return a lightweight summary of this angler's stops for pattern analysis.
 
     "All stops" means all of *theirs*. Pattern detection across users would
@@ -418,7 +420,7 @@ def _get_all_stops_summary(db: Database, user_id: int = 1) -> list[dict]:
     return stops
 
 
-def _detect_species_gap(stops: list[dict], user_id: int = 1) -> dict | None:
+def _detect_species_gap(stops: list[dict], *, user_id: int) -> dict | None:
     """Detect species in behavioral insights that the user has never personally caught."""
     species_caught_count: dict[str, int] = {}
     total_stops = len(stops)
@@ -553,7 +555,8 @@ def _detect_technique_pattern(stops: list[dict]) -> dict | None:
 def detect_proactive_patterns(
     db: Database,
     current_session_stops: list[dict],
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> dict | None:
     """Check for meaningful patterns across all trip history.
 

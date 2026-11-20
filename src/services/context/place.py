@@ -38,7 +38,8 @@ def resolve(
     lng: float | None = None,
     segment_id: int | None = None,
     radius_km: float = _DEFAULT_RADIUS_KM,
-    user_id: int = 1,
+    *,
+    user_id: int,
 ) -> Place | None:
     """Resolve any of lat/lng, segment ID, or a name to a Place.
 
@@ -85,7 +86,7 @@ def _known_place_names(db_path: str) -> frozenset[str]:
     return frozenset(names)
 
 
-def mentions_a_place(db: Database, text: str, user_id: int = 1) -> str | None:
+def mentions_a_place(db: Database, text: str, *, user_id: int) -> str | None:
     """The name of a specific stretch of water this text refers to, if any.
 
     Exists so the router can decide in Python whether a question is about

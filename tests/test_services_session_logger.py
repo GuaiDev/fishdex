@@ -75,7 +75,7 @@ def test_session_single_stop(mock_get_client, mock_resolve, db_conn):
     assert len(parsed["stops"]) == 1
     assert "creek chub" in parsed["stops"][0]["species_caught"]
 
-    result = log_session(parsed, db_conn)
+    result = log_session(parsed, db_conn, user_id=1)
     assert result["stops_logged"] == 1
     assert isinstance(result["session_id"], int)
 
@@ -132,7 +132,7 @@ def test_session_multi_stop(mock_get_client, mock_resolve, db_conn):
     assert parsed["stops"][0]["was_productive"] is True
     assert parsed["stops"][1]["was_productive"] is False
 
-    result = log_session(parsed, db_conn)
+    result = log_session(parsed, db_conn, user_id=1)
     assert result["stops_logged"] == 2
 
 
@@ -162,7 +162,7 @@ def test_session_no_ohn_snap_still_logs(mock_get_client, mock_resolve, db_conn):
 
     text = "Fished Oakville pier on Lake Ontario. Cast spoons for pike. Caught nothing."
     parsed = parse_session_from_text(text, db_conn, user_id=1)
-    result = log_session(parsed, db_conn)
+    result = log_session(parsed, db_conn, user_id=1)
     assert result["stops_logged"] == 1
 
     stop_row = db_conn.execute(

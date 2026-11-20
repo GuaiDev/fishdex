@@ -100,6 +100,7 @@ def test_user_with_no_home_gets_no_profile(db):
 
 def test_stored_home_overrides_the_profile_file_for_user_1(two_mill_creeks, tmp_path):
     profile_mod.save_profile(profile_mod.UserProfile.default(), path=profile_mod.PROFILE_PATH)
+    _user(two_mill_creeks, 1, "jason")
     set_user_home(two_mill_creeks, 1, KAMLOOPS, "CA-BC")
 
     profile, _, jurisdiction = chat._prompt_inputs(two_mill_creeks, 1)
@@ -113,9 +114,8 @@ def test_stored_home_overrides_the_profile_file_for_user_1(two_mill_creeks, tmp_
 def _migrated_up_to_previous(path):
     """A database as it was before this migration: every earlier step run."""
     db = get_db(path)
-    last = MIGRATIONS[-1]
-    assert last.name == "user_home"
-    for m in MIGRATIONS[:-1]:
+    idx = next(i for i, m in enumerate(MIGRATIONS) if m.name == "user_home")
+    for m in MIGRATIONS[:idx]:
         m.apply(db)
     return db
 
@@ -202,7 +202,7 @@ def test_profile_edit_persists_jurisdiction_without_coordinates(db, monkeypatch,
     answers = iter(["CA-BC", "", "", "", "trout", "fly fishing", "exploration"])
     monkeypatch.setattr(cli.typer, "prompt", lambda *args, **kwargs: next(answers))
 
-    cli.profile()
+    cli.profile(user=None)
 
     assert get_user_home(db, 1) == (None, "CA-BC")
     profile, _, jurisdiction = chat._prompt_inputs(db, 1)
@@ -215,6 +215,7 @@ def test_log_uses_stored_jurisdiction_over_legacy_profile(two_mill_creeks, monke
     import src.cli.main as cli
 
     profile_mod.save_profile(profile_mod.UserProfile.default())
+    _user(two_mill_creeks, 1, "jason")
     set_user_home(two_mill_creeks, 1, KAMLOOPS, "CA-BC")
     monkeypatch.setattr(cli, "get_db", lambda: two_mill_creeks)
     answers = iter(["2026-01-01", "Mill Creek"])
@@ -226,7 +227,7 @@ def test_log_uses_stored_jurisdiction_over_legacy_profile(two_mill_creeks, monke
 
     monkeypatch.setattr(cli.typer, "prompt", prompt)
     monkeypatch.setattr(cli.typer, "confirm", lambda *args, **kwargs: False)
-    cli.log()
+    cli.log(user="jason")
 
     assert two_mill_creeks.execute("SELECT jurisdiction FROM trips").fetchone()[0] == "CA-BC"
 
@@ -236,6 +237,7 @@ def test_ingest_uses_stored_home_over_legacy_profile(two_mill_creeks, monkeypatc
     import src.storage.stream_temperature as temperature
 
     profile_mod.save_profile(profile_mod.UserProfile.default())
+    _user(two_mill_creeks, 1, "jason")
     set_user_home(two_mill_creeks, 1, KAMLOOPS, "CA-BC")
     monkeypatch.setattr(cli, "get_db", lambda: two_mill_creeks)
     calls = {}
@@ -247,7 +249,7 @@ def test_ingest_uses_stored_home_over_legacy_profile(two_mill_creeks, monkeypatc
     monkeypatch.setattr(cli, "_print_ingest_summary", lambda results: None)
     monkeypatch.setattr(cli, "_check_sdm_retrain_needed", lambda db: None)
     monkeypatch.setattr(temperature, "is_data_loaded", lambda db: True)
-    cli.ingest(radius_km=300.0, days_back=90, lat=None, lng=None)
+    cli.ingest(radius_km=300.0, days_back=90, lat=None, lng=None, user="jason")
 
     assert calls["iNaturalist"] == (KAMLOOPS.lat, KAMLOOPS.lng)
     assert calls["GBIF"] == (KAMLOOPS.lat, KAMLOOPS.lng)
@@ -258,8 +260,8 @@ def test_cli_home_profile_uses_legacy_file_until_user_one_has_a_stored_home(db):
 
     profile_mod.save_profile(profile_mod.UserProfile.default())
     db.execute("DELETE FROM users WHERE id = 1")
-    assert cli._home_profile(db).home_location == OAKVILLE
+    assert cli._home_profile(db, 1).home_location == OAKVILLE
     _user(db, 1, "jason")
-    assert cli._home_profile(db).home_location == OAKVILLE
+    assert cli._home_profile(db, 1).home_location == OAKVILLE
     set_user_home(db, 1, KAMLOOPS, "CA-BC")
-    assert cli._home_profile(db).home_location == KAMLOOPS
+    assert cli._home_profile(db, 1).home_location == KAMLOOPS

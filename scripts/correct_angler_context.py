@@ -9,5 +9,5 @@ from src.storage.database import ensure_schema, get_db
 
 db = get_db()
 ensure_schema(db)
-correct_context(db)
+correct_context(db, user_id=1)  # the captain's context
 print("Done.")

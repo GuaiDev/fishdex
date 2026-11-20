@@ -18,7 +18,7 @@ SourceType = Literal[
 
 class BehavioralInsight(BaseModel):
     id: int | None = None
-    user_id: int = 1
+    user_id: int
     species: str
     condition_type: ConditionType
     condition_context: str

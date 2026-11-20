@@ -84,7 +84,7 @@ def _insert_stop(
 def test_species_coaching_with_no_catches_says_so_in_the_prompt(db_conn, captured):
     from src.services.coaching import get_species_coaching
 
-    get_species_coaching(db_conn, "madtom")
+    get_species_coaching(db_conn, "madtom", user_id=1)
     assert "Nothing logged" in captured["prompt"]
 
 
@@ -92,7 +92,7 @@ def test_unresolvable_location_does_not_call_the_model_at_all(db_conn, captured)
     """A place we cannot place is not a coaching question — it is a bad input."""
     from src.services.coaching import get_location_coaching
 
-    result = get_location_coaching(db_conn, "Nonexistent Creek")
+    result = get_location_coaching(db_conn, "Nonexistent Creek", user_id=1)
     assert "couldn't resolve" in result
     assert "prompt" not in captured
 
@@ -179,7 +179,7 @@ def test_species_coaching_carries_the_setup_that_worked(db_conn, captured):
         notes="5lb channel cat at 10am",
     )
 
-    get_species_coaching(db_conn, "channel catfish", "How do I find bigger fish?", 1)
+    get_species_coaching(db_conn, "channel catfish", "How do I find bigger fish?", user_id=1)
     prompt = captured["prompt"]
     assert "Byng Island" in prompt
     assert "Santee Cooper rig" in prompt

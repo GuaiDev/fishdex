@@ -8,6 +8,7 @@ from src.models.behavioral_insight import BehavioralInsight
 
 def _valid_kwargs(**overrides):
     base = dict(
+        user_id=1,
         species="brook trout",
         condition_type="behavioral",
         condition_context="post-cold-front",

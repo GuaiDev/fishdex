@@ -65,7 +65,7 @@ NEW SESSION SUMMARY:
 OUTPUT THE UPDATED DOCUMENT:"""
 
 
-def load_context(db: Database, user_id: int = 1) -> str | None:
+def load_context(db: Database, *, user_id: int) -> str | None:
     """Load the current angler context document for a user. Returns None if none exists yet."""
     try:
         row = next(db["angler_context"].rows_where("user_id = ?", [user_id]), None)
@@ -75,7 +75,7 @@ def load_context(db: Database, user_id: int = 1) -> str | None:
         return None
 
 
-def save_context(db: Database, content: str, user_id: int = 1) -> None:
+def save_context(db: Database, content: str, *, user_id: int) -> None:
     """Save the updated angler context document for a user, creating the row if needed."""
     existing = next(
         db["angler_context"].rows_where("user_id = ?", [user_id]),
@@ -101,7 +101,7 @@ def save_context(db: Database, content: str, user_id: int = 1) -> None:
     db.conn.commit()
 
 
-def correct_context(db: Database, user_id: int = 1) -> None:
+def correct_context(db: Database, *, user_id: int) -> None:
     """One-time correction for known wrong entries in the angler context document.
 
     Safe to run multiple times — only writes if a change is found.
@@ -146,7 +146,7 @@ def _validate_context(context: str, session_summary: str, existing: str = "") ->
     return warnings
 
 
-def update_context(db: Database, session_summary: str, user_id: int = 1) -> str:
+def update_context(db: Database, session_summary: str, *, user_id: int) -> str:
     """Merge a new session summary into the existing angler context document.
 
     Returns the updated document text.

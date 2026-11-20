@@ -19,6 +19,7 @@ def _make_db(tmp_path) -> Database:
 
 def _catfish_insight(**overrides) -> BehavioralInsight:
     base = dict(
+        user_id=1,
         species="channel catfish",
         condition_type="temporal",
         condition_context="midday-summer",
@@ -57,6 +58,7 @@ def test_identify_condition_gaps_weather():
         confidence="medium",
         source_type="agent_synthesis",
         source_detail="test",
+        user_id=1,
     )
     stop = {"weather_notes": None, "technique": "cut bait", "water_level": "normal"}
     gaps = identify_condition_gaps(stop, insight)
@@ -74,6 +76,7 @@ def test_identify_no_gaps_when_populated():
         confidence="medium",
         source_type="agent_synthesis",
         source_detail="test",
+        user_id=1,
     )
     stop = {
         "weather_notes": "overcast, rain the night before",
@@ -96,6 +99,7 @@ def test_identify_technique_gap():
         confidence="medium",
         source_type="agent_synthesis",
         source_detail="test",
+        user_id=1,
     )
     stop = {"technique": None, "gear": None}
     gaps = identify_condition_gaps(stop, insight)
@@ -113,6 +117,7 @@ def test_identify_time_of_day_gap():
         confidence="medium",
         source_type="agent_synthesis",
         source_detail="test",
+        user_id=1,
     )
     stop = {"notes": "fished the pool for an hour"}
     gaps = identify_condition_gaps(stop, insight)
@@ -130,6 +135,7 @@ def test_identify_no_time_gap_when_noted():
         confidence="medium",
         source_type="agent_synthesis",
         source_detail="test",
+        user_id=1,
     )
     stop = {"notes": "was there at midday, very productive"}
     gaps = identify_condition_gaps(stop, insight)
@@ -147,6 +153,7 @@ def test_build_followup_question_weather_gap():
         confidence="medium",
         source_type="agent_synthesis",
         source_detail="test",
+        user_id=1,
     )
     stop = {"location_name": "Willoway Park"}
     question = build_followup_question(stop, insight, ["weather"], was_productive=True)
@@ -165,6 +172,7 @@ def test_build_followup_question_blank_trip():
         confidence="medium",
         source_type="agent_synthesis",
         source_detail="test",
+        user_id=1,
     )
     stop = {"location_name": "Grand River"}
     question = build_followup_question(stop, insight, ["weather"], was_productive=False)
@@ -183,6 +191,7 @@ def test_build_followup_question_no_gaps_returns_none():
         confidence="medium",
         source_type="agent_synthesis",
         source_detail="test",
+        user_id=1,
     )
     stop = {"location_name": "Grand River"}
     question = build_followup_question(stop, insight, [], was_productive=True)
@@ -199,7 +208,14 @@ def test_confidence_escalation(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(evidence_count=1))  # one away from threshold
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=True, stop={}, use_llm=False)
+    updated = update_insight_confidence(
+        db,
+        insight,
+        was_productive=True,
+        stop={},
+        use_llm=False,
+        user_id=1,
+    )
     assert updated.confidence == "medium"
 
 
@@ -210,7 +226,14 @@ def test_confidence_escalation_not_yet(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(evidence_count=0))
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=True, stop={}, use_llm=False)
+    updated = update_insight_confidence(
+        db,
+        insight,
+        was_productive=True,
+        stop={},
+        use_llm=False,
+        user_id=1,
+    )
     assert updated.confidence == "low"  # not yet at threshold
     assert updated.evidence_count == 1
 
@@ -222,7 +245,14 @@ def test_contradiction_does_not_immediately_change_confidence(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(confidence="high", evidence_count=5))
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, use_llm=False)
+    updated = update_insight_confidence(
+        db,
+        insight,
+        was_productive=False,
+        stop={},
+        use_llm=False,
+        user_id=1,
+    )
     assert updated.confidence == "high"  # one contradiction doesn't drop confidence
 
 
@@ -233,7 +263,14 @@ def test_contradiction_appends_note(tmp_path):
     insight_id = insert_insight(db, _catfish_insight(source_detail="original detail"))
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, use_llm=False)
+    updated = update_insight_confidence(
+        db,
+        insight,
+        was_productive=False,
+        stop={},
+        use_llm=False,
+        user_id=1,
+    )
     assert "[contradicted" in (updated.source_detail or "")
 
 
@@ -251,7 +288,14 @@ def test_second_contradiction_triggers_refinement(tmp_path):
     )
     insight = get_insight(db, insight_id)
 
-    updated = update_insight_confidence(db, insight, was_productive=False, stop={}, use_llm=False)
+    updated = update_insight_confidence(
+        db,
+        insight,
+        was_productive=False,
+        stop={},
+        use_llm=False,
+        user_id=1,
+    )
     # After second contradiction: refinement fires, is_current flips, new record has confidence=low
     assert updated.confidence == "low"
     # Old insight should now be non-current
@@ -280,6 +324,7 @@ def test_enrich_session_returns_question_for_known_spot(tmp_path):
         lng=-79.774,
         condition_season="summer",
         location_name="Willoway Park",
+        user_id=1,
     )
     ins(db, insight)
 
@@ -303,7 +348,7 @@ def test_enrich_session_returns_question_for_known_spot(tmp_path):
         }
     )
 
-    result = enrich_session(db, session_id, use_llm=False)
+    result = enrich_session(db, session_id, use_llm=False, user_id=1)
     questions = result["followup_questions"]
     assert len(questions) == 1
     q = questions[0]["question"]
@@ -327,6 +372,7 @@ def test_blank_trip_matches_by_location(tmp_path):
         source_detail="test",
         lat=42.917,
         lng=-79.774,
+        user_id=1,
     )
     insert_insight(db, insight)
 
@@ -338,7 +384,7 @@ def test_blank_trip_matches_by_location(tmp_path):
         "lat": 42.917,
         "lng": -79.774,
     }
-    matched = match_insights_to_stop(db, stop)
+    matched = match_insights_to_stop(db, stop, user_id=1)
     assert len(matched) >= 1
 
 
@@ -366,7 +412,7 @@ def test_enrich_session_no_match_returns_empty(tmp_path):
         }
     )
 
-    result = enrich_session(db, session_id, use_llm=False)
+    result = enrich_session(db, session_id, use_llm=False, user_id=1)
     assert result["followup_questions"] == []
 
 

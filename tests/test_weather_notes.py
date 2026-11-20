@@ -69,7 +69,13 @@ def agent_db(db, monkeypatch):
 
 
 def _call(user_id=1):
-    out = json.loads(tools.execute_tool("get_conditions", {"lat": 43.5, "lng": -79.8}, user_id))
+    out = json.loads(
+        tools.execute_tool(
+            "get_conditions",
+            {"lat": 43.5, "lng": -79.8},
+            user_id=user_id,
+        )
+    )
     return out
 
 

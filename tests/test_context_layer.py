@@ -166,7 +166,7 @@ def test_every_ethics_rule_domain_is_blocked():
 
 
 def test_resolve_from_latlng(db):
-    p = place_mod.resolve(db, lat=43.4, lng=-79.75)
+    p = place_mod.resolve(db, lat=43.4, lng=-79.75, user_id=1)
     assert p is not None
     assert p.resolved_by == "latlng"
     assert p.lat == pytest.approx(43.4)
@@ -174,7 +174,7 @@ def test_resolve_from_latlng(db):
 
 def test_resolve_from_user_logged_name(db):
     _add_stop(db, name="Byng Island")
-    p = place_mod.resolve(db, query="byng")
+    p = place_mod.resolve(db, query="byng", user_id=1)
     assert p is not None
     assert p.resolved_by == "user_log"
     assert p.name == "Byng Island"
@@ -182,7 +182,7 @@ def test_resolve_from_user_logged_name(db):
 
 def test_resolve_unknown_name_returns_none_not_a_guess(db):
     """An unresolvable name must fail honestly, not resolve to the wrong river."""
-    assert place_mod.resolve(db, query="Nonexistent Brook") is None
+    assert place_mod.resolve(db, query="Nonexistent Brook", user_id=1) is None
 
 
 def _add_segment(db, ogf_id, name, lat, lng, stream_order=3):
@@ -201,7 +201,7 @@ def _add_segment(db, ogf_id, name, lat, lng, stream_order=3):
 
 def test_segment_centroid_is_averaged_from_wkt(db):
     _add_segment(db, 77, "Test Creek", 43.5, -79.8)
-    p = place_mod.resolve(db, segment_id=77)
+    p = place_mod.resolve(db, segment_id=77, user_id=1)
     assert p.lat == pytest.approx(43.5, abs=1e-6)
     assert p.lng == pytest.approx(-79.8, abs=1e-6)
 
@@ -210,14 +210,14 @@ def test_resolve_prefers_the_users_own_name_for_a_place(db):
     """If someone logs 'the dam' six times, that phrase means their dam."""
     _add_segment(db, 99, "The Dam Creek", 45.0, -80.0)
     _add_stop(db, name="the dam", lat=43.4, lng=-79.75)
-    p = place_mod.resolve(db, query="the dam")
+    p = place_mod.resolve(db, query="the dam", user_id=1)
     assert p.resolved_by == "user_log"
     assert p.lat == pytest.approx(43.4)
 
 
 def test_resolve_by_segment_id(db):
     _add_segment(db, 1234, "Sixteen Mile Creek", 43.45, -79.70, stream_order=4)
-    p = place_mod.resolve(db, segment_id=1234)
+    p = place_mod.resolve(db, segment_id=1234, user_id=1)
     assert p is not None
     assert p.resolved_by == "segment_id"
     assert p.name == "Sixteen Mile Creek"
@@ -225,7 +225,7 @@ def test_resolve_by_segment_id(db):
 
 def test_resolve_falls_back_to_ohn_name_when_user_has_no_log(db):
     _add_segment(db, 555, "Sixteen Mile Creek", 43.45, -79.70)
-    p = place_mod.resolve(db, query="sixteen mile")
+    p = place_mod.resolve(db, query="sixteen mile", user_id=1)
     assert p is not None
     assert p.resolved_by == "name"
     assert "OHN" in (p.resolution_note or "")
@@ -233,18 +233,18 @@ def test_resolve_falls_back_to_ohn_name_when_user_has_no_log(db):
 
 def test_resolve_missing_segment_id_returns_none(db):
     _add_segment(db, 1, "x", 43.0, -79.0)
-    assert place_mod.resolve(db, segment_id=404040) is None
+    assert place_mod.resolve(db, segment_id=404040, user_id=1) is None
 
 
 def test_stream_order_reaches_structure_slice(db):
     _add_segment(db, 4242, "Order Creek", 43.4, -79.75, stream_order=4)
-    ctx = describe(db, lat=43.4, lng=-79.75, caller="map_tap")
+    ctx = describe(db, lat=43.4, lng=-79.75, caller="map_tap", user_id=1)
     assert ctx.structure.stream_order.value == 4
     assert ctx.structure.stream_order.meaning is not None
 
 
 def test_resolve_with_no_input_returns_none(db):
-    assert place_mod.resolve(db) is None
+    assert place_mod.resolve(db, user_id=1) is None
 
 
 # ── describe() bundling ───────────────────────────────────────────────────────
@@ -252,32 +252,32 @@ def test_resolve_with_no_input_returns_none(db):
 
 def test_map_tap_bundle_omits_live_conditions(db):
     """A map tap should be free — no live API call for conditions."""
-    ctx = describe(db, lat=43.4, lng=-79.75, caller="map_tap")
+    ctx = describe(db, lat=43.4, lng=-79.75, caller="map_tap", user_id=1)
     assert ctx is not None
     assert ctx.conditions is None
     assert ctx.records is not None
 
 
 def test_full_bundle_populates_every_slice(db):
-    ctx = describe(db, lat=43.4, lng=-79.75, caller="full")
+    ctx = describe(db, lat=43.4, lng=-79.75, caller="full", user_id=1)
     for name in ("records", "water", "structure", "access", "history"):
         assert getattr(ctx, name) is not None, name
 
 
 def test_bundles_are_defined_for_every_caller_type(db):
     for caller in _BUNDLES:
-        ctx = describe(db, lat=43.4, lng=-79.75, caller=caller)
+        ctx = describe(db, lat=43.4, lng=-79.75, caller=caller, user_id=1)
         assert ctx is not None
         assert ctx.bundle == caller
 
 
 def test_describe_returns_none_for_unresolvable_place(db):
     """Unresolvable is a different failure from 'resolved but empty'."""
-    assert describe(db, query="Nowhere At All") is None
+    assert describe(db, query="Nowhere At All", user_id=1) is None
 
 
 def test_describe_of_unfished_water_says_so_specifically(db):
-    ctx = describe(db, lat=50.0, lng=-90.0, caller="full")
+    ctx = describe(db, lat=50.0, lng=-90.0, caller="full", user_id=1)
     assert ctx.history.empty_reason is EmptyReason.USER_NEVER_FISHED_HERE
     assert ctx.history.visits == 0
 
@@ -285,7 +285,7 @@ def test_describe_of_unfished_water_says_so_specifically(db):
 def test_history_counts_blanks_separately(db):
     _add_stop(db, productive=True, species=("creek chub",))
     _add_stop(db, productive=False, species=())
-    ctx = describe(db, lat=43.40, lng=-79.75, caller="full")
+    ctx = describe(db, lat=43.40, lng=-79.75, caller="full", user_id=1)
     assert ctx.history.visits == 2
     assert ctx.history.productive_visits == 1
     assert ctx.history.blanks == 1
@@ -316,7 +316,7 @@ def test_user_catches_become_records_with_provenance(db):
 
 def test_empty_records_distinguishes_no_coverage_from_no_sightings(db):
     """With no corpus at all, the reason is coverage — not an empty radius."""
-    ctx = describe(db, lat=43.4, lng=-79.75, caller="map_tap")
+    ctx = describe(db, lat=43.4, lng=-79.75, caller="map_tap", user_id=1)
     assert ctx.records.empty_reason is EmptyReason.SOURCE_DOES_NOT_COVER_AREA
 
     db["observations"].insert(
@@ -331,7 +331,7 @@ def test_empty_records_distinguishes_no_coverage_from_no_sightings(db):
             "jurisdiction": "CA-ON",
         }
     )
-    ctx2 = describe(db, lat=43.4, lng=-79.75, caller="map_tap")
+    ctx2 = describe(db, lat=43.4, lng=-79.75, caller="map_tap", user_id=1)
     assert ctx2.records.empty_reason is EmptyReason.NO_RECORDS_IN_RADIUS
 
 
@@ -425,7 +425,7 @@ def test_explore_reports_ties_at_the_top(monkeypatch, db):
         }
     )
     monkeypatch.setattr("src.services.untapped_potential.load_cached_untapped", lambda: tied)
-    resp = ctx_mod.explore(db, lat=43.41, lng=-79.76, radius_km=20)
+    resp = ctx_mod.explore(db, lat=43.41, lng=-79.76, radius_km=20, user_id=1)
     assert resp.tied_at_top == 2
 
 
@@ -451,7 +451,7 @@ def test_empty_barriers_table_never_fabricates_free_passage(db):
     assert "barriers" in db.table_names()
     assert db["barriers"].count == 0
 
-    ctx = describe(db, lat=52.0, lng=-87.0, caller="map_tap")
+    ctx = describe(db, lat=52.0, lng=-87.0, caller="map_tap", user_id=1)
     up = ctx.structure.barriers_upstream
     assert up.is_empty
     assert up.empty_reason is EmptyReason.SOURCE_DOES_NOT_COVER_AREA
@@ -461,7 +461,7 @@ def test_empty_barriers_table_never_fabricates_free_passage(db):
 
 def test_every_context_field_carries_a_reason_when_empty(db):
     """No field may render the internal 'no value and no reason' fallback."""
-    ctx = describe(db, lat=52.0, lng=-87.0, caller="full")
+    ctx = describe(db, lat=52.0, lng=-87.0, caller="full", user_id=1)
     for slice_name in ("water", "structure", "access"):
         sl = getattr(ctx, slice_name)
         for fname, f in sl.__dict__.items():
@@ -493,7 +493,7 @@ def test_substrate_reads_the_real_geology_field(db):
         },
         alter=True,
     )
-    ctx = describe(db, lat=43.40, lng=-79.75, caller="map_tap")
+    ctx = describe(db, lat=43.40, lng=-79.75, caller="map_tap", user_id=1)
     assert ctx.water.substrate.value == "coarse"
     assert "gravel" in (ctx.water.substrate.meaning or "")
 
@@ -517,7 +517,7 @@ def test_measured_but_unremarkable_ph_is_not_reported_as_absent(db):
         },
         alter=True,
     )
-    ph = describe(db, lat=43.40, lng=-79.75, caller="map_tap").water.ph
+    ph = describe(db, lat=43.40, lng=-79.75, caller="map_tap", user_id=1).water.ph
     assert ph.is_empty
     assert ph.empty_reason is EmptyReason.RECORDED_BUT_NOT_DECISION_RELEVANT
     assert "nothing recorded" not in ph.explain()
@@ -526,7 +526,7 @@ def test_measured_but_unremarkable_ph_is_not_reported_as_absent(db):
 def test_stream_order_gap_is_a_radius_gap_not_a_coverage_gap(db):
     """OHN covers Ontario. Holding segments but none nearby is NOT 'not covered'."""
     _add_segment(db, 1, "Far Away Creek", 45.0, -80.0)
-    order = describe(db, lat=43.40, lng=-79.75, caller="map_tap").structure.stream_order
+    order = describe(db, lat=43.40, lng=-79.75, caller="map_tap", user_id=1).structure.stream_order
     assert order.is_empty
     assert order.empty_reason is EmptyReason.NO_RECORDS_IN_RADIUS
 
@@ -577,7 +577,7 @@ def test_barrier_absence_requires_local_coverage_not_just_a_nonempty_table(db):
     _add_barrier(db, 43.40, -79.75)  # southern Ontario only
     _add_segment(db, 1, "Far Creek", 52.0, -87.0)
 
-    far = describe(db, lat=52.0, lng=-87.0, caller="map_tap").structure.barriers_upstream
+    far = describe(db, lat=52.0, lng=-87.0, caller="map_tap", user_id=1).structure.barriers_upstream
     assert far.is_empty
     assert far.empty_reason is EmptyReason.SOURCE_DOES_NOT_COVER_AREA
     assert far.provenance is None
@@ -587,7 +587,13 @@ def test_barrier_absence_requires_local_coverage_not_just_a_nonempty_table(db):
 def test_barrier_absence_is_a_real_claim_where_coverage_exists(db):
     """Symmetry check: with local coverage, zero barriers IS a fact."""
     _add_barrier(db, 43.40, -79.75)
-    near = describe(db, lat=43.42, lng=-79.76, caller="map_tap").structure.barriers_upstream
+    near = describe(
+        db,
+        lat=43.42,
+        lng=-79.76,
+        caller="map_tap",
+        user_id=1,
+    ).structure.barriers_upstream
     assert not near.is_empty
     assert near.provenance.kind is ProvenanceKind.RECORD
 
@@ -609,7 +615,7 @@ def test_unpopulated_column_is_not_reported_as_absent_data(db):
         },
         alter=True,
     )
-    order = describe(db, lat=43.40, lng=-79.75, caller="map_tap").structure.stream_order
+    order = describe(db, lat=43.40, lng=-79.75, caller="map_tap", user_id=1).structure.stream_order
     assert order.is_empty
     assert order.empty_reason is EmptyReason.FIELD_NOT_POPULATED_BY_SOURCE
     assert "nothing recorded" not in order.explain()
@@ -618,7 +624,7 @@ def test_unpopulated_column_is_not_reported_as_absent_data(db):
 def test_no_segments_at_all_still_reads_as_a_radius_gap(db):
     """Distinct from the above: segments exist in the corpus, just not here."""
     _add_segment(db, 601, "Elsewhere Creek", 45.0, -80.0, stream_order=3)
-    order = describe(db, lat=43.40, lng=-79.75, caller="map_tap").structure.stream_order
+    order = describe(db, lat=43.40, lng=-79.75, caller="map_tap", user_id=1).structure.stream_order
     assert order.empty_reason is EmptyReason.NO_RECORDS_IN_RADIUS
 
 
@@ -640,7 +646,7 @@ def test_conditions_assigns_every_field_even_when_the_live_source_fails(db, monk
     monkeypatch.setattr("src.services.weather.get_conditions_for_agent", boom)
     monkeypatch.setattr("src.services.stream_gauge.nearest_gauge", gauge_down)
 
-    ctx = describe(db, lat=43.5474, lng=-80.1973, caller="coach")
+    ctx = describe(db, lat=43.5474, lng=-80.1973, caller="coach", user_id=1)
     for fname, f in ctx.conditions.__dict__.items():
         assert f.empty_reason is not None, f"conditions.{fname} has no empty_reason"
         assert "this is a bug" not in f.explain(), fname
@@ -666,7 +672,7 @@ def test_ambiguous_name_resolves_nearest_home_and_says_so(db, monkeypatch):
     _add_segment(db, 1, "Sixteen Mile Creek", 43.0779, -79.4465)  # near Jordan
     _add_segment(db, 2, "Sixteen Mile Creek", 43.5140, -79.8844)  # near Oakville
 
-    p = place_mod.resolve(db, query="Sixteen Mile Creek")
+    p = place_mod.resolve(db, query="Sixteen Mile Creek", user_id=1)
     assert p is not None
     assert p.lat == pytest.approx(43.5140, abs=0.01)
     assert "other watercourse(s) match this name" in (p.resolution_note or "")
@@ -679,7 +685,7 @@ def test_exact_name_beats_a_nearer_substring_match(db, monkeypatch):
     _add_segment(db, 1, "East Sixteen Mile Creek", 43.4700, -79.6900)  # closer
     _add_segment(db, 2, "Sixteen Mile Creek", 43.5140, -79.8844)  # further
 
-    p = place_mod.resolve(db, query="Sixteen Mile Creek")
+    p = place_mod.resolve(db, query="Sixteen Mile Creek", user_id=1)
     assert p.name == "Sixteen Mile Creek"
 
 

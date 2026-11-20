@@ -72,7 +72,7 @@ def test_close_marks_session_ended(tmp_path: Path):
 
     db = _make_db(tmp_path)
     start_session(db, "close-session")
-    close_and_update_context(db, "close-session", [])
+    close_and_update_context(db, "close-session", [], user_id=1)
 
     row = db["chat_sessions"].get("close-session")
     assert row["ended_at"] is not None
@@ -83,7 +83,7 @@ def test_missing_session_does_not_crash(tmp_path: Path):
     from src.storage.conversations import close_and_update_context
 
     db = _make_db(tmp_path)
-    close_and_update_context(db, "nonexistent", [])  # should not raise
+    close_and_update_context(db, "nonexistent", [], user_id=1)  # should not raise
 
 
 def test_skip_empty_messages(tmp_path: Path):

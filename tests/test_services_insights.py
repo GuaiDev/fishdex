@@ -17,6 +17,7 @@ def _make_db(tmp_path):
 
 def _seed_insight(db, **overrides) -> int:
     base = dict(
+        user_id=1,
         species="brook trout",
         condition_type="behavioral",
         condition_context="post-cold-front",
@@ -36,7 +37,7 @@ def test_get_insights_empty(tmp_path, monkeypatch):
 
     from src.services.insights import get_behavioral_insights_for_agent
 
-    result = json.loads(get_behavioral_insights_for_agent(species="walleye"))
+    result = json.loads(get_behavioral_insights_for_agent(species="walleye", user_id=1))
     assert result["count"] == 0
     assert "note" in result
 
@@ -48,7 +49,7 @@ def test_get_insights_returns_data(tmp_path, monkeypatch):
 
     from src.services.insights import get_behavioral_insights_for_agent
 
-    result = json.loads(get_behavioral_insights_for_agent(species="brook trout"))
+    result = json.loads(get_behavioral_insights_for_agent(species="brook trout", user_id=1))
     assert result["count"] == 1
     insight = result["insights"][0]
     assert insight["conclusion"] == "Brook trout feed aggressively after a cold front."
@@ -65,7 +66,11 @@ def test_get_insights_condition_type_filter(tmp_path, monkeypatch):
     from src.services.insights import get_behavioral_insights_for_agent
 
     result = json.loads(
-        get_behavioral_insights_for_agent(species="brook trout", condition_type="habitat")
+        get_behavioral_insights_for_agent(
+            species="brook trout",
+            condition_type="habitat",
+            user_id=1,
+        )
     )
     assert result["count"] == 1
     assert result["insights"][0]["condition_type"] == "habitat"
@@ -87,6 +92,7 @@ def test_record_unverified_blocked(tmp_path, monkeypatch):
             source_type="agent_synthesis",
             source_detail="just a guess",
             evidence_count=0,
+            user_id=1,
         )
     )
     assert "error" in result
@@ -95,7 +101,7 @@ def test_record_unverified_blocked(tmp_path, monkeypatch):
     # Confirm nothing was written
     from src.storage.insights import query_insights
 
-    assert query_insights(db, species="brook trout") == []
+    assert query_insights(db, species="brook trout", user_id=1) == []
 
 
 def test_record_valid_insight(tmp_path, monkeypatch):
@@ -117,6 +123,7 @@ def test_record_valid_insight(tmp_path, monkeypatch):
             source_detail="8 personal outings Credit River spring 2026",
             evidence_count=8,
             jurisdiction="CA-ON",
+            user_id=1,
         )
     )
     assert result["success"] is True
@@ -126,6 +133,6 @@ def test_record_valid_insight(tmp_path, monkeypatch):
     # Confirm it was written
     from src.storage.insights import query_insights
 
-    stored = query_insights(db, species="brook trout")
+    stored = query_insights(db, species="brook trout", user_id=1)
     assert len(stored) == 1
     assert stored[0].jurisdiction == "CA-ON"
