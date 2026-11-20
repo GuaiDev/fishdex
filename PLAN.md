@@ -345,6 +345,7 @@ Parallel tracks once P0 is done: (1) P1 host and security; (2) P3 client screens
 | DL-21 | The captain adopted this plan for all later work (2026-11-20). | The captain said to adopt the beta plan for all later work, so every later FishDex prompt starts from section 0 and its phase, and changes direction through new `DL` entries. |
 | DL-22 | Supersedes the premise of DL-16: the questionnaire design is assumed ready in time, so P4 is not planned around the home-only fallback. | The captain said to assume the questionnaire design will be ready in time. Home-first and skippable questions still stand as design; only the plan for P4's "Cut if short" fallback is no longer the working assumption. P4 still must not block the core loop (P3). |
 | DL-23 | Supersedes the "never" wording of DL-4 and DEF-2: pin sharing is undecided. Public pin sharing is not wanted; sharing between anglers is acceptable. | The captain said no decision is made for now, that public pin sharing is not the best, and that sharing between anglers is fine. CLAUDE.md's ethical rule against broadcasting spot lists still covers the public case; no schema or code exists for any sharing. |
+| DL-24 | Supersedes DL-22: the questionnaire design is expected to be ready by the time beta is finished, not by launch. DL-16 stays the working plan (onboarding ships home-first with skippable questions and does not block the core loop), and P4's "Cut if short" fallback stays available at launch; the questions are added once the design exists. | The captain said the questionnaire is not assumed ready; it will be ready by the time beta is finished. DL-22 read the earlier "assume it will be ready in time" as ready before launch, which is not what was meant. |
 
 ---
 
@@ -442,3 +443,4 @@ Run on the hosted app from a phone on cellular, with a fresh invite code. Record
 | 2026-11-20 | DL-21 | added | Captain adopted this plan for all later work |
 | 2026-11-20 | DL-22 | added | Supersedes DL-16's premise: questionnaire design assumed ready in time; P4 not planned around the home-only fallback |
 | 2026-11-20 | DL-23 | added | Supersedes "never" in DL-4 and DEF-2: pin sharing undecided; public not wanted, between anglers acceptable |
+| 2026-11-20 | DL-24 | added | Supersedes DL-22: questionnaire design expected ready by end of beta, not launch; DL-16 and P4's home-only fallback stay the working plan |
