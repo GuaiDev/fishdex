@@ -253,11 +253,13 @@ def test_ingest_uses_stored_home_over_legacy_profile(two_mill_creeks, monkeypatc
     assert calls["GBIF"] == (KAMLOOPS.lat, KAMLOOPS.lng)
 
 
-def test_cli_home_profile_uses_legacy_only_without_a_user_row(db):
+def test_cli_home_profile_uses_legacy_file_until_user_one_has_a_stored_home(db):
     import src.cli.main as cli
 
     profile_mod.save_profile(profile_mod.UserProfile.default())
     db.execute("DELETE FROM users WHERE id = 1")
     assert cli._home_profile(db).home_location == OAKVILLE
     _user(db, 1, "jason")
-    assert cli._home_profile(db).home_location is None
+    assert cli._home_profile(db).home_location == OAKVILLE
+    set_user_home(db, 1, KAMLOOPS, "CA-BC")
+    assert cli._home_profile(db).home_location == KAMLOOPS
