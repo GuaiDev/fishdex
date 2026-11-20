@@ -72,7 +72,7 @@ What exists and works, in one paragraph each. The audits are longer; this is the
 | Tester feedback | Nothing | Route, table, button, dashboard view | P6 |
 | Privacy and legal basics | EXIF stripped; `/terms` is a glossary | No privacy note; no delete/export; personal data in repo | P1, P2, P6, captain |
 | Licensing and attribution | Licences stored per record and per source | Nothing rendered except OSM tile credit; Reddit scraping adapter present | P0, P5 |
-| Stability | Migrate-once, WAL, CI | Suite slow without T9; card latency 2.7 s without T3; `new_to_me` 128 s; Explore parquet caching tracked in P1.12 | P0, P1 |
+| Stability | Migrate-once, WAL, CI | Suite slow without T9; card latency 2.7 s without T3; `new_to_me` 128 s | P0, P1 |
 | An operator who can see what is happening | Admin dashboard, ledgers | No one-screen beta status; no runbook | P6 |
 | Written record that matches the code | CLAUDE.md, PRODUCT.md, backlog | All three contradict the code (no client, Railway, FishBot, "not for release") | P0 |
 
