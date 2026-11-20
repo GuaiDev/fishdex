@@ -52,7 +52,9 @@ project is a static build (`buildCommand` + `outputDirectory`).
 8. Check `https://<app>.fly.dev/health/live` returns `{"status":"ok"}` and
    `https://<app>.fly.dev/health/ready` returns `{"status":"ready", ...}`.
 9. Make your token on the host: `fly ssh console -C "python -m src.cli.main token"`.
-   For friends, create invite codes with `POST /admin/invite` using that token.
+   For friends, create invite codes with `POST /admin/invite` using that token. Sign-up
+   requires the onboarding questionnaire and answers 503 while the question set is only
+   stand-ins (PLAN.md DL-25); `FISHBOT_ALLOW_STAND_IN_QUESTIONS=1` is for local use only.
 10. `vercel login`, then from the repo root `vercel link` and `vercel --prod`. In the Vercel
     project settings set `FISHDEX_API_URL=https://<app>.fly.dev` before the deploy if the Fly name
     differs from `fishdex-api-jason`.
