@@ -2004,6 +2004,14 @@ def migrate_user_home(db: Database) -> None:
     db.conn.commit()
 
 
+def migrate_questionnaire_answers(db: Database) -> None:
+    """Create the onboarding answers table. Idempotent. Nothing is backfilled: accounts
+    made before the questionnaire have no answers and are not asked retroactively."""
+    from src.storage.questionnaire import ensure_tables
+
+    ensure_tables(db)
+
+
 # The schema's history, in the order it must run. Numbers are permanent: a step
 # that has run on any database is never edited or renumbered, and a change goes in
 # as a new step at the end. Version 1 is everything the app created before
@@ -2226,6 +2234,7 @@ MIGRATIONS: tuple[Migration, ...] = (
     Migration(30, "stream_segments_spatial_index", migrate_stream_segments_spatial_index),
     Migration(31, "user_home", migrate_user_home),
     Migration(32, "trip_owners_and_shared_insights", migrate_trip_owners_and_shared_insights),
+    Migration(33, "questionnaire_answers", migrate_questionnaire_answers),
 )
 
 assert [m.version for m in MIGRATIONS] == list(range(1, len(MIGRATIONS) + 1))

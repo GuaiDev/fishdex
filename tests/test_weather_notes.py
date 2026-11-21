@@ -13,11 +13,12 @@ from fastapi.testclient import TestClient
 
 from src.agent import tools
 from src.api.main import app
-from src.auth.auth import generate_invite_code, redeem_invite_code
+from src.auth.auth import generate_invite_code
 from src.services import presentation, terms, weather, weather_notes
 from src.services.context import angler_profile, recompute_user_layer
 from src.storage import angler_profile as store
 from src.storage import database
+from tests.signup_helpers import redeem_test_user
 from tests.test_angler_profile import trip
 
 # Words that promise a result or state fish behaviour as fact.
@@ -214,7 +215,7 @@ def api(tmp_path, monkeypatch, _template_db, fake_weather):
     ingest = importlib.import_module("src.ingest.global.weather")
     monkeypatch.setattr(ingest, "get_current_conditions", weather._weather.get_current_conditions)
     monkeypatch.setattr(ingest, "compute_pressure_trend", weather._weather.compute_pressure_trend)
-    got = redeem_invite_code(handle, generate_invite_code(handle), "angler")
+    got = redeem_test_user(handle, generate_invite_code(handle), "angler")
     return SimpleNamespace(
         client=TestClient(app),
         db=handle,

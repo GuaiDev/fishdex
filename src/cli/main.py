@@ -1376,7 +1376,9 @@ def invite(note: str = typer.Option("", "--note", "-n", help="Note for this invi
     code = generate_invite_code(db, created_by=1, note=note)
     console.print(f"\n[green]Invite code: [bold]{code}[/bold][/green]")
     console.print("Redeem it with POST /auth/signup on the API (wherever `make serve` runs)")
-    console.print(f"They enter: [bold]{code}[/bold] + choose a username")
+    console.print(
+        f"They enter: [bold]{code}[/bold] + choose a username + answer every onboarding question"
+    )
     if note:
         console.print(f"Note: {note}")
 
@@ -1419,6 +1421,54 @@ def users() -> None:
         tbl.add_row(str(r[0]), r[1], r[2] or "", r[3] or "", (r[4] or "")[:10], str(r[5]))
 
     console.print(tbl)
+
+
+@app.command(name="create-test-anglers")
+def create_test_anglers_cmd() -> None:
+    """Make local test anglers (regular, explorer, pond lover) through the real sign-up path.
+
+    Uses the stand-in onboarding questions and canned answers, which only ever run on
+    this machine. Prints each angler's token. Run `reset-test-anglers` to remove them.
+    """
+    from src.services.questionnaire import load_canned_answers, load_question_set
+    from src.services.test_anglers import create_test_anglers
+
+    db = get_db()
+    questions = load_question_set(allow_stand_in=True)
+    results = create_test_anglers(db, questions, load_canned_answers())
+    failed = False
+    for r in results:
+        if r["created"]:
+            console.print(
+                f"[green]{r['username']}[/green]  user {r['user_id']}  token {r['token']}"
+            )
+        elif r["error"] is None:
+            console.print(
+                f"[yellow]{r['username']} already exists; run reset-test-anglers first[/yellow]"
+            )
+        else:
+            failed = True
+            console.print(f"[red]{r['username']} not created:[/red] {r['error']}")
+    if failed:
+        console.print(
+            "[red]The canned answers in data/questionnaire/stand_in_test_anglers.json "
+            "must match the questions in data/questionnaire/questions.json.[/red]"
+        )
+        raise typer.Exit(1)
+
+
+@app.command(name="reset-test-anglers")
+def reset_test_anglers_cmd() -> None:
+    """Delete every test angler (username starting test_) and their data."""
+    from src.services.test_anglers import reset_test_anglers
+
+    removed = reset_test_anglers(get_db())
+    if not removed:
+        console.print("No test anglers to remove.")
+        return
+    console.print(
+        "[green]Removed:[/green] " + ", ".join(f"{t} {n}" for t, n in sorted(removed.items()))
+    )
 
 
 @app.command()

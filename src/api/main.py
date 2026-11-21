@@ -525,12 +525,39 @@ def health():
     return {"status": "ok", "service": "fishbot"}
 
 
+def _onboarding_questions():
+    """The question set to serve, or a 503: with only stand-ins, nobody signs up."""
+    from src.services.questionnaire import (
+        StandInQuestionsRefused,
+        load_question_set,
+        stand_in_allowed_by_env,
+    )
+
+    try:
+        return load_question_set(allow_stand_in=stand_in_allowed_by_env())
+    except StandInQuestionsRefused:
+        raise HTTPException(
+            status_code=503,
+            detail="Sign-up is not open yet: the onboarding questions are not ready.",
+        )
+
+
+@app.get("/onboarding/questions")
+def onboarding_questions():
+    """The questions every new account answers before it exists. Public: it is read
+    before sign-up. All of them are required; there is no skipping."""
+    qs = _onboarding_questions()
+    return {"version": qs.version, "questions": [q.model_dump() for q in qs.questions]}
+
+
 @app.post("/auth/signup")
 def signup(body: dict):
     """
-    Redeem an invite code and create an account.
-    Body: {"code": "A3KX9P2Q", "username": "jake", "display_name": "Jake"}
+    Redeem an invite code and create an account, with an answer to every onboarding question.
+    Body: {"code": "A3KX9P2Q", "username": "jake", "display_name": "Jake",
+           "answers": {<question id>: <answer>, ...}}  (questions: GET /onboarding/questions)
     Returns: {"token": "...", "user_id": N, "username": "..."}
+    Missing, unknown or invalid answers are a 422 naming each question; no account is made.
     """
     from src.auth.auth import redeem_invite_code
     from src.storage.database import get_db
@@ -546,9 +573,17 @@ def signup(body: dict):
     if not username.isalnum():
         raise HTTPException(status_code=400, detail="Username must be letters and numbers only")
 
+    questions = _onboarding_questions()
     db = get_db()
-    result = redeem_invite_code(db, code, username, display_name)
+    result = redeem_invite_code(
+        db, code, username, display_name, questions=questions, answers=body.get("answers")
+    )
     if not result["success"]:
+        if "problems" in result:
+            raise HTTPException(
+                status_code=422,
+                detail={"message": result["error"], "problems": result["problems"]},
+            )
         raise HTTPException(status_code=400, detail=result["error"])
 
     return {

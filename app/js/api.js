@@ -89,7 +89,7 @@ async function request(path, { method = 'GET', body, signal, token, base } = {})
     let detail = res.statusText;
     try {
       const j = await res.json();
-      detail = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail || j);
+      detail = typeof j.detail === 'string' ? j.detail : (j.detail && j.detail.message) || JSON.stringify(j.detail || j);
     } catch (e) { /* not JSON */ }
     // A sign-in attempt passes its own token and handles its own 401.
     if (res.status === 401 && token === undefined) authListeners.forEach((fn) => fn(detail));
@@ -100,8 +100,11 @@ async function request(path, { method = 'GET', body, signal, token, base } = {})
 
 export const me = (override) => request('/auth/me', override);
 
-export const signup = (base, code, username) =>
-  request('/auth/signup', { method: 'POST', base, token: '', body: { code, username } });
+export const onboardingQuestions = (base) => request('/onboarding/questions', { base, token: '' });
+
+// An account is made from an invite code, a username and an answer to every onboarding question.
+export const signup = (base, code, username, answers) =>
+  request('/auth/signup', { method: 'POST', base, token: '', body: { code, username, answers } });
 
 export const mapLabels = () => request('/map/spots/labels');
 

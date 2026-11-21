@@ -17,7 +17,7 @@ from pydantic import ValidationError
 
 import src.storage.database as database
 from src.api.main import app
-from src.auth.auth import generate_invite_code, redeem_invite_code
+from src.auth.auth import generate_invite_code
 from src.models.water_body import WaterBody
 from src.models.weed_report import WeedGeometry, WeedReportCreate, WeedReportUpdate
 from src.services.weed_reports import (
@@ -30,6 +30,7 @@ from src.services.weed_reports import (
 )
 from src.storage import weed_reports as store
 from src.storage.spots import replace_spots
+from tests.signup_helpers import redeem_test_user
 
 BUILT = "2026-10-01T00:00:00+00:00"
 TODAY = date(2026, 10, 15)
@@ -363,7 +364,7 @@ def api(tmp_path, monkeypatch, _template_db):
 
     def login(name):
         code = generate_invite_code(handle)
-        got = redeem_invite_code(handle, code, name)
+        got = redeem_test_user(handle, code, name)
         assert got["success"], got
         return {"id": got["user_id"], "h": {"Authorization": f"Bearer {got['token']}"}}
 

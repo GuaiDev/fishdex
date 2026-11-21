@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 
 import src.storage.database as database
 from src.api.main import app
-from src.auth.auth import generate_invite_code, redeem_invite_code
+from src.auth.auth import generate_invite_code
 from src.models.shoreline_feature import ShorelineFeature
 from src.models.spot import AccessRef, Spot
 from src.models.stretch import FishingStretch
@@ -31,6 +31,7 @@ from src.services.sections import (
 from src.storage import weed_reports as weed_store
 from src.storage.spots import replace_spots
 from src.storage.stretches import replace_stretches
+from tests.signup_helpers import redeem_test_user
 from tests.test_api_vocab import assert_clean
 
 BUILT = "2026-10-01T00:00:00+00:00"
@@ -743,7 +744,7 @@ def api(tmp_path, monkeypatch, _template_db):
 
     def login(name):
         code = generate_invite_code(handle)
-        got = redeem_invite_code(handle, code, name)
+        got = redeem_test_user(handle, code, name)
         assert got["success"], got
         return {"id": got["user_id"], "h": {"Authorization": f"Bearer {got['token']}"}}
 
