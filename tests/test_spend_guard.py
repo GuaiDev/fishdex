@@ -22,7 +22,7 @@ from src.api.main import app
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     import src.storage.database as database
-    from src.auth.auth import _create_token
+    from src.auth.auth import create_session
 
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "spend.db")
     monkeypatch.setattr("src.llm.ledger._open_db", lambda: database.get_db())
@@ -42,7 +42,7 @@ def env(tmp_path, monkeypatch):
             replace=True,
         )
     db.conn.commit()
-    tokens = {uid: _create_token(db, uid) for uid in (1, 2)}
+    tokens = {uid: create_session(db, uid) for uid in (1, 2)}
     return NS(db=db, tok=tokens, client=TestClient(app))
 
 

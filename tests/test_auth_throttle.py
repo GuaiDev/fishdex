@@ -5,7 +5,7 @@ from threading import Barrier
 from sqlite_utils import Database
 from sqlite_utils.db import Table
 
-from src.auth.auth import get_user_from_token
+from src.auth.auth import get_user_from_token, hash_token
 
 
 def _setup(tmp_path, db_factory):
@@ -26,7 +26,7 @@ def _setup(tmp_path, db_factory):
         {
             "id": 1,
             "user_id": 1,
-            "token": "tok",
+            "token": hash_token("tok"),
             "expires_at": (datetime.now() + timedelta(days=1)).isoformat(),
             "last_used_at": None,
         },

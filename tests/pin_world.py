@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.auth.auth import _create_token
+from src.auth.auth import create_session
 from src.models.stream_gauge import NearestGauge, StreamGaugeReading
 from src.services.trip_logger import log_session
 from src.storage import pins as store
@@ -105,7 +105,7 @@ class Angler:
         self.name = name
         if not db["users"].count_where("id = ?", [user_id]):
             db["users"].insert({"id": user_id, "username": name, "role": "beta"})
-        self.headers = {"Authorization": f"Bearer {_create_token(db, user_id)}"}
+        self.headers = {"Authorization": f"Bearer {create_session(db, user_id)}"}
 
     def pin(self, name: str, point=SPOT, favourite: bool = False) -> int:
         body = {"name": name, "lat": point[0], "lng": point[1], "is_favourite": favourite}
