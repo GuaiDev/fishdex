@@ -15,7 +15,7 @@ trips recommendations behavioral_insights dismissed_segments sessions stops catc
 personal_bests parsed_trips api_usage chat_sessions chat_messages angler_context
 segment_synthesis tool_usage session_conditions users invite_codes user_sessions
 daily_usage user_patterns pins pin_links pin_recalled_visits weed_reports llm_usage
-ingest_runs schema_migrations sqlite_sequence
+ingest_runs schema_migrations sqlite_sequence questionnaire_answers
 """.split()
 )
 CORPUS_TABLES = frozenset(
