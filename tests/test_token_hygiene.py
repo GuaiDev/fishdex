@@ -58,10 +58,10 @@ def test_migration_hashes_existing_rows_and_old_tokens_still_work(db):
     db["user_sessions"].insert(
         {"user_id": 2, "token": "legacy-plain-token", "expires_at": _future()}
     )
-    db.execute("DELETE FROM schema_migrations WHERE version = 33")
+    db.execute("DELETE FROM schema_migrations WHERE version = 34")
     db.conn.commit()
 
-    assert [m.version for m in migrate(db)] == [33]
+    assert [m.version for m in migrate(db)] == [34]
 
     assert _rows(db) == [(2, hash_token("legacy-plain-token"))]
     assert get_user_from_token(db, "legacy-plain-token")["id"] == 2
