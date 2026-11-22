@@ -267,9 +267,7 @@ def _query_segments_by_name(name: str, db: Any) -> list[dict]:
     return out
 
 
-def _most_fished_candidate(
-    candidates: list[dict], db: Any, *, user_id: int | None
-) -> dict | None:
+def _most_fished_candidate(candidates: list[dict], db: Any, *, user_id: int | None) -> dict | None:
     """Return the candidate segment most visited by this user, or None."""
     if user_id is None:
         return None
