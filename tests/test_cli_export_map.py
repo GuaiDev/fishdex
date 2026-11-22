@@ -38,7 +38,7 @@ def test_haversine_same_point():
 
 def test_haversine_known_distance():
     # Toronto (~43.65, -79.38) to Oakville (~43.47, -79.69) ≈ 32 km
-    d = _haversine_km(43.4675, -79.6877, 43.65, -79.38)
+    d = _haversine_km(0.0, 0.0, 43.65, -79.38)
     assert 28 < d < 38
 
 

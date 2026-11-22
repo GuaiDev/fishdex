@@ -29,7 +29,7 @@ class UserProfile(BaseModel):
         """Oakville-based starter profile matching CLAUDE.md."""
         return cls(
             home_jurisdiction="CA-ON",
-            home_location=Location(name="Oakville, ON", lat=43.4675, lng=-79.6877),
+            home_location=Location(name="Oakville, ON", lat=0.0, lng=0.0),
             target_species=[
                 "smallmouth bass",
                 "brook trout",

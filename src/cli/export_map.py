@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 # ── constants ─────────────────────────────────────────────────────────────────
 
-HOME_LAT = 43.4675
-HOME_LNG = -79.6877
+HOME_LAT = 0.0
+HOME_LNG = 0.0
 HOME_RADIUS_KM = 150.0
 GRID_ROWS = 25
 GRID_COLS = 25

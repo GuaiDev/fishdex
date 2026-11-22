@@ -17,40 +17,9 @@ from src.services.trip_logger import log_session
 from src.services.trip_parser import parse_session_from_text
 from src.storage.database import get_db
 
-SKIPPED_TRIPS = [
-    # Multi-stop day — 3 stops
-    """
-    May 10 2025. Started at a stormwater pond in Milton, caught one small common carp
-    on corn. Then went to Osprey Marsh in Mississauga, fished a few hours, caught
-    nothing — carp may have been spawning. Then tried Lake Aquitaine in Mississauga
-    with a trout magnet for panfish, caught nothing.
-    """,
-    # Multi-stop day — went to one spot, moved to another
-    """
-    April 17 2025. Originally went to Greenway Dog Park on the Thames River in London
-    Ontario but it was way too flooded to fish. Moved to The Forks in London Ontario
-    instead. At The Forks caught one shorthead redhorse and one 8 lb silver redhorse
-    despite the high water.
-    """,
-    # Vague multi-session
-    """
-    March 2025, multiple sessions in London Ontario. Tried several times for suckers
-    using worms. Also tried for walleye using white grubs with chartreuse tails.
-    Did not catch anything in any of these sessions.
-    """,
-    # Lake Ontario — no OHN segment
-    """
-    December 2024 or February 2025. Downtown Oakville pier on Lake Ontario.
-    Cast spoons targeting trout and pike. Caught nothing.
-    """,
-    # Lake Ontario ice fishing
-    """
-    December 2024 or February 2025. Burloak Boat Club harbour on Lake Ontario,
-    Oakville. Drilled holes and ice fished with mealworms. Not a single bite.
-    Completely unproductive.
-    """,
-]
+from personal_trip_data import load_personal_trip_data
 
+SKIPPED_TRIPS = load_personal_trip_data("skipped_trips")
 
 def main(auto: bool = False) -> None:
     db = get_db()

@@ -12,7 +12,7 @@ from src.models.profile import Location
 from src.storage.database import MIGRATIONS, get_db, migrate
 from src.storage.profile import get_user_home, set_user_home
 
-OAKVILLE = Location(name="Oakville, ON", lat=43.4675, lng=-79.6877)
+OAKVILLE = Location(name="Oakville, ON", lat=0.0, lng=0.0)
 KAMLOOPS = Location(name="Kamloops, BC", lat=50.6745, lng=-120.3273)
 
 

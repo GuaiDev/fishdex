@@ -26,7 +26,7 @@ from src.services.test_anglers import create_test_anglers, reset_test_anglers
 from src.storage import questionnaire as store
 from src.storage.profile import get_user_home
 
-HOME = {"name": "Oakville, ON", "lat": 43.4675, "lng": -79.6877, "jurisdiction": "CA-ON"}
+HOME = {"name": "Oakville, ON", "lat": 0.0, "lng": 0.0, "jurisdiction": "CA-ON"}
 
 
 @pytest.fixture
