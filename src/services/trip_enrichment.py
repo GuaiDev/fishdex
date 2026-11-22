@@ -56,7 +56,9 @@ def match_insights_to_stop(db: Database, stop: dict, *, user_id: int) -> list:
     season = None
     if session_id is not None:
         try:
-            session_rows = list(db["sessions"].rows_where("id = ?", [session_id]))
+            session_rows = list(
+                db["sessions"].rows_where("id = ? AND user_id = ?", [session_id, user_id])
+            )
             if session_rows:
                 date_str = session_rows[0].get("date")
                 if date_str:
@@ -327,7 +329,7 @@ def enrich_session(
 
     Returns dict with followup_questions (max 1) and proactive_coaching (or None).
     """
-    stops = list(db["stops"].rows_where("session_id = ?", [session_id]))
+    stops = list(db["stops"].rows_where("session_id = ? AND user_id = ?", [session_id, user_id]))
 
     if not stops:
         return {"followup_questions": [], "proactive_coaching": None}
