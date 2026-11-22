@@ -2,7 +2,7 @@
   "_note": "Canned answers for `fishbot create-test-anglers`. They match the stand-in questions in questions.json by id and value; when the real questionnaire replaces that list, replace these too (the command refuses answers that do not fit).",
   "anglers": {
     "regular": {
-      "home": {"name": "Oakville, ON", "lat": 0.0, "lng": 0.0, "jurisdiction": "CA-ON"},
+      "home": {"name": "Oakville, ON", "lat": 43.65, "lng": -79.38, "jurisdiction": "CA-ON"},
       "water_type": "rivers",
       "outing_style": "known_spot",
       "species_interest": ["gamefish", "trout_salmon"]

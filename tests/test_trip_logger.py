@@ -730,8 +730,8 @@ def test_fast_tally_session_with_no_notes_still_persists(db_conn):
         db_conn,
         user_id=1,
         structured_catches=structured,
-        fallback_lat=0.0,
-        fallback_lng=0.0,
+        fallback_lat=43.65,
+        fallback_lng=-79.38,
     )
 
     assert result["stops_logged"] == 1

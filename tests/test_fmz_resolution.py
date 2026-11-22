@@ -12,7 +12,7 @@ import pytest
 
 from src.storage.fmz_boundaries import boundary_count, resolve_zone
 
-OAKVILLE = (0.0, 0.0)
+OAKVILLE = (43.65, -79.38)
 
 
 @pytest.fixture

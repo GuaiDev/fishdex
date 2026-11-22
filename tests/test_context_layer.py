@@ -667,7 +667,7 @@ def test_conditions_assigns_every_field_even_when_the_live_source_fails(db, monk
 
 def test_ambiguous_name_resolves_nearest_home_and_says_so(db, monkeypatch):
     """Ontario has 33 Sixteen Mile Creeks. Picking row one is picking at random."""
-    monkeypatch.setattr(place_mod, "_home_point", lambda db, user_id: (0.0, 0.0))
+    monkeypatch.setattr(place_mod, "_home_point", lambda db, user_id: (43.65, -79.38))
 
     _add_segment(db, 1, "Sixteen Mile Creek", 43.0779, -79.4465)  # near Jordan
     _add_segment(db, 2, "Sixteen Mile Creek", 43.5140, -79.8844)  # near Oakville
@@ -680,7 +680,7 @@ def test_ambiguous_name_resolves_nearest_home_and_says_so(db, monkeypatch):
 
 def test_exact_name_beats_a_nearer_substring_match(db, monkeypatch):
     """'Sixteen Mile Creek' must not resolve to East Sixteen Mile Creek."""
-    monkeypatch.setattr(place_mod, "_home_point", lambda db, user_id: (0.0, 0.0))
+    monkeypatch.setattr(place_mod, "_home_point", lambda db, user_id: (43.65, -79.38))
 
     _add_segment(db, 1, "East Sixteen Mile Creek", 43.4700, -79.6900)  # closer
     _add_segment(db, 2, "Sixteen Mile Creek", 43.5140, -79.8844)  # further

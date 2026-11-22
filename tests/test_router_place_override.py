@@ -70,7 +70,7 @@ def test_a_named_water_is_detected(db, message, expected):
 
 
 def test_coordinates_count_as_a_place(db):
-    assert mentions_a_place(db, "What's at 0.0, 0.0?", user_id=1) is not None
+    assert mentions_a_place(db, "What's at 43.65, -79.38?", user_id=1) is not None
 
 
 def test_a_users_own_spot_name_counts_even_if_no_gazetteer_has_it(db):
