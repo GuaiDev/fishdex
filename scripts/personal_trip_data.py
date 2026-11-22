@@ -1,8 +1,14 @@
-"""Load private historical trip data kept outside the repository."""
+"""Load private historical trip data kept outside the repository.
+
+The data lives in the git-ignored `data/personal_trip_logs.json`: a JSON object
+whose keys are the trip lists the scripts read: "historical_trips"
+(batch_log_historical_trips.py), "historical_trips_v2"
+(batch_log_historical_trips_v2.py) and "skipped_trips" (relog_skipped_trips.py).
+Never commit this file.
+"""
 
 import json
 from pathlib import Path
-
 
 DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "personal_trip_logs.json"
 

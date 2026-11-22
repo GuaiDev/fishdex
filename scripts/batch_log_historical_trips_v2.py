@@ -9,13 +9,14 @@ Usage: uv run python scripts/batch_log_historical_trips_v2.py
 
 import json
 
+from personal_trip_data import load_personal_trip_data
+
 from src.services.trip_logger import log_trip
 from src.services.trip_parser import parse_trip_from_text
 from src.storage.database import get_db
 
-from personal_trip_data import load_personal_trip_data
-
 TRIPS = load_personal_trip_data("historical_trips_v2")
+
 
 def main() -> None:
     db = get_db()
@@ -26,9 +27,9 @@ def main() -> None:
     print("Press Enter to LOG each trip, or type 'skip' + Enter to discard.\n")
 
     for i, trip_text in enumerate(TRIPS, 1):
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"TRIP {i} of {len(TRIPS)}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print("INPUT TEXT:")
         print(trip_text.strip())
         print("\nParsing...")
@@ -59,12 +60,14 @@ def main() -> None:
                 print(f"→ Log failed: {result['confirmation']}")
                 skipped.append(i)
             else:
-                print(f"→ Logged as trip_id={result['trip_id']}, "
-                      f"snapped={result['segment_snapped']}, "
-                      f"insights={result['insights_generated']}")
+                print(
+                    f"→ Logged as trip_id={result['trip_id']}, "
+                    f"snapped={result['segment_snapped']}, "
+                    f"insights={result['insights_generated']}"
+                )
                 logged.append(i)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Done. Logged: {len(logged)} trips {logged}")
     print(f"      Skipped: {len(skipped)} trips {skipped}")
 

@@ -13,13 +13,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from personal_trip_data import load_personal_trip_data
+
 from src.services.trip_logger import log_session
 from src.services.trip_parser import parse_session_from_text
 from src.storage.database import get_db
 
-from personal_trip_data import load_personal_trip_data
-
 SKIPPED_TRIPS = load_personal_trip_data("skipped_trips")
+
 
 def main(auto: bool = False) -> None:
     db = get_db()

@@ -9,12 +9,13 @@ Usage: uv run python scripts/batch_log_historical_trips.py
 
 import time
 
+from personal_trip_data import load_personal_trip_data
+
 from src.services.trip_logger import log_trip
 from src.storage.database import get_db
 
-from personal_trip_data import load_personal_trip_data
-
 HISTORICAL_TRIPS = load_personal_trip_data("historical_trips")
+
 
 def main() -> None:
     db = get_db()
@@ -28,9 +29,7 @@ def main() -> None:
 
         # Skip if already logged (idempotent re-runs)
         if "parsed_trips" in db.table_names():
-            existing = list(db["parsed_trips"].rows_where(
-                "raw_text = ?", [text], limit=1
-            ))
+            existing = list(db["parsed_trips"].rows_where("raw_text = ?", [text], limit=1))
             if existing:
                 print(f"  already logged (trip_id={existing[0]['trip_id']}) — skipping\n")
                 logged += 1
