@@ -488,5 +488,6 @@ def test_enrich_session_does_not_read_another_owners_stops(fast_db):
     session_id = fast_db["sessions"].insert({"date": "2026-06-01", "user_id": 1}).last_pk
     fast_db["stops"].insert({"session_id": session_id, "user_id": 1, "location_text": "Creek"})
     assert enrich_session(fast_db, session_id, use_llm=False, user_id=2) == {
-        "followup_questions": [], "proactive_coaching": None,
+        "followup_questions": [],
+        "proactive_coaching": None,
     }
