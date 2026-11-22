@@ -1,7 +1,6 @@
 """Interactive chat loop using the Anthropic SDK + rich for terminal I/O."""
 
 import logging
-from datetime import datetime
 from typing import Any
 
 from anthropic import APIError
@@ -13,7 +12,12 @@ from src.agent.tools import execute_tool, tool_schemas
 from src.jurisdictions.registry import get_jurisdiction
 from src.models.profile import UserProfile
 from src.storage.angler_context import format_context_for_prompt, load_context
-from src.storage.conversations import close_and_update_context, save_turn, start_session
+from src.storage.conversations import (
+    close_and_update_context,
+    get_session,
+    save_turn,
+    start_session,
+)
 from src.storage.database import get_db
 from src.storage.profile import get_user_home, load_profile
 from src.storage.trips import recent_trips
@@ -133,7 +137,7 @@ def _run_full_pipeline(
     db = get_db()
     profile, trips, home = _prompt_inputs(db, user_id)
     system_prompt = assemble(load_template(), profile, trips, home)
-    start_session(db, session_id)
+    session_id = start_session(db, session_id, user_id=user_id)
     angler_context = load_context(db, user_id=user_id)
     if angler_context:
         system_prompt = system_prompt + "\n\n" + format_context_for_prompt(angler_context)
@@ -152,11 +156,18 @@ def _run_full_pipeline(
             m for m in messages if m["role"] == "user" and isinstance(m.get("content"), str)
         ]
         if user_msgs:
-            save_turn(db, session_id, "user", user_msgs[-1]["content"], len(user_msgs) - 1)
-        save_turn(db, session_id, "assistant", reply, len(user_msgs))
+            save_turn(
+                db,
+                session_id,
+                "user",
+                user_msgs[-1]["content"],
+                len(user_msgs) - 1,
+                user_id=user_id,
+            )
+        save_turn(db, session_id, "assistant", reply, len(user_msgs), user_id=user_id)
 
         # Lazy context update after 15 turns
-        session_row = db["chat_sessions"].get(session_id)
+        session_row = get_session(db, session_id, user_id=user_id)
         if session_row and (session_row.get("turn_count") or 0) >= 15:
             if not session_row.get("summary"):
                 close_and_update_context(db, session_id, messages, user_id=user_id)
@@ -202,6 +213,7 @@ def _run_full_pipeline(
                 db["tool_usage"].insert(
                     {
                         "session_id": session_id,
+                        "user_id": user_id,
                         "tool_name": block.name,
                         "input_summary": str(_json.dumps(block.input))[:200],
                         "success": 1,
@@ -221,12 +233,23 @@ def run_chat_api(
     *,
     user_id: int,
 ) -> dict:
+    """Resolve ownership before any routing, model calls or transcript writes."""
+    session_id = start_session(get_db(), session_id, user_id=user_id)
+    result = _run_chat_api(messages, session_id, routing_enabled, user_id=user_id)
+    result["session_id"] = session_id
+    return result
+
+
+def _run_chat_api(
+    messages: list[dict],
+    session_id: str,
+    routing_enabled: bool = True,
+    *,
+    user_id: int,
+) -> dict:
     """Routed entry point. Classifies the latest user message and dispatches to the
     cheapest capable path. Falls back to the full pipeline on synthesis or any uncertainty.
     """
-    if session_id is None:
-        session_id = datetime.now().isoformat()
-
     # Extract the latest user message text
     latest_user = None
     for m in reversed(messages):
@@ -383,8 +406,7 @@ def run_chat(*, user_id: int) -> None:
 
     db = get_db()
     cli_user_id = user_id
-    session_id = datetime.now().isoformat()
-    start_session(db, session_id)
+    session_id = start_session(db, user_id=cli_user_id)
 
     profile, trips, home = _prompt_inputs(db, cli_user_id)
     system_prompt = assemble(load_template(), profile, trips, home)
@@ -442,14 +464,14 @@ def run_chat(*, user_id: int) -> None:
             console.print()
             console.print()
             messages.append({"role": "user", "content": user_input})
-            save_turn(db, session_id, "user", user_input, turn_index)
+            save_turn(db, session_id, "user", user_input, turn_index, user_id=cli_user_id)
             messages.append({"role": "assistant", "content": reply})
-            save_turn(db, session_id, "assistant", reply, turn_index)
+            save_turn(db, session_id, "assistant", reply, turn_index, user_id=cli_user_id)
             turn_index += 1
             continue
 
         messages.append({"role": "user", "content": user_input})
-        save_turn(db, session_id, "user", user_input, turn_index)
+        save_turn(db, session_id, "user", user_input, turn_index, user_id=cli_user_id)
 
         # Synthesis cache check
         cache_loc: dict = {}
@@ -493,7 +515,7 @@ def run_chat(*, user_id: int) -> None:
                     console.print()
                     console.print()
                     messages.append({"role": "assistant", "content": reply})
-                    save_turn(db, session_id, "assistant", reply, turn_index)
+                    save_turn(db, session_id, "assistant", reply, turn_index, user_id=cli_user_id)
                     turn_index += 1
                     continue
 
@@ -519,7 +541,7 @@ def run_chat(*, user_id: int) -> None:
         # Save assistant reply and store to synthesis cache
         if messages and isinstance(messages[-1].get("content"), str):
             reply = messages[-1]["content"]
-            save_turn(db, session_id, "assistant", reply, turn_index)
+            save_turn(db, session_id, "assistant", reply, turn_index, user_id=cli_user_id)
 
             if mode == "synthesis" and reply:
                 c_lat = cache_loc.get("lat")
@@ -613,6 +635,7 @@ def _agentic_loop(
                 db["tool_usage"].insert(
                     {
                         "session_id": session_id,
+                        "user_id": user_id,
                         "tool_name": block.name,
                         "input_summary": str(_json.dumps(block.input))[:200],
                         "success": 1,
