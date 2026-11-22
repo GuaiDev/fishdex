@@ -238,6 +238,24 @@ def test_resolve_location_by_name(mock_geo, db_conn):
     assert result["confidence"] > 0.5
 
 
+@patch("src.services.trip_parser._nominatim_geocode", return_value=None)
+def test_resolve_location_tie_break_uses_only_calling_users_trips(mock_geo, db_conn):
+    """Another user's frequent segment cannot steer this user's ambiguous lookup."""
+    for idx in range(6):
+        db_conn.execute(
+            "INSERT INTO stream_segments (ogf_id, name, geom_wkt) VALUES (?, ?, ?)",
+            [3000 + idx, "Credit River", f"POINT (-79.{70 + idx:04d} 43.58)"],
+        )
+    db_conn.execute(
+        "INSERT INTO parsed_trips (user_id, ogf_id) VALUES ('1', 3000), ('1', 3000), "
+        "('1', 3000), ('2', 3001)"
+    )
+
+    result = resolve_location("Credit River", db_conn, user_id=2)
+
+    assert result["ohn_segment_id"] == 3001
+
+
 @patch("src.services.trip_parser._nominatim_geocode")
 def test_resolve_location_landmark_bridge(mock_geo, db_conn):
     """Bridge keyword + single segment produces high-confidence result."""
