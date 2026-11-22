@@ -747,8 +747,8 @@ def test_fast_tally_session_with_no_notes_still_persists(db_conn):
     ]
 
     stop = next(iter(db_conn["stops"].rows_where("session_id = ?", [result["session_id"]])))
-    assert stop["lat"] == 0.0
-    assert stop["lng"] == 0.0
+    assert stop["lat"] == 43.65
+    assert stop["lng"] == -79.38
     assert stop["location_method"] == "device_geolocation"
 
 
