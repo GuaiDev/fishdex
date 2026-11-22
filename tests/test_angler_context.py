@@ -79,8 +79,8 @@ def test_close_and_update_skips_empty_session(tmp_path: Path):
     from src.storage.conversations import close_and_update_context, start_session
 
     db = _make_db(tmp_path)
-    start_session(db, "empty-session")
-    close_and_update_context(db, "empty-session", [], user_id=1)
+    session_id = start_session(db, user_id=1)
+    close_and_update_context(db, session_id, [], user_id=1)
     assert load_context(db, user_id=1) is None
 
 

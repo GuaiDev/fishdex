@@ -1541,6 +1541,14 @@ def migrate_user_fields(db: Database) -> None:
             continue
         try:
             db.execute(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER DEFAULT 1")
+            if table in ("chat_sessions", "chat_messages", "api_usage", "tool_usage"):
+                existing_rows = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                if existing_rows:
+                    logger.warning(
+                        "%s: %d existing rows cannot be traced to a user and were left on user 1",
+                        table,
+                        existing_rows,
+                    )
         except Exception:
             pass  # Column already exists
         try:
