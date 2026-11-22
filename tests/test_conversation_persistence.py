@@ -234,3 +234,52 @@ def test_api_reusing_another_users_session_preserves_transcript_and_attributes_u
         rows = list(db[table].rows)
         assert len(rows) == expected
         assert all(r["user_id"] == 2 and r["session_id"] == other_session for r in rows)
+
+
+def test_client_reusing_issued_session_id_resumes_same_owned_session(db, monkeypatch):
+    from types import SimpleNamespace
+
+    from src.agent import chat
+    from src.llm import ledger
+
+    monkeypatch.setattr(chat, "get_db", lambda: db)
+    db_path = db.execute("PRAGMA database_list").fetchone()[2]
+    monkeypatch.setattr(ledger, "_open_db", lambda: Database(db_path))
+
+    def create(**kwargs):
+        return SimpleNamespace(
+            model=kwargs["model"],
+            usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+            content=[SimpleNamespace(type="text", text="ok")],
+        )
+
+    client = SimpleNamespace(messages=SimpleNamespace(create=create))
+    monkeypatch.setattr(chat.llm, "get_client", lambda: client)
+    monkeypatch.setattr("src.llm.client.get_client", lambda: client)
+
+    first = chat.run_chat_api(
+        [{"role": "user", "content": "one"}], session_id=None, routing_enabled=False, user_id=2
+    )
+    second = chat.run_chat_api(
+        [{"role": "user", "content": "two"}],
+        session_id=first["session_id"],
+        routing_enabled=False,
+        user_id=2,
+    )
+    assert second["session_id"] == first["session_id"]
+    assert db["chat_sessions"].count == 1
+    contents = [r["content"] for r in db.query("SELECT content FROM chat_messages ORDER BY id")]
+    assert contents == ["one", "ok", "two", "ok"]
+
+
+def test_migration_logs_untraceable_chat_rows_left_on_user_one(tmp_path, caplog):
+    import logging
+
+    from src.storage.database import migrate_user_fields
+
+    db = Database(tmp_path / "old.db")
+    db["chat_sessions"].insert({"id": "old", "summary": "x"}, pk="id")
+    with caplog.at_level(logging.WARNING, logger="src.storage.database"):
+        migrate_user_fields(db)
+    assert any("chat_sessions" in r.message and "user 1" in r.message for r in caplog.records)
+    assert db["chat_sessions"].get("old")["user_id"] == 1

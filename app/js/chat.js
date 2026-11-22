@@ -116,12 +116,13 @@ export function initChat(root) {
       ? `[The angler is looking at: ${store.placeSentence(place)}.]\n${text}` : text;
     const chat = store.get().chat;
     const history = chat.turns.filter((t) => !t.error).map((t) => ({ role: t.role, content: t.sent || t.content }));
-    const session = chat.session || `web-${Date.now()}`;
+    let session = chat.session || null;
     store.saveChat({ session, turns: [...chat.turns, { role: 'user', content: text, sent }] });
     input.value = '';
     busy = true; send.disabled = true; draw();
     try {
       const r = await api.chat(sent, history, session);
+      session = r.session_id || session;
       // With no model key the server answers 200 with its own message and never adds an
       // assistant turn to `messages`. A real answer always ends the history; show the
       // other as the problem it is.

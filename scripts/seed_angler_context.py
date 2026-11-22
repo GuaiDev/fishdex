@@ -16,7 +16,8 @@ ensure_schema(db)
 summaries = list(
     db.execute("""
     SELECT summary, started_at FROM chat_sessions
-    WHERE summary IS NOT NULL
+    WHERE user_id = 1
+      AND summary IS NOT NULL
       AND LENGTH(summary) > 100
     ORDER BY started_at ASC
 """).fetchall()
