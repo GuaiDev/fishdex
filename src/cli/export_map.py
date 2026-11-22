@@ -3,7 +3,7 @@
 Reads untapped_potential.parquet and writes data/processed/map_data.json as a
 GeoJSON FeatureCollection of segment centroids.
 
-Only segments within 150 km of home (Oakville, ON) are included.
+Only segments within 150 km of home (Toronto, ON) are included.
 Lake Ontario/Erie water-body dots, Virtual Flow segments, and order-1 streams
 with observation_density_25km > 500 (dense urban core only) are excluded.
 15×15 grid sampling ensures regional coverage.

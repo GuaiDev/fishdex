@@ -26,10 +26,10 @@ class UserProfile(BaseModel):
 
     @classmethod
     def default(cls) -> "UserProfile":
-        """Oakville-based starter profile matching CLAUDE.md."""
+        """Toronto-centre placeholder starter profile."""
         return cls(
             home_jurisdiction="CA-ON",
-            home_location=Location(name="Oakville, ON", lat=43.65, lng=-79.38),
+            home_location=Location(name="Toronto, ON", lat=43.65, lng=-79.38),
             target_species=[
                 "smallmouth bass",
                 "brook trout",
