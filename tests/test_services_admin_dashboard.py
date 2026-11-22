@@ -171,11 +171,11 @@ def test_top_locations_groups_name_only_entries(fast_db):
 
 def test_top_locations_clusters_nearby_coordinates(fast_db):
     db = _make_db(fast_db)
-    _seed_synthesis(db, "geo:43.467,-79.687", "Oakville A", lat=43.4671, lng=-79.6871, hit_count=2)
-    _seed_synthesis(db, "geo:43.468,-79.688", "Oakville B", lat=43.4682, lng=-79.6882, hit_count=1)
+    _seed_synthesis(db, "geo:43.651,-79.381", "Downtown A", lat=43.6511, lng=-79.3811, hit_count=2)
+    _seed_synthesis(db, "geo:43.652,-79.382", "Downtown B", lat=43.6522, lng=-79.3822, hit_count=1)
 
     result = build_dashboard(db)
-    # Both round to (43.5, -79.7) at 1-decimal clustering -> merged into one entry
+    # Both round to (43.7, -79.4) at 1-decimal clustering -> merged into one entry
     assert len(result["top_locations"]) == 1
     assert result["top_locations"][0]["query_count"] == 5  # (2+1) + (1+1)
 

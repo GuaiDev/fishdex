@@ -113,8 +113,8 @@ def test_location_coaching_reaches_the_corpus_when_the_user_has_no_history(db_co
             "osm_id": "w1",
             "feature_type": "stream",
             "name": "Sixteen Mile Creek",
-            "lat": 43.4675,
-            "lng": -79.6877,
+            "lat": 43.65,
+            "lng": -79.38,
         },
         alter=True,
     )

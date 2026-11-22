@@ -26,7 +26,7 @@ def test_save_and_load_round_trip(tmp_path):
 def test_default_profile_anchored_to_oakville():
     p = UserProfile.default()
     assert p.home_location is not None
-    assert "Oakville" in p.home_location.name
+    assert "Toronto" in p.home_location.name
 
 
 def test_an_old_profile_file_with_a_skill_level_still_loads_and_drops_it(tmp_path):

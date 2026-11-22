@@ -35,8 +35,8 @@ def _call(client, **kwargs):
     with patch("src.llm.client.get_client", return_value=client):
         return escalate_records(
             place_name="Sixteen Mile Creek",
-            lat=43.4675,
-            lng=-79.6877,
+            lat=43.65,
+            lng=-79.38,
             user_id=1,
             **kwargs,
         )
@@ -173,7 +173,7 @@ def test_map_tap_never_fires_a_live_search(db, monkeypatch):
     from src.services.context import describe
 
     calls = _spy(monkeypatch)
-    ctx = describe(db, lat=43.4675, lng=-79.6877, caller="map_tap", user_id=1)
+    ctx = describe(db, lat=43.65, lng=-79.38, caller="map_tap", user_id=1)
     assert ctx is not None
     assert ctx.records.escalated_to_web is False
     assert calls == []
@@ -183,7 +183,7 @@ def test_coach_escalates_when_the_corpus_is_empty(db, monkeypatch):
     from src.services.context import describe
 
     calls = _spy(monkeypatch)
-    ctx = describe(db, lat=43.4675, lng=-79.6877, caller="coach", user_id=1)
+    ctx = describe(db, lat=43.65, lng=-79.38, caller="coach", user_id=1)
     assert ctx is not None
     assert ctx.records.escalated_to_web is True
     assert len(calls) == 1
@@ -193,7 +193,7 @@ def test_explicit_flag_overrides_the_bundle(db, monkeypatch):
     from src.services.context import describe
 
     calls = _spy(monkeypatch)
-    describe(db, lat=43.4675, lng=-79.6877, caller="coach", escalate=False, user_id=1)
+    describe(db, lat=43.65, lng=-79.38, caller="coach", escalate=False, user_id=1)
     assert calls == []
 
 
@@ -202,5 +202,5 @@ def test_local_coverage_gap_survives_an_empty_web_search(db, monkeypatch):
     from src.services.context import describe
 
     _spy(monkeypatch)
-    ctx = describe(db, lat=43.4675, lng=-79.6877, caller="coach", user_id=1)
+    ctx = describe(db, lat=43.65, lng=-79.38, caller="coach", user_id=1)
     assert ctx.records.empty_reason is EmptyReason.SOURCE_DOES_NOT_COVER_AREA

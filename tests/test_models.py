@@ -50,7 +50,7 @@ def test_user_profile_default_is_ontario():
     p = UserProfile.default()
     assert p.home_jurisdiction == "CA-ON"
     assert p.home_location is not None
-    assert "Oakville" in p.home_location.name
+    assert "Toronto" in p.home_location.name
     assert len(p.target_species) > 0
 
 

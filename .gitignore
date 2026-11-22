@@ -43,3 +43,6 @@ data/processed/ca_harvest_report.json
 fishing.db
 data/species_images/originals/
 dist
+
+# Private historical trip logs
+/data/personal_trip_logs.json

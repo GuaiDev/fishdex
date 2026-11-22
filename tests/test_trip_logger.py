@@ -730,8 +730,8 @@ def test_fast_tally_session_with_no_notes_still_persists(db_conn):
         db_conn,
         user_id=1,
         structured_catches=structured,
-        fallback_lat=43.4675,
-        fallback_lng=-79.6877,
+        fallback_lat=43.65,
+        fallback_lng=-79.38,
     )
 
     assert result["stops_logged"] == 1
@@ -747,8 +747,8 @@ def test_fast_tally_session_with_no_notes_still_persists(db_conn):
     ]
 
     stop = next(iter(db_conn["stops"].rows_where("session_id = ?", [result["session_id"]])))
-    assert stop["lat"] == 43.4675
-    assert stop["lng"] == -79.6877
+    assert stop["lat"] == 43.65
+    assert stop["lng"] == -79.38
     assert stop["location_method"] == "device_geolocation"
 
 

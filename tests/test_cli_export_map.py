@@ -37,9 +37,9 @@ def test_haversine_same_point():
 
 
 def test_haversine_known_distance():
-    # Toronto (~43.65, -79.38) to Oakville (~43.47, -79.69) ≈ 32 km
-    d = _haversine_km(43.4675, -79.6877, 43.65, -79.38)
-    assert 28 < d < 38
+    # Toronto to Mississauga City Hall ≈ 22 km
+    d = _haversine_km(43.65, -79.38, 43.589, -79.6441)
+    assert 19 < d < 25
 
 
 # ── integration test: export produces valid GeoJSON ───────────────────────────

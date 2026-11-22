@@ -84,12 +84,12 @@ def test_unknown_tool_returns_an_error_not_an_exception():
 def test_home_coordinates_reach_the_schema_descriptions():
     class _WithHome:
         class home_location:
-            lat = 43.4675
-            lng = -79.6877
+            lat = 43.65
+            lng = -79.38
 
     schemas = tools.tool_schemas(_WithHome())
     describe = next(t for t in schemas if t["name"] == "describe_place")
-    assert "43.4675" in describe["input_schema"]["properties"]["lat"]["description"]
+    assert "43.65" in describe["input_schema"]["properties"]["lat"]["description"]
 
 
 # -- describe_place ------------------------------------------------------------
