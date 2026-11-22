@@ -196,7 +196,7 @@
             "session_id": 9,
             "date": "2025-01-02",
             "places": [
-              "Confluence D, River X, City A"
+              "Junction D, River X, City A"
             ],
             "lifelist": 2.0,
             "specialist": 0.0,
@@ -231,14 +231,14 @@
             "session_id": 7,
             "date": "2025-01-04",
             "places": [
-              "Confluence D, River X, City A"
+              "Junction D, River X, City A"
             ],
             "lifelist": 1.0,
             "specialist": 1.4,
             "signal": 0.417,
             "weight": 1.0,
             "reasons": [
-              "returned to Confluence D, River X, City A",
+              "returned to Junction D, River X, City A",
               "caught moxostoma anisurum, moxostoma macrolepidotum there again",
               "new species cyprinus carpio (recorded there)"
             ],
