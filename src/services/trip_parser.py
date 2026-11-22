@@ -267,8 +267,10 @@ def _query_segments_by_name(name: str, db: Any) -> list[dict]:
     return out
 
 
-def _most_fished_candidate(candidates: list[dict], db: Any) -> dict | None:
-    """Return the candidate segment most visited in parsed_trips, or None."""
+def _most_fished_candidate(candidates: list[dict], db: Any, *, user_id: int | None) -> dict | None:
+    """Return the candidate segment most visited by this user, or None."""
+    if user_id is None:
+        return None
     if "parsed_trips" not in db.table_names():
         return None
     ids = [c["ogf_id"] for c in candidates]
@@ -277,8 +279,9 @@ def _most_fished_candidate(candidates: list[dict], db: Any) -> dict | None:
     placeholders = ",".join("?" * len(ids))
     rows = db.execute(
         f"SELECT ogf_id, COUNT(*) AS cnt FROM parsed_trips "
-        f"WHERE ogf_id IN ({placeholders}) GROUP BY ogf_id ORDER BY cnt DESC LIMIT 1",
-        ids,
+        f"WHERE user_id = ? AND ogf_id IN ({placeholders}) "
+        f"GROUP BY ogf_id ORDER BY cnt DESC LIMIT 1",
+        [str(user_id), *ids],
     ).fetchall()
     if rows:
         best_id = rows[0][0]
@@ -308,7 +311,7 @@ def _result(
     }
 
 
-def resolve_location(location_text: str, db: Any) -> dict:
+def resolve_location(location_text: str, db: Any, *, user_id: int | None = None) -> dict:
     """Resolve a free-text location to OHN segment coordinates.
 
     Layer 1 — named waterbody lookup in stream_segments.
@@ -378,7 +381,7 @@ def resolve_location(location_text: str, db: Any) -> dict:
                     )
 
             # Fall back: most-fished candidate (no blocking)
-            mf = _most_fished_candidate(candidates, db)
+            mf = _most_fished_candidate(candidates, db, user_id=user_id)
             if mf:
                 return _result(
                     mf["lat"],
@@ -586,7 +589,7 @@ def parse_session_from_text(text: str, db_conn: Any, *, user_id: int | None) -> 
         stop["party_species_caught"] = _validate_species(
             stop.get("party_species_caught") or [], text, known_species
         )
-        loc = resolve_location(stop.get("location_text") or text, db_conn)
+        loc = resolve_location(stop.get("location_text") or text, db_conn, user_id=user_id)
         stop["lat"] = loc.get("lat")
         stop["lng"] = loc.get("lng")
         stop["ohn_segment_id"] = str(loc["ohn_segment_id"]) if loc.get("ohn_segment_id") else None
@@ -634,7 +637,7 @@ def parse_trip_from_text(
 
     if (lat is None or lng is None) and db is not None:
         location_text = parsed.get("waterbody_name") or parsed.get("location_description") or text
-        loc = resolve_location(location_text, db)
+        loc = resolve_location(location_text, db, user_id=user_id)
         if loc["lat"] is not None:
             lat = loc["lat"]
             lng = loc["lng"]
