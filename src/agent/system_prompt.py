@@ -1,15 +1,21 @@
 """Assemble the system prompt from template + dynamic context.
 
 The template at prompts/system.md holds the bot's persona and rules. The runtime
-appends three sections per conversation: profile, recent trips, active jurisdiction.
+appends two sections per conversation, both read for that user from the database:
+the angler (home, jurisdiction, blended profile) and the active jurisdiction.
 """
 
-from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from src.jurisdictions.base import Jurisdiction
-from src.models.profile import UserProfile
-from src.models.trip import Trip
+from src.jurisdictions.registry import get_jurisdiction
+from src.models.profile import Location
+from src.services.context import angler_profile
+from src.services.context.render import render_angler_profile
+from src.settings import default_jurisdiction
+from src.storage.profile import get_user_home
 
 TEMPLATE_PATH = Path("prompts/system.md")
 
@@ -19,87 +25,56 @@ def load_template(path: Path | None = None) -> str:
     return p.read_text()
 
 
-def assemble(
-    template: str,
-    profile: UserProfile | None,
-    recent_trips: list[Trip],
-    active_jurisdiction: Jurisdiction,
-) -> str:
-    """Build the system prompt.
+@dataclass(frozen=True)
+class PromptInputs:
+    """What one user's prompt is built from, all read from the database."""
 
-    `profile=None` omits the profile and recent-trips sections entirely. The
-    profile file and the legacy trips table belong to one angler; a prompt for
-    anyone else must not carry them, not even as an empty "No trips logged yet".
+    home_location: Location | None
+    jurisdiction: Jurisdiction
+    profile: Any
+    """The blended angler profile (`context.angler_profile`)."""
+
+
+def prompt_inputs(db: Any, user_id: int) -> PromptInputs:
+    """Home, jurisdiction and blended angler profile for one user.
+
+    Nothing here is shared between users: no profile file, no legacy `trips`
+    table. A user with no stored jurisdiction gets the deploy default, never
+    another user's home. A jurisdiction does not require coordinates.
     """
-    parts = [template.rstrip(), "", "---", ""]
-    if profile is not None:
-        parts += [_format_profile(profile), "", _format_recent_trips(recent_trips), ""]
-    parts.append(_format_jurisdiction(active_jurisdiction))
+    stored = get_user_home(db, user_id)
+    home, code = stored if stored is not None else (None, None)
+    return PromptInputs(
+        home_location=home,
+        jurisdiction=get_jurisdiction(code or default_jurisdiction()),
+        profile=angler_profile(db, user_id=user_id),
+    )
+
+
+def assemble(template: str, db: Any, user_id: int) -> str:
+    """Build the system prompt for one user."""
+    inputs = prompt_inputs(db, user_id)
+    parts = [
+        template.rstrip(),
+        "",
+        "---",
+        "",
+        _format_angler(inputs),
+        "",
+        _format_jurisdiction(inputs.jurisdiction),
+    ]
     return "\n".join(parts)
 
 
-def _format_profile(profile: UserProfile) -> str:
-    home = profile.home_location.name if profile.home_location else "(not set)"
-    species = ", ".join(profile.target_species) or "(not set)"
+def _format_angler(inputs: PromptInputs) -> str:
+    home = inputs.home_location
     lines = [
         "## Your angler",
         "",
-        f"- Home: {home} ({profile.home_jurisdiction})",
-        f"- Target species: {species}",
-        f"- Fishing style: {profile.fishing_style or '(not set)'}",
+        f"- Home: {home.name or 'a saved point'}" if home else "- Home: (not set)",
+        f"- Home jurisdiction: {inputs.jurisdiction.code}",
     ]
-    if profile.frequented_jurisdictions:
-        lines.append(f"- Also fishes: {', '.join(profile.frequented_jurisdictions)}")
-    if profile.preferences:
-        lines.append(f"- Preferences: {profile.preferences}")
-    if profile.gear:
-        gear_summary = "; ".join(", ".join(f"{k}: {v}" for k, v in g.items()) for g in profile.gear)
-        lines.append(f"- Gear: {gear_summary}")
-    profile_note = ""
-    if profile.updated_at:
-        days_old = (datetime.now() - profile.updated_at).days
-        if days_old > 90:
-            profile_note = (
-                f"\n⚠️ Profile last updated {days_old} days ago — "
-                "angler context document is more reliable for current preferences."
-            )
-    else:
-        profile_note = (
-            "\n(Profile has no update timestamp — "
-            "defer to angler context document for current preferences.)"
-        )
-    if profile_note:
-        lines.append(profile_note)
-    lines.append(
-        "Note: The angler context document below reflects actual fishing activity "
-        "and takes precedence over this profile for species preferences and patterns."
-    )
-    return "\n".join(lines)
-
-
-def _format_recent_trips(trips: list[Trip]) -> str:
-    if not trips:
-        return "## Recent trips\n\nNo trips logged yet."
-    lines = ["## Recent trips", ""]
-    for t in trips:
-        if t.species_caught:
-            species_summary = ", ".join(
-                c.species + (f" ({c.length_cm}cm)" if c.length_cm else "") for c in t.species_caught
-            )
-        else:
-            species_summary = "skunked"
-        notes_bits: list[str] = []
-        if t.what_worked:
-            notes_bits.append(f"worked: {t.what_worked}")
-        if t.what_didnt:
-            notes_bits.append(f"didn't: {t.what_didnt}")
-        if t.notes:
-            notes_bits.append(t.notes)
-        suffix = f" — {'; '.join(notes_bits)}" if notes_bits else ""
-        lines.append(
-            f"- {t.date.isoformat()} at {t.location_name} ({t.jurisdiction}): "
-            f"{species_summary}{suffix}"
-        )
+    lines += render_angler_profile(inputs.profile)
     return "\n".join(lines)
 
 

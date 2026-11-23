@@ -327,9 +327,7 @@ def _named_segment(
 def _home_point(db: Database, user_id: int) -> tuple[float, float] | None:
     """This user's home, from the database. None when they have not set one.
 
-    User 1 alone falls back to the legacy profile file, for a database that
-    predates per-user homes. Anyone else with no home gets no ranking, never the
-    captain's.
+    No file fallback: anyone with no stored home gets no ranking.
     """
     from src.storage.profile import get_user_home
 
@@ -337,17 +335,7 @@ def _home_point(db: Database, user_id: int) -> tuple[float, float] | None:
     if stored is not None:
         home = stored[0]
         return (home.lat, home.lng) if home is not None else None
-    if user_id != 1:
-        return None
-    try:
-        from src.storage.profile import load_profile
-
-        legacy = load_profile().home_location
-    except Exception:  # noqa: BLE001 - no profile is not an error here
-        return None
-    if legacy is None:
-        return None
-    return float(legacy.lat), float(legacy.lng)
+    return None
 
 
 def _named_water_feature(db: Database, pattern: str) -> tuple[float, float, str] | None:

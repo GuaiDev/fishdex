@@ -102,6 +102,8 @@ from src.models.pin import (  # noqa: E402
 )
 from src.models.user_context import UserContext  # noqa: E402
 from src.models.weed_report import WeedReportCreate, WeedReportUpdate  # noqa: E402
+from src.settings import default_jurisdiction, default_region, demo_center  # noqa: E402
+from src.storage.profile import get_user_home  # noqa: E402
 
 
 def verify_api_key(x_api_key: str = Header(None)) -> None:
@@ -505,9 +507,9 @@ def health_ready():
         )
         checks["map_row_floors"] = segment_floor is not None and map_rows >= segment_floor
 
-        # Beta serves Ontario. Species ranges record membership as a JSON list;
-        # the other three datasets carry a single jurisdiction per row.
-        jurisdiction = "CA-ON"
+        # Beta serves the deploy's jurisdiction. Species ranges record membership
+        # as a JSON list; the other three datasets carry a single jurisdiction per row.
+        jurisdiction = default_jurisdiction()
         details["served_jurisdiction"] = jurisdiction
         for table in ("spots", "water_bodies", "species_ranges", "stream_segments"):
             count = 0
@@ -1129,12 +1131,6 @@ def get_sessions(request: Request, user: UserContext = Depends(get_user_context)
         raise _internal_error(request, e) from e
 
 
-# Regional fallback when a user has no GPS grant and no located trips yet —
-# a plausible default centre so a brand-new user still sees real conditions
-# rather than an empty credibility panel on the Chat screen.
-_DEFAULT_REGION = {"lat": 43.5, "lng": -79.8, "name": "Southern Ontario"}
-
-
 @app.get("/conditions")
 def get_conditions(
     user: UserContext = Depends(get_user_context),
@@ -1152,7 +1148,7 @@ def get_conditions(
       1. explicit lat/lng (frontend passes these only when the browser
          already has a *granted* geolocation permission — never prompts),
       2. the user's most recent trip that has real coordinates,
-      3. a regional default (_DEFAULT_REGION) for brand-new users.
+      3. the user's own home, then the deploy's default region, for brand-new users.
     The response labels which of these it used, and the real place name, so
     the UI can be honest about whose conditions it's showing.
     """
@@ -1189,7 +1185,17 @@ def get_conditions(
                 "source": "last_trip",
             }
         else:
-            loc = {**_DEFAULT_REGION, "source": "regional_default"}
+            stored = get_user_home(db, user.user_id)
+            if stored is not None and stored[0] is not None:
+                home = stored[0]
+                loc = {
+                    "lat": home.lat,
+                    "lng": home.lng,
+                    "name": home.name or "your home",
+                    "source": "home",
+                }
+            else:
+                loc = {**default_region(), "source": "regional_default"}
 
     try:
         conditions = _weather.get_current_conditions(loc["lat"], loc["lng"])
@@ -1229,17 +1235,17 @@ def get_conditions(
 def get_fishdex(request: Request, user: UserContext = Depends(get_user_context)):
     """Return real caught-species + regional pool data for the My FishDex screen.
 
-    Jurisdiction is hardcoded to CA-ON for now (this app is Ontario-first per
-    CLAUDE.md and there's no per-user jurisdiction field on the profile yet) —
-    a real multi-jurisdiction pool would key this off the user's home
-    jurisdiction instead.
+    The regional pool is the user's home jurisdiction; a user with none stored
+    gets the deploy's default.
     """
     from src.services.fishdex import get_fishdex_data
     from src.storage.database import get_db
 
     db = get_db()
     try:
-        return get_fishdex_data(db, user.user_id, jurisdiction="CA-ON")
+        stored = get_user_home(db, user.user_id)
+        jurisdiction = (stored[1] if stored else None) or default_jurisdiction()
+        return get_fishdex_data(db, user.user_id, jurisdiction=jurisdiction)
     except Exception as e:
         raise _internal_error(request, e) from e
 
@@ -1608,7 +1614,6 @@ def _parse_bbox(bbox: str | None) -> tuple[float, float, float, float] | None:
 
 DEMO_MAX_TIER = 1
 DEMO_MAX_SPAN_DEG = 1.0
-DEMO_DEFAULT_CENTER = (-79.7, 43.45)
 
 
 def _demo_limits(user: UserContext, box, tier: int):
@@ -1619,7 +1624,7 @@ def _demo_limits(user: UserContext, box, tier: int):
         return box, tier
     half = DEMO_MAX_SPAN_DEG / 2
     if box is None:
-        cx, cy = DEMO_DEFAULT_CENTER
+        cx, cy = demo_center()
         box = (cx - half, cy - half, cx + half, cy + half)
     else:
         cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2

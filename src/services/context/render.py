@@ -442,6 +442,11 @@ def render_angler_style(profile: AnglerProfile | None) -> str:
     return "\n".join(lines)
 
 
+def render_angler_profile(profile: AnglerProfile | None) -> list[str]:
+    """Lines of the blended profile, for a system prompt's angler section."""
+    return _profile_lines(profile)
+
+
 def _profile_lines(profile: AnglerProfile | None) -> list[str]:
     """The angler profile as register guidance, never as a level.
 

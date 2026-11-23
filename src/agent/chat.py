@@ -7,10 +7,8 @@ from anthropic import APIError
 from rich.console import Console
 
 from src import llm
-from src.agent.system_prompt import assemble, load_template
+from src.agent.system_prompt import assemble, load_template, prompt_inputs
 from src.agent.tools import execute_tool, tool_schemas
-from src.jurisdictions.registry import get_jurisdiction
-from src.models.profile import UserProfile
 from src.storage.angler_context import format_context_for_prompt, load_context
 from src.storage.conversations import (
     close_and_update_context,
@@ -19,8 +17,6 @@ from src.storage.conversations import (
     start_session,
 )
 from src.storage.database import get_db
-from src.storage.profile import get_user_home, load_profile
-from src.storage.trips import recent_trips
 
 EXIT_COMMANDS = {"/exit", "/quit", "exit", "quit"}
 
@@ -37,9 +33,6 @@ def _iteration_cap_reply(tool_rounds: int) -> str:
         "answer. Try asking a narrower question, or ask again to continue."
     )
 
-
-# Jurisdiction for users who have no profile of their own (see _prompt_inputs).
-_DEFAULT_JURISDICTION = "CA-ON"
 
 logger = logging.getLogger(__name__)
 
@@ -91,40 +84,6 @@ def _summarize_history(
     ] + to_keep
 
 
-def _prompt_inputs(db: Any, user_id: int) -> tuple[Any, list, Any]:
-    """The profile, recent trips and jurisdiction a user's system prompt is built from.
-
-    The profile file (data/user_profile.json) and the legacy `trips` table have
-    no user_id: they are user 1's. Any other user gets neither. Home and
-    jurisdiction are per user and live in the database: a stored home overrides
-    the file's for user 1, and anyone else with stored home or jurisdiction gets
-    a profile carrying only those. A jurisdiction does not require coordinates.
-    Users without a stored jurisdiction use the app default (user 1 retains the
-    legacy file fallback), never another user's home, so nothing in their prompt
-    (or in the tool descriptions built from the profile) is derived from someone
-    else's data.
-    """
-    stored = get_user_home(db, user_id)
-    if user_id == 1:
-        profile = load_profile()
-        if stored is not None:
-            home, jurisdiction = stored
-            profile = profile.model_copy(
-                update={
-                    "home_location": home,
-                    "home_jurisdiction": jurisdiction or profile.home_jurisdiction,
-                }
-            )
-        trips = recent_trips(db, limit=5, user_id=user_id)
-        return profile, trips, get_jurisdiction(profile.home_jurisdiction)
-    if stored is not None:
-        home, jurisdiction = stored
-        jurisdiction = jurisdiction or _DEFAULT_JURISDICTION
-        profile = UserProfile(home_jurisdiction=jurisdiction, home_location=home)
-        return profile, [], get_jurisdiction(jurisdiction)
-    return None, [], get_jurisdiction(_DEFAULT_JURISDICTION)
-
-
 def _run_full_pipeline(
     messages: list[dict], session_id: str, mode: str = "synthesis", *, user_id: int
 ) -> dict:
@@ -135,8 +94,7 @@ def _run_full_pipeline(
         return {"reply": str(e), "tool_calls": [], "messages": messages}
 
     db = get_db()
-    profile, trips, home = _prompt_inputs(db, user_id)
-    system_prompt = assemble(load_template(), profile, trips, home)
+    system_prompt = assemble(load_template(), db, user_id)
     session_id = start_session(db, session_id, user_id=user_id)
     angler_context = load_context(db, user_id=user_id)
     if angler_context:
@@ -145,7 +103,7 @@ def _run_full_pipeline(
         system_prompt += (
             f"\n\nCurrent user: {user_id} (filter all personal data queries by this user_id)"
         )
-    tools = _tools(profile)
+    tools = _tools(prompt_inputs(db, user_id))
     tool_calls_made: list[str] = []
 
     def finish(reply: str) -> dict:
@@ -408,8 +366,7 @@ def run_chat(*, user_id: int) -> None:
     cli_user_id = user_id
     session_id = start_session(db, user_id=cli_user_id)
 
-    profile, trips, home = _prompt_inputs(db, cli_user_id)
-    system_prompt = assemble(load_template(), profile, trips, home)
+    system_prompt = assemble(load_template(), db, cli_user_id)
     angler_context = load_context(db, user_id=cli_user_id)
     if angler_context:
         system_prompt = system_prompt + "\n\n" + format_context_for_prompt(angler_context)
@@ -420,7 +377,7 @@ def run_chat(*, user_id: int) -> None:
     console.print()
 
     messages: list[dict] = []
-    tools = _tools(profile)
+    tools = _tools(prompt_inputs(db, cli_user_id))
     turn_index = 0
 
     while True:
