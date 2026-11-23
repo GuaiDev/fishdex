@@ -51,19 +51,23 @@ def prompt_inputs(db: Any, user_id: int) -> PromptInputs:
     )
 
 
-def assemble(template: str, db: Any, user_id: int) -> str:
-    """Build the system prompt for one user."""
+def assemble_parts(template: str, db: Any, user_id: int) -> tuple[str, str]:
+    """Build the system prompt for one user as (stable, per-user) text.
+
+    The stable part is the template alone, identical for every user and turn, so
+    the gateway can cache it. Everything after it varies per user.
+    """
     inputs = prompt_inputs(db, user_id)
-    parts = [
-        template.rstrip(),
-        "",
-        "---",
-        "",
-        _format_angler(inputs),
-        "",
-        _format_jurisdiction(inputs.jurisdiction),
-    ]
-    return "\n".join(parts)
+    per_user = "\n".join(
+        ["", "---", "", _format_angler(inputs), "", _format_jurisdiction(inputs.jurisdiction)]
+    )
+    return template.rstrip(), per_user
+
+
+def assemble(template: str, db: Any, user_id: int) -> str:
+    """Build the system prompt as one string; see `assemble_parts`."""
+    stable, per_user = assemble_parts(template, db, user_id)
+    return stable + "\n" + per_user
 
 
 def _format_angler(inputs: PromptInputs) -> str:

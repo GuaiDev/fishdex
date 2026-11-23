@@ -90,3 +90,17 @@ def test_any_user_id_is_treated_alike(db, user_id):
     _user(db, user_id, f"u{user_id}")
     set_user_home(db, user_id, GUELPH, "CA-ON")
     assert "Guelph, ON" in assemble(TEMPLATE, db, user_id)
+
+
+def test_assemble_parts_keeps_the_template_apart_from_per_user_text(db):
+    from src.agent.system_prompt import assemble_parts
+
+    _user(db, 5, "guelph_angler")
+    set_user_home(db, 5, GUELPH, "CA-ON")
+
+    stable, per_user = assemble_parts(TEMPLATE, db, 5)
+
+    assert stable == TEMPLATE.rstrip()
+    assert TEMPLATE not in per_user
+    assert "Guelph" in per_user
+    assert stable + "\n" + per_user == assemble(TEMPLATE, db, 5)
