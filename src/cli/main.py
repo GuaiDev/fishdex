@@ -1436,10 +1436,6 @@ def delete_user(
 
     db = get_db()
     uid, name = _operator_user(db, username)
-    role = db.execute("SELECT role FROM users WHERE id = ?", [uid]).fetchone()[0]
-    if role == "admin":
-        console.print(f"[red]Refusing to delete admin account '{name}'.[/red]")
-        raise typer.Exit(1)
     result = delete_user_data(db, uid, PHOTOS_DIR, dry_run=dry_run)
     verb = "Would remove" if dry_run else "Removed"
     for table, n in sorted(result["rows"].items()):
@@ -1467,6 +1463,7 @@ def export_user(
     payload = export_user_data(db, uid)
     # Private data: owner-only file, created before any content lands in it.
     fd = os.open(Path(out), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(payload, fh, indent=2, default=str)
     console.print(

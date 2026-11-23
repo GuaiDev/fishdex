@@ -125,12 +125,28 @@ def test_delete_leaves_no_rows_or_photos_and_spares_others(world):
     assert count_user_rows(db, KEEPER) == keeper_before
 
 
-def test_delete_refuses_admin_and_unknown_user(world):
+def test_delete_refuses_unknown_user(world):
+    db, _ = world
+    assert CliRunner().invoke(app, ["delete-user", "nobody"]).exit_code == 1
+    assert db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 3
+
+
+def test_admin_account_can_be_previewed_and_deleted(world):
     db, _ = world
     runner = CliRunner()
-    assert runner.invoke(app, ["delete-user", "admin"]).exit_code == 1
-    assert runner.invoke(app, ["delete-user", "nobody"]).exit_code == 1
-    assert db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 3
+    assert runner.invoke(app, ["delete-user", "admin", "--dry-run"]).exit_code == 0
+    assert db.execute("SELECT COUNT(*) FROM users WHERE id = 1").fetchone()[0] == 1
+    assert runner.invoke(app, ["delete-user", "admin"]).exit_code == 0
+    assert db.execute("SELECT COUNT(*) FROM users WHERE id = 1").fetchone()[0] == 0
+
+
+def test_export_tightens_permissions_on_existing_file(world, tmp_path):
+    out = tmp_path / "existing.json"
+    out.write_text("old")
+    out.chmod(0o644)
+    result = CliRunner().invoke(app, ["export-user", "victim", "--out", str(out)])
+    assert result.exit_code == 0, result.output
+    assert out.stat().st_mode & 0o777 == 0o600
 
 
 def test_photo_path_outside_photos_dir_is_never_deleted(world, tmp_path):
