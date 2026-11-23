@@ -94,14 +94,14 @@ def test_get_catches_for_sessions_batches_multiple_sessions(fast_db):
     insert_catch(db, stop_id=stop1, session_id=s1, user_id=1, species="creek chub")
     insert_catch(db, stop_id=stop2, session_id=s2, user_id=1, species="rock bass")
 
-    by_session = get_catches_for_sessions(db, [s1, s2])
+    by_session = get_catches_for_sessions(db, [s1, s2], user_id=1)
     assert by_session[s1][0]["species"] == "creek chub"
     assert by_session[s2][0]["species"] == "rock bass"
 
 
 def test_get_catches_for_sessions_empty_list_returns_empty_dict(fast_db):
     db = fast_db
-    assert get_catches_for_sessions(db, []) == {}
+    assert get_catches_for_sessions(db, [], user_id=1) == {}
 
 
 def test_insert_catch_round_trips_biggest_size_cm(fast_db):
@@ -349,3 +349,9 @@ def test_confirm_catch_species_not_found_returns_false(fast_db):
         "found": False,
         "is_new_pb": False,
     }
+
+
+def test_batch_catches_excludes_other_owner_even_with_their_session_id(fast_db):
+    session_id, stop_id = _session_and_stop(fast_db)
+    insert_catch(fast_db, stop_id=stop_id, session_id=session_id, user_id=1, species="chub")
+    assert get_catches_for_sessions(fast_db, [session_id], user_id=2) == {session_id: []}

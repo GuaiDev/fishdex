@@ -161,3 +161,46 @@ def _llm_ledger_in_tmp(monkeypatch, tmp_path, db_factory):
         return db
 
     monkeypatch.setattr(ledger, "_open_db", _open)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _tenancy_connections():
+    """Instrument module/session fixtures too; enforce only during requests."""
+    from tests.tenancy_trace import TraceConnection
+
+    real_connect = sqlite3.connect
+
+    def connect(*args, **kwargs):
+        kwargs["factory"] = TraceConnection
+        # The authorizer must run on repeated statements too.
+        kwargs["cached_statements"] = 0
+        return real_connect(*args, **kwargs)
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(sqlite3, "connect", connect)
+        yield
+
+
+@pytest.fixture(autouse=True)
+def tenancy_trace(monkeypatch):
+    """Enforce tenancy across every TestClient request without changing route tests."""
+    from starlette.testclient import TestClient
+
+    from tests.tenancy_trace import request_trace
+
+    real_send = TestClient.send
+    traces = []
+
+    def send(client, *args, **kwargs):
+        trace = {"statements": [], "violations": []}
+        traces.append(trace)
+        token = request_trace.set(trace)
+        try:
+            response = real_send(client, *args, **kwargs)
+        finally:
+            request_trace.reset(token)
+        assert not trace["violations"], f"Unscoped personal SQL: {trace['violations']}"
+        return response
+
+    monkeypatch.setattr(TestClient, "send", send)
+    return traces

@@ -158,14 +158,12 @@ def confirm_catch_species(
         return {"found": False, "is_new_pb": False}
     old_species_key = (row.get("species") or "").strip().lower()
     new_species_key = (species or "").strip().lower()
-    db["catches"].update(
-        catch_id,
-        {
-            "species": species,
-            "species_confirmed": 1,
-            "confirmed_at": datetime.now().isoformat(),
-        },
+    db.execute(
+        "UPDATE catches SET species = ?, species_confirmed = 1, confirmed_at = ? "
+        "WHERE id = ? AND user_id = ?",
+        [species, datetime.now().isoformat(), catch_id, user_id],
     )
+    db.conn.commit()
     # The personal-best row recorded at insert time is keyed to whatever
     # placeholder species the NL parser/vision guessed then (e.g.
     # "unidentified fish sp."), not the species the user is confirming now —
@@ -202,17 +200,18 @@ def get_catches_for_session(db: Database, session_id: int) -> list[dict[str, Any
 
 
 def get_catches_for_sessions(
-    db: Database, session_ids: list[int]
+    db: Database, session_ids: list[int], *, user_id: int
 ) -> dict[int, list[dict[str, Any]]]:
     """Return {session_id: [catch, ...]} for a batch of sessions, one query."""
     if not session_ids:
         return {}
     placeholders = ",".join("?" for _ in session_ids)
-    rows = db.execute(
-        f"SELECT * FROM catches WHERE session_id IN ({placeholders}) ORDER BY id",
-        session_ids,
-    ).fetchall()
-    cols = [c[0] for c in db.execute("SELECT * FROM catches LIMIT 0").description]
+    cursor = db.execute(
+        f"SELECT * FROM catches WHERE user_id = ? AND session_id IN ({placeholders}) ORDER BY id",
+        [user_id, *session_ids],
+    )
+    rows = cursor.fetchall()
+    cols = [c[0] for c in cursor.description]
     by_session: dict[int, list[dict[str, Any]]] = {sid: [] for sid in session_ids}
     for r in rows:
         row = dict(zip(cols, r))

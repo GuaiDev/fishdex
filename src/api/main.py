@@ -895,8 +895,9 @@ def _log_trip_core(
         iter(
             db.execute(
                 "SELECT air_temp_c, pressure_hpa, anomaly_flag "
-                "FROM session_conditions WHERE session_id = ?",
-                [result["session_id"]],
+                "FROM session_conditions sc JOIN sessions s ON s.id = sc.session_id "
+                "WHERE sc.session_id = ? AND s.user_id = ?",
+                [result["session_id"], user.user_id],
             ).fetchall()
         ),
         None,
@@ -1080,7 +1081,7 @@ def get_sessions(request: Request, user: UserContext = Depends(get_user_context)
         )
 
         session_ids = [r[0] for r in rows]
-        catches_by_session = get_catches_for_sessions(db, session_ids)
+        catches_by_session = get_catches_for_sessions(db, session_ids, user_id=user.user_id)
         pins_by_session = pins_for_sessions(db, user.user_id, session_ids)
 
         sessions = []
