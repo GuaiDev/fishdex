@@ -161,6 +161,8 @@ supplied explicitly. When user 1 has no stored home or
 jurisdiction, `log`, `ingest`, chat and name ranking all fall back to the JSON file. Other profile preferences
 remain in the JSON file, which the CLI profile editor still saves.
 
+Operator account tools (any username): `uv run python -m src.cli.main export-user <username> --out <file>` writes the user's sessions, stops, catches, pins, chat and profile as JSON (file mode 0600). `delete-user <username> [--dry-run]` removes every personal row and the user's photo files; `--dry-run` only reports what would go. Deleting an admin account is allowed.
+
 Requires a `.env` file with:
 
 ```

@@ -134,9 +134,10 @@ def test_delete_refuses_unknown_user(world):
 def test_admin_account_can_be_previewed_and_deleted(world):
     db, _ = world
     runner = CliRunner()
-    assert runner.invoke(app, ["delete-user", "admin", "--dry-run"]).exit_code == 0
+    admin = db.execute("SELECT username FROM users WHERE id = 1").fetchone()[0]
+    assert runner.invoke(app, ["delete-user", admin, "--dry-run"]).exit_code == 0
     assert db.execute("SELECT COUNT(*) FROM users WHERE id = 1").fetchone()[0] == 1
-    assert runner.invoke(app, ["delete-user", "admin"]).exit_code == 0
+    assert runner.invoke(app, ["delete-user", admin]).exit_code == 0
     assert db.execute("SELECT COUNT(*) FROM users WHERE id = 1").fetchone()[0] == 0
 
 
