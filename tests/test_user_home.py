@@ -4,11 +4,11 @@ import json
 
 import pytest
 
-import src.agent.chat as chat
 import src.services.context.place as place_mod
 import src.storage.profile as profile_mod
-from src.agent.system_prompt import assemble
+from src.agent.system_prompt import assemble, prompt_inputs
 from src.models.profile import Location
+from src.settings import default_jurisdiction
 from src.storage.database import MIGRATIONS, get_db, migrate
 from src.storage.profile import get_user_home, set_user_home
 
@@ -81,34 +81,29 @@ def test_home_round_trips_with_its_jurisdiction(two_mill_creeks):
 
 
 def test_bc_users_prompt_carries_their_home_and_jurisdiction(two_mill_creeks):
-    profile, trips, jurisdiction = chat._prompt_inputs(two_mill_creeks, 2)
-    prompt = assemble("template", profile, trips, jurisdiction)
+    prompt = assemble("template", two_mill_creeks, 2)
 
-    assert "Kamloops, BC (CA-BC)" in prompt
-    assert jurisdiction.code == "CA-BC"
+    assert "Kamloops, BC" in prompt
+    assert "Home jurisdiction: CA-BC" in prompt
     assert "Oakville" not in prompt
-    assert trips == []
 
 
-def test_user_with_no_home_gets_no_profile(db):
+def test_user_with_no_home_gets_no_home_and_the_deploy_jurisdiction(db):
     _user(db, 3, "newcomer")
-    profile, trips, jurisdiction = chat._prompt_inputs(db, 3)
-    assert profile is None
-    assert trips == []
-    assert jurisdiction.code == chat._DEFAULT_JURISDICTION
+    inputs = prompt_inputs(db, 3)
+    assert inputs.home_location is None
+    assert inputs.jurisdiction.code == default_jurisdiction()
 
 
-def test_stored_home_overrides_the_profile_file_for_user_1(two_mill_creeks, tmp_path):
+def test_user_1_prompt_comes_from_the_database_not_the_profile_file(two_mill_creeks):
     profile_mod.save_profile(profile_mod.UserProfile.default(), path=profile_mod.PROFILE_PATH)
-    _user(two_mill_creeks, 1, "jason")
     set_user_home(two_mill_creeks, 1, KAMLOOPS, "CA-BC")
 
-    profile, _, jurisdiction = chat._prompt_inputs(two_mill_creeks, 1)
+    inputs = prompt_inputs(two_mill_creeks, 1)
 
-    assert profile.home_location == KAMLOOPS
-    assert jurisdiction.code == "CA-BC"
-    # the rest of the profile still comes from the file
-    assert "brook trout" in profile.target_species
+    assert inputs.home_location == KAMLOOPS
+    assert inputs.jurisdiction.code == "CA-BC"
+    assert "brook trout" not in assemble("template", two_mill_creeks, 1)
 
 
 def _migrated_up_to_previous(path):
@@ -171,10 +166,9 @@ def test_migration_preserves_jurisdiction_without_a_home(tmp_path):
     profile_mod.PROFILE_PATH.unlink()
 
     assert get_user_home(db, 1) == (None, "CA-BC")
-    profile, _, jurisdiction = chat._prompt_inputs(db, 1)
-    assert profile.home_location is None
-    assert profile.home_jurisdiction == "CA-BC"
-    assert jurisdiction.code == "CA-BC"
+    inputs = prompt_inputs(db, 1)
+    assert inputs.home_location is None
+    assert inputs.jurisdiction.code == "CA-BC"
     assert place_mod._home_point(db, 1) is None
 
 
@@ -182,12 +176,10 @@ def test_jurisdiction_without_a_home_is_per_user(db):
     _user(db, 2, "bc_angler")
     db.execute("UPDATE users SET home_jurisdiction = ? WHERE id = ?", ["CA-BC", 2])
 
-    profile, trips, jurisdiction = chat._prompt_inputs(db, 2)
+    inputs = prompt_inputs(db, 2)
 
-    assert profile.home_location is None
-    assert profile.home_jurisdiction == "CA-BC"
-    assert jurisdiction.code == "CA-BC"
-    assert trips == []
+    assert inputs.home_location is None
+    assert inputs.jurisdiction.code == "CA-BC"
     assert place_mod._home_point(db, 2) is None
 
 
@@ -205,10 +197,9 @@ def test_profile_edit_persists_jurisdiction_without_coordinates(db, monkeypatch,
     cli.profile(user=None)
 
     assert get_user_home(db, 1) == (None, "CA-BC")
-    profile, _, jurisdiction = chat._prompt_inputs(db, 1)
-    assert profile.home_location is None
-    assert profile.home_jurisdiction == "CA-BC"
-    assert jurisdiction.code == "CA-BC"
+    inputs = prompt_inputs(db, 1)
+    assert inputs.home_location is None
+    assert inputs.jurisdiction.code == "CA-BC"
 
 
 def test_log_uses_stored_jurisdiction_over_legacy_profile(two_mill_creeks, monkeypatch):

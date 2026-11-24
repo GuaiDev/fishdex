@@ -2,7 +2,7 @@
 
 Companion to test_privacy_isolation.py. Covers behavioral_insights (written,
 read, and updated by trips) and the chat system prompt (built from a shared
-profile file and the legacy trips table that belong to user 1). No model
+home and profile read per user from the database). No model
 calls; all databases are temporary.
 """
 
@@ -279,15 +279,16 @@ def test_contradiction_refinement_stays_with_the_owner(db, monkeypatch):
     assert query_insights(db, "bass", user_id=1) == []
 
 
-# ── G3: user 2's prompt carries none of user 1's profile or trips ────────────
+# ── G3: user 2's prompt carries none of user 1's home or profile ─────────────
 
 
-def test_assemble_without_profile_omits_profile_and_trips():
+def test_assemble_for_a_user_with_no_home_has_no_home_or_trips(tmp_path):
     from src.agent.system_prompt import assemble
-    from src.jurisdictions.registry import get_jurisdiction
 
-    out = assemble("TEMPLATE", None, [], get_jurisdiction("CA-ON"))
-    assert "## Your angler" not in out
+    db = get_db(tmp_path / "t.db")
+    db["users"].insert({"id": 3, "username": "newcomer"}, pk="id")
+    out = assemble("TEMPLATE", db, 3)
+    assert "- Home: (not set)" in out
     assert "## Recent trips" not in out
     assert "## Active jurisdiction" in out
 
@@ -306,20 +307,14 @@ class _FakeClient:
         return types.SimpleNamespace(model="fake", usage=usage, content=[block])
 
 
-def _user_1_secrets(db, profile_path):
-    from src.models.profile import Location, UserProfile
-    from src.storage.profile import save_profile
+def _user_1_secrets(db):
+    from src.models.profile import Location
+    from src.storage.profile import set_user_home
 
-    save_profile(
-        UserProfile(
-            home_jurisdiction="CA-ON",
-            home_location=Location(name="Zebulon Falls Marina", lat=44.12345, lng=-80.54321),
-            target_species=["Burbot-of-Secrets"],
-            fishing_style="night-fishing-only",
-            preferences="my private preference sentinel",
-            gear=[{"rod": "SecretRod9000"}],
-        ),
-        path=profile_path,
+    for uid in (1, 2):
+        db["users"].insert({"id": uid, "username": f"u{uid}"}, pk="id", replace=True)
+    set_user_home(
+        db, 1, Location(name="Zebulon Falls Marina", lat=44.12345, lng=-80.54321), "CA-ON"
     )
     insert_trip(
         db,
@@ -331,29 +326,16 @@ def _user_1_secrets(db, profile_path):
         ),
         user_id=1,
     )
-    return [
-        "Zebulon Falls",
-        "44.12345",
-        "-80.54321",
-        "Burbot-of-Secrets",
-        "night-fishing-only",
-        "private preference sentinel",
-        "SecretRod9000",
-        "Sentinel Pond",
-        "private trip note",
-    ]
+    return ["Zebulon Falls", "44.12345", "-80.54321", "Sentinel Pond", "private trip note"]
 
 
 def _run_pipeline_for(user_id, tmp_path, monkeypatch):
     import src.agent.chat as chat
     import src.storage.database as db_mod
-    import src.storage.profile as profile_mod
 
     db_path = tmp_path / "test.db"
-    profile_path = tmp_path / "profile.json"
     monkeypatch.setattr(db_mod, "DB_PATH", db_path)
-    monkeypatch.setattr(profile_mod, "PROFILE_PATH", profile_path)
-    secrets = _user_1_secrets(get_db(db_path), profile_path)
+    secrets = _user_1_secrets(get_db(db_path))
 
     client = _FakeClient()
     monkeypatch.setattr("src.llm.client.get_client", lambda: client)
@@ -365,14 +347,14 @@ def _run_pipeline_for(user_id, tmp_path, monkeypatch):
     return sent, secrets
 
 
-def test_user_2_prompt_contains_none_of_user_1s_profile_or_trips(tmp_path, monkeypatch):
+def test_user_2_prompt_contains_none_of_user_1s_home_or_trips(tmp_path, monkeypatch):
     sent, secrets = _run_pipeline_for(2, tmp_path, monkeypatch)
     leaked = [s for s in secrets if s in sent]
     assert leaked == []
     assert "Current user: 2" in sent
 
 
-def test_user_1_prompt_still_gets_profile_and_trips(tmp_path, monkeypatch):
-    sent, secrets = _run_pipeline_for(1, tmp_path, monkeypatch)
-    for s in ("Zebulon Falls", "Sentinel Pond", "private trip note", "SecretRod9000"):
-        assert s in sent
+def test_user_1_prompt_carries_their_stored_home_and_no_legacy_trips(tmp_path, monkeypatch):
+    sent, _ = _run_pipeline_for(1, tmp_path, monkeypatch)
+    assert "Zebulon Falls" in sent
+    assert "Sentinel Pond" not in sent and "private trip note" not in sent
