@@ -1419,6 +1419,59 @@ def revoke_tokens(
     console.print(f"[green]Revoked {n} session(s) for {row['username']}.[/green]")
 
 
+def _operator_user(db, username: str) -> tuple[int, str]:
+    """Resolve the named account for an operator tool; never guesses a default."""
+    uid = _cli_user_id(db, username)
+    return uid, db.execute("SELECT username FROM users WHERE id = ?", [uid]).fetchone()[0]
+
+
+@app.command("delete-user")
+def delete_user(
+    username: str = typer.Argument(..., help="Account to remove"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would go; delete nothing"),
+) -> None:
+    """Remove an account: every personal row and every photo file they uploaded."""
+    from src.services.photo_storage import PHOTOS_DIR
+    from src.storage.ownership import delete_user_data
+
+    db = get_db()
+    uid, name = _operator_user(db, username)
+    result = delete_user_data(db, uid, PHOTOS_DIR, dry_run=dry_run)
+    verb = "Would remove" if dry_run else "Removed"
+    for table, n in sorted(result["rows"].items()):
+        console.print(f"  {table}: {n}")
+    console.print(
+        f"[green]{verb}[/green] {sum(result['rows'].values())} rows and "
+        f"{result['photos']} photo file(s) for {name}."
+    )
+
+
+@app.command("export-user")
+def export_user(
+    username: str = typer.Argument(..., help="Account to export"),
+    out: str = typer.Option(..., "--out", "-o", help="JSON file to write"),
+) -> None:
+    """Write an account's profile, sessions, stops, catches, pins and chat as JSON."""
+    import json
+    import os
+    from pathlib import Path
+
+    from src.storage.ownership import export_user_data
+
+    db = get_db()
+    uid, name = _operator_user(db, username)
+    payload = export_user_data(db, uid)
+    # Private data: owner-only file, created before any content lands in it.
+    fd = os.open(Path(out), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, indent=2, default=str)
+    console.print(
+        f"[green]Exported {name}[/green] to {out}: "
+        + ", ".join(f"{t} {n}" for t, n in payload["counts"].items())
+    )
+
+
 @app.command()
 def users() -> None:
     """List all registered users and their usage."""

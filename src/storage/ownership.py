@@ -9,6 +9,8 @@ import sqlite3
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
+from sqlite_utils import Database
+
 PERSONAL_TABLES = frozenset(
     """
 trips recommendations behavioral_insights dismissed_segments sessions stops catches
@@ -128,3 +130,129 @@ def import_shared(
         raise
     finally:
         conn.close()
+
+
+# Personal tables that belong to no single angler: operational ledgers and SQLite internals.
+UNOWNED_PERSONAL_TABLES = frozenset({"ingest_runs", "schema_migrations", "sqlite_sequence"})
+# Personal tables keyed by something other than a user_id column. {uid} is the angler's id.
+_OWNER_PREDICATES = {
+    "users": "id = :uid",
+    "invite_codes": "used_by = :uid",
+    "recommendations": "trip_id IN (SELECT id FROM trips WHERE user_id = :uid)",
+}
+
+
+def owner_predicates(db: Database) -> dict[str, str]:
+    """Table -> WHERE clause (binding :uid) selecting one angler's rows, for every
+    personal table that exists. A personal table that cannot be attributed to an
+    angler raises, so a new table is classified here rather than silently kept
+    after a delete."""
+    predicates = {}
+    for table in sorted(PERSONAL_TABLES - UNOWNED_PERSONAL_TABLES):
+        if table not in db.table_names():
+            continue
+        if table in _OWNER_PREDICATES:
+            predicates[table] = _OWNER_PREDICATES[table]
+        elif "user_id" in {c.name for c in db[table].columns}:
+            predicates[table] = "user_id = :uid"
+        else:
+            raise ValueError(f"Personal table {table} has no owner rule in ownership.py")
+    return predicates
+
+
+def count_user_rows(db: Database, user_id: int) -> dict[str, int]:
+    """Rows each personal table holds for one angler (only tables with rows)."""
+    counts = {}
+    for table, where in owner_predicates(db).items():
+        n = db.execute(
+            f"SELECT COUNT(*) FROM {_quote(table)} WHERE {where}", {"uid": user_id}
+        ).fetchone()[0]
+        if n:
+            counts[table] = n
+    return counts
+
+
+def user_photo_files(db: Database, user_id: int, photos_dir: Path) -> list[Path]:
+    """Photo files on disk that this angler's catches and stops point at.
+
+    Only paths that resolve inside photos_dir are returned, so a bad row can
+    never aim a delete at an arbitrary file."""
+    root = Path(photos_dir).resolve()
+    names = set()
+    for table, column in (
+        ("catches", "photo_path"),
+        ("catches", "photo_url"),
+        ("stops", "photo_url"),
+    ):
+        if table not in db.table_names():
+            continue
+        for (value,) in db.execute(
+            f"SELECT {column} FROM {table} WHERE user_id = ? AND {column} IS NOT NULL",
+            [user_id],
+        ):
+            if value:
+                names.add(Path(value).name)
+    files = []
+    for name in sorted(names):
+        path = (root / name).resolve()
+        if path.parent == root and path.is_file():
+            files.append(path)
+    return files
+
+
+def delete_user_data(
+    db: Database, user_id: int, photos_dir: Path, *, dry_run: bool = False
+) -> dict:
+    """Remove every personal row and photo file for one angler.
+
+    Returns {"rows": {table: n}, "photos": n}. Rows go in one transaction; photo
+    files are unlinked only after it commits. A dry run changes nothing."""
+    predicates = owner_predicates(db)
+    photos = user_photo_files(db, user_id, photos_dir)
+    rows = count_user_rows(db, user_id)
+    if dry_run:
+        return {"rows": rows, "photos": len(photos)}
+    with db.conn:
+        # recommendations resolve through trips, so they must go before trips do.
+        order = ["recommendations"] + [
+            t for t in predicates if t not in ("recommendations", "users")
+        ]
+        for table in [*order, "users"]:
+            if table in predicates:
+                db.execute(
+                    f"DELETE FROM {_quote(table)} WHERE {predicates[table]}", {"uid": user_id}
+                )
+    for path in photos:
+        path.unlink(missing_ok=True)
+    return {"rows": rows, "photos": len(photos)}
+
+
+# Which tables make up each section of an account export.
+EXPORT_SECTIONS = {
+    "profile": ("users", "questionnaire_answers", "angler_context"),
+    "sessions": ("sessions", "session_conditions"),
+    "stops": ("stops",),
+    "catches": ("catches", "personal_bests"),
+    "pins": ("pins", "pin_links", "pin_recalled_visits"),
+    "chat": ("chat_sessions", "chat_messages"),
+}
+
+
+def export_user_data(db: Database, user_id: int) -> dict:
+    """Everything an angler logged, as plain JSON-ready dicts, with per-table counts."""
+    predicates = owner_predicates(db)
+    data, counts = {}, {}
+    for section, tables in EXPORT_SECTIONS.items():
+        data[section] = {}
+        for table in tables:
+            if table not in predicates:
+                continue
+            cursor = db.execute(
+                f"SELECT * FROM {_quote(table)} WHERE {predicates[table]} ORDER BY rowid",
+                {"uid": user_id},
+            )
+            names = [d[0] for d in cursor.description]
+            rows = [dict(zip(names, r)) for r in cursor.fetchall()]
+            data[section][table] = rows
+            counts[table] = len(rows)
+    return {"user_id": user_id, "counts": counts, **data}
