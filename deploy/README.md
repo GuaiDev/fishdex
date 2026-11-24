@@ -118,8 +118,11 @@ public demo only serves tier 1 spots; tier 2 or 3 requires sign-in.
 
 ## Notes
 
-- `auto_stop_machines` is on, so an idle API sleeps and the first request takes a few seconds.
-  Set `min_machines_running = 1` in `fly.toml` to keep it warm.
+- The machine is always on (`min_machines_running = 1`) with 2 GB of memory, so there is no
+  cold start. This costs more than a machine that sleeps: a shared-cpu-1x with 2 GB runs
+  about $10 to $12 a month by our estimate (not checked against current Fly pricing; see
+  https://fly.io/docs/about/pricing/ for the real number). Set `min_machines_running = 0`
+  to let an idle API sleep again; the first request then takes a few seconds.
 - SQLite means one machine only. Do not scale to more than one.
 - For [ingest behavior and local commands](../README.md#setting-fishbot_api_key-locally),
   see the README. Run regional refreshes on the host with
