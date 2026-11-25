@@ -161,3 +161,88 @@ def test_usage_displays_unpriced_calls(ledger_db, monkeypatch):
     assert mixed_line.split()[-1] == "1"
     day_line = next(line for line in rendered.splitlines() if "0.2500" in line)
     assert day_line.split()[-1] == "2"
+
+
+class _CachingMessages:
+    """A fake API with prompt-caching behaviour: a marked prefix seen before is read."""
+
+    def __init__(self):
+        self.seen: set[str] = set()
+        self.requests: list[dict] = []
+
+    def create(self, **kwargs):
+        self.requests.append(kwargs)
+        prefix = repr((kwargs.get("tools"), (kwargs.get("system") or [None])[0]))
+        marked = any("cache_control" in t for t in kwargs.get("tools") or [])
+        hit = marked and prefix in self.seen
+        if marked:
+            self.seen.add(prefix)
+        usage = types.SimpleNamespace(
+            input_tokens=100,
+            output_tokens=20,
+            cache_creation_input_tokens=0 if hit or not marked else 4000,
+            cache_read_input_tokens=4000 if hit else 0,
+            server_tool_use=None,
+        )
+        return types.SimpleNamespace(model=kwargs["model"], usage=usage, content=[])
+
+
+TOOLS = [{"name": "a", "input_schema": {}}, {"name": "b", "input_schema": {}}]
+
+
+def test_chat_marks_tools_and_stable_system_block_and_second_turn_reads_cache(
+    ledger_db, monkeypatch
+):
+    msgs = _CachingMessages()
+    _use(monkeypatch, msgs)
+    for user_text, per_user in (("hi", "user one"), ("again", "user one")):
+        llm.complete(
+            "chat",
+            caller="t.chat",
+            user_id=1,
+            max_tokens=5,
+            system=[
+                {"type": "text", "text": "STABLE"},
+                {"type": "text", "text": per_user},
+            ],
+            tools=TOOLS,
+            messages=[{"role": "user", "content": user_text}],
+        )
+    first, second = msgs.requests
+    assert first["tools"][-1]["cache_control"] == {"type": "ephemeral"}
+    assert "cache_control" not in first["tools"][0]
+    assert first["system"][0]["cache_control"] == {"type": "ephemeral"}
+    assert "cache_control" not in first["system"][1]
+    rows = _rows(ledger_db)
+    assert rows[0]["cache_read_tokens"] == 0 and rows[0]["cache_creation_tokens"] > 0
+    assert rows[1]["cache_read_tokens"] > 0
+
+
+def test_coaching_string_system_becomes_one_cached_block(ledger_db, monkeypatch):
+    msgs = _CachingMessages()
+    _use(monkeypatch, msgs)
+    llm.complete("coaching", caller="t.coach", user_id=1, max_tokens=5, system="RULES", tools=TOOLS)
+    assert msgs.requests[0]["system"] == [
+        {"type": "text", "text": "RULES", "cache_control": {"type": "ephemeral"}}
+    ]
+
+
+def test_caller_set_breakpoint_is_kept_and_input_is_not_mutated(ledger_db, monkeypatch):
+    msgs = _Messages()
+    _use(monkeypatch, msgs)
+    system = [
+        {"type": "text", "text": "A"},
+        {"type": "text", "text": "B", "cache_control": {"type": "ephemeral"}},
+    ]
+    tools = [{"name": "a", "input_schema": {}}]
+    llm.complete("chat", caller="t", user_id=1, max_tokens=5, system=system, tools=tools)
+    assert "cache_control" not in msgs.kwargs["system"][0]
+    assert "cache_control" not in tools[0] and "cache_control" not in system[0]
+
+
+def test_other_roles_are_not_marked(ledger_db, monkeypatch):
+    msgs = _Messages()
+    _use(monkeypatch, msgs)
+    llm.complete("router", caller="t", user_id=1, max_tokens=5, system="S", tools=TOOLS)
+    assert msgs.kwargs["system"] == "S"
+    assert all("cache_control" not in t for t in msgs.kwargs["tools"])

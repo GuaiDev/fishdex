@@ -75,11 +75,14 @@ the rest, and suggest the angler verify the current listing themselves."""
 
 
 def _ask(prompt: str, max_tokens: int, *, user_id: int, caller: str) -> str:
+    # The rules are the same on every call, so they go in `system`, where the
+    # gateway caches them; the per-user records stay in the user message.
     resp = llm.complete(
         "coaching",
         caller=caller,
         user_id=user_id,
         max_tokens=max_tokens,
+        system=_RULES,
         messages=[{"role": "user", "content": prompt}],
     )
     return resp.content[0].text.strip()
@@ -107,7 +110,6 @@ def get_species_coaching(
         render_species_history(history),
         render_user_layer(layer),
         render_angler_style(angler_profile(db, user_id=user_id)),
-        _RULES,
     ]
     # Gated on an affirmative listing signal, not on `sar_alert`. Every species
     # in the local file is unverified, so gating on the alert would refuse
@@ -162,7 +164,6 @@ def get_location_coaching(
             render_place_context(ctx),
             render_user_layer(layer),
             render_angler_style(angler_profile(db, user_id=user_id)),
-            _RULES,
             "Structure your answer as: what worked here, what didn't, and one "
             "specific thing to try next visit. If this angler has never fished "
             "here, say so and work from what is recorded about the water "

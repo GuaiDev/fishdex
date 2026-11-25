@@ -42,7 +42,9 @@ def captured(monkeypatch):
     box: dict = {}
 
     def _complete(role, **kwargs):
-        box["prompt"] = kwargs["messages"][0]["content"]
+        # What the model sees is the system text (the fixed rules) plus the user message.
+        box["system"] = kwargs.get("system", "")
+        box["prompt"] = box["system"] + "\n\n" + kwargs["messages"][0]["content"]
         return type("R", (), {"content": [type("B", (), {"text": "stub response"})()]})()
 
     monkeypatch.setattr(coaching.llm, "complete", _complete)

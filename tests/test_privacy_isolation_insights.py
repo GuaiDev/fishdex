@@ -343,7 +343,10 @@ def _run_pipeline_for(user_id, tmp_path, monkeypatch):
     assert result["reply"] == "ok"
     (call,) = client.calls
     # Everything that reaches the model: system prompt and tool descriptions.
-    sent = call["system"] + json.dumps(call["tools"])
+    system = call["system"]
+    if not isinstance(system, str):
+        system = "".join(block["text"] for block in system)
+    sent = system + json.dumps(call["tools"])
     return sent, secrets
 
 

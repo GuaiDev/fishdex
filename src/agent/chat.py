@@ -7,7 +7,7 @@ from anthropic import APIError
 from rich.console import Console
 
 from src import llm
-from src.agent.system_prompt import assemble, load_template, prompt_inputs
+from src.agent.system_prompt import assemble_parts, load_template, prompt_inputs
 from src.agent.tools import execute_tool, tool_schemas
 from src.storage.angler_context import format_context_for_prompt, load_context
 from src.storage.conversations import (
@@ -84,6 +84,28 @@ def _summarize_history(
     ] + to_keep
 
 
+def _system_blocks(
+    db: Any,
+    user_id: int,
+    angler_context: Any,
+    *,
+    note_user: bool = False,
+) -> list[dict]:
+    """The system prompt as two blocks: the stable template, then per-user text.
+
+    The gateway puts a cache breakpoint after the first block, so the template
+    is read from cache on every turn and everything user-specific follows it.
+    """
+    stable, per_user = assemble_parts(load_template(), db, user_id)
+    if angler_context:
+        per_user += "\n\n" + format_context_for_prompt(angler_context)
+    if note_user and user_id != 1:
+        per_user += (
+            f"\n\nCurrent user: {user_id} (filter all personal data queries by this user_id)"
+        )
+    return [{"type": "text", "text": stable}, {"type": "text", "text": per_user}]
+
+
 def _run_full_pipeline(
     messages: list[dict], session_id: str, mode: str = "synthesis", *, user_id: int
 ) -> dict:
@@ -94,15 +116,9 @@ def _run_full_pipeline(
         return {"reply": str(e), "tool_calls": [], "messages": messages}
 
     db = get_db()
-    system_prompt = assemble(load_template(), db, user_id)
     session_id = start_session(db, session_id, user_id=user_id)
     angler_context = load_context(db, user_id=user_id)
-    if angler_context:
-        system_prompt = system_prompt + "\n\n" + format_context_for_prompt(angler_context)
-    if user_id != 1:
-        system_prompt += (
-            f"\n\nCurrent user: {user_id} (filter all personal data queries by this user_id)"
-        )
+    system_prompt = _system_blocks(db, user_id, angler_context, note_user=True)
     tools = _tools(prompt_inputs(db, user_id))
     tool_calls_made: list[str] = []
 
@@ -366,10 +382,8 @@ def run_chat(*, user_id: int) -> None:
     cli_user_id = user_id
     session_id = start_session(db, user_id=cli_user_id)
 
-    system_prompt = assemble(load_template(), db, cli_user_id)
     angler_context = load_context(db, user_id=cli_user_id)
-    if angler_context:
-        system_prompt = system_prompt + "\n\n" + format_context_for_prompt(angler_context)
+    system_prompt = _system_blocks(db, cli_user_id, angler_context)
 
     model = llm.model_for("chat")
 
@@ -523,7 +537,7 @@ def run_chat(*, user_id: int) -> None:
 
 
 def _agentic_loop(
-    system_prompt: str,
+    system_prompt: list[dict],
     messages: list[dict],
     tools: list[dict],
     console: Console,

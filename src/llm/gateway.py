@@ -14,6 +14,36 @@ from src.llm.registry import model_for
 logger = logging.getLogger(__name__)
 
 
+# Roles whose requests repeat a large stable prefix (system prompt, tool list).
+_CACHED_ROLES = frozenset({"chat", "coaching"})
+_BREAKPOINT = {"type": "ephemeral"}
+
+
+def _with_cache_breakpoints(role: str, request: dict[str, Any]) -> dict[str, Any]:
+    """Mark the stable prefix of a request for prompt caching.
+
+    The API caches everything up to a breakpoint, in the order tools, system,
+    messages. So the last tool gets a breakpoint, and so does the stable system
+    block. A `system` string is all stable. A `system` list is split by the
+    caller: its first block is the stable part and the rest is per-user text
+    that follows the breakpoint. A caller that already set `cache_control` on a
+    system block keeps its own placement. Other roles pass through unchanged.
+    """
+    if role not in _CACHED_ROLES:
+        return request
+    out = dict(request)
+    tools = out.get("tools")
+    if tools:
+        out["tools"] = [*tools[:-1], {**tools[-1], "cache_control": _BREAKPOINT}]
+    system = out.get("system")
+    if isinstance(system, str) and system:
+        out["system"] = [{"type": "text", "text": system, "cache_control": _BREAKPOINT}]
+    elif isinstance(system, list) and system:
+        if not any(isinstance(b, dict) and "cache_control" in b for b in system):
+            out["system"] = [{**system[0], "cache_control": _BREAKPOINT}, *system[1:]]
+    return out
+
+
 def _count(value: Any) -> int:
     """A token count, or 0 when the SDK object does not carry one (older SDKs, fakes)."""
     return value if isinstance(value, int) and not isinstance(value, bool) else 0
@@ -97,7 +127,7 @@ def complete(
     client = client_mod.get_client()
     started = time.monotonic()
     try:
-        response = client.messages.create(model=model, **request)
+        response = client.messages.create(model=model, **_with_cache_breakpoints(role, request))
     except BaseException as exc:
         ledger.record(
             _failure_row(
@@ -143,7 +173,9 @@ def stream(
     client = client_mod.get_client()
     started = time.monotonic()
     try:
-        with client.messages.stream(model=model, **request) as sdk_stream:
+        with client.messages.stream(
+            model=model, **_with_cache_breakpoints(role, request)
+        ) as sdk_stream:
             yield sdk_stream
             final = sdk_stream.get_final_message()
     except BaseException as exc:
