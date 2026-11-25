@@ -1029,6 +1029,24 @@ def ingest_fmz() -> None:
         console.print("[red]No FMZ boundaries fetched — zone resolution stays closed.[/red]")
 
 
+@app.command(name="load-species-ranges")
+def load_species_ranges() -> None:
+    """Load the 69-species Ontario range file into species_ranges.
+
+    Every row arrives with unverified conservation status. Run
+    `verify-species-status` afterwards to verify the species a registry covers.
+    """
+    from src.services.species_ranges import load_and_store
+
+    n = load_and_store()
+    if not n:
+        console.print(
+            "[red]No species loaded — data/processed/ontario_species_ranges.json missing?[/red]"
+        )
+        raise typer.Exit(1)
+    console.print(f"[green]species_ranges loaded: {n} species[/green]")
+
+
 _REGISTRY_DIR = "data/registry"
 _DEFAULT_REGISTRY = f"{_REGISTRY_DIR}/cosewic_2024.csv"
 
